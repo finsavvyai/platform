@@ -17,3 +17,7 @@ export { DEFAULT_REDACT_KEYS, REDACTED, redact, type RedactOptions } from "./red
 // Analytics namespace — financial analytics + reporting.
 // Kept deliberately separate from raw OTel traces above.
 export * as analytics from "./analytics/index.js";
+
+// Tamper-evident audit log — hash-chain + signature + verifier.
+// Composes with AuditEmitter above; never modifies it.
+export * as auditTamper from "./audit-tamper/index.js";
