@@ -128,4 +128,18 @@ export interface BrainApiConfig {
     readonly defaultTopK?: number;
     readonly maxTopK?: number;
   };
+  /**
+   * Optional rate-limit configuration. When provided, the middleware is
+   * mounted BEFORE the authenticated subtree so abusive callers cannot
+   * burn CPU on JWT verification. Owned by SOC2-PREP agent (mesh §10).
+   * Off by default — production wiring enables it via deploy manifest.
+   */
+  readonly rateLimit?: {
+    readonly config: import("./rate-limit/types.js").RateLimitConfig;
+    readonly store: import("./rate-limit/types.js").RateLimitStore;
+    readonly keyFn: import("./rate-limit/types.js")
+      .RateLimitMiddlewareOptions["keyFn"];
+    readonly failClosed?: boolean;
+    readonly bypassPaths?: readonly string[];
+  };
 }

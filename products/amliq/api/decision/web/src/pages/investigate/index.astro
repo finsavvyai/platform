@@ -1,0 +1,94 @@
+---
+import Investigate from '../../layouts/Investigate.astro';
+import CaseRow from '../../components/CaseRow.astro';
+import { listDecisions } from '../../lib/investigate-client.ts';
+
+const env =
+  typeof process !== 'undefined' ? process.env : ({} as NodeJS.ProcessEnv);
+const apiUrl = env['BRAIN_API_URL'];
+const token = env['BRAIN_JWT'];
+const tenantId = env['BRAIN_TENANT_ID'] ?? 'demo-tenant';
+const authMode = apiUrl ? 'live' : 'fixture';
+
+const response = await listDecisions({
+  tenantId,
+  ...(apiUrl ? { baseUrl: apiUrl } : {}),
+  ...(token ? { token } : {}),
+});
+
+const errorCode = response.ok === false ? response.error : null;
+const rows = response.ok ? response.rows : [];
+---
+
+<Investigate
+  title="Cases — AMLIQ Investigate"
+  tenantId={tenantId}
+  authMode={authMode}
+  active="cases"
+>
+  <header class="mb-6 flex flex-col gap-1">
+    <p class="text-xs uppercase tracking-widest text-ink-400">
+      AMLIQ Investigate
+    </p>
+    <h1 class="text-balance text-2xl font-semibold tracking-tightish sm:text-3xl">
+      Recent decisions
+    </h1>
+    <p
+      class="text-pretty text-sm text-ink-500 dark:text-ink-400"
+      aria-live="polite"
+    >
+      {rows.length} case{rows.length === 1 ? '' : 's'} for tenant
+      <code class="rounded bg-ink-100 px-1 py-0.5 dark:bg-ink-700">
+        {tenantId}
+      </code>.
+    </p>
+  </header>
+
+  {errorCode && (
+    <div
+      role="alert"
+      class="mb-6 rounded-xl border border-risk-high/30 bg-risk-high/5 p-4
+             text-sm text-risk-high"
+    >
+      Failed to load cases: <code>{errorCode}</code>
+    </div>
+  )}
+
+  {rows.length === 0 && !errorCode ? (
+    <p
+      class="rounded-xl border border-ink-100 bg-white p-6 text-sm text-ink-500
+             dark:border-ink-700 dark:bg-ink-900 dark:text-ink-400"
+    >
+      No recent decisions for this tenant.
+    </p>
+  ) : (
+    <div
+      class="overflow-hidden rounded-2xl border border-ink-100 bg-white
+             shadow-[0_1px_2px_rgba(10,10,12,0.04)]
+             dark:border-ink-700 dark:bg-ink-900"
+    >
+      <table class="min-w-full text-left">
+        <caption class="sr-only">
+          Recent decisions, columns: timestamp, subject hash, amount,
+          channel, max engine score, recommended action, open link.
+        </caption>
+        <thead class="border-b border-ink-100 bg-ink-50 dark:border-ink-700 dark:bg-ink-700/20">
+          <tr class="text-[11px] uppercase tracking-widest text-ink-500 dark:text-ink-400">
+            <th scope="col" class="px-3 py-2 font-medium">Timestamp</th>
+            <th scope="col" class="px-3 py-2 font-medium">Subject</th>
+            <th scope="col" class="px-3 py-2 font-medium">Amount</th>
+            <th scope="col" class="px-3 py-2 font-medium">Channel</th>
+            <th scope="col" class="px-3 py-2 font-medium">Score</th>
+            <th scope="col" class="px-3 py-2 font-medium">Action</th>
+            <th scope="col" class="px-3 py-2 font-medium text-right">
+              <span class="sr-only">Open</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => <CaseRow row={row} />)}
+        </tbody>
+      </table>
+    </div>
+  )}
+</Investigate>

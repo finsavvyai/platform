@@ -1,0 +1,165 @@
+---
+import Investigate from '../../../layouts/Investigate.astro';
+import DecisionPill from '../../../components/DecisionPill.astro';
+import EngineScoreBadge from '../../../components/EngineScoreBadge.astro';
+import {
+  getDecision,
+  listDecisions,
+} from '../../../lib/investigate-client.ts';
+import {
+  formatMoneyMinor,
+  formatTimestamp,
+} from '../../../lib/format.ts';
+
+export async function getStaticPaths() {
+  // Pre-render fixture rows in static mode. Live SSR builds will switch
+  // to `output: 'server'` and remove this export.
+  const r = await listDecisions({ tenantId: 'demo-tenant' });
+  if (!r.ok) return [];
+  return r.rows.map((row) => ({ params: { id: row.decision_id } }));
+}
+
+const { id } = Astro.params;
+
+const env =
+  typeof process !== 'undefined' ? process.env : ({} as NodeJS.ProcessEnv);
+const apiUrl = env['BRAIN_API_URL'];
+const token = env['BRAIN_JWT'];
+const tenantId = env['BRAIN_TENANT_ID'] ?? 'demo-tenant';
+const authMode = apiUrl ? 'live' : 'fixture';
+const base = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
+
+const r = await getDecision(id ?? '', {
+  tenantId,
+  ...(apiUrl ? { baseUrl: apiUrl } : {}),
+  ...(token ? { token } : {}),
+});
+
+const ok = r.ok;
+const decision = ok ? r.decision : null;
+const subjectHash = ok ? r.subject_hash : null;
+const amount = ok ? formatMoneyMinor(r.amount_minor, r.currency) : null;
+const ts = decision ? formatTimestamp(decision.ts) : null;
+---
+
+<Investigate
+  title={ok ? `Case ${id} — AMLIQ Investigate` : 'Case not found'}
+  tenantId={tenantId}
+  authMode={authMode}
+  active="cases"
+>
+  <p class="mb-4 text-xs">
+    <a
+      href={`${base}/`}
+      class="rounded text-ink-500 underline-offset-4 hover:underline
+             focus:outline-none focus:ring-2 focus:ring-accent-500/40
+             dark:text-ink-400"
+    >
+      ← Back to cases
+    </a>
+  </p>
+
+  {!ok && (
+    <div
+      role="alert"
+      class="rounded-xl border border-risk-high/30 bg-risk-high/5 p-5 text-sm
+             text-risk-high"
+    >
+      Decision not found: <code>{r.error}</code>
+    </div>
+  )}
+
+  {ok && decision && (
+    <article class="space-y-6">
+      <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 class="text-balance text-2xl font-semibold tracking-tightish">
+            Case {decision.decision_id}
+          </h1>
+          <p class="mt-1 text-xs text-ink-500 dark:text-ink-400">
+            {ts} · subject
+            <code class="ml-1 font-mono">{subjectHash}</code> · amount
+            <span class="ml-1 tabular-nums">{amount}</span>
+          </p>
+        </div>
+        <DecisionPill action={decision.recommended_action} />
+      </header>
+
+      <section
+        aria-labelledby="engines"
+        class="rounded-2xl border border-ink-100 bg-white p-5
+               dark:border-ink-700 dark:bg-ink-900"
+      >
+        <h2 id="engines" class="mb-3 text-sm font-semibold tracking-tightish">
+          Per-engine scores
+        </h2>
+        <table class="min-w-full text-left">
+          <thead>
+            <tr class="text-[11px] uppercase tracking-widest text-ink-500 dark:text-ink-400">
+              <th scope="col" class="py-2 pr-4 font-medium">Engine</th>
+              <th scope="col" class="py-2 pr-4 font-medium">Score</th>
+              <th scope="col" class="py-2 pr-4 font-medium">Latency</th>
+              <th scope="col" class="py-2 font-medium">Signals</th>
+            </tr>
+          </thead>
+          <tbody>
+            {decision.engine_results.map((er) => (
+              <tr class="border-t border-ink-100 dark:border-ink-700">
+                <th scope="row" class="py-2 pr-4 text-sm font-medium">{er.engine}</th>
+                <td class="py-2 pr-4">
+                  <EngineScoreBadge score={er.risk_score} label={er.engine} />
+                </td>
+                <td class="py-2 pr-4 text-xs tabular-nums text-ink-500 dark:text-ink-400">
+                  {er.latency_ms} ms
+                </td>
+                <td class="py-2">
+                  <ul class="flex flex-wrap gap-1">
+                    {er.explanations.map((e) => (
+                      <li
+                        class="rounded bg-ink-100 px-1.5 py-0.5 font-mono text-[11px]
+                               text-ink-700 dark:bg-ink-700 dark:text-ink-50/80"
+                      >
+                        {e}
+                      </li>
+                    ))}
+                  </ul>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section
+        aria-labelledby="explanation"
+        class="rounded-2xl border border-ink-100 bg-white p-5
+               dark:border-ink-700 dark:bg-ink-900"
+      >
+        <h2 id="explanation" class="mb-3 text-sm font-semibold tracking-tightish">
+          Aggregated reason codes
+        </h2>
+        <ul class="flex flex-wrap gap-2">
+          {decision.aggregated_explanation.map((code) => (
+            <li
+              class="rounded-full border border-ink-100 bg-ink-50 px-2.5 py-0.5
+                     font-mono text-xs text-ink-700
+                     dark:border-ink-700 dark:bg-ink-900 dark:text-ink-50/80"
+            >
+              {code}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <p class="text-xs text-ink-500 dark:text-ink-400">
+        <a
+          href={`${base}/audit`}
+          class="rounded underline-offset-4 hover:underline
+                 focus:outline-none focus:ring-2 focus:ring-accent-500/40"
+        >
+          View audit chain →
+        </a>
+      </p>
+    </article>
+  )}
+</Investigate>

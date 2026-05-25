@@ -1,0 +1,52 @@
+---
+interface Props {
+  feature: string;
+  cells: readonly [string, string, string];
+  emphasis?: boolean;
+}
+
+const { feature, cells, emphasis = false } = Astro.props;
+const cellBase = 'px-4 py-3 align-top text-sm';
+const featureCellClass = emphasis
+  ? 'font-medium tracking-tightish'
+  : 'text-ink-900/80 dark:text-ink-50/80';
+
+// Symbolic "—" denotes "not included" in that tier; rendered with an
+// aria-label so screen readers don't pronounce a dash.
+const cellNode = (text: string) =>
+  text === '—'
+    ? {
+        text: '—',
+        aria: 'Not included',
+        muted: true,
+      }
+    : { text, aria: undefined, muted: false };
+---
+
+<tr class="border-t border-ink-900/10 dark:border-ink-50/10">
+  <th
+    scope="row"
+    class:list={[
+      cellBase,
+      featureCellClass,
+      'text-left text-ink-900 dark:text-ink-50',
+    ]}
+  >
+    {feature}
+  </th>
+  {cells.map((c) => {
+    const node = cellNode(c);
+    return (
+      <td
+        class:list={[
+          cellBase,
+          'text-ink-900/85 dark:text-ink-50/85',
+          node.muted ? 'text-ink-900/40 dark:text-ink-50/40' : '',
+        ]}
+        aria-label={node.aria}
+      >
+        {node.text}
+      </td>
+    );
+  })}
+</tr>

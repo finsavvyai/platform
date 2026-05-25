@@ -1,0 +1,39 @@
+---
+import { actionLabel } from '../lib/format.ts';
+import type { RecommendedAction } from '../lib/types.ts';
+
+interface Props {
+  action: RecommendedAction;
+}
+
+const { action } = Astro.props;
+const label = actionLabel(action);
+
+// Apple HIG-aligned status pills. Calm: not screaming reds.
+const styles: Readonly<Record<RecommendedAction, string>> = {
+  allow:
+    'bg-risk-low/15 text-risk-low border-risk-low/40',
+  flag:
+    'bg-risk-medium/15 text-risk-medium border-risk-medium/40',
+  block:
+    'bg-risk-high/15 text-risk-high border-risk-high/40',
+};
+
+const icon: Readonly<Record<RecommendedAction, string>> = {
+  allow: '✓',
+  flag: '⚠',
+  block: '✕',
+};
+---
+
+<span
+  class:list={[
+    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5',
+    'text-[11px] font-medium uppercase tracking-widest',
+    styles[action],
+  ]}
+  aria-label={`Recommended action: ${label}`}
+>
+  <span aria-hidden="true">{icon[action]}</span>
+  <span>{label}</span>
+</span>

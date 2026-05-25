@@ -1,0 +1,147 @@
+---
+import Default from '../../layouts/Default.astro';
+import PricingCard from '../../components/pricing/PricingCard.astro';
+import FeatureRow from '../../components/pricing/FeatureRow.astro';
+import { COMPARISON, TIERS } from '../../content/pricing/tiers.ts';
+
+// Brain Month 3 GTM Week 9: "Brain Pro pricing page drafted."
+// Tier + comparison data lives in `src/content/pricing/tiers.ts` so this
+// page stays focused on layout + a11y wiring and within the 200-line cap.
+//
+// Apple HIG conformance (per websites/finsavvyai.com/CLAUDE.md §"Apple
+// HIG visual / interaction language"):
+//   - Type: system font stack via tailwind `font-sans` (default).
+//     `tracking-tightish` for display headings; tabular-nums for prices
+//     to keep digits monospaced for scanability.
+//   - Color: ink-on-paper palette only. No new colours added. Highlight
+//     tier uses border + ring on existing ink tokens — calm, not loud.
+//   - Spacing: generous; `mb-12` to `mb-16` between sections puts whitespace
+//     in front of dense content (8pt grid via Tailwind defaults).
+//   - Motion: none — only hover/focus colour transitions on the CTA.
+//     Respects `prefers-reduced-motion` by default (no animation).
+//   - Focus: every CTA carries a visible focus ring (`focus:ring-2`).
+//     Skip-link present in the shared Default layout.
+//   - Accessibility (WCAG 2.1 AA target):
+//     - Landmarks via shared layout (`<main id="main">`).
+//     - `<section aria-labelledby="...">` on every section.
+//     - Comparison table has a `<caption class="sr-only">`.
+//     - "—" cells carry `aria-label="Not included"` (see FeatureRow).
+//     - Pricing card CTAs carry `aria-label="<verb> — <tier> tier"`.
+//     - Recommended badge is visible only — no aria-hidden trickery —
+//       so screen-reader users hear "Recommended" before the tier name.
+---
+
+<Default
+  title="Pricing — FinsavvyAI"
+  description="AMLIQ Brain pricing. Starter, Pro, and Enterprise tiers with platform fee + per-agent-action billing."
+>
+  <section class="mb-12 max-w-3xl sm:mb-16">
+    <p
+      class="mb-6 text-sm font-medium uppercase tracking-widest text-ink-900/60
+             dark:text-ink-50/60"
+    >
+      AMLIQ Brain pricing
+    </p>
+    <h1
+      class="text-balance text-4xl font-semibold leading-[1.05] tracking-tightish
+             sm:text-5xl"
+    >
+      Platform fee plus agent actions. No hidden seat tax.
+    </h1>
+    <p
+      class="mt-6 text-pretty text-lg leading-relaxed text-ink-900/80
+             dark:text-ink-50/80"
+    >
+      Every tier ships multi-tenant isolation, the tamper-evident audit
+      chain, and the full FinCEN compliance corpus. You pay for the
+      sanctions tier you need and the agent actions you run.
+    </p>
+  </section>
+
+  <section
+    aria-labelledby="tiers"
+    class="mb-16 grid gap-6 sm:gap-7 lg:grid-cols-3"
+  >
+    <h2 id="tiers" class="sr-only">Pricing tiers</h2>
+    {TIERS.map((t) => <PricingCard {...t} />)}
+  </section>
+
+  <section aria-labelledby="compare" class="mb-16">
+    <h2
+      id="compare"
+      class="mb-6 text-2xl font-semibold tracking-tightish sm:text-3xl"
+    >
+      Compare tiers
+    </h2>
+    <div
+      class="overflow-x-auto rounded-2xl border border-ink-900/10
+             dark:border-ink-50/10"
+    >
+      <table class="min-w-full text-left">
+        <caption class="sr-only">
+          Feature comparison across Starter, Pro, and Enterprise tiers.
+        </caption>
+        <thead>
+          <tr class="bg-ink-50/60 dark:bg-ink-900/60">
+            <th
+              scope="col"
+              class="px-4 py-3 text-sm font-medium text-ink-900/70 dark:text-ink-50/70"
+            >
+              Feature
+            </th>
+            <th
+              scope="col"
+              class="px-4 py-3 text-sm font-medium text-ink-900 dark:text-ink-50"
+            >
+              Starter
+            </th>
+            <th
+              scope="col"
+              class="px-4 py-3 text-sm font-medium text-ink-900 dark:text-ink-50"
+            >
+              Pro
+            </th>
+            <th
+              scope="col"
+              class="px-4 py-3 text-sm font-medium text-ink-900 dark:text-ink-50"
+            >
+              Enterprise
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {COMPARISON.map((m) => <FeatureRow {...m} />)}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section
+    aria-labelledby="notes"
+    class="mb-8 max-w-3xl text-sm text-ink-900/70 dark:text-ink-50/70"
+  >
+    <h2
+      id="notes"
+      class="mb-4 text-2xl font-semibold tracking-tightish text-ink-900 dark:text-ink-50 sm:text-3xl"
+    >
+      Notes
+    </h2>
+    <ul class="flex flex-col gap-3">
+      <li>
+        <strong class="text-ink-900 dark:text-ink-50">Agent action.</strong>
+        Counted once per completed agent run (one SAR draft, one regulatory
+        delta, one triaged alert). Drafts you discard still count.
+      </li>
+      <li>
+        <strong class="text-ink-900 dark:text-ink-50">Sanctions data.</strong>
+        Pro pricing includes ComplyAdvantage pass-through. Enterprise
+        requires the customer to license Dow Jones Risk directly.
+      </li>
+      <li>
+        <strong class="text-ink-900 dark:text-ink-50">Annual contracts.</strong>
+        Pro and Enterprise are annual. Custom multi-year terms available
+        on request.
+      </li>
+    </ul>
+  </section>
+</Default>

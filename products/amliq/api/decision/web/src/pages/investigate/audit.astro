@@ -1,0 +1,129 @@
+---
+import Investigate from '../../layouts/Investigate.astro';
+import AuditChainViewer from '../../components/AuditChainViewer.astro';
+import { listAudit } from '../../lib/investigate-client.ts';
+import { formatTimestamp } from '../../lib/format.ts';
+
+const env =
+  typeof process !== 'undefined' ? process.env : ({} as NodeJS.ProcessEnv);
+const apiUrl = env['BRAIN_API_URL'];
+const token = env['BRAIN_JWT'];
+const tenantId = env['BRAIN_TENANT_ID'] ?? 'demo-tenant';
+const authMode = apiUrl ? 'live' : 'fixture';
+
+const r = await listAudit({
+  tenantId,
+  ...(apiUrl ? { baseUrl: apiUrl } : {}),
+  ...(token ? { token } : {}),
+});
+
+const ok = r.ok;
+const errorCode = ok ? null : r.error;
+const records = ok ? r.records : [];
+const chain = ok ? r.chain : null;
+
+const decisionBadge: Readonly<Record<'allow' | 'deny' | 'error', string>> = {
+  allow: 'bg-risk-low/15 text-risk-low border-risk-low/40',
+  deny: 'bg-risk-high/15 text-risk-high border-risk-high/40',
+  error: 'bg-risk-medium/15 text-risk-medium border-risk-medium/40',
+};
+---
+
+<Investigate
+  title="Audit — AMLIQ Investigate"
+  tenantId={tenantId}
+  authMode={authMode}
+  active="audit"
+>
+  <header class="mb-6 flex flex-col gap-1">
+    <p class="text-xs uppercase tracking-widest text-ink-400">
+      AMLIQ Investigate
+    </p>
+    <h1 class="text-balance text-2xl font-semibold tracking-tightish sm:text-3xl">
+      Audit trail
+    </h1>
+    <p class="text-pretty text-sm text-ink-500 dark:text-ink-400">
+      Read-only tamper-evident chain. Every decision in this tenant emits
+      one audit record. Failure to emit blocks the response.
+    </p>
+  </header>
+
+  {errorCode && (
+    <div
+      role="alert"
+      class="mb-6 rounded-xl border border-risk-high/30 bg-risk-high/5 p-4
+             text-sm text-risk-high"
+    >
+      Failed to load audit: <code>{errorCode}</code>
+    </div>
+  )}
+
+  {chain && (
+    <section class="mb-6">
+      <AuditChainViewer chain={chain} />
+    </section>
+  )}
+
+  {records.length === 0 && !errorCode ? (
+    <p
+      class="rounded-xl border border-ink-100 bg-white p-6 text-sm text-ink-500
+             dark:border-ink-700 dark:bg-ink-900 dark:text-ink-400"
+    >
+      No audit records for this tenant.
+    </p>
+  ) : (
+    <div
+      class="overflow-hidden rounded-2xl border border-ink-100 bg-white
+             dark:border-ink-700 dark:bg-ink-900"
+    >
+      <table class="min-w-full text-left">
+        <caption class="sr-only">
+          Audit records, columns: timestamp, event, decision, reason code,
+          actor, chain hash.
+        </caption>
+        <thead class="border-b border-ink-100 bg-ink-50 dark:border-ink-700 dark:bg-ink-700/20">
+          <tr class="text-[11px] uppercase tracking-widest text-ink-500 dark:text-ink-400">
+            <th scope="col" class="px-3 py-2 font-medium">Timestamp</th>
+            <th scope="col" class="px-3 py-2 font-medium">Event</th>
+            <th scope="col" class="px-3 py-2 font-medium">Decision</th>
+            <th scope="col" class="px-3 py-2 font-medium">Reason</th>
+            <th scope="col" class="px-3 py-2 font-medium">Actor</th>
+            <th scope="col" class="px-3 py-2 font-medium">Hash</th>
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((rec) => (
+            <tr class="border-b border-ink-100 last:border-0 dark:border-ink-700">
+              <td class="px-3 py-2 text-xs tabular-nums text-ink-500 dark:text-ink-400">
+                {formatTimestamp(rec.ts)}
+              </td>
+              <td class="px-3 py-2 font-mono text-xs text-ink-700 dark:text-ink-50/80">
+                {rec.event}
+              </td>
+              <td class="px-3 py-2">
+                <span
+                  class:list={[
+                    'inline-flex rounded-full border px-2 py-0.5 text-[11px]',
+                    'uppercase tracking-widest',
+                    decisionBadge[rec.decision],
+                  ]}
+                >
+                  {rec.decision}
+                </span>
+              </td>
+              <td class="px-3 py-2 font-mono text-xs text-ink-700 dark:text-ink-50/80">
+                {rec.reason}
+              </td>
+              <td class="px-3 py-2 text-xs text-ink-500 dark:text-ink-400">
+                {rec.actor_id}
+              </td>
+              <td class="max-w-[10rem] truncate px-3 py-2 font-mono text-[11px] text-ink-400">
+                {rec.chain_hash}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</Investigate>

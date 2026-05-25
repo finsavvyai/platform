@@ -41,6 +41,8 @@ export type {
   SearchResult,
 } from "./search/index.js";
 
+export * from "./rate-limit/index.js";
+
 export type {
   AuthClaims,
   AuthErrorCode,

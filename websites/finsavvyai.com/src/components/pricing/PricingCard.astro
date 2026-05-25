@@ -1,0 +1,100 @@
+---
+import CtaButton from './CtaButton.astro';
+
+interface Props {
+  name: string;
+  tagline: string;
+  platformPrice: string;
+  platformUnit: string;
+  agentPrice: string;
+  agentUnit: string;
+  features: readonly string[];
+  cta: { href: string; label: string };
+  highlight?: boolean;
+  badge?: string;
+}
+
+const {
+  name,
+  tagline,
+  platformPrice,
+  platformUnit,
+  agentPrice,
+  agentUnit,
+  features,
+  cta,
+  highlight = false,
+  badge,
+} = Astro.props;
+
+const surface = highlight
+  ? 'border-ink-900/25 ring-1 ring-ink-900/15 dark:border-ink-50/30 dark:ring-ink-50/20'
+  : 'border-ink-900/10 dark:border-ink-50/10';
+---
+
+<article
+  aria-labelledby={`tier-${name}`}
+  class:list={[
+    'flex h-full flex-col gap-6 rounded-2xl bg-ink-50/60 p-6 sm:p-8',
+    'shadow-[0_1px_2px_rgba(10,10,12,0.04)]',
+    'dark:bg-ink-900/60',
+    'border',
+    surface,
+  ]}
+>
+  <header class="flex flex-col gap-3">
+    {badge && (
+      <span
+        class="inline-flex w-fit rounded-full bg-ink-900 px-2.5 py-0.5
+               text-[11px] font-medium uppercase tracking-widest text-ink-50
+               dark:bg-ink-50 dark:text-ink-900"
+      >
+        {badge}
+      </span>
+    )}
+    <h2
+      id={`tier-${name}`}
+      class="text-2xl font-semibold tracking-tightish"
+    >
+      {name}
+    </h2>
+    <p class="text-sm text-ink-900/70 dark:text-ink-50/70">
+      {tagline}
+    </p>
+  </header>
+
+  <div class="flex flex-col gap-2">
+    <p class="flex items-baseline gap-1.5">
+      <span class="text-4xl font-semibold tracking-tightish tabular-nums">
+        {platformPrice}
+      </span>
+      <span class="text-sm text-ink-900/60 dark:text-ink-50/60">
+        {platformUnit}
+      </span>
+    </p>
+    <p class="text-sm tabular-nums text-ink-900/70 dark:text-ink-50/70">
+      <span class="font-medium">{agentPrice}</span>
+      <span class="text-ink-900/55 dark:text-ink-50/55">{agentUnit}</span>
+    </p>
+  </div>
+
+  <ul class="flex flex-col gap-2 text-sm">
+    {features.map((f) => (
+      <li class="flex items-start gap-2 text-ink-900/80 dark:text-ink-50/80">
+        <span aria-hidden="true" class="mt-1 text-ink-900/40 dark:text-ink-50/40">
+          ✓
+        </span>
+        <span>{f}</span>
+      </li>
+    ))}
+  </ul>
+
+  <div class="mt-auto pt-2">
+    <CtaButton
+      href={cta.href}
+      label={cta.label}
+      variant={highlight ? 'primary' : 'secondary'}
+      ariaLabel={`${cta.label} — ${name} tier`}
+    />
+  </div>
+</article>

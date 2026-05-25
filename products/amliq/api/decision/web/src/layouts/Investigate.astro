@@ -1,0 +1,112 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+  tenantId: string;
+  authMode: 'fixture' | 'live';
+  active: 'cases' | 'audit' | 'settings';
+}
+
+const {
+  title,
+  description = 'AMLIQ Investigate — analyst case-review console.',
+  tenantId,
+  authMode,
+  active,
+} = Astro.props;
+
+const base = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
+const nav = [
+  { id: 'cases', href: `${base}/`, label: 'Cases' },
+  { id: 'audit', href: `${base}/audit`, label: 'Audit' },
+] as const;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex" />
+    <title>{title}</title>
+  </head>
+  <body
+    class="min-h-screen bg-ink-50 text-ink-900 antialiased
+           selection:bg-ink-900 selection:text-ink-50
+           dark:bg-ink-900 dark:text-ink-50"
+  >
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2
+             focus:rounded focus:bg-ink-900 focus:px-3 focus:py-1.5
+             focus:text-ink-50"
+    >
+      Skip to content
+    </a>
+
+    {authMode === 'fixture' && (
+      <div
+        role="status"
+        class="border-b border-ink-100 bg-ink-50/95 px-6 py-2
+               text-xs text-ink-500
+               dark:border-ink-700 dark:bg-ink-900/95 dark:text-ink-400"
+      >
+        Demo mode — using fixture decisions. Set
+        <code class="mx-1 rounded bg-ink-100 px-1 py-0.5 dark:bg-ink-700">
+          BRAIN_API_URL
+        </code>
+        and
+        <code class="mx-1 rounded bg-ink-100 px-1 py-0.5 dark:bg-ink-700">
+          BRAIN_JWT
+        </code>
+        to call the live decision API.
+      </div>
+    )}
+
+    <header class="border-b border-ink-100 dark:border-ink-700">
+      <nav
+        aria-label="Primary"
+        class="mx-auto flex max-w-6xl items-center gap-6 px-gutter py-4"
+      >
+        <a
+          href={`${base}/`}
+          class="text-sm font-semibold tracking-tightish"
+        >
+          AMLIQ Investigate
+        </a>
+        <ul class="flex flex-1 items-center gap-4 text-sm">
+          {nav.map((item) => (
+            <li>
+              <a
+                href={item.href}
+                aria-current={active === item.id ? 'page' : undefined}
+                class:list={[
+                  'rounded px-2 py-1 transition-colors focus:outline-none',
+                  'focus:ring-2 focus:ring-accent-500/40',
+                  active === item.id
+                    ? 'text-ink-900 dark:text-ink-50'
+                    : 'text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-50',
+                ]}
+              >
+                {item.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+        <span
+          class="rounded-full border border-ink-100 bg-white px-3 py-1
+                 text-[11px] uppercase tracking-widest text-ink-500
+                 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-400"
+          aria-label={`Tenant ${tenantId}`}
+        >
+          {tenantId}
+        </span>
+      </nav>
+    </header>
+    <main id="main" class="mx-auto max-w-6xl px-gutter py-10 sm:py-12">
+      <slot />
+    </main>
+  </body>
+</html>

@@ -15,6 +15,7 @@ import { Hono } from "hono";
 import { buildAuthMiddleware, getBrainAuth } from "./auth.js";
 import { BrainAuditEmitter } from "./audit.js";
 import { HealthBuilder } from "./health.js";
+import { createRateLimitMiddleware } from "./rate-limit/index.js";
 import { buildSearchHandler } from "./search/search-handler.js";
 import type { BrainApiConfig } from "./types.js";
 
@@ -42,6 +43,37 @@ export const createBrainApp = (config: BrainApiConfig): BrainApp => {
     ...(config.clock !== undefined ? { clock: config.clock } : {}),
   };
   const audit = new BrainAuditEmitter(auditOpts);
+
+  // -------- Pre-auth rate limit (mesh §10; off unless configured) --------
+  if (config.rateLimit !== undefined) {
+    const rl = config.rateLimit;
+    app.use(
+      "*",
+      createRateLimitMiddleware({
+        config: rl.config,
+        store: rl.store,
+        keyFn: rl.keyFn,
+        ...(rl.failClosed !== undefined ? { failClosed: rl.failClosed } : {}),
+        ...(rl.bypassPaths !== undefined
+          ? { bypassPaths: rl.bypassPaths }
+          : {}),
+        ...(config.clock !== undefined
+          ? { clock: () => config.clock!().getTime() }
+          : {}),
+        onReject: (info) => {
+          // Fire-and-forget audit emit; stable code per mesh §10.
+          void audit.emit({
+            actorId: "anonymous",
+            event: "brain.rate_limit.rejected",
+            resource: `rate_limit:${info.key}`,
+            decision: "deny",
+            reason: info.decision.reason ?? "rate_limit.window_exceeded",
+            meta: { path: info.path },
+          });
+        },
+      }),
+    );
+  }
 
   // -------- Public: health --------
   app.get("/health", async (c) => {

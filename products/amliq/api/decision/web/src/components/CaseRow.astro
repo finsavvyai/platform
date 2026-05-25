@@ -1,0 +1,55 @@
+---
+import DecisionPill from './DecisionPill.astro';
+import EngineScoreBadge from './EngineScoreBadge.astro';
+import { formatMoneyMinor, formatTimestamp } from '../lib/format.ts';
+import type { DecisionListRow } from '../lib/types.ts';
+
+interface Props {
+  row: DecisionListRow;
+}
+
+const { row } = Astro.props;
+const base = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
+const href = `${base}/case/${encodeURIComponent(row.decision_id)}`;
+const ts = formatTimestamp(row.ts);
+const amount = formatMoneyMinor(row.amount_minor, row.currency);
+---
+
+<tr
+  class="border-b border-ink-100 transition-colors
+         hover:bg-white focus-within:bg-white
+         dark:border-ink-700 dark:hover:bg-ink-700/30"
+>
+  <td class="px-3 py-3 text-xs tabular-nums text-ink-500 dark:text-ink-400">
+    {ts}
+  </td>
+  <td class="max-w-[14rem] truncate px-3 py-3 font-mono text-xs text-ink-700 dark:text-ink-50/80">
+    {row.subject_hash}
+  </td>
+  <td class="px-3 py-3 text-sm tabular-nums text-ink-900 dark:text-ink-50">
+    {amount}
+  </td>
+  <td class="px-3 py-3 text-xs uppercase tracking-widest text-ink-500 dark:text-ink-400">
+    {row.channel}
+  </td>
+  <td class="px-3 py-3">
+    <EngineScoreBadge score={row.max_risk_score} label="Max engine score" />
+  </td>
+  <td class="px-3 py-3">
+    <DecisionPill action={row.recommended_action} />
+  </td>
+  <td class="px-3 py-3 text-right">
+    <a
+      href={href}
+      class="inline-flex rounded-md border border-ink-100 bg-white px-2.5 py-1
+             text-xs font-medium text-ink-700 transition-colors
+             hover:border-ink-400 hover:text-ink-900
+             focus:outline-none focus:ring-2 focus:ring-accent-500/40
+             dark:border-ink-700 dark:bg-ink-900 dark:text-ink-50/80
+             dark:hover:border-ink-400"
+      aria-label={`Open decision ${row.decision_id}`}
+    >
+      Open
+    </a>
+  </td>
+</tr>

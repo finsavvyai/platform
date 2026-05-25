@@ -133,6 +133,64 @@ src/
 
 200-line cap (portfolio rule) is enforced on every source file in `src/`.
 
+## Scope addendum (M3 W11) — Jira + Teams
+
+Brain Month 3 mesh §8 ("connector parity") extends this package with two
+more `McpConnector` implementations. Behaviour is identical to the M2
+trio (DI-only tokens, tenant-scoped upstream queries, `ComplianceDoc`
+output, `ConnectorError` mapping).
+
+| Connector | API | Tenant isolation mechanism |
+|-----------|-----|----------------------------|
+| Jira | Cloud REST v3 (`search`, `issue/{key}`) | JQL `labels in (tenant-<id>)` ANDed into every search |
+| Teams | Microsoft Graph v1.0 (`search/query`, `teams/.../messages/...`) | KQL `channelIdentity/teamId:<teamIdForTenant(id)>` ANDed into every search |
+
+Both connectors share the M2 error-code surface and additionally throw a
+local `JiraRateLimitedError` / `TeamsRateLimitedError` (subclasses of
+`ConnectorError` with `code === 'rate_limited'`) on HTTP 429. When the
+upstream returns a numeric `Retry-After`, it is surfaced as
+`meta.retry_after_seconds`. These subclasses live in the per-connector
+folder so the shared `types.ts` surface remains untouched (round-2 rule).
+
+### Jira env var convention (consumer-side)
+
+| Var | Used by | Purpose |
+|-----|---------|---------|
+| `JIRA_BASE_URL` | Jira connector | tenant base URL, e.g. `https://acme.atlassian.net` |
+| `JIRA_API_TOKEN` | Jira connector (`authMode: 'basic'`) | base64(`email:apiToken`) for HTTP Basic auth |
+| `JIRA_OAUTH_TOKEN` | Jira connector (`authMode: 'bearer'`) | Atlassian Cloud OAuth 2.0 bearer |
+| `JIRA_AUTH_MODE` | Jira connector | `'basic'` or `'bearer'` — selects the `Authorization` header scheme |
+
+### Teams env var convention (consumer-side)
+
+| Var | Used by | Purpose |
+|-----|---------|---------|
+| `MS_GRAPH_BASE_URL` | Teams connector | Graph base URL, defaults to `https://graph.microsoft.com` |
+| `MS_TEAMS_OAUTH_TOKEN` | Teams connector | OAuth 2.0 bearer with `ChatMessage.Read.All` / search scopes |
+
+As with the M2 connectors, this package never reads `process.env`
+itself. The brain wiring layer resolves these names against the platform
+secret store keyed by `tenant_id`. The tenant→`teamId` map for the Teams
+connector is supplied via DI (`teamIdForTenant(tenantId)`) — the
+connector throws `unauthorized` if the resolver returns an empty string.
+
+### Usage (sketch)
+
+```ts
+import { JiraConnector, TeamsConnector } from "@amliq/brain-connectors";
+
+const jira = new JiraConnector({
+  baseUrl: tenantTokens.get(tenantId, "JIRA_BASE_URL"),
+  tokenForTenant: (t) => tenantTokens.get(t, "JIRA_API_TOKEN"),
+  authMode: "basic",
+});
+
+const teams = new TeamsConnector({
+  tokenForTenant: (t) => tenantTokens.get(t, "MS_TEAMS_OAUTH_TOKEN"),
+  teamIdForTenant: (t) => tenantTeamMap.get(t),
+});
+```
+
 ## License
 
 Apache-2.0 (same as the rest of the AMLIQ Brain workspace).
