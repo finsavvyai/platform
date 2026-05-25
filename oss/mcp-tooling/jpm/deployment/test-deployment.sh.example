@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Deployment Test Script Template
+# Copy this file to scripts/test-deployment.sh and customize the URLs
+
+set -e
+
+# CUSTOMIZE THESE URLS FOR YOUR DEPLOYMENT
+BASE_URL="https://api.your-domain.com"  # Replace with your API domain
+MAIN_SITE="https://your-domain.com"     # Replace with your main site domain
+
+echo "🚀 Testing deployment..."
+echo "Base API URL: $BASE_URL"
+echo "Main Site: $MAIN_SITE"
+echo
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Test function
+test_endpoint() {
+    local name="$1"
+    local url="$2"
+    local expected_status="$3"
+    local description="$4"
+    
+    echo -n "Testing $name... "
+    
+    status=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+    
+    if [ "$status" = "$expected_status" ]; then
+        echo -e "${GREEN}✅ PASS${NC} ($status) - $description"
+        return 0
+    else
+        echo -e "${RED}❌ FAIL${NC} ($status, expected $expected_status) - $description"
+        return 1
+    fi
+}
+
+# Test MCP endpoint with proper request
+test_mcp_endpoint() {
+    echo -n "Testing MCP endpoint... "
+    
+    response=$(curl -s -X POST "$BASE_URL/mcp" \
+        -H "Content-Type: application/json" \
+        -d '{"method":"initialize","params":{}}')
+    
+    if echo "$response" | grep -q "protocolVersion"; then
+        echo -e "${GREEN}✅ PASS${NC} - MCP initialization works"
+        return 0
+    else
+        echo -e "${RED}❌ FAIL${NC} - MCP initialization failed"
+        echo "Response: $response"
+        return 1
+    fi
+}
+
+# Counter for failed tests
+failed_tests=0
+
+echo "🔍 Running endpoint tests..."
+echo
+
+# Test basic endpoints
+test_endpoint "Health" "$BASE_URL/health" "200" "Health check endpoint" || ((failed_tests++))
+test_endpoint "Analytics Dashboard" "$BASE_URL/analytics" "200" "Analytics dashboard loads" || ((failed_tests++))
+test_endpoint "Main Website" "$MAIN_SITE" "200" "Main website loads" || ((failed_tests++))
+
+echo
+
+# Test MCP functionality
+test_mcp_endpoint || ((failed_tests++))
+
+echo
+
+# Summary
+echo "📊 Test Summary:"
+echo "==============="
+
+if [ $failed_tests -eq 0 ]; then
+    echo -e "${GREEN}🎉 All tests passed! Deployment is successful.${NC}"
+    echo
+    echo "✅ Health endpoint working"
+    echo "✅ MCP server responding correctly"
+    echo "✅ Analytics dashboard functional"
+    echo "✅ Main website accessible"
+    echo
+    echo "🚀 Your MCP server is ready for use!"
+    exit 0
+else
+    echo -e "${RED}❌ $failed_tests test(s) failed. Please check the deployment.${NC}"
+    echo
+    echo "🔧 Common fixes:"
+    echo "  - Wait a few minutes for deployment to complete"
+    echo "  - Check function logs for errors"
+    echo "  - Verify DNS settings for custom domains"
+    echo "  - Check that all files are committed and deployed"
+    exit 1
+fi

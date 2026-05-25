@@ -274,4 +274,50 @@ The May 2026 ranking surfaced that `/Users/shaharsolomon/dev/projects/01_-09_` n
 
 ---
 
+## 6. Third-Pass Decisions + Audit Verdict (2026-05-25 evening)
+
+### Decisions executed
+
+| Decision | Action | Location |
+|---|---|---|
+| jpm + npmplus-core | Both folded under `oss/mcp-tooling/` | `oss/mcp-tooling/{jpm,npmplus-core}/` (1.9M + 1.2M) |
+| 08_open_source vendoring | Bulk rsync to vendored tree | `infrastructure/vendored/opensource/` (1.6G after excludes; was 7.1G raw) + README documenting hard rules |
+| GTM top-3 next 60 days | Accept memo recommendation | `docs/GTM_TOP3_60DAY.md` written with Day-30/Day-60 milestones per product |
+| pixel-pets path | **Path A — spin-out** as separate venture | `_archive/externalized/pixel-pets/EXTERNALIZE_PLAN.md` updated with 9-step spin-out checklist |
+
+### Audit verdict (`_archive/numbered-folders-audit.md`)
+
+The May 2026 ranking memo claimed numbered folders (`01_-09_`) held "more mature versions" of migrated products. **Audit refuted this.**
+
+- 16 canonical units checked
+- **KEEP_CANONICAL: 11** — finsavvyai-platform versions are equal or superset
+- **RE_MIGRATE_FROM_NUMBERED: 0** — no counterpart is materially newer than canonical
+- **MERGE: 3** — selective lifts needed (not full re-migrations):
+  - `amliq` — pull `cmd/`, `pkg/`, `sdks/`, `Makefile`, `Dockerfile`, `migrations/`, `tests/`, `docs/`, `mcp-config.json`, `render.yaml`, `AGENTS.md` from `portfolio/aegis/`
+  - `tenantiq` — standalone variant (11,998 files, different stack) has `k8s/`, `load-tests/`, `openclaw/` features worth lifting selectively
+  - `packages/telemetry` — `03_Enterprize_application/packages/shared-analytics` has 2.5× file count; review for missing modules
+- **NO_COUNTERPART: 2** — `packages/policy-engine`, `oss/clawpipe` (portfolio version older than canonical)
+- **INVESTIGATE: 1** — `oss/mcp-tooling` (1,739 files) vs `02_AI_AGENTS/mcp-servers` (11,258 files) are entirely different scopes; could be a separate un-migrated product ("mcpoverflow")
+
+The big finding: the heavy parallel tree was always `/Users/shaharsolomon/dev/projects/portfolio/` (which canonical was rsync'd from), not the numbered folders. Inflated counts were build artifacts (`__pycache__`, `.venv`, `.svelte-kit`, `node_modules`, etc.).
+
+### Updated counts (post-third-pass)
+
+- **CORE**: 9 (FinSavvy Cluster + QueryFlux + 7 originals)
+- **OSS**: **10** (added jpm + npmplus-core)
+- **PLATFORM**: 5 (unchanged)
+- **INFRA + VENDORED**: 1 new (vendored/opensource/)
+- **EXTERNALIZE**: 2 (looma-sh + pixel-pets)
+- **ARCHIVE**: ~20
+
+### Outstanding (lower-priority follow-ups, not blocking GTM)
+
+- Selective MERGE actions on amliq (lift cmd/pkg/sdks etc), tenantiq (lift k8s/load-tests/openclaw selectively), packages/telemetry (review shared-analytics for missing modules)
+- INVESTIGATE: clarify `02_AI_AGENTS/mcp-servers` scope — is it "mcpoverflow" the product, or just a workspace?
+- jpm-vs-UPM redundancy decision (jpm has JS specialization; UPM is universal — confirm both stay or archive jpm)
+- npmplus-core supersession check (UPM + jpm may cover its scope; archive if so)
+- Final source deletions: `/portfolio/{autoboot,looma-sh,pixel-pets,queryflux-git,querylens}` (after verification) + `/02_AI_AGENTS/llm` (after FinSavvy Cluster verification) + `/08_open_source/` (after vendored copy verification)
+
+---
+
 *End of addendum. Pair with `finsavvyai_full_extended_consolidation_plan.md`.*

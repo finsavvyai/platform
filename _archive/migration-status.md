@@ -75,11 +75,17 @@ After the cross-folder May ranking memo (web-verified market analysis):
 - [x] **UPM → OSS** — `oss/mcp-tooling/upm/` (13M from `03_Enterprize_application/products/devx-platform/upm/`). LICENSE present. Sibling to jpm/npmplus-core (not yet folded).
 - [x] **pixel-pets → EXTERNALIZE** — moved to `_archive/externalized/pixel-pets/`. Last-commit-2-days-ago contradicted the archive decision.
 - [ ] **Numbered folders audit** — background agent running. Will produce `_archive/numbered-folders-audit.md` with per-product KEEP_CANONICAL vs RE_MIGRATE_FROM_NUMBERED verdict.
-- [ ] **jpm + npmplus-core fold** — pending founder decision (memo recommends fold to `oss/mcp-tooling/`).
-- [ ] **08_open_source/ vendor move** — pending founder decision (memo: "not mine", move to `infrastructure/vendored/`).
-- [ ] **GTM top-3** — memo recommends TenantIQ + PushCI+PipeWarden + QueryFlux for next 60 days. Founder accept?
+- [x] **jpm + npmplus-core fold** — ✅ folded under `oss/mcp-tooling/{jpm,npmplus-core}/`. MIGRATION_NOTES written.
+- [x] **08_open_source/ vendor move** — ✅ bulk rsync to `infrastructure/vendored/opensource/` (1.6G after excludes). README documenting hard rules.
+- [x] **GTM top-3** — ✅ accepted memo recommendation. `docs/GTM_TOP3_60DAY.md` with Day-30/Day-60 milestones for TenantIQ + PushCI+PipeWarden + QueryFlux.
+- [x] **pixel-pets path** — ✅ Path A (spin-out). 9-step checklist in EXTERNALIZE_PLAN.md.
+- [x] **Numbered folders audit** — ✅ completed. `_archive/numbered-folders-audit.md`: 11 KEEP_CANONICAL, 0 RE_MIGRATE_FROM_NUMBERED, 3 MERGE (selective lifts), 2 NO_COUNTERPART, 1 INVESTIGATE.
+- [ ] Execute 3 MERGE lifts (amliq cmd/pkg/sdks, tenantiq k8s/load-tests/openclaw, packages/telemetry shared-analytics review)
+- [ ] INVESTIGATE: `02_AI_AGENTS/mcp-servers` scope (could be un-migrated "mcpoverflow"?)
+- [ ] jpm-vs-UPM redundancy resolution
+- [ ] npmplus-core supersession check
 
-See addendum §5.
+See addendum §5 and §6.
 
 ## Website rebuild
 

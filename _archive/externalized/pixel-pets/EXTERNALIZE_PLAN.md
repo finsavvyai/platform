@@ -24,21 +24,40 @@ EXTERNALIZE — treat like looma-sh:
 - Don't silently delete (active code with strategic brief)
 - Don't bring into the monorepo (different velocity, different cap-table story)
 
-## Spin-out or deprioritize — founder choice
+## Decision: Path A — Spin-out as separate venture (2026-05-25)
 
-Two viable paths:
+Founder chose Path A. Pixel-pets is now an externalized sibling project, not a FinsavvyAI asset.
 
-### Path A: Externalize as separate venture
-1. Stand up own brand identity (already has it — "pixel-pets" franchise)
-2. Move to own GitHub org if not already
-3. Keep velocity if AI consumer / franchise is a play you want to pursue
-4. Sibling entity under personal cap table
+### Spin-out checklist
 
-### Path B: Explicit deprioritize (maintenance-only)
-1. Acknowledge the project, freeze active dev
-2. Keep code intact at `/portfolio/pixel-pets/` for future revisit
-3. No GTM investment
-4. Revisit in 6 months if franchise narrative becomes relevant
+| # | Action | Owner | Status | Notes |
+|---|---|---|---|---|
+| 1 | Decide entity wrapper (LLC vs sole-prop vs subsidiary) | user | ☐ | Talk to lawyer; consumer/franchise IP differs from FinsavvyAI infra IP |
+| 2 | Trademark "pixel-pets" + character names if not done | user | ☐ | Franchise IP is the asset class — protect early |
+| 3 | Move repo to own GitHub org (`github.com/pixel-pets/` or similar) | user | ☐ | Clean separation from FinsavvyAI orgs |
+| 4 | Stand up own brand identity (domain, design system, website) | user | ☐ | Don't share `finsavvyai.com` design system |
+| 5 | Separate Stripe / payment account for any merch/franchise revenue | user | ☐ | Clean books |
+| 6 | Hire / partner on consumer GTM (different muscle than B2B infra) | user | ☐ | Optional but spin-out implies investment |
+| 7 | Update FinsavvyAI public materials to not mention pixel-pets | n/a | ✓ | Already not mentioned |
+| 8 | Continue NFC / genome / safety phase 2 work on own velocity | user | — | Already in progress per recent commits |
+| 9 | Final: delete `/portfolio/pixel-pets/` once entity transfer verified | user | ☐ | Last step |
+
+## What this directory holds
+
+- `PRIOR_ARCHIVED.md` — the original (incorrect) archive manifest from round 4
+- `EXTERNALIZE_PLAN.md` — this doc (Path A spin-out)
+
+No source copied here. Original at `/portfolio/pixel-pets/` (586M, intact).
+
+## Why Path A over Path B
+
+Path B (maintenance-only) was the lower-commitment option. Founder chose A. Rationale (implicit from the choice):
+
+- Active sprint loop + phase-2 work + 5 PROPOSED ADRs indicate the project has narrative momentum worth backing.
+- AI consumer/franchise is a real category (NFT, AI companions, character-IP-as-platform) — different story but a real one.
+- Spin-out preserves cap-table optionality the same way looma-sh does for V2V.
+
+Path A is more work than B. If founder later reconsiders, this doc can be revised; the EXTERNALIZED bucket structure supports both.
 
 ## What this directory holds
 
