@@ -1,0 +1,681 @@
+# Blue-Green Deployment Infrastructure for QuantumBeam
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: blue-green
+  labels:
+    purpose: deployment-strategy
+---
+# Blue Environment Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-api-blue
+  namespace: blue-green
+  labels:
+    app: quantumbeam-api
+    environment: blue
+    component: deployment
+spec:
+  selector:
+    app: quantumbeam-api
+    environment: blue
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: grpc
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-fraud-detection-blue
+  namespace: blue-green
+  labels:
+    app: quantumbeam-fraud-detection
+    environment: blue
+    component: deployment
+spec:
+  selector:
+    app: quantumbeam-fraud-detection
+    environment: blue
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: grpc
+    port: 50051
+    targetPort: 50051
+    protocol: TCP
+  type: ClusterIP
+---
+# Green Environment Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-api-green
+  namespace: blue-green
+  labels:
+    app: quantumbeam-api
+    environment: green
+    component: deployment
+spec:
+  selector:
+    app: quantumbeam-api
+    environment: green
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: grpc
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-fraud-detection-green
+  namespace: blue-green
+  labels:
+    app: quantumbeam-fraud-detection
+    environment: green
+    component: deployment
+spec:
+  selector:
+    app: quantumbeam-fraud-detection
+    environment: green
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: grpc
+    port: 50051
+    targetPort: 50051
+    protocol: TCP
+  type: ClusterIP
+---
+# Production Service (Traffic Router)
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-api
+  namespace: production
+  labels:
+    app: quantumbeam-api
+    component: production-router
+  annotations:
+    # Annotation for traffic routing controller
+    router.istio.io/traffic-scheme: blue-green
+spec:
+  selector:
+    # Empty selector - managed by traffic router
+    app: none
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 443
+    protocol: TCP
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-fraud-detection
+  namespace: production
+  labels:
+    app: quantumbeam-fraud-detection
+    component: production-router
+  annotations:
+    router.istio.io/traffic-scheme: blue-green
+spec:
+  selector:
+    app: none
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  - name: grpc
+    port: 50051
+    targetPort: 50051
+    protocol: TCP
+  type: ClusterIP
+---
+# Traffic Router Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traffic-router-config
+  namespace: blue-green
+data:
+  config.yaml: |
+    # Blue-Green Traffic Router Configuration
+    router:
+      # Default environment (blue or green)
+      default_environment: "blue"
+
+      # Traffic splitting configuration
+      traffic_splitting:
+        enabled: true
+        split_percentage:
+          blue: 100
+          green: 0
+        gradual_rollout:
+          enabled: true
+          steps: [5, 10, 25, 50, 100]
+          step_duration: "5m"
+
+      # Health check configuration
+      health_checks:
+        enabled: true
+        endpoint: "/health"
+        interval: "30s"
+        timeout: "10s"
+        failure_threshold: 3
+        success_threshold: 2
+
+      # Validation configuration
+      validation:
+        enabled: true
+        smoke_tests:
+          enabled: true
+          test_suite: "smoke-tests"
+          timeout: "10m"
+        performance_tests:
+          enabled: true
+          baseline_comparison: true
+          tolerance_percent: 10
+
+      # Rollback configuration
+      rollback:
+        enabled: true
+        automatic_rollback: true
+        rollback_triggers:
+          health_check_failures: true
+          smoke_test_failures: true
+          performance_degradation: true
+          error_rate_threshold: 5
+        rollback_delay: "30s"
+
+    # Service-specific configuration
+    services:
+      quantumbeam-api:
+        port: 80
+        health_endpoint: "/health"
+        smoke_tests: ["api-connectivity", "basic-crud", "auth-flow"]
+        performance_thresholds:
+          response_time_p95: "500ms"
+          error_rate: "1%"
+          throughput_degradation: "5%"
+
+      quantumbeam-fraud-detection:
+        port: 80
+        health_endpoint: "/health"
+        smoke_tests: ["fraud-detection-flow", "ml-model-load", "cache-connectivity"]
+        performance_thresholds:
+          response_time_p95: "200ms"
+          error_rate: "0.5%"
+          model_accuracy_degradation: "2%"
+
+    # Notification configuration
+    notifications:
+      enabled: true
+      channels:
+        slack:
+          webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+          channel: "#deployments"
+        pagerduty:
+          integration_key: "YOUR_PAGERDUTY_KEY"
+        email:
+          enabled: true
+          recipients: ["ops@quantumbeam.io", "dev@quantumbeam.io"]
+
+      events:
+        deployment_started: true
+        health_check_passed: false
+        health_check_failed: true
+        smoke_test_passed: false
+        smoke_test_failed: true
+        traffic_switched: true
+        rollback_triggered: true
+        deployment_completed: true
+---
+# Traffic Router Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traffic-router
+  namespace: blue-green
+  labels:
+    app: traffic-router
+    component: deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: traffic-router
+  template:
+    metadata:
+      labels:
+        app: traffic-router
+        component: deployment
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: traffic-router-sa
+      containers:
+      - name: traffic-router
+        image: quantumbeam/traffic-router:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: CONFIG_PATH
+          value: "/app/config/config.yaml"
+        - name: NAMESPACE
+          value: "blue-green"
+        - name: PRODUCTION_NAMESPACE
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: scripts
+          mountPath: /app/scripts
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: traffic-router-config
+      - name: scripts
+        configMap:
+          name: traffic-router-scripts
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+---
+# Traffic Router Service Account and RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traffic-router-sa
+  namespace: blue-green
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: traffic-router-role
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+- apiGroups: ["networking.istio.io"]
+  resources: ["virtualservices", "destinationrules"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: traffic-router-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traffic-router-role
+subjects:
+- kind: ServiceAccount
+  name: traffic-router-sa
+  namespace: blue-green
+---
+# Traffic Router Scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traffic-router-scripts
+  namespace: blue-green
+data:
+  switch-traffic.sh: |
+    #!/bin/bash
+    # Traffic switching script
+
+    SERVICE_NAME=${1:-quantumbeam-api}
+    TARGET_ENVIRONMENT=${2:-green}
+    NAMESPACE=${3:-production}
+    BLUE_GREEN_NAMESPACE=${4:-blue-green}
+
+    echo "Switching traffic for ${SERVICE_NAME} to ${TARGET_ENVIRONMENT} environment"
+
+    # Update the production service selector to point to target environment
+    kubectl patch service ${SERVICE_NAME} -n ${NAMESPACE} -p '{"spec":{"selector":{"app":"'${SERVICE_NAME}'","environment":"'${TARGET_ENVIRONMENT}'"}}}'
+
+    # Update traffic router configuration
+    kubectl patch configmap traffic-router-config -n ${BLUE_GREEN_NAMESPACE} --type=merge -p '{
+      "data": {
+        "config.yaml": $(kubectl get configmap traffic-router-config -n ${BLUE_GREEN_NAMESPACE} -o jsonpath='{.data.config\.yaml}' | sed 's/default_environment: "[^"]*"/default_environment: "'${TARGET_ENVIRONMENT}'"/')
+      }
+    }'
+
+    echo "Traffic switch completed"
+
+  health-check.sh: |
+    #!/bin/bash
+    # Health check script for deployments
+
+    SERVICE_NAME=${1:-quantumbeam-api}
+    ENVIRONMENT=${2:-blue}
+    NAMESPACE=${3:-blue-green}
+    TIMEOUT=${4:-300}
+
+    echo "Performing health check for ${SERVICE_NAME} in ${ENVIRONMENT} environment"
+
+    END_TIME=$((SECONDS + TIMEOUT))
+
+    while [ $SECONDS -lt $END_TIME ]; do
+      # Check if service exists
+      if ! kubectl get service ${SERVICE_NAME}-${ENVIRONMENT} -n ${NAMESPACE} &>/dev/null; then
+        echo "Service ${SERVICE_NAME}-${ENVIRONMENT} not found"
+        sleep 10
+        continue
+      fi
+
+      # Check if service has endpoints
+      ENDPOINTS=$(kubectl get endpoints ${SERVICE_NAME}-${ENVIRONMENT} -n ${NAMESPACE} -o jsonpath='{.subsets[*].addresses[*].ip}' | wc -w)
+      if [ $ENDPOINTS -eq 0 ]; then
+        echo "No endpoints available for ${SERVICE_NAME}-${ENVIRONMENT}"
+        sleep 10
+        continue
+      fi
+
+      # Perform health check
+      HEALTH_URL="http://${SERVICE_NAME}-${ENVIRONMENT}.${NAMESPACE}.svc.cluster.local/health"
+      if curl -f -s --max-time 10 "$HEALTH_URL" >/dev/null; then
+        echo "Health check passed for ${SERVICE_NAME}-${ENVIRONMENT}"
+        exit 0
+      fi
+
+      echo "Health check failed, retrying in 10 seconds..."
+      sleep 10
+    done
+
+    echo "Health check timed out for ${SERVICE_NAME}-${ENVIRONMENT}"
+    exit 1
+
+  rollback.sh: |
+    #!/bin/bash
+    # Rollback script
+
+    SERVICE_NAME=${1:-quantumbeam-api}
+    FROM_ENVIRONMENT=${2:-green}
+    TO_ENVIRONMENT=${3:-blue}
+    NAMESPACE=${4:-production}
+    BLUE_GREEN_NAMESPACE=${5:-blue-green}
+
+    echo "Rolling back ${SERVICE_NAME} from ${FROM_ENVIRONMENT} to ${TO_ENVIRONMENT}"
+
+    # Switch traffic back to previous environment
+    kubectl patch service ${SERVICE_NAME} -n ${NAMESPACE} -p '{"spec":{"selector":{"app":"'${SERVICE_NAME}'","environment":"'${TO_ENVIRONMENT}'"}}}'
+
+    # Update traffic router configuration
+    kubectl patch configmap traffic-router-config -n ${BLUE_GREEN_NAMESPACE} --type=merge -p '{
+      "data": {
+        "config.yaml": $(kubectl get configmap traffic-router-config -n ${BLUE_GREEN_NAMESPACE} -o jsonpath='{.data.config\.yaml}' | sed 's/default_environment: "[^"]*"/default_environment: "'${TO_ENVIRONMENT}'"/')
+      }
+    }'
+
+    echo "Rollback completed"
+
+  smoke-test.sh: |
+    #!/bin/bash
+    # Smoke test script
+
+    SERVICE_NAME=${1:-quantumbeam-api}
+    ENVIRONMENT=${2:-green}
+    NAMESPACE=${3:-blue-green}
+    TEST_TIMEOUT=${4:-600}
+
+    echo "Running smoke tests for ${SERVICE_NAME} in ${ENVIRONMENT} environment"
+
+    BASE_URL="http://${SERVICE_NAME}-${ENVIRONMENT}.${NAMESPACE}.svc.cluster.local"
+
+    # Create smoke test job
+    cat <<EOF | kubectl apply -f -
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: smoke-test-${SERVICE_NAME}-${ENVIRONMENT}-$(date +%s)
+      namespace: ${NAMESPACE}
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: smoke-test
+            image: quantumbeam/smoke-tests:latest
+            env:
+            - name: BASE_URL
+              value: "${BASE_URL}"
+            - name: SERVICE_NAME
+              value: "${SERVICE_NAME}"
+            - name: TEST_TIMEOUT
+              value: "${TEST_TIMEOUT}"
+            command:
+            - python
+            - -m
+            - smoke_tests.main
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+    EOF
+
+    echo "Smoke test job created"
+---
+# Istio Virtual Service for Traffic Routing
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: quantumbeam-api-vs
+  namespace: production
+spec:
+  hosts:
+  - quantumbeam-api
+  http:
+  - match:
+    - headers:
+        x-environment:
+          exact: blue
+    route:
+    - destination:
+        host: quantumbeam-api-blue.blue-green.svc.cluster.local
+      weight: 100
+  - route:
+    - destination:
+        host: quantumbeam-api-blue.blue-green.svc.cluster.local
+      weight: 100
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: quantumbeam-fraud-detection-vs
+  namespace: production
+spec:
+  hosts:
+  - quantumbeam-fraud-detection
+  http:
+  - match:
+    - headers:
+        x-environment:
+          exact: green
+    route:
+    - destination:
+        host: quantumbeam-fraud-detection-green.blue-green.svc.cluster.local
+      weight: 100
+  - route:
+    - destination:
+        host: quantumbeam-fraud-detection-blue.blue-green.svc.cluster.local
+      weight: 100
+---
+# Blue-Green Deployment Controller
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blue-green-controller
+  namespace: blue-green
+  labels:
+    app: blue-green-controller
+    component: deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blue-green-controller
+  template:
+    metadata:
+      labels:
+        app: blue-green-controller
+        component: deployment
+    spec:
+      serviceAccountName: blue-green-controller-sa
+      containers:
+      - name: controller
+        image: quantumbeam/blue-green-controller:latest
+        imagePullPolicy: Always
+        env:
+        - name: WATCH_NAMESPACE
+          value: "blue-green,production"
+        - name: SERVICE_ACCOUNT_NAME
+          value: "blue-green-controller-sa"
+        - name: CONFIG_MAP_NAME
+          value: "traffic-router-config"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: METRICS_ADDR
+          value: ":8080"
+        - name: HEALTH_PROBE_ADDR
+          value: ":8081"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        ports:
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: blue-green-controller-sa
+  namespace: blue-green
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: blue-green-controller-role
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+- apiGroups: ["networking.istio.io"]
+  resources: ["virtualservices", "destinationrules"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: blue-green-controller-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: blue-green-controller-role
+subjects:
+- kind: ServiceAccount
+  name: blue-green-controller-sa
+  namespace: blue-green

@@ -1,0 +1,399 @@
+# AWS WAF Rules Configuration for QuantumBeam API
+# Provides comprehensive protection against common web attacks
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'QuantumBeam WAF Security Rules'
+
+Parameters:
+  StackName:
+    Type: String
+    Default: 'quantumbeam-waf'
+    Description: 'Stack name for WAF resources'
+
+  Environment:
+    Type: String
+    Default: 'production'
+    AllowedValues: ['production', 'staging', 'development']
+    Description: 'Environment for WAF deployment'
+
+Resources:
+  # WAF WebACL
+  QuantumBeamWebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub '${StackName}-${Environment}-webacl'
+      Scope: CLOUDFRONT  # Use REGIONAL for ALB, CLOUDFRONT for CloudFront
+      DefaultAction:
+        Allow: {}
+      Description: 'QuantumBeam API WebACL with security rules'
+      Rules:
+        # AWSManagedRulesCommonRuleSet - Common attack patterns
+        - Name: AWSManagedRulesCommonRuleSet
+          Priority: 1
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+              ExcludedRules:
+                # Exclude rules that might block legitimate traffic
+                - Name: NoUserAgent_HEADER
+                - Name: UserAgent_BadBots_HEADER
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesCommonRuleSet
+
+        # AWSManagedRulesKnownBadInputsRuleSet - Known bad inputs
+        - Name: AWSManagedRulesKnownBadInputsRuleSet
+          Priority: 2
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesKnownBadInputsRuleSet
+
+        # AWSManagedRulesSQLiRuleSet - SQL Injection protection
+        - Name: AWSManagedRulesSQLiRuleSet
+          Priority: 3
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesSQLiRuleSet
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesSQLiRuleSet
+
+        # AWSManagedRulesUnixRuleSet - Unix OS command injection
+        - Name: AWSManagedRulesUnixRuleSet
+          Priority: 4
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesUnixRuleSet
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesUnixRuleSet
+
+        # AWSManagedRulesLinuxRuleSet - Linux OS command injection
+        - Name: AWSManagedRulesLinuxRuleSet
+          Priority: 5
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesLinuxRuleSet
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesLinuxRuleSet
+
+        # AWSManagedRulesPHPRuleSet - PHP injection attacks
+        - Name: AWSManagedRulesPHPRuleSet
+          Priority: 6
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesPHPRuleSet
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: AWSManagedRulesPHPRuleSet
+
+        # Rate limiting rule
+        - Name: RateLimitRule
+          Priority: 10
+          Statement:
+            RateBasedStatement:
+              Limit: 2000  # requests per 5 minutes
+              AggregateKeyType: IP
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateLimitRule
+
+        # Rate limiting for API endpoints (more restrictive)
+        - Name: APIRateLimitRule
+          Priority: 11
+          Statement:
+            AndStatement:
+              Statements:
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      UriPath: {}
+                    PositionalConstraint: STARTS_WITH
+                    SearchString: '/v1/'
+                    TextTransformations:
+                      - Priority: 0
+                        Type: NONE
+                - RateBasedStatement:
+                    Limit: 1000  # requests per 5 minutes for API
+                    AggregateKeyType: IP
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: APIRateLimitRule
+
+        # Block suspicious user agents
+        - Name: BlockSuspiciousUserAgents
+          Priority: 12
+          Statement:
+            OrStatement:
+              Statements:
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      SingleHeader:
+                        Name: user-agent
+                    PositionalConstraint: CONTAINS
+                    SearchString: 'sqlmap'
+                    TextTransformations:
+                      - Priority: 0
+                        Type: LOWERCASE
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      SingleHeader:
+                        Name: user-agent
+                    PositionalConstraint: CONTAINS
+                    SearchString: 'nikto'
+                    TextTransformations:
+                      - Priority: 0
+                        Type: LOWERCASE
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      SingleHeader:
+                        Name: user-agent
+                    PositionalConstraint: CONTAINS
+                    SearchString: 'nmap'
+                    TextTransformations:
+                      - Priority: 0
+                        Type: LOWERCASE
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      SingleHeader:
+                        Name: user-agent
+                    PositionalConstraint: CONTAINS
+                    SearchString: 'masscan'
+                    TextTransformations:
+                      - Priority: 0
+                        Type: LOWERCASE
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: BlockSuspiciousUserAgents
+
+        # Block requests with suspicious headers
+        - Name: BlockSuspiciousHeaders
+          Priority: 13
+          Statement:
+            OrStatement:
+              Statements:
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      SingleHeader:
+                        Name: x-forwarded-for
+                    PositionalConstraint: CONTAINS
+                    SearchString: 'localhost'
+                    TextTransformations:
+                      - Priority: 0
+                        Type: LOWERCASE
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      SingleHeader:
+                        Name: x-real-ip
+                    PositionalConstraint: CONTAINS
+                    SearchString: '127.0.0.1'
+                    TextTransformations:
+                      - Priority: 0
+                        Type: NONE
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: BlockSuspiciousHeaders
+
+        # Geographic blocking (optional - uncomment to enable)
+        # - Name: GeographicBlockRule
+        #   Priority: 14
+        #   Statement:
+        #     GeoMatchStatement:
+        #       CountryCodes:
+        #         - CN  # China
+        #         - RU  # Russia
+        #         - KP  # North Korea
+        #         - IR  # Iran
+        #   Action:
+        #     Block: {}
+        #   VisibilityConfig:
+        #     SampledRequestsEnabled: true
+        #     CloudWatchMetricsEnabled: true
+        #     MetricName: GeographicBlockRule
+
+        # Size constraint rule (block very large requests)
+        - Name: SizeConstraintRule
+          Priority: 15
+          Statement:
+            SizeConstraintStatement:
+              FieldToMatch:
+                Body: {}
+              ComparisonOperator: GT
+              Size: 10485760  # 10MB
+              TextTransformations:
+                - Priority: 0
+                  Type: NONE
+          Action:
+            Block: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: SizeConstraintRule
+
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub '${StackName}-${Environment}-webacl'
+      Tags:
+        - Key: Name
+          Value: !Sub '${StackName}-${Environment}-webacl'
+        - Key: Project
+          Value: quantumbeam
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CloudWatch Log Group for WAF logs
+  WAFLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/wafv2/${StackName}-${Environment}'
+      RetentionInDays: 30
+
+  # IAM Role for WAF logging
+  WAFLoggingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${StackName}-${Environment}-waf-logging-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ['firehose.amazonaws.com']
+            Action: ['sts:AssumeRole']
+      Policies:
+        - PolicyName: WAFLoggingPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/wafv2/${StackName}-${Environment}:*'
+
+  # Kinesis Firehose for WAF logging
+  WAFFirehose:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Sub '${StackName}-${Environment}-waf-logs'
+      S3DestinationConfiguration:
+        BucketARN: !Sub 'arn:aws:s3:::quantumbeam-waf-logs-${AWS::AccountId}'
+        Prefix: 'waf-logs/'
+        ErrorOutputPrefix: 'waf-logs-errors/'
+        BufferingHints:
+          SizeInMBs: 5
+          IntervalInSeconds: 300
+        CompressionFormat: GZIP
+        RoleARN: !GetAtt WAFLoggingRole.Arn
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Ref WAFLogGroup
+          LogStreamName: waf-delivery-stream
+
+  # WebACL Association with CloudFront Distribution (if using CloudFront)
+  # Uncomment and modify if you're using CloudFront
+  # WebACLAssociation:
+  #   Type: AWS::WAFv2::WebACLAssociation
+  #   Properties:
+  #     ResourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/YOUR_DISTRIBUTION_ID'
+  #     WebACLArn: !GetAtt QuantumBeamWebACL.Arn
+
+  # CloudWatch Alarms for WAF metrics
+  WAFBlockedRequestsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${StackName}-${Environment}-waf-blocked-requests'
+      AlarmDescription: 'Alarm when WAF blocks too many requests'
+      MetricName: AllowedRequests
+      Namespace: 'AWS/WAFV2'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 100
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+        - Name: WebACL
+          Value: !Ref QuantumBeamWebACL
+      AlarmActions:
+        - !Ref WAFAlarmTopic
+      TreatMissingData: notBreaching
+
+  # SNS Topic for WAF alerts
+  WAFAlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${StackName}-${Environment}-waf-alerts'
+      DisplayName: 'QuantumBeam WAF Alerts'
+
+  # SNS Subscription for alerts
+  WAFAlertSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref WAFAlarmTopic
+      Protocol: email
+      Endpoint: !Sub 'security-alerts@quantumbeam.com'  # Replace with actual email
+
+Outputs:
+  WebACLId:
+    Description: 'WAF WebACL ID'
+    Value: !GetAtt QuantumBeamWebACL.Id
+    Export:
+      Name: !Sub '${StackName}-${Environment}-WebACLId'
+
+  WebACLArn:
+    Description: 'WAF WebACL ARN'
+    Value: !GetAtt QuantumBeamWebACL.Arn
+    Export:
+      Name: !Sub '${StackName}-${Environment}-WebACLArn'
+
+  WAFLogGroupName:
+    Description: 'CloudWatch Log Group for WAF logs'
+    Value: !Ref WAFLogGroup
+    Export:
+      Name: !Sub '${StackName}-${Environment}-WAFLogGroup'
+
+  WAFAlarmTopicArn:
+    Description: 'SNS Topic for WAF alerts'
+    Value: !Ref WAFAlarmTopic
+    Export:
+      Name: !Sub '${StackName}-${Environment}-WAFAlarmTopic'

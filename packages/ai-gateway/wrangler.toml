@@ -1,0 +1,106 @@
+# Cloudflare Workers config for @finsavvyai/ai-gateway
+#
+# Base worker is unused for deploy — always use --env staging or --env production.
+# All ids below are PLACEHOLDERS. Replace via `wrangler ... create` outputs.
+# See: infrastructure/cloudflare/README.md for provisioning + secret management.
+
+name = "finsavvy-ai-gateway"
+main = "src/worker.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+# Default vars (overridden per env). Secrets go via `wrangler secret put`, never here.
+[vars]
+FINSAVVY_AUDIT_SINK = "stdout"
+LOG_LEVEL = "info"
+VERSION = "0.0.0-local"
+
+[observability]
+enabled = true
+
+# -----------------------------------------------------------------------------
+# Staging
+# -----------------------------------------------------------------------------
+[env.staging]
+name = "finsavvy-ai-gateway-staging"
+workers_dev = false
+routes = [
+  { pattern = "ai-gateway.staging.finsavvy.ai/*", zone_name = "finsavvy.ai" },
+]
+
+[env.staging.vars]
+FINSAVVY_AUDIT_SINK = "r2"
+FINSAVVY_AUDIT_R2_BUCKET = "finsavvy-audit-staging"
+LOG_LEVEL = "debug"
+VERSION = "<POPULATED_AT_DEPLOY>"
+
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "<PLACEHOLDER_STAGING_RATE_LIMIT_KV_ID>"
+
+[[env.staging.kv_namespaces]]
+binding = "RESPONSE_CACHE_KV"
+id = "<PLACEHOLDER_STAGING_RESPONSE_CACHE_KV_ID>"
+
+[[env.staging.d1_databases]]
+binding = "GATEWAY_DB"
+database_name = "finsavvy-ai-gateway-staging"
+database_id = "<PLACEHOLDER_STAGING_D1_ID>"
+migrations_dir = "migrations"
+
+[[env.staging.r2_buckets]]
+binding = "AUDIT_LOG_BUCKET"
+bucket_name = "finsavvy-audit-staging"
+
+[env.staging.observability]
+enabled = true
+
+# Secrets (set via `wrangler secret put <NAME> --env staging`):
+#   FINSAVVY_AUDIT_DD_API_KEY     - Datadog ingestion key (only if AUDIT_SINK=datadog)
+#   JWT_PUBLIC_KEY                - PEM-encoded RSA public key for token verify
+#   STRIPE_WEBHOOK_SECRET         - whsec_... from Stripe webhook endpoint
+#   LEMONSQUEEZY_WEBHOOK_SECRET   - signing secret from LemonSqueezy store settings
+
+# -----------------------------------------------------------------------------
+# Production
+# -----------------------------------------------------------------------------
+[env.production]
+name = "finsavvy-ai-gateway-production"
+workers_dev = false
+routes = [
+  { pattern = "ai-gateway.finsavvy.ai/*", zone_name = "finsavvy.ai" },
+]
+
+[env.production.vars]
+FINSAVVY_AUDIT_SINK = "datadog"
+FINSAVVY_AUDIT_R2_BUCKET = "finsavvy-audit-production"
+LOG_LEVEL = "info"
+VERSION = "<POPULATED_AT_DEPLOY>"
+
+[[env.production.kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "<PLACEHOLDER_PRODUCTION_RATE_LIMIT_KV_ID>"
+
+[[env.production.kv_namespaces]]
+binding = "RESPONSE_CACHE_KV"
+id = "<PLACEHOLDER_PRODUCTION_RESPONSE_CACHE_KV_ID>"
+
+[[env.production.d1_databases]]
+binding = "GATEWAY_DB"
+database_name = "finsavvy-ai-gateway-production"
+database_id = "<PLACEHOLDER_PRODUCTION_D1_ID>"
+migrations_dir = "migrations"
+
+[[env.production.r2_buckets]]
+binding = "AUDIT_LOG_BUCKET"
+bucket_name = "finsavvy-audit-production"
+
+[env.production.observability]
+enabled = true
+
+# Secrets (set via `wrangler secret put <NAME> --env production`):
+#   FINSAVVY_AUDIT_DD_API_KEY
+#   JWT_PUBLIC_KEY
+#   STRIPE_WEBHOOK_SECRET
+#   LEMONSQUEEZY_WEBHOOK_SECRET

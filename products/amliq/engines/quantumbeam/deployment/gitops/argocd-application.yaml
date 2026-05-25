@@ -1,0 +1,273 @@
+# ArgoCD Application for QuantumBeam GitOps
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam
+  namespace: argocd
+  labels:
+    app: quantumbeam
+    environment: production
+    component: gitops
+  annotations:
+    argocd.argoproj.io/sync-options: CreateNamespace=true
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/quantumbeam-k8s
+    targetRevision: main
+    path: manifests/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+    - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    managedNamespaceMetadata:
+      labels:
+        managed-by: argocd
+        app.kubernetes.io/part-of: quantumbeam
+      annotations:
+        argocd.argoproj.io/managed-by: quantumbeam
+---
+# Monitoring Stack Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-monitoring
+  namespace: argocd
+  labels:
+    app: quantumbeam
+    component: monitoring
+    environment: production
+  annotations:
+    argocd.argoproj.io/sync-options: CreateNamespace=true
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/quantumbeam-k8s
+    targetRevision: main
+    path: manifests/monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+# Blue-Green Deployment Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-bluegreen
+  namespace: argocd
+  labels:
+    app: quantumbeam
+    component: blue-green
+    environment: production
+  annotations:
+    argocd.argoproj.io/sync-options: CreateNamespace=true
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/quantumbeam-k8s
+    targetRevision: main
+    path: manifests/blue-green
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: blue-green
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+# Infrastructure Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-infrastructure
+  namespace: argocd
+  labels:
+    app: quantumbeam
+    component: infrastructure
+    environment: production
+  annotations:
+    argocd.argoproj.io/sync-options: CreateNamespace=true
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/quantumbeam-infra
+    targetRevision: main
+    path: terraform/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false  # Manual sync for infrastructure changes
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+---
+# Secrets Management Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-secrets
+  namespace: argocd
+  labels:
+    app: quantumbeam
+    component: secrets
+    environment: production
+  annotations:
+    argocd.argoproj.io/sync-options: CreateNamespace=true
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/quantumbeam-secrets
+    targetRevision: main
+    path: manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+# Staging Environment Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-staging
+  namespace: argocd
+  labels:
+    app: quantumbeam
+    environment: staging
+    component: gitops
+  annotations:
+    argocd.argoproj.io/sync-options: CreateNamespace=true
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/quantumbeam-k8s
+    targetRevision: main
+    path: manifests/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+# Development Environment Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-development
+  namespace: argocd
+  labels:
+    app: quantumbeam
+    environment: development
+    component: gitops
+  annotations:
+    argocd.argoproj.io/sync-options: CreateNamespace=true
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/quantumbeam-k8s
+    targetRevision: develop
+    path: manifests/development
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: development
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PrunePropagationPolicy=foreground
+    - PruneLast=true
+    - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

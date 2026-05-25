@@ -1,0 +1,405 @@
+# QuantumBeam Auto-scaling Configuration
+# Comprehensive auto-scaling with predictive capabilities and cost optimization
+
+# Global settings
+evaluation_interval: 60  # seconds
+stabilization_window: 300  # seconds
+max_scale_up_percent: 100  # Maximum scale-up percentage
+max_scale_down_percent: 50  # Maximum scale-down percentage
+
+# Metrics collection configuration
+metrics:
+  prometheus:
+    url: "http://prometheus:9090"
+    headers: {}
+    timeout: 30  # seconds
+
+# Predictive scaling configuration
+predictive_scaling:
+  enabled: true
+  forecast_minutes: 15
+  confidence_threshold: 0.7
+  historical_data_days: 7
+  model_update_interval: 3600  # seconds
+
+# Cost optimization configuration
+cost_optimization:
+  enabled: true
+  instance_cost_per_hour: 0.05  # $0.05 per vCPU-hour
+  memory_gb_cost_per_hour: 0.01  # $0.01 per GB-hour
+  max_cost_increase_percent: 20
+  target_cost_efficiency: 0.8
+
+# Auto-scaling policies
+policies:
+  # API Service Auto-scaling
+  - name: "api-service"
+    namespace: "quantumbeam"
+    deployment_name: "quantumbeam-api"
+    min_replicas: 3
+    max_replicas: 20
+    scaling_behavior: "step"
+    stabilization_window: 300
+    predictive_scaling: true
+    cost_optimization: true
+    metrics:
+      - name: "cpu_utilization"
+        prometheus_query: "rate(container_cpu_usage_seconds_total{namespace=\"quantumbeam\",pod=~\"quantumbeam-api-.*\"}[5m]) * 100"
+        target_value: 70.0
+        threshold_up: 80.0
+        threshold_down: 30.0
+        scaling_factor: 0.5
+        evaluation_period: 300
+        cooldown_period: 300
+
+      - name: "memory_utilization"
+        prometheus_query: "(container_memory_working_set_bytes{namespace=\"quantumbeam\",pod=~\"quantumbeam-api-.*\"} / container_spec_memory_limit_bytes{namespace=\"quantumbeam\",pod=~\"quantumbeam-api-.*\"}) * 100"
+        target_value: 75.0
+        threshold_up: 85.0
+        threshold_down: 40.0
+        scaling_factor: 0.3
+        evaluation_period: 300
+        cooldown_period: 300
+
+      - name: "request_rate"
+        prometheus_query: "rate(http_requests_total{namespace=\"quantumbeam\",service=\"api\"}[5m])"
+        target_value: 100.0
+        threshold_up: 150.0
+        threshold_down: 50.0
+        scaling_factor: 1.0
+        evaluation_period: 180
+        cooldown_period: 120
+
+      - name: "response_time_p95"
+        prometheus_query: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{namespace=\"quantumbeam\",service=\"api\"}[5m])) * 1000"
+        target_value: 500.0
+        threshold_up: 1000.0
+        threshold_down: 200.0
+        scaling_factor: 0.5
+        evaluation_period: 300
+        cooldown_period: 300
+
+  # Worker Service Auto-scaling
+  - name: "worker-service"
+    namespace: "quantumbeam"
+    deployment_name: "quantumbeam-worker"
+    min_replicas: 2
+    max_replicas: 10
+    scaling_behavior: "linear"
+    stabilization_window: 600
+    predictive_scaling: true
+    cost_optimization: true
+    metrics:
+      - name: "queue_length"
+        prometheus_query: "redis_queue_length{namespace=\"quantumbeam\",queue=\"worker_tasks\"}"
+        target_value: 100.0
+        threshold_up: 200.0
+        threshold_down: 25.0
+        scaling_factor: 1.0
+        evaluation_period: 120
+        cooldown_period: 180
+
+      - name: "cpu_utilization"
+        prometheus_query: "rate(container_cpu_usage_seconds_total{namespace=\"quantumbeam\",pod=~\"quantumbeam-worker-.*\"}[5m]) * 100"
+        target_value: 80.0
+        threshold_up: 90.0
+        threshold_down: 40.0
+        scaling_factor: 0.5
+        evaluation_period: 300
+        cooldown_period: 300
+
+      - name: "processing_rate"
+        prometheus_query: "rate(worker_tasks_processed_total{namespace=\"quantumbeam\"}[5m])"
+        target_value: 50.0
+        threshold_up: 80.0
+        threshold_down: 20.0
+        scaling_factor: 1.0
+        evaluation_period: 300
+        cooldown_period: 240
+
+  # Analytics Service Auto-scaling
+  - name: "analytics-service"
+    namespace: "quantumbeam"
+    deployment_name: "quantumbeam-analytics"
+    min_replicas: 1
+    max_replicas: 5
+    scaling_behavior: "exponential"
+    stabilization_window: 900
+    predictive_scaling: false
+    cost_optimization: true
+    metrics:
+      - name: "cpu_utilization"
+        prometheus_query: "rate(container_cpu_usage_seconds_total{namespace=\"quantumbeam\",pod=~\"quantumbeam-analytics-.*\"}[5m]) * 100"
+        target_value: 70.0
+        threshold_up: 85.0
+        threshold_down: 20.0
+        scaling_factor: 0.7
+        evaluation_period: 600
+        cooldown_period: 600
+
+      - name: "concurrent_queries"
+        prometheus_query: "analytics_concurrent_queries{namespace=\"quantumbeam\"}"
+        target_value: 50.0
+        threshold_up: 100.0
+        threshold_down: 10.0
+        scaling_factor: 0.8
+        evaluation_period: 300
+        cooldown_period: 600
+
+  # Background Job Service Auto-scaling
+  - name: "job-service"
+    namespace: "quantumbeam"
+    deployment_name: "quantumbeam-jobs"
+    min_replicas: 1
+    max_replicas: 3
+    scaling_behavior: "step"
+    stabilization_window: 1800
+    predictive_scaling: true
+    cost_optimization: false
+    metrics:
+      - name: "job_queue_length"
+        prometheus_query: "job_queue_length{namespace=\"quantumbeam\",type=\"background\"}"
+        target_value: 10.0
+        threshold_up: 50.0
+        threshold_down: 0.0
+        scaling_factor: 1.0
+        evaluation_period: 300
+        cooldown_period: 900
+
+      - name: "job_completion_rate"
+        prometheus_query: "rate(jobs_completed_total{namespace=\"quantumbeam\"}[5m])"
+        target_value: 5.0
+        threshold_up: 10.0
+        threshold_down: 1.0
+        scaling_factor: 1.0
+        evaluation_period: 600
+        cooldown_period: 1200
+
+# Environment-specific settings
+environments:
+  development:
+    evaluation_interval: 120
+    stabilization_window: 180
+    max_scale_up_percent: 200
+    max_scale_down_percent: 100
+    cost_optimization:
+      enabled: false
+    predictive_scaling:
+      enabled: false
+
+  staging:
+    evaluation_interval: 90
+    stabilization_window: 300
+    max_scale_up_percent: 150
+    max_scale_down_percent: 75
+    cost_optimization:
+      enabled: true
+      max_cost_increase_percent: 30
+    predictive_scaling:
+      enabled: true
+      confidence_threshold: 0.6
+
+  production:
+    evaluation_interval: 60
+    stabilization_window: 300
+    max_scale_up_percent: 100
+    max_scale_down_percent: 50
+    cost_optimization:
+      enabled: true
+      max_cost_increase_percent: 20
+    predictive_scaling:
+      enabled: true
+      confidence_threshold: 0.7
+
+# Scaling behavior configurations
+scaling_behaviors:
+  step:
+    description: "Step scaling with fixed replica changes"
+    max_scale_factor: 2.0
+    min_scale_factor: 0.5
+
+  linear:
+    description: "Linear scaling with proportional changes"
+    max_scale_factor: 3.0
+    min_scale_factor: 0.3
+
+  exponential:
+    description: "Exponential scaling for rapid changes"
+    max_scale_factor: 4.0
+    min_scale_factor: 0.2
+    max_replicas_per_step: 5
+
+# Advanced scaling features
+advanced_features:
+  # Predictive scaling configuration
+  predictive_scaling:
+    algorithms:
+      - "linear_regression"
+      - "moving_average"
+      - "seasonal_decomposition"
+    model_retraining_interval: 3600  # seconds
+    min_confidence_threshold: 0.5
+    max_confidence_threshold: 0.9
+
+  # Cost optimization
+  cost_optimization:
+    algorithms:
+      - "cost_efficiency"
+      - "performance_per_cost"
+      - "budget_constraints"
+    cost_sensitivity: "medium"  # low, medium, high
+    allow_overspend_percent: 10
+
+  # Scaling policies
+  scaling_policies:
+    aggressive:
+      description: "Fast scaling for performance-critical services"
+      scale_up_threshold: 1.2
+      scale_down_threshold: 0.5
+      stabilization_window: 180
+
+    conservative:
+      description: "Cautious scaling for stability-focused services"
+      scale_up_threshold: 1.5
+      scale_down_threshold: 0.2
+      stabilization_window: 600
+
+    balanced:
+      description: "Balanced scaling for general-purpose services"
+      scale_up_threshold: 1.3
+      scale_down_threshold: 0.3
+      stabilization_window: 300
+
+# Integration settings
+integrations:
+  # Prometheus integration
+  prometheus:
+    enabled: true
+    scrape_interval: 15  # seconds
+    metric_retention: 7  # days
+
+  # Kubernetes integration
+  kubernetes:
+    enabled: true
+    api_timeout: 30  # seconds
+    retry_attempts: 3
+    retry_delay: 5  # seconds
+
+  # CloudWatch integration (for AWS)
+  cloudwatch:
+    enabled: false
+    region: "us-east-1"
+    namespace: "QuantumBeam/AutoScaling"
+
+  # Slack notifications
+  notifications:
+    slack:
+      enabled: true
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#scaling-alerts"
+      username: "QuantumBeam Auto-scaler"
+
+    email:
+      enabled: true
+      smtp_server: "smtp.gmail.com"
+      smtp_port: 587
+      username: "${SMTP_USERNAME}"
+      password: "${SMTP_PASSWORD}"
+      recipients: ["team@quantumbeam.io"]
+
+# Monitoring and alerting
+monitoring:
+  # Performance metrics
+  metrics:
+    scaling_events:
+      enabled: true
+      retention_days: 30
+
+    policy_performance:
+      enabled: true
+      retention_days: 30
+
+    cost_tracking:
+      enabled: true
+      retention_days: 30
+
+  # Alerts
+  alerts:
+    scaling_events:
+      enabled: true
+      channels: ["slack", "email"]
+
+    performance_degradation:
+      enabled: true
+      channels: ["slack"]
+
+    cost_anomalies:
+      enabled: true
+      channels: ["email"]
+
+  # Thresholds
+  thresholds:
+    scaling_frequency:
+      warning: 5  # events per hour
+      critical: 10  # events per hour
+
+    response_time:
+      warning: 5000  # milliseconds
+      critical: 10000  # milliseconds
+
+    error_rate:
+      warning: 5  # percent
+      critical: 10  # percent
+
+# Security settings
+security:
+  # Authentication
+  authentication:
+    enabled: true
+    method: "rbac"
+
+  # Authorization
+  authorization:
+    enabled: true
+    rbac_config:
+      rules:
+        - resource: "policies"
+          actions: ["read", "write", "delete"]
+          roles: ["admin"]
+
+        - resource: "events"
+          actions: ["read"]
+          roles: ["admin", "operator", "viewer"]
+
+  # Audit logging
+  audit:
+    enabled: true
+    log_level: "INFO"
+    log_actions: ["evaluate", "scale", "create_policy", "delete_policy"]
+    retention_days: 90
+
+# Troubleshooting and debugging
+debugging:
+  # Debug logging
+  logging:
+    enabled: false
+    level: "DEBUG"
+    include_sensitive_data: false
+
+  # Debug endpoints
+  endpoints:
+    enabled: true
+    authentication_required: true
+    paths:
+      - "/debug/policies"
+      - "/debug/metrics"
+      - "/debug/events"
+      - "/debug/predictions"
+
+  # Health checks
+  health_checks:
+    enabled: true
+    endpoints:
+      - "/health"
+      - "/ready"
+    check_interval: 30  # seconds

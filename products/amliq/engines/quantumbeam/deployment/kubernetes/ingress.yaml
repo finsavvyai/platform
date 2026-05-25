@@ -1,0 +1,247 @@
+# Ingress for QuantumBeam API and Services
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quantumbeam-ingress
+  namespace: quantumbeam
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+spec:
+  tls:
+  - hosts:
+    - api.quantumbeam.io
+    - app.quantumbeam.io
+    - monitor.quantumbeam.io
+    secretName: quantumbeam-tls
+  rules:
+  # Main API endpoint
+  - host: api.quantumbeam.io
+    http:
+      paths:
+      - path: /v1(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: quantumbeam-api-service
+            port:
+              number: 8080
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: quantumbeam-api-service
+            port:
+              number: 8080
+      - path: /metrics
+        pathType: Prefix
+        backend:
+          service:
+            name: quantumbeam-api-service
+            port:
+              number: 8080
+  # Frontend application
+  - host: app.quantumbeam.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: quantumbeam-api-service
+            port:
+              number: 8080
+  # Monitoring services (restricted access)
+  - host: monitor.quantumbeam.io
+    http:
+      paths:
+      - path: /grafana(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana-service
+            port:
+              number: 3000
+      - path: /prometheus(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus-service
+            port:
+              number: 9090
+
+---
+
+# Separate Ingress for internal services with authentication
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quantumbeam-internal-ingress
+  namespace: quantumbeam
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/auth-type: "basic"
+    nginx.ingress.kubernetes.io/auth-secret: "quantumbeam-basic-auth"
+    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+spec:
+  tls:
+  - hosts:
+    - internal.quantumbeam.io
+    secretName: quantumbeam-internal-tls
+  rules:
+  - host: internal.quantumbeam.io
+    http:
+      paths:
+      # Quantum service internal access
+      - path: /quantum(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: quantum-service
+            port:
+              number: 8001
+      # AI/ML service internal access
+      - path: /ai(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: ai-ml-service
+            port:
+              number: 8001
+      # AlertManager internal access
+      - path: /alerts(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: alertmanager-service
+            port:
+              number: 9093
+
+---
+
+# Network Policy for QuantumBeam services
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quantumbeam-network-policy
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from Ingress controller
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8001
+  # Allow traffic between QuantumBeam services
+  - from:
+    - podSelector:
+        matchLabels:
+          app: quantumbeam-api
+    - podSelector:
+        matchLabels:
+          app: quantumbeam-quantum
+    - podSelector:
+        matchLabels:
+          app: quantumbeam-ai-ml
+    - podSelector:
+        matchLabels:
+          app: quantumbeam-prometheus
+    - podSelector:
+        matchLabels:
+          app: quantumbeam-grafana
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8001
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 3000
+  # Allow traffic from monitoring
+  - from:
+    - podSelector:
+        matchLabels:
+          app: quantumbeam-prometheus
+    - podSelector:
+        matchLabels:
+          app: quantumbeam-grafana
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8001
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+  egress:
+  # Allow DNS resolution
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow external API calls (OpenAI, Anthropic, Quantum backends)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  # Allow database and cache access
+  - to:
+    - podSelector:
+        matchLabels:
+          app: quantumbeam-postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: quantumbeam-redis
+    ports:
+    - protocol: TCP
+      port: 6379
+
+---
+
+# Basic Authentication Secret for Internal Services
+apiVersion: v1
+kind: Secret
+metadata:
+  name: quantumbeam-basic-auth
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: auth
+type: Opaque
+data:
+  # Base64 encoded username:password (admin:secure_password_123)
+  auth: YWRtaW46c2VjdXJlX3Bhc3N3b3JkXzEyMwo=

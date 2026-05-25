@@ -1,0 +1,325 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: quantumbeam-api-vpa
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: api
+    scaling-type: vpa
+  annotations:
+    vpa-update-mode: "Auto"
+    vpa-conditions: "Available"
+spec:
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    minAllowed:
+      cpu: 50m
+      memory: 256Mi
+    maxAllowed:
+      cpu: 2000m
+      memory: 4Gi
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-api
+  recommenders:
+    - name: quantumbeam-resource-recommender
+      type: "Resource"
+    - name: quantumbeam-workload-recommender
+      type: "Workload"
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: quantumbeam-fraud-detector-vpa
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: fraud-detector
+    scaling-type: vpa
+  annotations:
+    vpa-update-mode: "Auto"
+    vpa-conditions: "Available"
+spec:
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    minAllowed:
+      cpu: 100m
+      memory: 512Mi
+    maxAllowed:
+      cpu: 4000m
+      memory: 8Gi
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-fraud-detector
+  recommenders:
+    - name: quantumbeam-resource-recommender
+      type: "Resource"
+    - name: quantumbeam-workload-recommender
+      type: "Workload"
+
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: quantumbeam-ai-ml-vpa
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: ai-ml
+    scaling-type: vpa
+  annotations:
+    vpa-update-mode: "Auto"
+    vpa-conditions: "Available"
+spec:
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    minAllowed:
+      cpu: 500m
+      memory: 1Gi
+    maxAllowed:
+      cpu: 8000m
+      memory: 16Gi
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-ai-ml
+  recommenders:
+    - name: quantumbeam-resource-recommender
+      type: "Resource"
+    - name: quantumbeam-workload-recommender
+      type: "Workload"
+
+---
+# VPA Updater configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vpa-updater-config
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: autoscaling
+    type: vpa-config
+data:
+  config.yaml: |
+    # VPA Updater configuration
+    updateMode: Auto
+    evictionTolerance: 0.1
+    resourceRequirements: {
+      # Default resource requirements for pods without explicit requests
+      defaultCPURequest: 100m
+      defaultMemoryRequest: 256Mi
+      defaultCPULimit: 2000m
+      defaultMemoryLimit: 4Gi
+    }
+
+    # Cost optimization settings
+    costOptimization: {
+      # Cost per CPU core per month
+      cpuCostPerCore: 50
+      # Cost per GB RAM per month
+      memoryCostPerGB: 10
+      # Maximum monthly cost per pod
+      maxMonthlyCostPerPod: 500
+    }
+
+    # Update policies
+    updatePolicies: {
+      # Minimum time between VPA updates for the same pod
+      minUpdateInterval: "24h"
+      # Maximum percentage change in resource requests
+      maxResourceChangePercent: 50
+      # Preferred utilization target
+      targetUtilizationPercent: 70
+    }
+
+    # Monitoring settings
+    monitoring: {
+      # Enable detailed logging
+      enableDetailedLogging: true
+      # Log update decisions
+      logUpdateDecisions: true
+      # Create metrics for VPA operations
+      createMetrics: true
+    }
+
+    # Performance tuning
+    performance: {
+      # Enable performance profiling
+      enableProfiling: true
+      # Profile duration
+      profileDuration: "7d"
+      # Sample rate for profiling
+      profileSampleRate: 0.1
+    }
+
+  recommendations.yaml: |
+    # Resource recommendation strategies
+    strategies:
+      resource:
+        # Conservative strategy - 10% headroom
+        conservative:
+          headroomPercent: 10
+          utilizationTarget: 60
+          confidenceThreshold: 0.8
+
+        # Balanced strategy - 20% headroom
+        balanced:
+          headroomPercent: 20
+          utilizationTarget: 70
+          confidenceThreshold: 0.7
+
+        # Aggressive strategy - 30% headroom
+        aggressive:
+          headroomPercent: 30
+          utilizationTarget: 80
+          confidenceThreshold: 0.6
+
+      workload:
+        # CPU intensive workloads
+        cpuIntensive:
+          cpuMultiplier: 1.2
+          memoryMultiplier: 1.1
+
+        # Memory intensive workloads
+        memoryIntensive:
+          cpuMultiplier: 1.1
+          memoryMultiplier: 1.3
+
+        # Balanced workloads
+        balanced:
+          cpuMultiplier: 1.1
+          memoryMultiplier: 1.1
+
+        # Network intensive workloads
+        networkIntensive:
+          cpuMultiplier: 1.3
+          memoryMultiplier: 1.0
+
+    # Application-specific recommendations
+    applications:
+      quantumbeam-api:
+        strategy: "balanced"
+        resourceMultipliers:
+          cpu: 1.1
+          memory: 1.05
+        specialRules:
+          - name: "high-traffic-scaling"
+            condition: "requests_per_minute > 1000"
+            cpuMultiplier: 1.5
+            memoryMultiplier: 1.2
+          - name: "machine-learning-workload"
+            condition: "ml_inference_rate > 50"
+            cpuMultiplier: 2.0
+            memoryMultiplier: 1.5
+
+      quantumbeam-fraud-detector:
+        strategy: "balanced"
+        resourceMultipliers:
+          cpu: 1.2
+          memory: 1.1
+        specialRules:
+          - name: "high-fraud-rate"
+            condition: "fraud_detection_rate > 10"
+            cpuMultiplier: 1.5
+            memoryMultiplier: 1.3
+          - name: "complex-model-execution"
+            condition: "model_complexity > 0.8"
+            cpuMultiplier: 2.0
+            memoryMultiplier: 2.0
+
+      quantumbeam-ai-ml:
+        strategy: "aggressive"
+        resourceMultipliers:
+          cpu: 1.3
+          memory: 1.2
+        specialRules:
+          - name: "gpu-intensive"
+            condition: "gpu_utilization > 80"
+            cpuMultiplier: 1.1
+            memoryMultiplier: 1.0
+          - name: "large-model-inference"
+            condition: "model_size > 1GB"
+            cpuMultiplier: 2.0
+            memoryMultiplier: 3.0
+
+  constraints.yaml: |
+    # Resource constraints and limits
+    globalConstraints:
+      # Maximum CPU per pod
+      maxCPUPerPod: 4
+      # Maximum memory per pod
+      maxMemoryPerPod: 16Gi
+      # Maximum storage per pod
+      maxStoragePerPod: 100Gi
+
+      # Cluster-wide constraints
+      cluster:
+        # Maximum CPU across all pods
+        maxTotalCPU: 100
+        # Maximum memory across all pods
+        maxTotalMemory: 400Gi
+        # Maximum pods in namespace
+        maxPodsPerNamespace: 1000
+
+    namespace: "quantumbeam":
+      # Maximum CPU for namespace
+      maxCPU: 50
+      # Maximum memory for namespace
+      maxMemory: 200Gi
+      # Maximum pods in namespace
+      maxPods: 500
+
+      # Per-deployment constraints
+      deployments:
+        quantumbeam-api:
+          maxCPU: 10
+          maxMemory: 20Gi
+          maxReplicas: 20
+          minReplicas: 3
+
+        quantumbeam-fraud-detector:
+          maxCPU: 20
+          maxMemory: 40Gi
+          maxReplicas: 10
+          minReplicas: 2
+
+        quantumbeam-ai-ml:
+          maxCPU: 40
+          maxMemory: 80Gi
+          maxReplicas: 8
+          minReplicas: 1
+
+  alerts.yaml: |
+    # VPA alerting rules
+    alerts:
+      - name: "high-resource-utilization"
+        condition: "utilization > 90%"
+        severity: "warning"
+        cooldown: "5m"
+        message: "High resource utilization detected"
+
+      - name: "frequent-scaling"
+        condition: "scaling_events > 5/hour"
+        severity: "info"
+        cooldown: "30m"
+        message: "Frequent VPA scaling detected"
+
+      - name: "resource-requests-not-met"
+        condition: "oom_kill_detected"
+        severity: "critical"
+        cooldown: "5m"
+        message: "Resource requests not met - OOM detected"
+
+      - name: "optimization-opportunity"
+        condition: "potential_savings > $50/month"
+        severity: "info"
+        cooldown: "1h"
+        message: "Resource optimization opportunity available"

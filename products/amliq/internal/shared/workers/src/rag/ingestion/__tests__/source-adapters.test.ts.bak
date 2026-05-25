@@ -1,0 +1,182 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { UserUploadAdapter } from "../source-adapters/user-upload-adapter";
+import { RegulatoryFeedAdapter } from "../source-adapters/regulatory-feed-adapter";
+import { ApiImportAdapter } from "../source-adapters/api-import-adapter";
+import { WebCrawlAdapter } from "../source-adapters/web-crawl-adapter";
+import { DocumentSource, DocumentType, Jurisdiction } from "../document-ingester";
+
+describe("Source Adapters", () => {
+  describe("UserUploadAdapter", () => {
+    let adapter: UserUploadAdapter;
+
+    beforeEach(() => {
+      adapter = new UserUploadAdapter();
+    });
+
+    it("should return provided content for user uploads", async () => {
+      const request = {
+        source: DocumentSource.USER_UPLOAD,
+        jurisdiction: Jurisdiction.US,
+        content: "Test document content"
+      };
+
+      const content = await adapter.fetchDocument(request);
+      expect(content).toBe("Test document content");
+    });
+
+    it("should extract metadata including upload type", async () => {
+      const request = {
+        source: DocumentSource.USER_UPLOAD,
+        jurisdiction: Jurisdiction.US,
+        content: "REGULATION document content",
+        metadata: { filename: "test.pdf", mimeType: "application/pdf" }
+      };
+
+      const metadata = await adapter.extractMetadata("Test content", request);
+      expect(metadata.uploadType).toBe("regulatory_document");
+      expect(metadata.filename).toBe("test.pdf");
+      expect(metadata.mimeType).toBe("application/pdf");
+    });
+
+    it("should validate user upload requests", async () => {
+      const validRequest = {
+        source: DocumentSource.USER_UPLOAD,
+        jurisdiction: Jurisdiction.US,
+        content: "Test content"
+      };
+
+      const invalidRequest = {
+        source: DocumentSource.USER_UPLOAD,
+        jurisdiction: Jurisdiction.US
+        // Missing content
+      };
+
+      expect(await adapter.validateRequest(validRequest)).toBe(true);
+      expect(await adapter.validateRequest(invalidRequest)).toBe(false);
+    });
+
+    it("should throw error for missing content", async () => {
+      const request = {
+        source: DocumentSource.USER_UPLOAD,
+        jurisdiction: Jurisdiction.US
+      };
+
+      await expect(adapter.fetchDocument(request)).rejects.toThrow("User upload requires content");
+    });
+  });
+
+  describe("RegulatoryFeedAdapter", () => {
+    let adapter: RegulatoryFeedAdapter;
+
+    beforeEach(() => {
+      adapter = new RegulatoryFeedAdapter();
+    });
+
+    it("should fetch content from regulatory feeds", async () => {
+      const request = {
+        source: DocumentSource.REGULATORY_FEED,
+        jurisdiction: Jurisdiction.US
+      };
+
+      const content = await adapter.fetchDocument(request);
+      expect(content).toContain("Sample Regulation from US");
+      expect(content).toContain("Regulatory Feed");
+    });
+
+    it("should validate regulatory feed requests", async () => {
+      const validRequest = {
+        source: DocumentSource.REGULATORY_FEED,
+        jurisdiction: Jurisdiction.US
+      };
+
+      const invalidRequest = {
+        source: DocumentSource.REGULATORY_FEED
+        // Missing jurisdiction
+      };
+
+      expect(await adapter.validateRequest(validRequest)).toBe(true);
+      expect(await adapter.validateRequest(invalidRequest)).toBe(false);
+    });
+  });
+
+  describe("ApiImportAdapter", () => {
+    let adapter: ApiImportAdapter;
+
+    beforeEach(() => {
+      adapter = new ApiImportAdapter();
+    });
+
+    it("should fetch content from API endpoints", async () => {
+      const request = {
+        source: DocumentSource.API_IMPORT,
+        jurisdiction: Jurisdiction.EU,
+        apiUrl: "https://api.example.com/data"
+      };
+
+      const content = await adapter.fetchDocument(request);
+      expect(content).toContain("Data imported from https://api.example.com/data");
+    });
+
+    it("should include API metadata", async () => {
+      const request = {
+        source: DocumentSource.API_IMPORT,
+        jurisdiction: Jurisdiction.EU,
+        apiUrl: "https://api.example.com/data"
+      };
+
+      const metadata = await adapter.extractMetadata("Test content", request);
+      expect(metadata.sourceUrl).toBe("https://api.example.com/data");
+      expect(metadata.importFormat).toBe("json");
+    });
+
+    it("should throw error for missing apiUrl", async () => {
+      const request = {
+        source: DocumentSource.API_IMPORT,
+        jurisdiction: Jurisdiction.EU
+      };
+
+      await expect(adapter.fetchDocument(request)).rejects.toThrow("API import requires apiUrl");
+    });
+  });
+
+  describe("WebCrawlAdapter", () => {
+    let adapter: WebCrawlAdapter;
+
+    beforeEach(() => {
+      adapter = new WebCrawlAdapter();
+    });
+
+    it("should fetch content from web URLs", async () => {
+      const request = {
+        source: DocumentSource.WEB_CRAWL,
+        jurisdiction: Jurisdiction.GLOBAL,
+        url: "https://example.com/article"
+      };
+
+      const content = await adapter.fetchDocument(request);
+      expect(content).toContain("Content crawled from https://example.com/article");
+    });
+
+    it("should include crawl metadata", async () => {
+      const request = {
+        source: DocumentSource.WEB_CRAWL,
+        jurisdiction: Jurisdiction.GLOBAL,
+        url: "https://example.com/article"
+      };
+
+      const metadata = await adapter.extractMetadata("Test content", request);
+      expect(metadata.sourceUrl).toBe("https://example.com/article");
+      expect(metadata.contentType).toBe("text/html");
+      expect(metadata.crawlMethod).toBe("automated");
+    });
+
+    it("should throw error for missing url", async () => {
+      const request = {
+        source: DocumentSource.WEB_CRAWL,
+        jurisdiction: Jurisdiction.GLOBAL
+      };
+
+      await expect(adapter.fetchDocument(request)).rejects.toThrow("Web crawl requires url");
+    });
+  });
+});

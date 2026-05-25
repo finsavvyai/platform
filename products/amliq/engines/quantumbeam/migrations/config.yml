@@ -1,0 +1,82 @@
+# QuantumBeam.io - Database Migration Configuration
+# Configuration for golang-migrate tool
+
+# Database configuration
+database:
+  host: ${DB_HOST:-localhost}
+  port: ${DB_PORT:-5433}
+  user: ${DB_USER:-postgres}
+  password: ${DB_PASSWORD:-password}
+  name: ${DB_NAME:-quantumbeam_dev}
+  ssl_mode: ${DB_SSL_MODE:-disable}
+  timezone: ${TIMEZONE:-UTC}
+
+# Connection pool settings
+pool:
+  max_open_connections: 25
+  max_idle_connections: 5
+  connection_max_lifetime: 300s
+  connection_max_idle_time: 60s
+
+# Migration settings
+migrations:
+  table_name: schema_migrations
+  lock_timeout: 30s
+  statements_timeout: 600s
+
+# Environments
+environments:
+  development:
+    database:
+      name: quantumbeam_dev
+    ssl_mode: disable
+    pool:
+      max_open_connections: 10
+
+  testing:
+    database:
+      name: quantumbeam_test
+    ssl_mode: disable
+    pool:
+      max_open_connections: 5
+
+  staging:
+    database:
+      name: quantumbeam_staging
+    ssl_mode: require
+    pool:
+      max_open_connections: 25
+
+  production:
+    database:
+      name: quantumbeam_prod
+    ssl_mode: require
+    pool:
+      max_open_connections: 100
+
+# Migration paths
+paths:
+  migrations: ./migrations
+  seeds: ./seeds
+  backup: ./backup
+
+# Validation settings
+validation:
+  check_foreign_keys: true
+  check_constraints: true
+  check_indexes: true
+  check_table_existence: true
+
+# Backup settings
+backup:
+  enabled: true
+  path: ./backup
+  format: sql
+  compression: gzip
+  retention_days: 30
+
+# Logging
+logging:
+  level: info
+  format: json
+  file: ./logs/migrations.log

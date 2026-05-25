@@ -1,0 +1,183 @@
+# FinsavvyAI — Provider-agnostic alert rules.
+#
+# Source of truth. The Datadog JSON (datadog.json) and any future provider
+# (Grafana, NewRelic, Cloudflare Workers Analytics) MUST be generated from /
+# kept in sync with this file.
+#
+# Fields:
+#   id          SCREAMING_SNAKE_CASE, stable. Used in runbook filenames + pager titles.
+#   name        Human readable, shown in pager/Slack.
+#   severity    critical | high | medium | low  (maps to SEV1..SEV4 in _oncall.md)
+#   trigger     One of:
+#                 prom_expr:   <PromQL-style expression on metric names emitted by OBSERVABILITY>
+#                 synthetic:   <probe name + ok=false consecutive runs>
+#                 audit_code:  <stable error code + count threshold + window>
+#   for         Duration the condition must persist before firing (e.g., "5m").
+#   runbook     Path (repo-relative) to the runbook markdown.
+#   channels    Notification channels — placeholders. See infrastructure/alerts/README.md.
+#   notes       Optional. Operational context for the on-call.
+#
+# Metric naming convention (must match OBSERVABILITY emitter):
+#   finsavvy.<service>.<signal>            e.g. finsavvy.gateway.error_rate
+#   finsavvy.audit.code.<dotted_code>      e.g. finsavvy.audit.code.billing_webhook_signature_invalid
+#     (dots in the original code are replaced with underscores for metric name safety)
+#
+# Worker names referenced (per WRANGLER contract §5):
+#   finsavvy-ai-gateway-staging | finsavvy-ai-gateway-production
+#   finsavvy-amliq-staging      | finsavvy-amliq-production  (planned)
+
+version: 1
+defaults:
+  channels: [slack-oncall]
+  evaluation_interval: 1m
+
+rules:
+  - id: HEALTH_DOWN
+    name: "Service health endpoint reporting down"
+    severity: critical
+    trigger:
+      synthetic:
+        probe: health
+        condition: ok=false
+        consecutive_runs: 2
+    for: 2m
+    runbook: docs/runbooks/HEALTH_DOWN.md
+    channels: [pagerduty, slack-oncall, slack-status]
+    notes: "Synthetic emits {probe, ok, latency_ms, ts, error}. Maps to contract §1 health shape."
+
+  - id: GATEWAY_ROUTE_FAIL
+    name: "AI gateway route synthetic failing"
+    severity: critical
+    trigger:
+      synthetic:
+        probe: gateway-route
+        condition: ok=false
+        consecutive_runs: 2
+    for: 2m
+    runbook: docs/runbooks/GATEWAY_ROUTE_FAIL.md
+    channels: [pagerduty, slack-oncall]
+
+  - id: GATEWAY_ERROR_RATE
+    name: "AI gateway 5xx error rate >1% (5m)"
+    severity: high
+    trigger:
+      prom_expr: 'finsavvy.gateway.error_rate{env="production"} > 0.01'
+    for: 5m
+    runbook: docs/runbooks/GATEWAY_ERROR_RATE.md
+    channels: [pagerduty, slack-oncall]
+
+  - id: GATEWAY_LATENCY_P95
+    name: "AI gateway p95 latency >500ms (10m)"
+    severity: high
+    trigger:
+      prom_expr: 'finsavvy.gateway.latency_ms_p95{env="production"} > 500'
+    for: 10m
+    runbook: docs/runbooks/GATEWAY_LATENCY_P95.md
+    channels: [slack-oncall]
+
+  - id: STRIPE_WEBHOOK_SIG_FAIL
+    name: "Stripe webhook signature failures spike"
+    severity: critical
+    trigger:
+      audit_code:
+        code: billing.webhook.signature_invalid
+        provider_label: stripe
+        count_gt: 5
+        window: 5m
+    for: 1m
+    runbook: docs/runbooks/STRIPE_WEBHOOK_SIG_FAIL.md
+    channels: [pagerduty, slack-oncall, slack-security]
+    notes: "Source: @finsavvyai/billing WebhookSignatureError. Possible forged webhooks or rotated secret."
+
+  - id: LEMONSQUEEZY_WEBHOOK_SIG_FAIL
+    name: "LemonSqueezy webhook signature failures spike"
+    severity: critical
+    trigger:
+      audit_code:
+        code: billing.webhook.signature_invalid
+        provider_label: lemonsqueezy
+        count_gt: 5
+        window: 5m
+    for: 1m
+    runbook: docs/runbooks/LEMONSQUEEZY_WEBHOOK_SIG_FAIL.md
+    channels: [pagerduty, slack-oncall, slack-security]
+
+  - id: WEBHOOK_REPLAY_DETECTED
+    name: "Webhook replay attempt detected"
+    severity: critical
+    trigger:
+      audit_code:
+        code: billing.webhook.replay
+        count_gt: 0
+        window: 5m
+    for: 0m  # fire immediately on any occurrence
+    runbook: docs/runbooks/WEBHOOK_REPLAY_DETECTED.md
+    channels: [pagerduty, slack-oncall, slack-security]
+    notes: "WebhookReplayError = timestamp outside replay window. Could be retry storm or attack."
+
+  - id: AUTH_JWT_SPIKE
+    name: "Auth failure rate spike (>50/min)"
+    severity: high
+    trigger:
+      prom_expr: 'rate(finsavvy.auth.failures_total{env="production"}[1m]) * 60 > 50'
+    for: 5m
+    runbook: docs/runbooks/AUTH_JWT_SPIKE.md
+    channels: [pagerduty, slack-oncall, slack-security]
+    notes: "Likely credential stuffing, expired JWKS, or clock skew."
+
+  - id: RATE_LIMIT_SPIKE
+    name: "Rate-limit rejections spike (>100/min)"
+    severity: medium
+    trigger:
+      prom_expr: 'rate(finsavvy.gateway.rate_limit_rejected_total{env="production"}[1m]) * 60 > 100'
+    for: 5m
+    runbook: docs/runbooks/RATE_LIMIT_SPIKE.md
+    channels: [slack-oncall]
+
+  - id: TOKEN_SPEND_BUDGET
+    name: "Per-tenant token spend over hourly budget"
+    severity: high
+    trigger:
+      # Threshold below is a PLACEHOLDER until finance signs off.
+      prom_expr: 'sum by (tenant_id) (rate(finsavvy.gateway.token_cost_usd_total{env="production"}[1h])) > 50'
+    for: 5m
+    runbook: docs/runbooks/TOKEN_SPEND_BUDGET.md
+    channels: [slack-oncall, slack-finance]
+    notes: "Threshold $50/h/tenant is placeholder. Update once usage baselines exist."
+
+  - id: POLICY_DENY_SPIKE
+    name: "Policy engine denial / error spike"
+    severity: high
+    trigger:
+      audit_code:
+        # Matches any PolicyError code (policy.malformed, policy.missing_id, policy.rule.malformed, policy.statement.malformed).
+        code_prefix: policy.
+        count_gt: 20
+        window: 5m
+    for: 5m
+    runbook: docs/runbooks/POLICY_DENY_SPIKE.md
+    channels: [slack-oncall]
+
+  - id: AMLIQ_DECISION_FAIL
+    name: "AMLIQ decision synthetic failing"
+    severity: high
+    trigger:
+      synthetic:
+        probe: amliq-decision
+        condition: ok=false
+        consecutive_runs: 2
+    for: 2m
+    runbook: docs/runbooks/AMLIQ_DECISION_FAIL.md
+    channels: [pagerduty, slack-oncall]
+    notes: "Probe is expected (not yet shipped). SYNTHETICS owes amliq-decision.mjs."
+
+  - id: WORKER_CPU_LIMIT
+    name: "Cloudflare Worker CPU >50ms (5m avg)"
+    severity: high
+    trigger:
+      # Cloudflare-emitted metric, surfaced via OBSERVABILITY analytics-engine exporter.
+      prom_expr: 'avg_over_time(finsavvy.worker.cpu_ms{env="production"}[5m]) > 50'
+    for: 5m
+    runbook: docs/runbooks/WORKER_CPU_LIMIT.md
+    channels: [slack-oncall]
+    notes: "CPU ceiling for Workers is 50ms (paid plan default). Sustained >50ms = throttling imminent."

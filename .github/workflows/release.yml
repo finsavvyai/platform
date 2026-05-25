@@ -1,0 +1,93 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: gate (ci checks)
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  build-and-release:
+    name: build-and-release
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm -r build
+
+      - name: Compute release tag
+        id: tag
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE=$(date -u +%Y%m%d)
+          TAG="v0.0.0-rc-${DATE}-${SHORT_SHA}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Package build artifacts
+        run: |
+          mkdir -p dist-release
+          # Archive each package dist if it exists
+          for pkg in packages/* products/*/engines/* oss/*; do
+            if [ -d "${pkg}/dist" ]; then
+              name=$(echo "${pkg}" | tr '/' '-')
+              tar -czf "dist-release/${name}.tgz" -C "${pkg}" dist
+            fi
+          done
+          ls -la dist-release || true
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.tag.outputs.tag }}
+          path: dist-release/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: "Create GitHub release (placeholder; TODO: wire changesets for semver)"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          body: |
+            Automated pre-release. Replace with changesets-driven release notes.
+            Commit: ${{ github.sha }}
+          draft: true
+          prerelease: true
+          files: dist-release/*.tgz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # TODO: publish to npm via changesets/action once package versions are managed.
+      # - uses: changesets/action@v1
+      #   with:
+      #     publish: pnpm -r publish --access public
+      #   env:
+      #     NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

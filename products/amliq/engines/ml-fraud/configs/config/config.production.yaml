@@ -1,0 +1,634 @@
+# QuantumBeam Configuration - Production Environment
+# This file contains production-specific overrides with security and performance optimizations
+
+# Environment Configuration
+environment:
+  name: "production"
+  debug: false
+  region: "us-east-1"
+  zone: "us-east-1a"
+  version: "1.0.0"
+  build_time: ""
+  git_commit: ""
+  instance_id: "" # Set automatically
+  cluster_name: "production-cluster"
+
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  port: 443 # HTTPS port
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "60s"
+  shutdown_timeout: "60s" # Longer graceful shutdown
+
+  tls:
+    enabled: true
+    cert_file: "/etc/ssl/certs/quantumbeam.crt"
+    key_file: "/etc/ssl/private/quantumbeam.key"
+    ca_file: "/etc/ssl/certs/ca.crt"
+    min_version: "TLS1.3" # Strongest TLS version
+    ciphers: ["TLS_AES_256_GCM_SHA384", "TLS_AES_128_GCM_SHA256", "TLS_CHACHA20_POLY1305_SHA256"]
+    auto_cert: false
+    email: "admin@quantumbeam.io"
+    hosts: ["quantumbeam.io", "api.quantumbeam.io", "www.quantumbeam.io"]
+
+  cors:
+    allowed_origins: ["https://quantumbeam.io", "https://app.quantumbeam.io", "https://admin.quantumbeam.io"]
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+    allowed_headers: ["Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-API-Version", "X-Feature-Flags"]
+    exposed_headers: ["X-Total-Count", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"]
+    allow_credentials: true
+    max_age: 86400
+
+  limits:
+    max_header_bytes: 1048576 # 1MB
+    max_body_bytes: 10485760 # 10MB
+    max_conns_per_ip: 20 # Stricter limits
+    max_conns_per_host: 1000
+    max_request_size: 10485760 # 10MB
+    max_file_upload_size: 20971520 # 20MB
+    request_timeout: "60s"
+    read_header_timeout: "30s"
+
+# Database Configuration
+database:
+  host: "prod-db-primary.quantumbeam.io" # Primary database
+  port: 5432
+  user: "quantumbeam_prod"
+  password: "" # Loaded from environment variable
+  dbname: "quantumbeam_prod"
+  sslmode: "verify-full" # Strongest SSL mode
+  max_connections: 100 # Production-ready pool
+  min_connections: 10
+  max_idle_connections: 25
+  max_lifetime: "2h"
+  max_idle_time: "30m"
+  connect_timeout: "10s"
+  query_timeout: "30s"
+  slow_query_threshold: "100ms" # Strict threshold
+  enable_query_logger: false # Minimal logging in production
+  migration_path: "./migrations"
+  seed_data_path: "" # No seed data in production
+  connection_attempts: 5
+  connection_retry_wait: "2s"
+
+  # Production database replicas
+  replicas:
+    - host: "prod-db-replica-1.quantumbeam.io"
+      port: 5432
+      user: "quantumbeam_readonly"
+      password: "" # Loaded from environment
+      dbname: "quantumbeam_prod"
+      sslmode: "verify-full"
+      max_connections: 50
+      read_only: true
+
+# Redis Configuration
+redis:
+  host: "prod-redis-cluster.quantumbeam.io" # Redis cluster
+  port: 6379
+  password: "" # Loaded from environment variable
+  db: 0
+  pool_size: 50
+  min_idle_conns: 10
+  max_retries: 3
+  dial_timeout: "5s"
+  read_timeout: "3s"
+  write_timeout: "3s"
+  pool_timeout: "4s"
+  idle_timeout: "10m"
+  idle_check_frequency: "1m"
+
+  cluster:
+    enabled: true
+    nodes:
+      - "prod-redis-1.quantumbeam.io:6379"
+      - "prod-redis-2.quantumbeam.io:6379"
+      - "prod-redis-3.quantumbeam.io:6379"
+    max_redirects: 5
+    read_only: false
+    route_by_latency: true
+    route_randomly: false
+
+# Security Configuration
+security:
+  jwt:
+    secret: "" # Loaded from environment variable - must be very secure
+    access_expiration: "15m" # Short expiration
+    refresh_expiration: "24h" # Longer refresh token
+    issuer: "quantumbeam-prod"
+    audience: "quantumbeam.io"
+    algorithm: "HS256"
+    refresh_enabled: true
+    blacklist_enabled: true
+
+  password:
+    min_length: 12 # Stronger requirements
+    max_length: 128
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_special: true
+    special_chars: "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    hash_algorithm: "bcrypt"
+    hash_iterations: 14 # Higher cost factor for production
+
+  rate_limit:
+    enabled: true
+    algorithm: "token_bucket"
+    global_limit: 10000 # High but reasonable limit
+    window: "1m"
+    burst_size: 1000
+    storage: "redis"
+
+  encryption:
+    algorithm: "AES256-GCM"
+    key_length: 256
+    key_rotation: true
+    rotation_period: "90d"
+    key_derivation: "PBKDF2"
+
+  session:
+    store: "redis"
+    cookie_name: "__Host-quantumbeam_session" # __Host prefix for security
+    max_age: "8h" # Shorter session in production
+    path: "/"
+    domain: ".quantumbeam.io"
+    secure: true
+    http_only: true
+    same_site: "Strict"
+
+  api_key:
+    default_rate_limit_per_minute: 5000
+    default_rate_limit_per_hour: 500000
+    max_keys_per_user: 5 # Fewer keys per user
+    key_length: 40 # Longer keys in production
+    key_prefix: "qp_"
+    default_expiration: "90d"
+    max_expiration: "180d"
+    require_approval: true # Require approval for production
+    auto_cleanup_expired: true
+    cleanup_interval: "1h"
+
+  web_security:
+    csp_enabled: true
+    csp_policy: "default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'nonce-{nonce}'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https:; frame-ancestors 'none';"
+    xss_protection: "1; mode=block"
+    content_type_nosniff: true
+    x_frame_options: "DENY"
+    hsts_max_age: 31536000 # 1 year
+    hsts_include_subdomains: true
+    hsts_preload: true
+    trusted_proxies: ["production-proxy.quantumbeam.io", "cloudflare"]
+    max_request_size: 10485760 # 10MB
+
+# AI/ML Configuration
+ai:
+  enabled: true
+  provider: "openai"
+  model: "gpt-4"
+  api_key: "" # Loaded from environment variable
+  endpoint: "https://api.openai.com/v1"
+  timeout: "30s"
+  max_tokens: 4096
+  temperature: 0.3 # Lower temperature for consistency
+  top_p: 1.0
+  frequency_penalty: 0.0
+  presence_penalty: 0.0
+  retry_attempts: 5 # More retries in production
+  retry_delay: "2s"
+  cache_enabled: true
+  cache_ttl: "6h" # Longer cache in production
+  confidence_threshold: 0.85 # Higher threshold for production
+
+  # Production AI providers with failover
+  providers:
+    primary:
+      provider: "openai"
+      model: "gpt-4"
+      api_key: "" # Loaded from environment
+    fallback:
+      provider: "anthropic"
+      model: "claude-3-opus-20240229"
+      api_key: "" # Loaded from environment
+
+# Quantum Computing Configuration
+quantum:
+  enabled: true # Enabled in production
+  provider: "ibm"
+  endpoint: "https://quantum-computing.ibm.com"
+  api_key: "" # Loaded from environment variable
+  timeout: "600s" # Longer timeout for production
+  max_qubits: 127 # Production quantum systems
+  backend: "ibm_washington" # Production backend
+  shots: 8192 # More shots for accuracy
+  noise_model: "ibm_washington"
+  error_mitigation: true
+  transpile: true
+  optimization_level: 3 # Highest optimization
+  cache_enabled: true
+  cache_ttl: "24h"
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+
+  metrics:
+    enabled: true
+    provider: "prometheus"
+    port: 9090
+    path: "/metrics"
+    namespace: "quantumbeam"
+    subsystem: "production"
+    labels: ["environment", "version", "instance", "datacenter"]
+
+  tracing:
+    enabled: true
+    provider: "jaeger"
+    endpoint: "http://jaeger-production.quantumbeam.io:14268/api/traces"
+    service_name: "quantumbeam-api-prod"
+    service_version: "1.0.0"
+    sample_rate: 0.01 # Sample only 1% in production for performance
+    timeout: "5s"
+    max_payload_size: 8192 # Smaller payload in production
+    propagators: ["trace-context", "baggage"]
+    tags: ["environment", "version", "instance"]
+
+  health_check:
+    enabled: true
+    port: 8081
+    path: "/health"
+    interval: "15s" # More frequent health checks
+    timeout: "5s"
+    failure_threshold: 3
+    success_threshold: 2
+    checkers: ["database", "redis", "external_services", "disk_space", "memory", "cpu", "network"]
+
+  alerting:
+    enabled: true
+    provider: "pagerduty"
+    rules:
+      - name: "critical_error_rate"
+        expression: "rate(http_requests_total{status=~\"5..\"}[2m]) > 0.05"
+        severity: "critical"
+        duration: "2m"
+        labels:
+          service: "quantumbeam-api"
+          environment: "production"
+          team: "platform"
+        annotations:
+          summary: "Critical error rate detected"
+          description: "Error rate is above 5% for the last 2 minutes in production"
+
+      - name: "high_response_time_p95"
+        expression: "histogram_quantile(0.95, http_request_duration_seconds_bucket) > 1.5"
+        severity: "warning"
+        duration: "5m"
+        labels:
+          service: "quantumbeam-api"
+          environment: "production"
+          team: "platform"
+        annotations:
+          summary: "High P95 response time"
+          description: "95th percentile response time is above 1.5 seconds"
+
+      - name: "fraud_detection_anomaly"
+        expression: "rate(fraud_alerts_total[5m]) > 100"
+        severity: "critical"
+        duration: "1m"
+        labels:
+          service: "quantumbeam-api"
+          environment: "production"
+          team: "fraud"
+        annotations:
+          summary: "Unusual fraud detection activity"
+          description: "Fraud alert rate is abnormally high"
+
+      - name: "database_connection_exhaustion"
+        expression: "pg_stat_activity_count > 90"
+        severity: "critical"
+        duration: "1m"
+        labels:
+          service: "quantumbeam-api"
+          environment: "production"
+          team: "platform"
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Database connections are above 90"
+
+      - name: "quantum_service_down"
+        expression: "up{service=\"quantum-computing\"} == 0"
+        severity: "warning"
+        duration: "2m"
+        labels:
+          service: "quantumbeam-api"
+          environment: "production"
+          team: "quantum"
+        annotations:
+          summary: "Quantum computing service unavailable"
+          description: "Quantum computing service is down"
+
+    webhooks:
+      - name: "pagerduty"
+        url: "https://events.pagerduty.com/v2/enqueue"
+        events: ["alert.created", "alert.escalated"]
+        enabled: true
+        headers:
+          "Content-Type": "application/json"
+          "Authorization": "Token prod_pagerduty_token"
+
+      - name: "slack-critical"
+        url: "https://hooks.slack.com/services/PRODUCTION_CRITICAL_WEBHOOK"
+        events: ["alert.created"]
+        enabled: true
+        headers:
+          "Content-Type": "application/json"
+
+      - name: "email-alerts"
+        url: "https://api.sendgrid.com/v3/mail/send"
+        events: ["alert.escalated"]
+        enabled: true
+        headers:
+          "Authorization": "Bearer prod_sendgrid_token"
+
+  profiling:
+    enabled: false # Disable profiling in production for security
+
+# Logging Configuration
+logging:
+  level: "warn" # Higher log level in production
+  format: "json"
+  output: ["stdout", "file"]
+
+  file:
+    enabled: true
+    path: "/var/log/quantumbeam/production/app.log"
+    max_size: 500 # MB
+    max_age: 7 # days (rotate faster in production)
+    max_backups: 30
+    compress: true
+    local_time: false
+    rotate: true
+    filter: "level>=warn" # Only log warnings and errors to file
+
+  console:
+    enabled: true
+    no_color: true
+    time_format: "2006-01-02T15:04:05.000Z07:00"
+
+  structured: true
+  fields: ["timestamp", "level", "logger", "message", "request_id", "user_id", "trace_id", "span_id", "environment", "instance"]
+  min_level: "warn"
+  max_level: "error"
+
+  # Sensitive data filtering
+  filters:
+    - "password"
+    - "token"
+    - "secret"
+    - "key"
+    - "authorization"
+    - "credit_card"
+    - "ssn"
+
+# Feature Flags Configuration
+features:
+  fraud_detection:
+    enabled: true
+    percentage: 100
+
+  ai_analysis:
+    enabled: true
+    percentage: 100
+
+  quantum_analysis:
+    enabled: true
+    percentage: 100
+
+  advanced_analytics:
+    enabled: true
+    percentage: 100
+
+  real_time_monitoring:
+    enabled: true
+    percentage: 100
+
+  multi_currency:
+    enabled: true
+    percentage: 100
+
+  batch_processing:
+    enabled: true
+    percentage: 100
+
+  webhooks:
+    enabled: true
+    percentage: 100
+
+  audit_logging:
+    enabled: true
+    percentage: 100
+
+  data_export:
+    enabled: true
+    percentage: 100
+
+# External Services Configuration
+external_services:
+  notifications:
+    enabled: true
+    channels: ["email", "sms", "push"]
+    providers:
+      email:
+        enabled: true
+        config:
+          provider: "sendgrid"
+          api_key: "" # Loaded from environment
+          from_email: "noreply@quantumbeam.io"
+      sms:
+        enabled: true
+        config:
+          provider: "twilio"
+          account_sid: "" # Loaded from environment
+          auth_token: "" # Loaded from environment
+          from_number: "+1234567890"
+      push:
+        enabled: true
+        config:
+          provider: "firebase"
+          api_key: "" # Loaded from environment
+
+  payment:
+    enabled: true
+    providers: ["stripe", "paypal"]
+    default: "stripe"
+    webhook_url: "https://api.quantumbeam.io/webhooks/payment"
+    timeout: "30s"
+
+  email_service:
+    enabled: true
+    provider: "sendgrid"
+    config:
+      api_key: "" # Loaded from environment
+    templates:
+      welcome: "welcome_production.html"
+      password_reset: "password_reset_production.html"
+      verification: "email_verification_production.html"
+      fraud_alert: "fraud_alert_production.html"
+
+  sms_service:
+    enabled: true
+    provider: "twilio"
+    config:
+      account_sid: "" # Loaded from environment
+      auth_token: "" # Loaded from environment
+
+  storage:
+    enabled: true
+    provider: "s3"
+    config:
+      bucket: "quantumbeam-production"
+      region: "us-east-1"
+      access_key: "" # Loaded from environment
+      secret_key: "" # Loaded from environment
+      encryption: "AES256"
+    buckets:
+      documents:
+        name: "quantumbeam-docs-prod"
+        public: false
+        expiry: "24h"
+        max_size: 52428800 # 50MB
+      uploads:
+        name: "quantumbeam-uploads-prod"
+        public: false
+        expiry: "1h"
+        max_size: 20971520 # 20MB
+      exports:
+        name: "quantumbeam-exports-prod"
+        public: false # Keep exports private in production
+        expiry: "1h"
+        max_size: 1073741824 # 1GB
+
+  cdn:
+    enabled: true
+    provider: "cloudflare"
+    domain: "quantumbeam.io"
+    cache_ttl: "24h" # Longer cache in production
+    compression: true
+    minify: true
+
+# Rate Limiting Configuration
+rate_limiting:
+  global:
+    enabled: true
+    limit: 10000
+    window: "1m"
+    burst: 1000
+
+  users:
+    enabled: true
+    default_limit: 5000
+    premium_limit: 25000
+    window: "1m"
+    burst: 500
+    storage: "redis"
+
+  api_keys:
+    enabled: true
+    default_limit: 5000
+    premium_limit: 25000
+    window: "1m"
+    burst: 500
+    storage: "redis"
+    per_key_limits:
+      "internal": 50000
+      "partner": 25000
+
+  ips:
+    enabled: true
+    default_limit: 2000
+    window: "1m"
+    burst: 200
+    whitelist:
+      - "office.quantumbeam.io"
+      - "partner.quantumbeam.io"
+    blacklist: [] # Populated dynamically from threat intelligence
+    storage: "redis"
+
+# Cache Configuration
+cache:
+  enabled: true
+  provider: "redis"
+  default_ttl: "6h" # Longer cache in production
+  max_entries: 1000000 # Larger cache
+  eviction: "lru"
+  compression: true
+  encryption: true # Enable encryption in production
+  prefix: "qp:"
+
+# Webhook Configuration
+webhook:
+  enabled: true
+  max_retries: 5 # More retries in production
+  retry_delay: "5s"
+  timeout: "30s"
+  max_payload: 1048576 # 1MB
+  secret: "" # Loaded from environment - must be secure
+  headers:
+    "User-Agent": "QuantumBeam-Webhook/1.0"
+
+  endpoints:
+    - name: "fraud_alerts"
+      url: "https://api.quantumbeam.io/webhooks/fraud-alerts"
+      events: ["fraud.alert.created", "fraud.alert.resolved"]
+      enabled: true
+      secret: "" # Loaded from environment
+      timeout: "30s"
+      max_retries: 5
+
+    - name: "user_events"
+      url: "https://api.quantumbeam.io/webhooks/user-events"
+      events: ["user.created", "user.updated", "user.deleted"]
+      enabled: true
+      secret: ""
+      timeout: "30s"
+      max_retries: 5
+
+    - name: "transaction_events"
+      url: "https://api.quantumbeam.io/webhooks/transaction-events"
+      events: ["transaction.created", "transaction.analyzed", "transaction.flagged"]
+      enabled: true
+      secret: ""
+      timeout: "30s"
+      max_retries: 5
+
+    - name: "compliance_events"
+      url: "https://compliance.quantumbeam.io/webhooks/events"
+      events: ["fraud.alert.created", "user.suspended", "transaction.flagged"]
+      enabled: true
+      secret: ""
+      timeout: "60s"
+      max_retries: 10
+
+# Production-specific settings
+production:
+  auto_migrate: false # Manual migrations in production
+  seed_test_data: false
+  enable_debug_endpoints: false
+  monitoring_level: "maximum"
+  backup_enabled: true
+  backup_schedule: "0 3 * * *" # Daily at 3 AM
+  backup_retention: "90d"
+  disaster_recovery: true
+  performance_monitoring: true
+  security_scanning: true
+  load_balancing: true
+  auto_scaling: true
+  ddos_protection: true
+  waf_enabled: true
+  audit_trail: true
+  compliance_mode: true
+  hipaa_compliance: false # Set to true if needed
+  pci_compliance: true
+  gdpr_compliance: true

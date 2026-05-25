@@ -1,0 +1,597 @@
+# Configuration Drift Detection Setup
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: drift-detection-config
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: drift-detection
+data:
+  drift-config.yaml: |
+    # Drift detection configuration
+    detection:
+      # How often to run drift detection
+      interval: 600  # 10 minutes
+
+      # Environment pairs to compare
+      comparison_pairs:
+        - source: "production"
+          target: "staging"
+          direction: "prod-to-staging"
+        - source: "staging"
+          target: "development"
+          direction: "staging-to-dev"
+        - source: "production"
+          target: "development"
+          direction: "prod-to-dev"
+
+      # Resource types to compare
+      resource_types:
+        - "deployments"
+        - "services"
+        - "configmaps"
+        - "secrets"
+        - "ingresses"
+        - "statefulsets"
+        - "daemonsets"
+        - "horizontalpodautoscalers"
+        - "networkpolicies"
+        - "resourcequotas"
+        - "limitranges"
+        - "poddisruptionbudgets"
+
+      # Fields to ignore when comparing resources
+      ignore_fields:
+        # Kubernetes system fields
+        - "metadata.managedFields"
+        - "metadata.resourceVersion"
+        - "metadata.uid"
+        - "metadata.generation"
+        - "metadata.creationTimestamp"
+        - "metadata.deletionTimestamp"
+        - "metadata.deletionGracePeriodSeconds"
+
+        # Status fields (usually reflect runtime state)
+        - "status"
+
+        # Cluster-specific values
+        - "metadata.namespace"
+
+        # Service-specific dynamic fields
+        - "spec.clusterIP"
+        - "spec.clusterIPs"
+        - "spec.externalIPs"
+        - "spec.loadBalancerIP"
+
+        # Load balancer specific fields
+        - "status.loadBalancer"
+
+        # HPA specific fields
+        - "status.currentReplicas"
+        - "status.currentCPUUtilizationPercentage"
+        - "status.desiredReplicas"
+
+        # Timestamps that change automatically
+        - "metadata.annotations['kubectl.kubernetes.io/last-applied-configuration']"
+        - "metadata.annotations['deployment.kubernetes.io/revision']"
+
+      # Drift thresholds
+      thresholds:
+        # Percentage difference required to flag as drift
+        resource_threshold: 0.05  # 5%
+
+        # Maximum number of differences before flagging as major drift
+        max_differences: 10
+
+        # Weight different types of drift
+        drift_weights:
+          security: 1.0
+          resource: 0.8
+          network: 0.9
+          configuration: 0.6
+          compliance: 1.0
+
+    # Categorization of drift types
+    drift_types:
+      security:
+        - "securityContext"
+        - "runAsNonRoot"
+        - "runAsUser"
+        - "privileged"
+        - "capabilities"
+        - "seccompProfile"
+        - "appArmorProfile"
+        - "hostPID"
+        - "hostNetwork"
+        - "hostIPC"
+        - "securityContext.*"
+
+      resource:
+        - "resources.requests"
+        - "resources.limits"
+        - "replicas"
+        - "containers[*].resources"
+        - "containers[*].image"
+
+      network:
+        - "ports"
+        - "type"
+        - "selector"
+        - "spec.tls"
+        - "spec.rules"
+        - "affinity"
+        - "tolerations"
+        - "nodeSelector"
+
+      configuration:
+        - "env"
+        - "envFrom"
+        - "volumeMounts"
+        - "volumes"
+        - "configMaps"
+        - "secrets"
+
+      compliance:
+        - "metadata.labels['data-classification']"
+        - "metadata.annotations['cost-center']"
+        - "metadata.annotations['compliance-*']"
+
+    # Notification settings
+    notifications:
+      # Minimum severity levels for notifications
+      slack:
+        min_severity: "warning"
+        channels:
+          "critical": "#alerts-critical"
+          "error": "#alerts-security"
+          "warning": "#config-drift"
+          "info": "#config-updates"
+
+      pagerduty:
+        min_severity: "critical"
+        service_key: "config-drift-monitoring"
+
+      email:
+        min_severity: "error"
+        recipients:
+          - "platform-team@quantumbeam.io"
+          - "security-team@quantumbeam.io"
+
+    # Auto-remediation settings
+    remediation:
+      # Enable automatic remediation
+      enabled: false
+
+      # Types of drift that can be auto-remediated
+      auto_remediatable:
+        - "configuration"
+        - "resource"
+
+      # Require approval for certain types
+      approval_required:
+        - "security"
+        - "compliance"
+        - "network"
+
+      # Remediation timeout
+      timeout: 300  # 5 minutes
+
+      # Dry run mode (don't actually apply changes)
+      dry_run: true
+
+  drift-rules.yaml: |
+    # Drift detection rules
+
+    # Rules for identifying significant drift
+    rules:
+      - name: "security-drift-critical"
+        type: "security"
+        severity: "critical"
+        description: "Security configuration has drifted"
+        condition: |
+          drift.field in ["securityContext", "privileged", "runAsNonRoot"] AND
+          drift.source_value != drift.target_value
+        action: "alert"
+
+      - name: "resource-requests-drift"
+        type: "resource"
+        severity: "warning"
+        description: "Resource requests have changed"
+        condition: |
+          drift.field matches "resources.requests.*" AND
+          percentage_change(drift.source_value, drift.target_value) > 20
+        action: "alert"
+
+      - name: "container-image-drift"
+        type: "resource"
+        severity: "error"
+        description: "Container image version has changed"
+        condition: |
+          drift.field == "image" AND
+          extract_version(drift.source_value) != extract_version(drift.target_value)
+        action: "alert"
+
+      - name: "network-policy-drift"
+        type: "network"
+        severity: "error"
+        description: "Network configuration has changed"
+        condition: |
+          drift.field in ["ports", "type", "selector"] AND
+          drift.source_value != drift.target_value
+        action: "alert"
+
+      - name: "environment-config-drift"
+        type: "configuration"
+        severity: "info"
+        description: "Environment-specific configuration has changed"
+        condition: |
+          drift.field startsWith "env." AND
+          is_environment_specific(drift.field) AND
+          drift.source_value != drift.target_value
+        action: "log"
+
+      - name: "compliance-annotation-drift"
+        type: "compliance"
+        severity: "warning"
+        description: "Compliance annotations have changed"
+        condition: |
+          drift.field matches "metadata.annotations['compliance-*']" AND
+          drift.source_value != drift.target_value
+        action: "alert"
+
+    # Drift scoring algorithm
+    scoring:
+      base_score: 10
+
+      severity_multipliers:
+        critical: 5.0
+        error: 3.0
+        warning: 2.0
+        info: 1.0
+
+      type_multipliers:
+        security: 3.0
+        compliance: 2.5
+        network: 2.0
+        resource: 1.5
+        configuration: 1.0
+
+      environment_multipliers:
+        production: 2.0
+        staging: 1.5
+        development: 1.0
+
+  monitoring-config.yaml: |
+    # Monitoring and alerting for drift detection
+
+    # Prometheus metrics configuration
+    metrics:
+      # Drift detection metrics
+      - name: "drift_detections_total"
+        type: "counter"
+        description: "Total number of drift detections"
+        labels: ["environment_pair", "drift_type", "severity"]
+
+      - name: "drift_detection_duration_seconds"
+        type: "histogram"
+        description: "Time taken to detect drift"
+        labels: ["environment_pair", "resource_type"]
+        buckets: [1, 5, 10, 30, 60, 300]
+
+      - name: "drift_score_gauge"
+        type: "gauge"
+        description: "Current drift score"
+        labels: ["environment_pair", "resource_type"]
+
+      - name: "environment_sync_status"
+        type: "gauge"
+        description: "Synchronization status between environments"
+        labels: ["environment_pair", "status"]
+
+      - name: "drift_resolution_duration_seconds"
+        type: "histogram"
+        description: "Time taken to resolve drift"
+        labels: ["drift_type", "resolution_method"]
+        buckets: [60, 300, 900, 3600, 14400]
+
+    # Alerting rules
+    alerting:
+      - name: "HighDriftRate"
+        condition: "rate(drift_detections_total[5m]) > 0.1"
+        severity: "warning"
+        description: "High rate of configuration drift detected"
+        runbook: "https://docs.quantumbeam.io/runbooks/drift-high-rate"
+
+      - name: "CriticalSecurityDrift"
+        condition: "drift_detections_total{severity='critical',drift_type='security'} > 0"
+        severity: "critical"
+        description: "Critical security configuration drift detected"
+        runbook: "https://docs.quantumbeam.io/runbooks/security-drift"
+
+      - name: "EnvironmentSyncFailure"
+        condition: "environment_sync_status{status='failed'} > 0"
+        severity: "error"
+        description: "Environment synchronization failed"
+        runbook: "https://docs.quantumbeam.io/runbooks/sync-failure"
+
+      - name: "DriftResolutionSlow"
+        condition: "histogram_quantile(0.95, rate(drift_resolution_duration_seconds_bucket[1h])) > 3600"
+        severity: "warning"
+        description: "Drift resolution taking longer than expected"
+        runbook: "https://docs.quantumbeam.io/runbooks/drift-resolution-slow"
+
+    # Dashboard configuration
+    dashboards:
+      - name: "Configuration Drift Overview"
+        panels:
+          - title: "Drift Detection Rate"
+            metrics: ["rate(drift_detections_total[5m])"]
+            type: "graph"
+
+          - title: "Drift by Type"
+            metrics: ["drift_detections_total by (drift_type)"]
+            type: "piechart"
+
+          - title: "Drift Severity Distribution"
+            metrics: ["drift_detections_total by (severity)"]
+            type: "heatmap"
+
+          - title: "Environment Sync Status"
+            metrics: ["environment_sync_status"]
+            type: "stat"
+
+          - title: "Drift Detection Duration"
+            metrics: ["histogram_quantile(0.95, rate(drift_detection_duration_seconds_bucket[5m]))"]
+            type: "graph"
+
+          - name: "Drift Resolution Time"
+            metrics: ["histogram_quantile(0.95, rate(drift_resolution_duration_seconds_bucket[1h]))"]
+            type: "graph"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-detection-full-scan
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: drift-detection
+    schedule-type: full-scan
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: config-validator
+            component: drift-detection
+            job-type: full-scan
+        spec:
+          serviceAccountName: config-validator
+          restartPolicy: OnFailure
+          activeDeadlineSeconds: 1800  # 30 minutes
+          backoffLimit: 2
+          containers:
+          - name: drift-detector
+            image: quantumbeam/config-validator:latest
+            imagePullPolicy: Always
+            command:
+            - python
+            - config-validator.py
+            - --drift-only
+            - --environment
+            - production
+            env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: DRIFT_DETECTION_MODE
+              value: "full-scan"
+            - name: SLACK_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  name: config-validator-secrets
+                  key: slack-webhook
+                  optional: true
+            volumeMounts:
+            - name: config-volume
+              mountPath: /config
+              readOnly: true
+            - name: drift-config-volume
+              mountPath: /drift-config
+              readOnly: true
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            resources:
+              requests:
+                cpu: 500m
+                memory: 256Mi
+              limits:
+                cpu: 1000m
+                memory: 512Mi
+          volumes:
+          - name: config-volume
+            configMap:
+              name: config-validator-config
+              items:
+              - key: config.yaml
+                path: config.yaml
+          - name: drift-config-volume
+            configMap:
+              name: drift-detection-config
+              items:
+              - key: drift-config.yaml
+                path: drift-config.yaml
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-detection-incremental
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: drift-detection
+    schedule-type: incremental
+spec:
+  schedule: "*/30 * * * *"  # Every 30 minutes
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: config-validator
+            component: drift-detection
+            job-type: incremental
+        spec:
+          serviceAccountName: config-validator
+          restartPolicy: OnFailure
+          activeDeadlineSeconds: 600  # 10 minutes
+          backoffLimit: 2
+          containers:
+          - name: drift-detector
+            image: quantumbeam/config-validator:latest
+            imagePullPolicy: Always
+            command:
+            - python
+            - config-validator.py
+            - --drift-only
+            - --environment
+            - production
+            env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: DRIFT_DETECTION_MODE
+              value: "incremental"
+            - name: SLACK_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  name: config-validator-secrets
+                  key: slack-webhook
+                  optional: true
+            volumeMounts:
+            - name: config-volume
+              mountPath: /config
+              readOnly: true
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            resources:
+              requests:
+                cpu: 200m
+                memory: 128Mi
+              limits:
+                cpu: 400m
+                memory: 256Mi
+          volumes:
+          - name: config-volume
+            configMap:
+              name: config-validator-config
+              items:
+              - key: config.yaml
+                path: config.yaml
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: drift-detection-metrics
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: drift-detection
+    monitoring: prometheus
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  selector:
+    app: config-validator
+    component: drift-detection
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: drift-detection-alerts
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: drift-detection
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: drift-detection.rules
+    rules:
+    - alert: HighDriftDetectionRate
+      expr: rate(config_validations_total{result="fail"}[5m]) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+        component: drift-detection
+      annotations:
+        summary: "High rate of configuration drift detected"
+        description: "Configuration drift detection rate is {{ $value }} per second"
+        runbook: "https://docs.quantumbeam.io/runbooks/high-drift-rate"
+
+    - alert: CriticalConfigurationDrift
+      expr: drift_detections_total{severity="critical"} > 0
+      for: 0m
+      labels:
+        severity: critical
+        component: drift-detection
+      annotations:
+        summary: "Critical configuration drift detected"
+        description: "Critical configuration drift detected in {{ $labels.environment_pair }}"
+        runbook: "https://docs.quantumbeam.io/runbooks/critical-drift"
+
+    - alert: EnvironmentSyncFailure
+      expr: config_validations_total{environment="production",result="fail"} > 5
+      for: 5m
+      labels:
+        severity: error
+        component: drift-detection
+      annotations:
+        summary: "Multiple configuration validation failures in production"
+        description: "{{ $value }} configuration validation failures detected in production"
+        runbook: "https://docs.quantumbeam.io/runbooks/production-validation-failure"
+
+    - alert: DriftDetectionDown
+      expr: up{job="config-validator"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        component: drift-detection
+      annotations:
+        summary: "Configuration drift detection service is down"
+        description: "Configuration drift detection service has been down for more than 1 minute"
+        runbook: "https://docs.quantumbeam.io/runbooks/drift-detection-down"

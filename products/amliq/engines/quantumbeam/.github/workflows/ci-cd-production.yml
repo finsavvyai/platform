@@ -1,0 +1,592 @@
+name: Production CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, release/* ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: quantumbeam
+
+jobs:
+  # Code Quality and Security Checks
+  code-quality:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: true
+
+    - name: Run Gofmt
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "Code is not formatted properly"
+          gofmt -s -l .
+          exit 1
+        fi
+
+    - name: Run Go Vet
+      run: go vet ./...
+
+    - name: Run Golangci Lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=5m
+
+    - name: Run Gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: '-fmt sarif -out gosec.sarif ./...'
+
+    - name: Upload SARIF file
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: gosec.sarif
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Unit Tests
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: quantumbeam_test
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: true
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: go mod download && go mod verify
+
+    - name: Run unit tests
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/quantumbeam_test?sslmode=disable
+        REDIS_URL: redis://localhost:6379
+        JWT_SECRET: test_jwt_secret
+        OPENAI_API_KEY: test_key
+        ANTHROPIC_API_KEY: test_key
+      run: |
+        go test -v -race -coverprofile=coverage.out \
+          -covermode=atomic \
+          -timeout=10m \
+          ./...
+
+    - name: Run tests with coverage
+      run: |
+        go tool cover -html=coverage.out -o coverage.html
+        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "COVERAGE=${COVERAGE}" >> $GITHUB_ENV
+
+    - name: Check coverage threshold
+      run: |
+        if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+          echo "Coverage ${COVERAGE}% is below required 80%"
+          exit 1
+        fi
+        echo "Coverage ${COVERAGE}% meets requirements"
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+
+    - name: Archive test coverage
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: coverage.html
+        retention-days: 30
+
+  # Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [code-quality, unit-tests]
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: quantumbeam_integration
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Start test dependencies
+      run: |
+        docker-compose -f docker-compose.test.yml up -d
+        sleep 30
+
+    - name: Run database migrations
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/quantumbeam_integration?sslmode=disable
+      run: |
+        go run ./cmd/migrate/main.go up
+
+    - name: Run integration tests
+      env:
+        DATABASE_URL: postgres://postgres:postgres@localhost:5432/quantumbeam_integration?sslmode=disable
+        REDIS_URL: redis://localhost:6379
+        QUANTUM_SERVICE_URL: http://localhost:8002
+        AI_SERVICE_URL: http://localhost:8001
+        JWT_SECRET: test_jwt_secret_integration
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      run: |
+        go test -v -tags=integration -timeout=15m ./tests/integration/...
+
+    - name: Cleanup test dependencies
+      if: always()
+      run: |
+        docker-compose -f docker-compose.test.yml down -v
+
+  # Build and Push Docker Images
+  build-and-push:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [integration-tests]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/tags/'))
+
+    strategy:
+      matrix:
+        service: [api, quantum, ai-ml]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+          latest
+
+    - name: Build and push ${{ matrix.service }} image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ${{ matrix.service == 'api' && 'Dockerfile.production' || format('services/{0}/Dockerfile.production', matrix.service) }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+
+    - name: Generate SBOM
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}@${{ steps.meta.outputs.digest }}
+        format: spdx-json
+        output-file: sbom-${{ matrix.service }}.json
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom-${{ matrix.service }}
+        path: sbom-${{ matrix.service }}.json
+        retention-days: 90
+
+  # End-to-End Tests
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up k3s
+      uses: rancher/k3s-action@v1.1.0
+      with:
+        k3s-version: v1.27.3+k3s1
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: v3.12.0
+
+    - name: Add Helm repositories
+      run: |
+        helm repo add bitnami https://charts.bitnami.com/bitnami
+        helm repo update
+
+    - name: Deploy application for E2E testing
+      run: |
+        helm dependency update deployment/helm
+        helm install quantumbeam-e2e deployment/helm \
+          --namespace quantumbeam-e2e \
+          --create-namespace \
+          --set apiServer.image.tag=${{ github.sha }} \
+          --set quantumService.image.tag=${{ github.sha }} \
+          --set aiMlService.image.tag=${{ github.sha }} \
+          --set postgresql.enabled=true \
+          --set redis.enabled=true \
+          --set prometheus.enabled=false \
+          --set grafana.enabled=false \
+          --wait --timeout=10m
+
+    - name: Run E2E tests
+      env:
+        KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+        TEST_NAMESPACE: quantumbeam-e2e
+      run: |
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=quantumbeam -n quantumbeam-e2e --timeout=300s
+        go test -v -tags=e2e -timeout=20m ./tests/e2e/...
+
+    - name: Collect logs on failure
+      if: failure()
+      run: |
+        kubectl logs -n quantumbeam-e2e -l app.kubernetes.io/name=quantumbeam --tail=100
+        kubectl describe pods -n quantumbeam-e2e
+        kubectl get events -n quantumbeam-e2e --sort-by='.lastTimestamp'
+
+    - name: Cleanup E2E deployment
+      if: always()
+      run: |
+        helm uninstall quantumbeam-e2e -n quantumbeam-e2e || true
+        kubectl delete namespace quantumbeam-e2e || true
+
+  # Security Scanning of Images
+  security-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build-and-push
+    if: github.event_name == 'push'
+
+    strategy:
+      matrix:
+        service: [api, quantum, ai-ml]
+
+    steps:
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results-${{ matrix.service }}.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+
+    - name: Run Grype vulnerability scanner
+      uses: anchore/scan-action@v3
+      id: scan
+      with:
+        image: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}
+        fail-build: false
+        format: sarif
+        output-file: grype-results-${{ matrix.service }}.sarif
+
+    - name: Upload Grype scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: grype-results-${{ matrix.service }}.sarif
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [security-scan, e2e-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --name quantumbeam-staging --region us-east-1
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: v3.12.0
+
+    - name: Deploy to staging
+      run: |
+        helm upgrade --install quantumbeam-staging deployment/helm \
+          --namespace quantumbeam-staging \
+          --create-namespace \
+          --values deployment/helm/values-staging.yaml \
+          --set apiServer.image.tag=${{ github.sha }} \
+          --set quantumService.image.tag=${{ github.sha }} \
+          --set aiMlService.image.tag=${{ github.sha }} \
+          --wait --timeout=15m
+
+    - name: Verify deployment
+      run: |
+        kubectl rollout status deployment/quantumbeam-api-server -n quantumbeam-staging --timeout=300s
+        kubectl get pods -n quantumbeam-staging
+        kubectl get services -n quantumbeam-staging
+
+    - name: Run smoke tests
+      env:
+        STAGING_URL: https://api-staging.quantumbeam.io
+      run: |
+        go test -v -tags=smoke -timeout=5m ./tests/smoke/...
+
+  # Deploy to Production (Manual Approval)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://api.quantumbeam.io
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --name quantumbeam-production --region us-east-1
+
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: v3.12.0
+
+    - name: Create backup
+      run: |
+        kubectl create job --from=cronjob/postgres-backup-$(date +%Y%m%d%H%M%S) -n quantumbeam-production || true
+
+    - name: Deploy to production with blue-green strategy
+      run: |
+        # Deploy to blue environment first
+        helm upgrade --install quantumbeam-prod-blue deployment/helm \
+          --namespace quantumbeam-production \
+          --values deployment/helm/values-production.yaml \
+          --set apiServer.image.tag=${{ github.sha }} \
+          --set quantumService.image.tag=${{ github.sha }} \
+          --set aiMlService.image.tag=${{ github.sha }} \
+          --set ingress.hosts[0].host=api-blue.quantumbeam.io \
+          --wait --timeout=20m
+
+        # Run health checks on blue environment
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=quantumbeam -n quantumbeam-production --timeout=600s
+
+        # Switch traffic to blue
+        kubectl patch service quantumbeam-api-service -n quantumbeam-production -p '{"spec":{"selector":{"version":"blue"}}}'
+
+        # Wait and monitor
+        sleep 300
+
+        # If everything is good, this will be the new production
+        echo "Blue deployment successful"
+
+    - name: Verify production deployment
+      run: |
+        kubectl rollout status deployment/quantumbeam-api-server -n quantumbeam-production --timeout=600s
+        kubectl get pods -n quantumbeam-production
+        kubectl get services -n quantumbeam-production
+
+    - name: Run production smoke tests
+      env:
+        PRODUCTION_URL: https://api.quantumbeam.io
+      run: |
+        go test -v -tags=production-smoke -timeout=10m ./tests/production/...
+
+    - name: Cleanup old deployment
+      if: success()
+      run: |
+        # Remove green environment if it exists
+        helm uninstall quantumbeam-prod-green -n quantumbeam-production || true
+
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        message: |
+          Production deployment ${{ job.status }}!
+          Commit: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+          Deployed by: ${{ github.actor }}
+
+  # Performance Tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: deploy-production
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up K6
+      run: |
+        sudo gpg -k
+        gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        sudo apt-get update
+        sudo apt-get install k6
+
+    - name: Run performance tests
+      env:
+        BASE_URL: https://api.quantumbeam.io
+      run: |
+        k6 run --out json=performance-results.json tests/performance/load-test.js
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: performance-results.json
+        retention-days: 30
+
+    - name: Check performance thresholds
+      run: |
+        # Parse results and check if they meet performance criteria
+        echo "Performance test completed - check artifacts for detailed results"

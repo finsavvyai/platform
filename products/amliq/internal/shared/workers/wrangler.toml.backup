@@ -1,0 +1,208 @@
+name = "finsavvy-ai-suite"
+main = "src/simplified-production-worker.ts"
+compatibility_date = "2024-10-14"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# Limits and configuration
+# [limits]
+# cpu_ms = 50000 # Commented out - not supported on free plan
+
+# Environment variables
+[vars]
+ENVIRONMENT = "production"
+LOG_LEVEL = "info"
+AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+EMBEDDING_MODEL = "@cf/baai/bge-base-en-v1.5"
+VISION_MODEL = "@cf/unrealised/image-model"
+WHISPER_MODEL = "@cf/openai/whisper"
+FRONTEND_URL = "https://finsavvyai.com"
+API_BASE_URL = "https://api.finsavvyai.com"
+DEFAULT_REGION = "US"
+ENABLE_AI_FEATURES = "true"
+ENABLE_COLLABORATION = "true"
+DATA_RETENTION_DAYS = "365"
+AUDIT_LOG_RETENTION_DAYS = "1095"
+DATABASE_ARCHITECTURE = "consolidated" # Using consolidated schema approach
+
+# AI and Machine Learning bindings
+[ai]
+binding = "AI"
+
+# Consolidated D1 Database Architecture
+# We now use 3 databases instead of 8, using table prefixes for multi-tenancy
+# This approach reduces database count and improves management
+
+[[d1_databases]]
+binding = "DB_PRIMARY"
+database_name = "finsavvy-primary"
+database_id = "74147f17-042c-4cc3-862b-a2077b381785" # finsavvy-billing-us (repurposed)
+
+[[d1_databases]]
+binding = "DB_SECONDARY"
+database_name = "finsavvy-secondary"
+database_id = "e86be027-03cd-457d-91a3-4f0b01ab893f" # finsavvy-billing-eu (repurposed)
+
+[[d1_databases]]
+binding = "DB_COMPLIANCE"
+database_name = "finsavvy-compliance"
+database_id = "43db0e30-d750-47fb-99a1-1068b83f0dfb" # finsavvy-compliance-us (repurposed)
+
+# Note: Using consolidated approach with table prefixes:
+# DB_PRIMARY: billing_us_*, billing_eu_*, intelligence_us_*, intelligence_eu_*
+# DB_SECONDARY: risk_*, organizations, audit_logs, api_keys (shared tables)
+# DB_COMPLIANCE: compliance_us_*, compliance_eu_*
+
+# KV Namespace bindings
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "73b427dc72c34f5c8809061bb90cfaaa"
+preview_id = "73b427dc72c34f5c8809061bb90cfaaa"
+
+[[kv_namespaces]]
+binding = "SESSIONS_KV"
+id = "7d70e7cf6cf9461cafb384e14d10bf2b"
+preview_id = "7d70e7cf6cf9461cafb384e14d10bf2b"
+
+[[kv_namespaces]]
+binding = "AGENT_MEMORY_KV"
+id = "a58a7ae0d27c47a5968a8585bf09b567"
+preview_id = "a58a7ae0d27c47a5968a8585bf09b567"
+
+[[kv_namespaces]]
+binding = "RATE_LIMITS_KV"
+id = "5f1264ee39304fb68628628b2fcf985b"
+preview_id = "5f1264ee39304fb68628628b2fcf985b"
+
+[[kv_namespaces]]
+binding = "USER_PREFERENCES_KV"
+id = "08d7cb62838c45e4b4c8f41fc1e8631d"
+preview_id = "08d7cb62838c45e4b4c8f41fc1e8631d"
+
+# R2 Bucket bindings
+[[r2_buckets]]
+binding = "DOCUMENTS_BUCKET"
+bucket_name = "finsavvy-documents"
+
+[[r2_buckets]]
+binding = "EVIDENCE_BUCKET"
+bucket_name = "finsavvy-evidence"
+
+[[r2_buckets]]
+binding = "BACKUPS_BUCKET"
+bucket_name = "finsavvy-backups"
+
+[[r2_buckets]]
+binding = "AI_MODELS_BUCKET"
+bucket_name = "finsavvy-ai-models"
+
+# Queue bindings - Temporarily commented out for initial deployment
+# [[queues.producers]]
+# binding = "BILLING_QUEUE"
+# queue = "finsavvy-billing-queue"
+
+# [[queues.producers]]
+# binding = "COMPLIANCE_QUEUE"
+# queue = "finsavvy-compliance-queue"
+
+# [[queues.producers]]
+# binding = "INTELLIGENCE_QUEUE"
+# queue = "finsavvy-intelligence-queue"
+
+# [[queues.producers]]
+# binding = "RISK_QUEUE"
+# queue = "finsavvy-risk-queue"
+
+# [[queues.producers]]
+# binding = "NOTIFICATION_QUEUE"
+# queue = "finsavvy-notification-queue"
+
+# Note: Queue consumers with batch settings need to be configured via API or dashboard
+# The wrangler.toml format for consumers is limited in current version
+
+# Vectorize bindings for RAG
+[[vectorize]]
+binding = "RAG_EMBEDDINGS"
+index_name = "finsavvy-rag-embeddings"
+
+# Custom domains for finsavvyai.com - SEO Optimized Subdomains
+
+# Primary platform and API gateway
+[[routes]]
+pattern = "suite.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+[[routes]]
+pattern = "api.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+# Service-specific subdomains - SEO optimized
+[[routes]]
+pattern = "billing.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+[[routes]]
+pattern = "compliance.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+[[routes]]
+pattern = "intelligence.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+[[routes]]
+pattern = "risk.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+# Application and utility subdomains
+[[routes]]
+pattern = "app.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+[[routes]]
+pattern = "dashboard.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+# Marketing subdomains for SEO
+[[routes]]
+pattern = "invoicing.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+[[routes]]
+pattern = "kyc.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+[[routes]]
+pattern = "ai-finance.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+[[routes]]
+pattern = "enterprise.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+# Environment-specific configurations
+[env.staging]
+name = "finsavvy-ai-suite-staging"
+vars = { ENVIRONMENT = "staging", LOG_LEVEL = "debug" }
+
+[env.development]
+name = "finsavvy-ai-suite-dev"
+vars = { ENVIRONMENT = "development", LOG_LEVEL = "debug" }
+
+# Services configuration (for future use)
+# [[services]]
+# binding = "AI_SERVICE"
+# service = "finsavvy-ai-service"
+# environment = "production"
+
+# [[services]]
+# binding = "AUTH_SERVICE"
+# service = "finsavvy-auth-service"
+# environment = "production"
+
+# Note: Durable Objects configuration commented out until implementation is ready
+# Requires proper migrations setup in wrangler.toml
+
+# Workflow configuration (commented out for now - workflows is a newer feature)
+# [[workflows]]
+# name = "finsavvy-workflows"
+# binding = "WORKFLOWS"

@@ -1,0 +1,95 @@
+name: synthetic
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Environment target to probe."
+        required: false
+        default: staging
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: synthetic-${{ github.event.inputs.target || 'staging' }}
+  cancel-in-progress: true
+
+# Owned by SYNTHETICS agent: infrastructure/synthetics/run.mjs
+# Result shape (per round-3 contract §3):
+#   { probe: string, ok: boolean, latency_ms: number, ts: string, error?: string }
+
+jobs:
+  probe:
+    name: synthetic probe
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run synthetic probes
+        id: probe
+        continue-on-error: true
+        env:
+          FINSAVVY_SYNTHETIC_TARGET: ${{ github.event.inputs.target || 'staging' }}
+        run: |
+          if [ ! -f infrastructure/synthetics/run.mjs ]; then
+            echo "::warning::infrastructure/synthetics/run.mjs missing (SYNTHETICS agent task)."
+            echo "status=missing" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          node infrastructure/synthetics/run.mjs --target "${FINSAVVY_SYNTHETIC_TARGET}" | tee probe.log
+          echo "status=ran" >> "$GITHUB_OUTPUT"
+
+      - name: Open / update synthetic-failure issue on failure
+        if: failure() || steps.probe.outcome == 'failure'
+        uses: actions/github-script@v7
+        env:
+          TARGET: ${{ github.event.inputs.target || 'staging' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const target = process.env.TARGET;
+            const runUrl = process.env.RUN_URL;
+            const title = `[synthetic-failure] ${target} probe failing`;
+            const body = [
+              `Synthetic monitor failed for target **${target}**.`,
+              ``,
+              `Run: ${runUrl}`,
+              `Time: ${new Date().toISOString()}`,
+              ``,
+              `Runbook: docs/runbooks/synthetic-failure.md (ALERTING agent)`,
+            ].join("\n");
+            const label = "synthetic-failure";
+            // Ensure label exists
+            try {
+              await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name: label });
+            } catch (e) {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner, repo: context.repo.repo,
+                name: label, color: "b60205",
+                description: "Synthetic monitor failure"
+              });
+            }
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: "open", labels: label, per_page: 50,
+            });
+            const match = existing.find(i => i.title === title);
+            if (match) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: match.number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body, labels: [label],
+              });
+            }

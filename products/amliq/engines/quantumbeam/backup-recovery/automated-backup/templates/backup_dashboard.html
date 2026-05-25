@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantumBeam Backup Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header p {
+            opacity: 0.9;
+            margin-top: 0.5rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .metric-card h3 {
+            color: #666;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-change {
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .metric-change.positive {
+            color: #10b981;
+        }
+
+        .metric-change.negative {
+            color: #ef4444;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .chart-card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .chart-container {
+            height: 400px;
+        }
+
+        .storage-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .storage-bar {
+            background: #e5e7eb;
+            border-radius: 8px;
+            height: 30px;
+            margin: 1rem 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .storage-used {
+            background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+            height: 100%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.875rem;
+        }
+
+        .storage-breakdown {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .storage-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .storage-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .jobs-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .jobs-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .jobs-table th {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 2px solid #e5e7eb;
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .jobs-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.875rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-pending {
+            background: #fed7aa;
+            color: #9a3412;
+        }
+
+        .status-running {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .close {
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+
+        .form-group textarea {
+            height: 100px;
+            resize: vertical;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .alert-warning {
+            background: #fed7aa;
+            color: #9a3412;
+        }
+
+        .recent-backups {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .backup-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .backup-item:last-child {
+            border-bottom: none;
+        }
+
+        .backup-info h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .backup-info p {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .backup-size {
+            font-size: 0.875rem;
+            color: #374151;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>💾 QuantumBeam Backup Dashboard</h1>
+        <p>Comprehensive backup management and monitoring system</p>
+    </header>
+
+    <div class="container">
+        <!-- Metrics Summary -->
+        <div class="metrics-grid" id="metricsGrid">
+            <div class="loading">Loading metrics...</div>
+        </div>
+
+        <!-- Storage Usage -->
+        <div class="storage-section">
+            <h2>Storage Usage</h2>
+            <div class="storage-bar">
+                <div class="storage-used" id="storageUsedBar" style="width: 0%">
+                    <span id="storagePercentage">0%</span>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                <span id="storageUsed">0 GB used</span>
+                <span id="storageTotal">0 GB total</span>
+            </div>
+            <div class="storage-breakdown" id="storageBreakdown">
+                <div class="loading">Loading storage breakdown...</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>Backup Timeline</h2>
+                <div id="timelineChart" class="chart-container"></div>
+            </div>
+            <div class="chart-card">
+                <h2>Storage Breakdown</h2>
+                <div id="breakdownChart" class="chart-container"></div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>Success Rate Trend</h2>
+                <div id="successRateChart" class="chart-container"></div>
+            </div>
+        </div>
+
+        <!-- Recent Backups -->
+        <div class="recent-backups">
+            <div class="section-header">
+                <h2>Recent Backups</h2>
+                <button class="btn btn-secondary" onclick="refreshRecentBackups()">
+                    🔄 Refresh
+                </button>
+            </div>
+            <div id="recentBackups">
+                <div class="loading">Loading recent backups...</div>
+            </div>
+        </div>
+
+        <!-- Backup Jobs -->
+        <div class="jobs-section">
+            <div class="section-header">
+                <h2>Backup Jobs</h2>
+                <div>
+                    <button class="btn btn-secondary" onclick="refreshJobs()">
+                        🔄 Refresh
+                    </button>
+                    <button class="btn btn-primary" onclick="openValidationModal()">
+                        ✅ Validate Backup
+                    </button>
+                </div>
+            </div>
+            <div id="jobsContainer">
+                <div class="loading">Loading backup jobs...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Validation Modal -->
+    <div id="validationModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Validate Backup</h2>
+                <span class="close" onclick="closeValidationModal()">&times;</span>
+            </div>
+            <form id="validationForm">
+                <div class="form-group">
+                    <label for="backupPath">Backup Path/URL</label>
+                    <input type="text" id="backupPath" name="backupPath" required
+                           placeholder="s3://bucket/path/to/backup.dump.gz or /local/path/backup.dump.gz">
+                </div>
+
+                <div class="form-group">
+                    <label for="backupName">Backup Name</label>
+                    <input type="text" id="backupName" name="backupName" required
+                           placeholder="My Database Backup">
+                </div>
+
+                <div class="form-group">
+                    <label for="expectedChecksum">Expected Checksum (optional)</label>
+                    <input type="text" id="expectedChecksum" name="expectedChecksum"
+                           placeholder="SHA256 checksum of the backup">
+                </div>
+
+                <div class="form-group">
+                    <label for="storageType">Storage Type</label>
+                    <select id="storageType" name="storageType">
+                        <option value="local">Local File</option>
+                        <option value="s3">Amazon S3</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="s3Config" style="display: none;">
+                    <label for="s3Bucket">S3 Bucket</label>
+                    <input type="text" id="s3Bucket" name="s3Bucket" placeholder="my-backup-bucket">
+
+                    <label for="s3Key" style="margin-top: 0.5rem;">S3 Key</label>
+                    <input type="text" id="s3Key" name="s3Key" placeholder="path/to/backup.dump.gz">
+                </div>
+
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeValidationModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Validate Backup</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let jobs = [];
+        let metrics = {};
+        let storageUsage = {};
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMetrics();
+            loadStorageUsage();
+            loadCharts();
+            loadRecentBackups();
+            loadJobs();
+
+            // Auto-refresh every 30 seconds
+            setInterval(() => {
+                loadMetrics();
+                loadJobs();
+            }, 30000);
+        });
+
+        // Load metrics summary
+        async function loadMetrics() {
+            try {
+                const response = await axios.get('/api/metrics/summary');
+                metrics = response.data;
+                renderMetrics();
+            } catch (error) {
+                console.error('Failed to load metrics:', error);
+                document.getElementById('metricsGrid').innerHTML =
+                    '<div class="error">Failed to load metrics</div>';
+            }
+        }
+
+        // Render metrics cards
+        function renderMetrics() {
+            const metricsGrid = document.getElementById('metricsGrid');
+
+            metricsGrid.innerHTML = `
+                <div class="metric-card">
+                    <h3>Total Jobs</h3>
+                    <div class="metric-value">${metrics.total_jobs || 0}</div>
+                    <div class="metric-change">Configured backup jobs</div>
+                </div>
+
+                <div class="metric-card">
+                    <h3>Success Rate</h3>
+                    <div class="metric-value">${metrics.success_rate?.toFixed(1) || 0}%</div>
+                    <div class="metric-change ${metrics.success_rate >= 95 ? 'positive' : 'negative'}">
+                        ${metrics.success_rate >= 95 ? '↑ Excellent' : '↓ Needs attention'}
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <h3>Last 24h</h3>
+                    <div class="metric-value">${metrics.last_24h_backups || 0}</div>
+                    <div class="metric-change">Backups completed</div>
+                </div>
+
+                <div class="metric-card">
+                    <h3>Active Jobs</h3>
+                    <div class="metric-value">${metrics.active_jobs || 0}</div>
+                    <div class="metric-change">Currently running</div>
+                </div>
+            `;
+        }
+
+        // Load storage usage
+        async function loadStorageUsage() {
+            try {
+                const response = await axios.get('/api/storage/usage');
+                storageUsage = response.data;
+                renderStorageUsage();
+            } catch (error) {
+                console.error('Failed to load storage usage:', error);
+            }
+        }
+
+        // Render storage usage
+        function renderStorageUsage() {
+            const percentage = storageUsage.usage_percentage || 0;
+            const used = storageUsage.used_gb || 0;
+            const total = storageUsage.total_quota_gb || 0;
+
+            document.getElementById('storageUsedBar').style.width = `${percentage}%`;
+            document.getElementById('storagePercentage').textContent = `${percentage.toFixed(1)}%`;
+            document.getElementById('storageUsed').textContent = `${used} GB used`;
+            document.getElementById('storageTotal').textContent = `${total} GB total`;
+
+            // Render breakdown
+            const breakdownHtml = Object.entries(storageUsage.breakdown || {}).map(([type, size]) => {
+                const colors = {
+                    'database_backups': '#3b82f6',
+                    'file_backups': '#10b981',
+                    'log_backups': '#f59e0b',
+                    'other': '#6b7280'
+                };
+
+                return `
+                    <div class="storage-item">
+                        <div class="storage-color" style="background: ${colors[type] || '#6b7280'}"></div>
+                        <span>${type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}: ${size} GB</span>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('storageBreakdown').innerHTML = breakdownHtml || '<p>No breakdown data available</p>';
+        }
+
+        // Load charts
+        async function loadCharts() {
+            try {
+                // Timeline chart
+                const timelineResponse = await axios.get('/api/charts/backup-timeline');
+                const timelineData = JSON.parse(timelineResponse.data);
+                Plotly.newPlot('timelineChart', timelineData.data, timelineData.layout);
+
+                // Storage breakdown chart
+                const breakdownResponse = await axios.get('/api/charts/storage-breakdown');
+                const breakdownData = JSON.parse(breakdownResponse.data);
+                Plotly.newPlot('breakdownChart', breakdownData.data, breakdownData.layout);
+
+                // Success rate chart
+                const successResponse = await axios.get('/api/charts/success-rate');
+                const successData = JSON.parse(successResponse.data);
+                Plotly.newPlot('successRateChart', successData.data, successData.layout);
+
+            } catch (error) {
+                console.error('Failed to load charts:', error);
+            }
+        }
+
+        // Load recent backups
+        async function loadRecentBackups() {
+            try {
+                const response = await axios.get('/api/backups/recent');
+                const backups = response.data;
+                renderRecentBackups(backups);
+            } catch (error) {
+                console.error('Failed to load recent backups:', error);
+                document.getElementById('recentBackups').innerHTML =
+                    '<div class="error">Failed to load recent backups</div>';
+            }
+        }
+
+        // Render recent backups
+        function renderRecentBackups(backups) {
+            const container = document.getElementById('recentBackups');
+
+            if (backups.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 2rem;">No recent backups found</p>';
+                return;
+            }
+
+            const backupsHtml = backups.map(backup => {
+                const statusClass = backup.status === 'completed' ? 'status-completed' : 'status-failed';
+                const sizeText = backup.size_bytes ? formatBytes(backup.size_bytes) : 'N/A';
+                const durationText = backup.duration_seconds ? `${backup.duration_seconds}s` : 'N/A';
+
+                return `
+                    <div class="backup-item">
+                        <div class="backup-info">
+                            <h4>${backup.job_name}</h4>
+                            <p>
+                                ${backup.start_time ? new Date(backup.start_time).toLocaleString() : 'Unknown time'} •
+                                Duration: ${durationText}
+                                ${backup.error_message ? ` • Error: ${backup.error_message}` : ''}
+                            </p>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span class="backup-size">${sizeText}</span>
+                            <span class="status-badge ${statusClass}">${backup.status}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = backupsHtml;
+        }
+
+        // Load backup jobs
+        async function loadJobs() {
+            try {
+                const response = await axios.get('/api/jobs');
+                jobs = response.data;
+                renderJobs();
+            } catch (error) {
+                console.error('Failed to load jobs:', error);
+                document.getElementById('jobsContainer').innerHTML =
+                    '<div class="error">Failed to load backup jobs</div>';
+            }
+        }
+
+        // Render jobs table
+        function renderJobs() {
+            const container = document.getElementById('jobsContainer');
+
+            if (jobs.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 2rem;">No backup jobs configured</p>';
+                return;
+            }
+
+            const table = `
+                <table class="jobs-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Storage</th>
+                            <th>Schedule</th>
+                            <th>Status</th>
+                            <th>Last Run</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${jobs.map(job => `
+                            <tr>
+                                <td><strong>${job.name}</strong></td>
+                                <td>${job.backup_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</td>
+                                <td>${job.storage_type.toUpperCase()}</td>
+                                <td>${job.schedule_cron}</td>
+                                <td>
+                                    <span class="status-badge status-${job.status}">${job.status}</span>
+                                </td>
+                                <td>${job.last_run ? new Date(job.last_run).toLocaleString() : 'Never'}</td>
+                                <td>
+                                    <button class="btn btn-success" onclick="runJob('${job.id}')">
+                                        ▶️ Run Now
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = table;
+        }
+
+        // Run backup job
+        async function runJob(jobId) {
+            try {
+                showSuccessMessage('Starting backup job...');
+                const response = await axios.post(`/api/job/${jobId}/run`);
+
+                if (response.data.status === 'completed') {
+                    showSuccessMessage(`Backup completed successfully! Size: ${formatBytes(response.data.size_bytes)}`);
+                } else {
+                    showErrorMessage(`Backup completed with status: ${response.data.status}`);
+                }
+
+                setTimeout(() => {
+                    loadJobs();
+                    loadRecentBackups();
+                    loadMetrics();
+                }, 2000);
+
+            } catch (error) {
+                showErrorMessage('Failed to run backup job: ' + (error.response?.data?.error || error.message));
+            }
+        }
+
+        // Refresh functions
+        function refreshJobs() {
+            loadJobs();
+        }
+
+        function refreshRecentBackups() {
+            loadRecentBackups();
+        }
+
+        // Modal functions
+        function openValidationModal() {
+            document.getElementById('validationModal').style.display = 'block';
+        }
+
+        function closeValidationModal() {
+            document.getElementById('validationModal').style.display = 'none';
+            document.getElementById('validationForm').reset();
+        }
+
+        // Handle storage type change
+        document.getElementById('storageType').addEventListener('change', function(e) {
+            const s3Config = document.getElementById('s3Config');
+            s3Config.style.display = e.target.value === 's3' ? 'block' : 'none';
+        });
+
+        // Validate backup
+        document.getElementById('validationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const storageType = formData.get('storageType');
+
+            let storageLocation = {};
+            if (storageType === 's3') {
+                storageLocation = {
+                    type: 's3',
+                    bucket: formData.get('s3Bucket'),
+                    key: formData.get('s3Key')
+                };
+            } else {
+                storageLocation = {
+                    type: 'local',
+                    path: formData.get('backupPath')
+                };
+            }
+
+            const validationData = {
+                backup_path: formData.get('backupPath'),
+                backup_name: formData.get('backupName'),
+                expected_checksum: formData.get('expectedChecksum') || null,
+                storage_location: storageLocation
+            };
+
+            try {
+                showSuccessMessage('Starting backup validation...');
+                const response = await axios.post('/api/validate', validationData);
+
+                closeValidationModal();
+
+                const result = response.data;
+                const statusClass = result.overall_status === 'passed' ? 'success' :
+                                  result.overall_status === 'warning' ? 'alert-warning' : 'error';
+
+                let message = `
+                    <h3>Validation Results</h3>
+                    <p><strong>Overall Status:</strong> ${result.overall_status.toUpperCase()}</p>
+                    <p><strong>Total Tests:</strong> ${result.total_tests}</p>
+                    <p><strong>Passed:</strong> ${result.passed_tests}</p>
+                    <p><strong>Failed:</strong> ${result.failed_tests}</p>
+                    <p><strong>Warnings:</strong> ${result.warning_tests}</p>
+                `;
+
+                if (result.recommendations && result.recommendations.length > 0) {
+                    message += '<h4>Recommendations:</h4><ul>';
+                    result.recommendations.forEach(rec => {
+                        message += `<li>${rec}</li>`;
+                    });
+                    message += '</ul>';
+                }
+
+                showMessage(message, statusClass);
+
+            } catch (error) {
+                showErrorMessage('Validation failed: ' + (error.response?.data?.error || error.message));
+            }
+        });
+
+        // Utility functions
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showSuccessMessage(message) {
+            showMessage(message, 'success');
+        }
+
+        function showErrorMessage(message) {
+            showMessage(message, 'error');
+        }
+
+        function showMessage(message, type) {
+            const alert = document.createElement('div');
+            alert.className = `alert ${type}`;
+            alert.innerHTML = message;
+            alert.style.position = 'fixed';
+            alert.style.top = '20px';
+            alert.style.right = '20px';
+            alert.style.zIndex = '2000';
+            alert.style.maxWidth = '500px';
+            alert.style.maxHeight = '80vh';
+            alert.style.overflowY = 'auto';
+
+            document.body.appendChild(alert);
+            setTimeout(() => alert.remove(), 10000);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('validationModal');
+            if (event.target === modal) {
+                closeValidationModal();
+            }
+        }
+    </script>
+</body>
+</html>

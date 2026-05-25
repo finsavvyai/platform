@@ -1,0 +1,587 @@
+# ArgoCD Configuration for QuantumBeam GitOps
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    name: argocd
+    purpose: gitops
+---
+# ArgoCD Installation
+apiVersion: argoproj.io/v1alpha1
+kind: ArgoCD
+metadata:
+  name: argocd
+  namespace: argocd
+  labels:
+    app: argocd
+    component: gitops-controller
+spec:
+  controller:
+    processors:
+      operation: 10
+      status: 20
+  dex:
+    config: |
+      connectors:
+      - type: oidc
+        id: oidc
+        name: OpenID Connect
+        config:
+          issuer: https://your-oidc-provider.com
+          clientID: argocd
+          clientSecret: $oidc.clientSecret
+          requestedScopes: ["openid", "profile", "email", "groups"]
+  ha:
+    enabled: true
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4096Mi
+      requests:
+        cpu: 1000m
+        memory: 2048Mi
+  redis:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+  repo:
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 1024Mi
+      requests:
+        cpu: 500m
+        memory: 512Mi
+  server:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    route:
+      enabled: true
+      tls:
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: argocd
+---
+# ArgoCD Project Configuration
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: quantumbeam
+  namespace: argocd
+  labels:
+    app: quantumbeam
+    component: gitops
+spec:
+  description: QuantumBeam Applications
+  sourceRepos:
+  - 'https://github.com/quantumbeam/quantumbeam-k8s'
+  - 'https://github.com/quantumbeam/quantumbeam-infra'
+  - 'https://github.com/quantumbeam/quantumbeam-secrets'
+  destinations:
+  - namespace: production
+    server: https://kubernetes.default.svc
+  - namespace: staging
+    server: https://kubernetes.default.svc
+  - namespace: development
+    server: https://kubernetes.default.svc
+  - namespace: observability
+    server: https://kubernetes.default.svc
+  - namespace: blue-green
+    server: https://kubernetes.default.svc
+  - namespace: monitoring
+    server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+  namespaceResourceWhitelist:
+  - group: '*'
+    kind: '*'
+  orphanedResources:
+    warn: true
+  roles:
+  - name: developers
+    description: Developers can sync and manage applications
+    policies:
+    - p, proj:quantumbeam:developers, applications, sync, quantumbeam/*, allow
+    - p, proj:quantumbeam:developers, applications, override, quantumbeam/*, allow
+    - p, proj:quantumbeam:developers, applications, get, quantumbeam/*, allow
+    groups:
+    - quantumbeam:developers
+  - name: ops
+    description: Ops team has full access
+    policies:
+    - p, proj:quantumbeam:ops, applications, *, quantumbeam/*, allow
+    groups:
+    - quantumbeam:ops
+  - name: readonly
+    description: Read-only access
+    policies:
+    - p, proj:quantumbeam:readonly, applications, get, quantumbeam/*, allow
+    groups:
+    - quantumbeam:readonly
+---
+# ArgoCD ConfigMap for additional configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Application controller configuration
+  application.instanceLabelKey: argocd.argoproj.io/instance
+
+  # Repository configuration
+  repositories: |
+    - type: git
+      url: https://github.com/quantumbeam/quantumbeam-k8s
+      name: quantumbeam-k8s
+      insecure: false
+    - type: git
+      url: https://github.com/quantumbeam/quantumbeam-infra
+      name: quantumbeam-infra
+      insecure: false
+    - type: git
+      url: https://github.com/quantumbeam/quantumbeam-secrets
+      name: quantumbeam-secrets
+      insecure: false
+      connectionState:
+        status: Successful
+
+  # URL configuration
+  url: https://argocd.quantumbeam.io
+
+  # OIDC configuration
+  oidc.config: |
+    name: QuantumBeam OIDC
+    issuer: https://your-oidc-provider.com
+    clientID: argocd
+    clientSecret: $oidc.clientSecret
+    requestedScopes: ["openid", "profile", "email", "groups"]
+
+  # Resource tracking configuration
+  resource.customizations: |
+    argoproj.io/Application:
+      health.lua: |
+        hs = {}
+        if obj.status ~= nil then
+          if obj.status.health ~= nil then
+            hs.status = obj.status.health.status
+            if obj.status.health.message ~= nil then
+              hs.message = obj.status.health.message
+            end
+          end
+        end
+        return hs
+
+  # Notification configuration
+  notifications.argocd.cfg: |
+    triggers:
+      - name: on-sync-succeeded
+        condition: ApplicationStatus && ApplicationStatus.health.status == 'Healthy' && ApplicationStatus.operationState.phase in ['Succeeded']
+        template: app-sync-succeeded
+      - name: on-sync-failed
+        condition: ApplicationStatus && ApplicationStatus.health.status == 'Degraded' && ApplicationStatus.operationState.phase in ['Failed', 'Error']
+        template: app-sync-failed
+      - name: on-sync-running
+        condition: ApplicationStatus && ApplicationStatus.operationState.phase in ['Running']
+        template: app-sync-running
+
+  # Notification templates
+  templates.app-sync-succeeded: |
+    message: |
+      Application {{.app.metadata.name}} has been successfully synced.
+
+      Repository: {{.app.spec.source.repoURL}}
+      Revision: {{.app.status.sync.revision}}
+      Synced at: {{.app.status.operationState.finishedAt}}
+    slack:
+      attachments: |
+        [{
+          "title": "Sync Successful",
+          "color": "good",
+          "fields": [
+            {"title": "Application", "value": "{{.app.metadata.name}}", "short": true},
+            {"title": "Repository", "value": "{{.app.spec.source.repoURL}}", "short": true},
+            {"title": "Revision", "value": "{{.app.status.sync.revision}}", "short": true},
+            {"title": "Synced at", "value": "{{.app.status.operationState.finishedAt}}", "short": true}
+          ]
+        }]
+
+  templates.app-sync-failed: |
+    message: |
+      Application {{.app.metadata.name}} sync failed.
+
+      Error: {{.app.status.operationState.message}}
+      Repository: {{.app.spec.source.repoURL}}
+      Revision: {{.app.status.sync.revision}}
+    slack:
+      attachments: |
+        [{
+          "title": "Sync Failed",
+          "color": "danger",
+          "fields": [
+            {"title": "Application", "value": "{{.app.metadata.name}}", "short": true},
+            {"title": "Error", "value": "{{.app.status.operationState.message}}", "short": false},
+            {"title": "Repository", "value": "{{.app.spec.source.repoURL}}", "short": true},
+            {"title": "Revision", "value": "{{.app.status.sync.revision}}", "short": true}
+          ]
+        }]
+
+  templates.app-sync-running: |
+    message: |
+      Application {{.app.metadata.name}} sync is running.
+
+      Repository: {{.app.spec.source.repoURL}}
+      Revision: {{.app.status.sync.revision}}
+    slack:
+      attachments: |
+        [{
+          "title": "Sync Running",
+          "color": "warning",
+          "fields": [
+            {"title": "Application", "value": "{{.app.metadata.name}}", "short": true},
+            {"title": "Repository", "value": "{{.app.spec.source.repoURL}}", "short": true},
+            {"title": "Revision", "value": "{{.app.status.sync.revision}}", "short": true}
+          ]
+        }]
+
+  # Configuration for Helm charts
+  helm.valuesFileSchemes: |
+    - https://*
+    - git+https://*
+
+  # Resource tracking and comparison
+  resource.compareoptions: |
+    ignoreAggregatedRoles: true
+    ignoreResourceStatusField: ["apps/v1/Deployment", "extensions/v1beta1/Deployment"]
+
+  # Application controller performance
+  controller.processors.operation: 10
+  controller.processors.status: 20
+
+  # Server configuration
+  server.insecure: false
+  server.grpc.web: true
+---
+# ArgoCD RBAC Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Policy definitions
+  policy.csv: |
+    # Default policies
+    p, role:readonly, applications, get, *, allow
+    p, role:readonly, applications, list, *, allow
+    p, role:readonly, clusters, get, *, allow
+    p, role:readonly, repositories, get, *, allow
+    p, role:readonly, repositories, list, *, allow
+
+    # Developer policies
+    p, role:developer, applications, *, quantumbeam/*, allow
+    p, role:developer, applications, sync, quantumbeam/*, allow
+    p, role:developer, applications, override, quantumbeam/*, allow
+    p, role:developer, applications, get, *, allow
+    p, role:developer, clusters, get, *, allow
+    p, role:developer, repositories, get, *, allow
+    p, role:developer, repositories, create, *, allow
+    p, role:developer, repositories, update, *, allow
+    p, role:developer, repositories, delete, *, allow
+
+    # Ops policies
+    p, role:ops, applications, *, *, allow
+    p, role:ops, clusters, *, *, allow
+    p, role:ops, repositories, *, *, allow
+    p, role:ops, accounts, *, *, allow
+    p, role:ops, gpgkeys, *, *, allow
+    p, role:ops, certificates, *, *, allow
+
+    # Admin policies
+    p, role:admin, *, *, *, allow
+
+    # Group mappings
+    g, quantumbeam:developers, role:developer
+    g, quantumbeam:ops, role:ops
+    g, quantumbeam:readonly, role:readonly
+    g, argocd-admins, role:admin
+
+  # Policy default
+  policy.default: role:readonly
+---
+# ArgoCD Secret for notifications and OIDC
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-notifications-secret
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-notifications-secret
+    app.kubernetes.io/part-of: argocd
+type: Opaque
+stringData:
+  # Slack webhook URL
+  slack-token: "YOUR_SLACK_WEBHOOK_URL"
+
+  # Email configuration
+  email-username: "argocd@quantumbeam.io"
+  email-password: "YOUR_EMAIL_PASSWORD"
+  email-from: "ArgoCD <argocd@quantumbeam.io>"
+  email-smtp-host: "smtp.gmail.com"
+  email-smtp-port: "587"
+---
+# ArgoCD Notification Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-secret
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-secret
+    app.kubernetes.io/part-of: argocd
+type: Opaque
+data:
+  # Admin password (change this in production)
+  # Use: echo -n "your-password" | base64
+  admin.password: YWRtaW4=
+
+  # Admin password MTime (current timestamp)
+  admin.passwordMtime: MTY5NDY3MDAwMA==
+
+  # Server secret key
+  # Use: openssl rand -base64 32
+  server.secretkey: <BASE64-SECRET-KEY>
+
+  # OIDC client secret
+  oidc.clientSecret: <OIDC-CLIENT-SECRET>
+---
+# ArgoCD Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: argocd-metrics
+  namespace: argocd
+  labels:
+    app: argocd-metrics
+    component: gitops
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: argocd-metrics
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+---
+# ArgoCD Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-grafana-dashboard
+  namespace: argocd
+  labels:
+    grafana_dashboard: "1"
+    app: argocd-dashboard
+data:
+  quantumbeam-argocd.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "QuantumBeam ArgoCD",
+        "tags": ["argocd", "quantumbeam", "gitops"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Applications Health",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(argocd_app_info{健康状态=\"Healthy\"})",
+                "legendFormat": "Healthy"
+              },
+              {
+                "expr": "sum(argocd_app_info{健康状态=\"Degraded\"})",
+                "legendFormat": "Degraded"
+              },
+              {
+                "expr": "sum(argocd_app_info{健康状态=\"Missing\"})",
+                "legendFormat": "Missing"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                },
+                "custom": {
+                  "displayMode": "list",
+                  "orientation": "horizontal"
+                },
+                "mappings": [
+                  {
+                    "options": {
+                      "0": {
+                        "text": "DEGRADED",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "HEALTHY",
+                        "color": "green"
+                      }
+                    },
+                    "type": "value"
+                  }
+                ],
+                "thresholds": {
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                },
+                "unit": "short"
+              }
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "title": "Sync Status",
+            "type": "piechart",
+            "targets": [
+              {
+                "expr": "sum(argocd_app_sync_status{状态=\"Synced\"})",
+                "legendFormat": "Synced"
+              },
+              {
+                "expr": "sum(argocd_app_sync_status{状态=\"OutOfSync\"})",
+                "legendFormat": "OutOfSync"
+              },
+              {
+                "expr": "sum(argocd_app_sync_status{状态=\"Unknown\"})",
+                "legendFormat": "Unknown"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "palette-classic"
+                }
+              }
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 0
+            }
+          },
+          {
+            "title": "Application Sync Duration",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(argocd_app_sync_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(argocd_app_sync_bucket[5m]))",
+                "legendFormat": "50th percentile"
+              }
+            ],
+            "yAxes": [
+              {
+                "unit": "seconds"
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 24,
+              "x": 0,
+              "y": 8
+            }
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+---
+# ArgoCD ApplicationSet for multiple environments
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: quantumbeam-env-apps
+  namespace: argocd
+  labels:
+    app: quantumbeam
+    component: gitops
+spec:
+  generators:
+  - git:
+      repoURL: https://github.com/quantumbeam/quantumbeam-k8s
+      revision: main
+      directories:
+      - path: environments/*
+  template:
+    metadata:
+      name: 'quantumbeam-{{path.basename}}'
+      namespace: argocd
+      labels:
+        app: quantumbeam
+        environment: '{{path.basename}}'
+        component: gitops
+    spec:
+      project: quantumbeam
+      source:
+        repoURL: https://github.com/quantumbeam/quantumbeam-k8s
+        targetRevision: main
+        path: 'environments/{{path.basename}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m

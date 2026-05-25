@@ -1,0 +1,877 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: config-validation
+  labels:
+    name: config-validation
+    environment: production
+    purpose: configuration-validation
+    component: governance
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: config-validator
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: config-validator
+  labels:
+    app: config-validator
+    component: governance
+rules:
+# Core API permissions for reading all resources
+- apiGroups: [""]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+# Apps API permissions for deployments, statefulsets, etc.
+- apiGroups: ["apps"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+# Networking API permissions for ingresses, network policies
+- apiGroups: ["networking.k8s.io"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+# Policy API permissions for pod security policies
+- apiGroups: ["policy"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+# Extensions API permissions
+- apiGroups: ["extensions"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+# Batch API permissions for jobs and cronjobs
+- apiGroups: ["batch"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+# Autoscaling API permissions
+- apiGroups: ["autoscaling"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+# RBAC permissions for reading roles and bindings
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+# API extensions permissions
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+# Custom resources permissions
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+# ConfigMap and Secret permissions for validation rules
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
+# Event permissions for reporting validation results
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: config-validator
+  labels:
+    app: config-validator
+    component: governance
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: config-validator
+subjects:
+- kind: ServiceAccount
+  name: config-validator
+  namespace: config-validation
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-validator-config
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+data:
+  config.yaml: |
+    validation:
+      interval: 300
+      parallel_checks: 10
+      timeout: 30
+      retry_count: 3
+    drift_detection:
+      interval: 600
+      comparison_environments:
+        - "production"
+        - "staging"
+      ignore_fields:
+        - "metadata.managedFields"
+        - "status"
+        - "metadata.creationTimestamp"
+        - "metadata.generation"
+        - "metadata.resourceVersion"
+        - "metadata.uid"
+      drift_threshold: 0.1
+    policies:
+      policy_directory: "/policies"
+      opa_server: "http://opa.config-validation.svc.cluster.local:8181"
+      gatekeeper_enabled: true
+    remediation:
+      auto_remediate: false
+      dry_run: true
+      approval_required: true
+      remediation_timeout: 300
+    storage:
+      s3_bucket: "quantumbeam-config-backup"
+      local_path: "/var/lib/config-manager"
+      retention_days: 90
+    environments:
+      production:
+        cluster: "prod-cluster"
+        region: "us-east-1"
+      staging:
+        cluster: "staging-cluster"
+        region: "us-east-1"
+      development:
+        cluster: "dev-cluster"
+        region: "us-west-2"
+    reporting:
+      slack_webhook: "${SLACK_WEBHOOK}"
+      pagerduty_key: "${PAGERDUTY_KEY}"
+      email_enabled: true
+    logging:
+      level: "INFO"
+      format: "json"
+      audit_enabled: true
+
+  policies.yaml: |
+    # Built-in validation policies
+    policies:
+      security-context:
+        category: security
+        severity: error
+        description: "Pods must have security context configured"
+        rule: "spec.securityContext != null OR spec.containers[*].securityContext != null"
+        remediation: "Add securityContext to pod spec or container spec with appropriate settings"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging", "development"]
+
+      non-root-user:
+        category: security
+        severity: error
+        description: "Containers should not run as root"
+        rule: "spec.securityContext.runAsNonRoot == true OR spec.containers[*].securityContext.runAsNonRoot == true"
+        remediation: "Set runAsNonRoot: true in securityContext"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+      drop-capabilities:
+        category: security
+        severity: warning
+        description: "Containers should drop all capabilities"
+        rule: "spec.containers[*].securityContext.capabilities.drop == ['ALL']"
+        remediation: "Add capabilities.drop: ['ALL'] to securityContext"
+        enabled: true
+        auto_remediate: false
+        environments: ["production"]
+
+      resource-limits:
+        category: resource
+        severity: error
+        description: "Containers must have resource limits"
+        rule: "spec.containers[*].resources.limits != null"
+        remediation: "Add resource limits to container configuration"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+      resource-requests:
+        category: resource
+        severity: warning
+        description: "Containers should have resource requests"
+        rule: "spec.containers[*].resources.requests != null"
+        remediation: "Add resource requests to container configuration"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging", "development"]
+
+      readiness-probe:
+        category: availability
+        severity: warning
+        description: "Containers should have readiness probes"
+        rule: "spec.containers[*].readinessProbe != null"
+        remediation: "Add readinessProbe to container configuration"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+      liveness-probe:
+        category: availability
+        severity: warning
+        description: "Containers should have liveness probes"
+        rule: "spec.containers[*].livenessProbe != null"
+        remediation: "Add livenessProbe to container configuration"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+      network-policy:
+        category: network
+        severity: warning
+        description: "Namespaces should have network policies"
+        rule: "kind == 'NetworkPolicy'"
+        remediation: "Create NetworkPolicy for namespace"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+      rbac-enabled:
+        category: security
+        severity: error
+        description: "RBAC should be enabled and configured"
+        rule: "kind == 'Role' OR kind == 'ClusterRole' OR kind == 'RoleBinding' OR kind == 'ClusterRoleBinding'"
+        remediation: "Configure proper RBAC rules"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+      namespace-quota:
+        category: resource
+        severity: warning
+        description: "Namespaces should have resource quotas"
+        rule: "kind == 'ResourceQuota'"
+        remediation: "Create ResourceQuota for namespace"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+      pod-disruption-budget:
+        category: availability
+        severity: info
+        description: "Deployments should have pod disruption budgets"
+        rule: "kind == 'PodDisruptionBudget'"
+        remediation: "Create PodDisruptionBudget for high-availability applications"
+        enabled: true
+        auto_remediate: false
+        environments: ["production"]
+
+      horizontal-pod-autoscaler:
+        category: scalability
+        severity: info
+        description: "Deployments should have HPA configured"
+        rule: "kind == 'HorizontalPodAutoscaler'"
+        remediation: "Create HorizontalPodAutoscaler for automatic scaling"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+      ssl-tls-only:
+        category: security
+        severity: error
+        description: "Ingress resources should enforce TLS"
+        rule: "spec.tls != null"
+        remediation: "Add TLS configuration to Ingress"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+      latest-tag:
+        category: security
+        severity: warning
+        description: "Container images should not use 'latest' tag"
+        rule: "spec.containers[*].image !contains ':latest'"
+        remediation: "Use specific image tag instead of 'latest'"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+      read-only-filesystem:
+        category: security
+        severity: warning
+        description: "Containers should use read-only root filesystem"
+        rule: "spec.containers[*].securityContext.readOnlyRootFilesystem == true"
+        remediation: "Set readOnlyRootFilesystem: true in securityContext"
+        enabled: true
+        auto_remediate: false
+        environments: ["production"]
+
+      no-secrets-as-env:
+        category: security
+        severity: warning
+        description: "Avoid using secrets as environment variables"
+        rule: "spec.containers[*].envFrom[*].secretRef == null AND spec.containers[*].env[*].valueFrom.secretKeyRef == null"
+        remediation: "Use mounted secrets instead of environment variables"
+        enabled: true
+        auto_remediate: false
+        environments: ["production", "staging"]
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-validator
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+    version: v1.0.0
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: config-validator
+      component: governance
+  template:
+    metadata:
+      labels:
+        app: config-validator
+        component: governance
+        version: v1.0.0
+        monitoring: enabled
+    spec:
+      serviceAccountName: config-validator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: config-validator
+        image: quantumbeam/config-validator:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 8000
+          protocol: TCP
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: SLACK_WEBHOOK
+          valueFrom:
+            secretKeyRef:
+              name: config-validator-secrets
+              key: slack-webhook
+              optional: true
+        - name: PAGERDUTY_KEY
+          valueFrom:
+            secretKeyRef:
+              name: config-validator-secrets
+              key: pagerduty-key
+              optional: true
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: config-validator-secrets
+              key: aws-access-key-id
+              optional: true
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: config-validator-secrets
+              key: aws-secret-access-key
+              optional: true
+        - name: CONFIG_ENVIRONMENT
+          value: "production"
+        volumeMounts:
+        - name: config-volume
+          mountPath: /config
+          readOnly: true
+        - name: policies-volume
+          mountPath: /policies
+          readOnly: true
+        - name: cache-volume
+          mountPath: /var/lib/config-manager
+        - name: tmp-volume
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+      volumes:
+      - name: config-volume
+        configMap:
+          name: config-validator-config
+          items:
+          - key: config.yaml
+            path: config.yaml
+      - name: policies-volume
+        configMap:
+          name: config-validator-config
+          items:
+          - key: policies.yaml
+            path: policies.yaml
+      - name: cache-volume
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: tmp-volume
+        emptyDir:
+          sizeLimit: 100Mi
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      schedulerName: default-scheduler
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-validator
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 8000
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: config-validator
+    component: governance
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-validator-metrics
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+    monitoring: prometheus
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: metrics
+    port: 8000
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: config-validator
+    component: governance
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: config-validator-pdb
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: config-validator
+      component: governance
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: config-validator-hpa
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: config-validator
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: config-validator-secrets
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+type: Opaque
+data:
+  # Base64 encoded values - replace with actual values
+  slack-webhook: ""
+  pagerduty-key: ""
+  aws-access-key-id: ""
+  aws-secret-access-key: ""
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: config-validator-scheduled
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+    schedule-type: validation
+spec:
+  schedule: "*/15 * * * *"  # Every 15 minutes
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: config-validator
+            component: governance
+            job-type: scheduled-validation
+        spec:
+          serviceAccountName: config-validator
+          restartPolicy: OnFailure
+          activeDeadlineSeconds: 600
+          backoffLimit: 3
+          containers:
+          - name: config-validator
+            image: quantumbeam/config-validator:latest
+            imagePullPolicy: Always
+            command:
+            - python
+            - config-validator.py
+            - --validate-only
+            - --monitor
+            env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: SLACK_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  name: config-validator-secrets
+                  key: slack-webhook
+                  optional: true
+            - name: PAGERDUTY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: config-validator-secrets
+                  key: pagerduty-key
+                  optional: true
+            volumeMounts:
+            - name: config-volume
+              mountPath: /config
+              readOnly: true
+            - name: policies-volume
+              mountPath: /policies
+              readOnly: true
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            resources:
+              requests:
+                cpu: 200m
+                memory: 128Mi
+              limits:
+                cpu: 400m
+                memory: 256Mi
+          volumes:
+          - name: config-volume
+            configMap:
+              name: config-validator-config
+              items:
+              - key: config.yaml
+                path: config.yaml
+          - name: policies-volume
+            configMap:
+              name: config-validator-config
+              items:
+              - key: policies.yaml
+                path: policies.yaml
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-detection-scheduled
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+    schedule-type: drift-detection
+spec:
+  schedule: "0 */2 * * *"  # Every 2 hours
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: config-validator
+            component: governance
+            job-type: drift-detection
+        spec:
+          serviceAccountName: config-validator
+          restartPolicy: OnFailure
+          activeDeadlineSeconds: 900
+          backoffLimit: 2
+          containers:
+          - name: config-validator
+            image: quantumbeam/config-validator:latest
+            imagePullPolicy: Always
+            command:
+            - python
+            - config-validator.py
+            - --drift-only
+            - --monitor
+            env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: SLACK_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  name: config-validator-secrets
+                  key: slack-webhook
+                  optional: true
+            volumeMounts:
+            - name: config-volume
+              mountPath: /config
+              readOnly: true
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            resources:
+              requests:
+                cpu: 200m
+                memory: 128Mi
+              limits:
+                cpu: 400m
+                memory: 256Mi
+          volumes:
+          - name: config-volume
+            configMap:
+              name: config-validator-config
+              items:
+              - key: config.yaml
+                path: config.yaml
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: config-validator
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: config-validator
+      component: governance
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    honorLabels: true
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: config-validator-netpol
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+spec:
+  podSelector:
+    matchLabels:
+      app: config-validator
+      component: governance
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: config-validation
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS
+    - protocol: TCP
+      port: 53   # DNS
+    - protocol: UDP
+      port: 53   # DNS
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 443  # Kubernetes API
+
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: config-validation-quota
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: "2Gi"
+    limits.cpu: "4"
+    limits.memory: "4Gi"
+    persistentvolumeclaims: "2"
+    pods: "10"
+    services: "5"
+    services.loadbalancers: "0"
+    services.nodeports: "0"
+    count/secrets: "10"
+    count/configmaps: "10"
+
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: config-validation-limits
+  namespace: config-validation
+  labels:
+    app: config-validator
+    component: governance
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - max:
+      cpu: "2"
+      memory: "2Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    type: Container

@@ -1,0 +1,243 @@
+# Docker Compose for Testing Environment
+version: '3.8'
+
+services:
+  # PostgreSQL for testing
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: quantumbeam-postgres-test
+    environment:
+      POSTGRES_DB: quantumbeam_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    command: postgres -c shared_preload_libraries=pg_stat_statements
+
+  # Redis for testing
+  redis-test:
+    image: redis:7-alpine
+    container_name: quantumbeam-redis-test
+    command: redis-server --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Test PostgreSQL with specific schema
+  postgres-integration:
+    image: postgres:15-alpine
+    container_name: quantumbeam-postgres-integration
+    environment:
+      POSTGRES_DB: quantumbeam_integration
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_integration_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+      - ./tests/fixtures:/fixtures:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redis for integration tests
+  redis-integration:
+    image: redis:7-alpine
+    container_name: quantumbeam-redis-integration
+    command: redis-server --appendonly no
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis_integration_data:/data
+
+  # Mock AI/ML Service for testing
+  ai-ml-mock:
+    build:
+      context: ./tests/mocks
+      dockerfile: Dockerfile.aiml-mock
+    container_name: quantumbeam-ai-ml-mock
+    ports:
+      - "8003:8001"
+    environment:
+      - MOCK_SERVICE=ai-ml
+      - LOG_LEVEL=debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Mock Quantum Service for testing
+  quantum-mock:
+    build:
+      context: ./tests/mocks
+      dockerfile: Dockerfile.quantum-mock
+    container_name: quantumbeam-quantum-mock
+    ports:
+      - "8004:8001"
+    environment:
+      - MOCK_SERVICE=quantum
+      - LOG_LEVEL=debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Test Data Generator
+  test-data-generator:
+    build:
+      context: ./tests/tools
+      dockerfile: Dockerfile.data-generator
+    container_name: quantumbeam-test-data-generator
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres-integration:5432/quantumbeam_integration?sslmode=disable
+      - REDIS_URL=redis://redis-integration:6379
+      - GENERATE_USERS=100
+      - GENERATE_TRANSACTIONS=1000
+    depends_on:
+      postgres-integration:
+        condition: service_healthy
+      redis-integration:
+        condition: service_healthy
+    volumes:
+      - ./tests/fixtures:/fixtures:ro
+
+  # Performance Test Load Generator
+  performance-tester:
+    build:
+      context: ./tests/performance
+      dockerfile: Dockerfile
+    container_name: quantumbeam-performance-tester
+    environment:
+      - TARGET_URL=http://api-server:8080
+      - VUS=50
+      - DURATION=300
+    depends_on:
+      - api-server
+    profiles:
+      - performance
+
+  # API Server (test version)
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quantumbeam-api-server-test
+    ports:
+      - "8081:8080"
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres-integration:5432/quantumbeam_integration?sslmode=disable
+      - REDIS_URL=redis://redis-integration:6379
+      - QUANTUM_SERVICE_URL=http://quantum-mock:8001
+      - AI_SERVICE_URL=http://ai-ml-mock:8001
+      - JWT_SECRET=test_jwt_secret_for_testing_only
+      - GIN_MODE=test
+      - LOG_LEVEL=debug
+    depends_on:
+      postgres-integration:
+        condition: service_healthy
+      redis-integration:
+        condition: service_healthy
+      quantum-mock:
+        condition: service_healthy
+      ai-ml-mock:
+        condition: service_healthy
+    volumes:
+      - ./config:/app/config:ro
+      - ./tests:/app/tests:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Security Testing Container
+  security-scanner:
+    image: owasp/zap2docker-stable
+    container_name: quantumbeam-security-scanner
+    command: zap-baseline.py -t http://api-server:8080 -I -r /zap/report.html
+    volumes:
+      - ./security-reports:/zap
+    depends_on:
+      - api-server
+    profiles:
+      - security
+
+  # Network Monitoring for tests
+  network-monitor:
+    image: nicolaka/netshoot
+    container_name: quantumbeam-network-monitor
+    command: tail -f /dev/null
+    depends_on:
+      - api-server
+      - ai-ml-mock
+      - quantum-mock
+    profiles:
+      - debug
+
+volumes:
+  postgres_test_data:
+    driver: local
+  postgres_integration_data:
+    driver: local
+  redis_test_data:
+    driver: local
+  redis_integration_data:
+    driver: local
+
+# Profile for running performance tests
+profiles:
+  performance:
+    services:
+      - performance-tester
+      - api-server
+      - postgres-integration
+      - redis-integration
+      - ai-ml-mock
+      - quantum-mock
+
+  security:
+    services:
+      - security-scanner
+      - api-server
+      - postgres-integration
+      - redis-integration
+      - ai-ml-mock
+      - quantum-mock
+
+  integration:
+    services:
+      - api-server
+      - postgres-integration
+      - redis-integration
+      - ai-ml-mock
+      - quantum-mock
+      - test-data-generator
+
+  debug:
+    services:
+      - network-monitor
+      - api-server
+      - postgres-integration
+      - redis-integration
+      - ai-ml-mock
+      - quantum-mock

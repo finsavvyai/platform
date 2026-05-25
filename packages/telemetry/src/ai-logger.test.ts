@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryAiLogger } from "./ai-logger.js";
+import { REDACTED } from "./redact.js";
 import type { AiExecutionEvent } from "./types.js";
 
 const event = (overrides: Partial<AiExecutionEvent> = {}): AiExecutionEvent => ({
@@ -32,5 +33,37 @@ describe("InMemoryAiLogger", () => {
   it("starts empty", () => {
     const log = new InMemoryAiLogger();
     expect(log.totals().promptTokens).toBe(0);
+  });
+
+  it("scrubs token-shaped substrings in string fields", () => {
+    const log = new InMemoryAiLogger();
+    log.record(
+      event({
+        // Misuse: caller jammed a token into `model`. Must be scrubbed.
+        model: "claude-opus-4-7 sk-ant-aaaaaaaaaaaaaaaa",
+      }),
+    );
+    expect(log.events[0].model).not.toContain("sk-ant-aaaaaaaaaaaaaaaa");
+    expect(log.events[0].model).toContain(REDACTED);
+  });
+
+  it("respects custom redactKeys for arbitrary extension fields", () => {
+    const log = new InMemoryAiLogger({ redactKeys: ["prompt"] });
+    // Cast: extension fields are common in practice via downstream wrappers.
+    const ext = { ...event(), prompt: "user supplied secret prompt" } as unknown as AiExecutionEvent;
+    log.record(ext);
+    expect((log.events[0] as unknown as { prompt: string }).prompt).toBe(
+      REDACTED,
+    );
+  });
+
+  it("totals on empty logger returns zeros", () => {
+    const log = new InMemoryAiLogger();
+    expect(log.totals()).toEqual({
+      promptTokens: 0,
+      completionTokens: 0,
+      cost: 0,
+      cacheHits: 0,
+    });
   });
 });

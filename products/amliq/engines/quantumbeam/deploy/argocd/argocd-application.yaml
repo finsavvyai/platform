@@ -1,0 +1,144 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-app
+  namespace: argocd
+  labels:
+    app: quantumbeam
+    environment: production
+    managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: CreateNamespace=true
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    notifications.argoproj.io/subscribe.on-sync-succeeded.slack: quantumbeam-deployments
+    notifications.argoproj.io/subscribe.on-sync-failed.slack: quantumbeam-alerts
+    notifications.argoproj.io/subscribe.on-sync-status-unknown.slack: quantumbeam-alerts
+spec:
+  # The project this application belongs to
+  project: default
+
+  # Source of the application manifests
+  source:
+    # Git repository URL
+    repoURL: https://github.com/quantumbeam/quantumbeam-k8s
+    # Target revision
+    targetRevision: main
+    # Path within the Git repository
+    path: environments/production
+
+    # Helm chart configuration
+    helm:
+      # Helm release name
+      releaseName: quantumbeam
+
+      # Helm values files
+      valueFiles:
+      - values.yaml
+      - values-production.yaml
+
+      # Helm parameters
+      parameters:
+      - name: image.tag
+        value: "{{.Values.image.tag | default \"latest\"}}"
+      - name: global.environment
+        value: production
+      - name: global.namespace
+        value: quantumbeam
+
+      # Hooks for pre/post deployment
+      hooks:
+      # Pre-sync hook for database migrations
+      - name: pre-sync-db-migration
+        type: PreSync
+        command: ["sh", "-c"]
+        args: ["echo 'Running database migrations...' && kubectl apply -f migrations/"]
+
+      # Post-sync hook for smoke tests
+      - name: post-sync-smoke-tests
+        type: PostSync
+        command: ["sh", "-c"]
+        args: ["echo 'Running smoke tests...' && ./scripts/smoke-tests.sh"]
+
+    # Kustomize configuration (alternative to Helm)
+    # kustomize:
+    #   images:
+    #   - name: quay.io/quantumbeam/quantumbeam-api
+    #     newTag: "{{.Values.image.tag | default \"latest\"}}"
+
+  # Destination cluster and namespace
+  destination:
+    # Kubernetes server URL
+    server: https://kubernetes.default.svc
+    # Target namespace
+    namespace: quantumbeam
+
+  # Sync policy
+  syncPolicy:
+    # Automated sync
+    automated:
+      # Whether to automatically sync when new manifests are applied
+      prune: true
+      # Whether to automatically sync when the manifest source changes
+      selfHeal: true
+      # Allow empty resources to be created
+      allowEmpty: false
+
+    # Sync options
+    syncOptions:
+    # Create namespace if it doesn't exist
+    - CreateNamespace=true
+    # Prune propagation policy
+    - PrunePropagationPolicy=foreground
+    # Respect ignore differences
+    - RespectIgnoreDifferences=true
+    # Apply out of sync only
+    - ApplyOutOfSyncOnly=true
+
+    # Retry configuration
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+    # Managed fields
+    managedNamespaceMetadata:
+      labels:
+        app.kubernetes.io/managed-by: argocd
+        environment: production
+      annotations:
+        argocd.argoproj.io/managed-by: argocd
+
+    # Ignore differences for certain fields
+    ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+      - /spec/replicas
+    - group: ""
+      kind: Service
+      jsonPointers:
+      - /spec/clusterIP
+    - group: ""
+      kind: Secret
+      jsonPointers:
+      - /data
+      - /metadata/annotations/kubectl.kubernetes.io/last-applied-configuration
+
+  # Revision history limit
+  revisionHistoryLimit: 3
+
+  # Application health
+  health:
+    # Health check configuration
+    status: Healthy
+
+  # Application info
+  info:
+    - name: Environment
+      value: Production
+    - name: Owner
+      value: QuantumBeam Team
+    - name: Contact
+      value: ops@quantumbeam.io

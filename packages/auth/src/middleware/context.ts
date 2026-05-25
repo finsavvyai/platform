@@ -27,5 +27,10 @@ export const extractBearer = (header: string | undefined): string | undefined =>
   if (!header) return undefined;
   const trimmed = header.trim();
   if (!trimmed.toLowerCase().startsWith("bearer ")) return undefined;
-  return trimmed.slice(7).trim();
+  const token = trimmed.slice(7).trim();
+  // Reject empty/whitespace-only tokens and tokens with internal whitespace —
+  // a well-formed bearer token is a single opaque string.
+  if (token.length === 0) return undefined;
+  if (/\s/.test(token)) return undefined;
+  return token;
 };

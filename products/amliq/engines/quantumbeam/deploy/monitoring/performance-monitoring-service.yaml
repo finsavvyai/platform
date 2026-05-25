@@ -1,0 +1,999 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-performance-monitoring
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: performance-monitoring
+    service-type: monitoring
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http-metrics
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    - name: http-api
+      port: 8090
+      targetPort: 8090
+      protocol: TCP
+  selector:
+    app: quantumbeam
+    component: performance-monitoring
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quantumbeam-performance-monitoring
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: performance-monitoring
+    deployment-type: monitoring
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: quantumbeam
+      component: performance-monitoring
+  template:
+    metadata:
+      labels:
+        app: quantumbeam
+        component: performance-monitoring
+        monitoring: enabled
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        checksum/config: "{{ .Values.performanceMonitoring.configChecksum | default \"\" }}"
+    spec:
+      serviceAccountName: quantumbeam-performance-monitoring
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: performance-analyzer
+          image: quantumbeam/performance-analyzer:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: api
+              containerPort: 8090
+              protocol: TCP
+          env:
+            - name: PROMETHEUS_URL
+              value: "http://prometheus.monitoring.svc.cluster.local:9090"
+            - name: REDIS_URL
+              value: "redis://redis-service.quantumbeam.svc.cluster.local:6379"
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: connection-string
+            - name: ALERTMANAGER_URL
+              value: "http://alertmanager.monitoring.svc.cluster.local:9093"
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: monitoring-secrets
+                  key: slack-webhook-url
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: ANALYSIS_INTERVAL
+              value: "300"
+            - name: ANOMALY_THRESHOLD
+              value: "2.0"
+            - name: AUTO_OPTIMIZATION_ENABLED
+              value: "true"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+        - name: performance-dashboard-server
+          image: nginx:alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: dashboard
+              containerPort: 80
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: dashboard-config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+            - name: dashboard-static
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+      volumes:
+        - name: config-volume
+          configMap:
+            name: performance-monitoring-config
+            items:
+              - key: performance-monitoring.yaml
+                path: performance-monitoring.yaml
+              - key: performance-automation.yaml
+                path: performance-automation.yaml
+
+        - name: dashboard-config
+          configMap:
+            name: performance-dashboard-config
+
+        - name: dashboard-static
+          configMap:
+            name: performance-dashboard-static
+
+        - name: tmp
+          emptyDir: {}
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - quantumbeam
+                    - key: component
+                      operator: In
+                      values:
+                        - performance-monitoring
+                topologyKey: kubernetes.io/hostname
+
+      tolerations:
+        - key: "monitoring"
+          operator: "Equal"
+          value: "dedicated"
+          effect: "NoSchedule"
+
+      nodeSelector:
+        node-type: monitoring
+
+      terminationGracePeriodSeconds: 30
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quantumbeam-performance-monitoring
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: performance-monitoring
+  annotations:
+    iam.amazonaws.com/role: "quantumbeam-performance-monitoring-role"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: quantumbeam-performance-monitoring
+  labels:
+    app: quantumbeam
+    component: performance-monitoring
+rules:
+  # Read permissions for monitoring
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "nodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Read permissions for metrics
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
+
+  # Read permissions for custom metrics
+  - apiGroups: ["custom.metrics.k8s.io"]
+    resources: ["*"]
+    verbs: ["get", "list"]
+
+  # Read permissions for deployments and statefulsets
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+
+  # Write permissions for scaling
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale", "statefulsets/scale"]
+    verbs: ["get", "update", "patch"]
+
+  # Read permissions for horizontal pod autoscalers
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+
+  # Read permissions for vertical pod autoscalers
+  - apiGroups: ["autoscaling.k8s.io"]
+    resources: ["verticalpodautoscalers"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+
+  # Read permissions for KEDA
+  - apiGroups: ["keda.sh"]
+    resources: ["scaledobjects", "scaledjobs", "triggerauthentications"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+
+  # Read permissions for monitoring stack
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["prometheuses", "servicemonitors", "podmonitors", "prometheusrules"]
+    verbs: ["get", "list", "watch"]
+
+  # Create and update permissions for events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+  # Read permissions for configmaps and secrets (configuration)
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: quantumbeam-performance-monitoring
+  labels:
+    app: quantumbeam
+    component: performance-monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: quantumbeam-performance-monitoring
+subjects:
+  - kind: ServiceAccount
+    name: quantumbeam-performance-monitoring
+    namespace: quantumbeam
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: quantumbeam-performance-monitoring
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: performance-monitoring
+    monitoring: enabled
+spec:
+  selector:
+    matchLabels:
+      app: quantumbeam
+      component: performance-monitoring
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: 'go_.*|process_.*'
+          action: drop
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: quantumbeam-performance-monitoring
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: performance-monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: quantumbeam.performance.monitoring
+      rules:
+        # Performance monitoring service health
+        - alert: QuantumBeamPerformanceMonitoringDown
+          expr: up{job="quantumbeam-performance-monitoring"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            team: sre
+            service: performance-monitoring
+          annotations:
+            summary: "Performance Monitoring Service Down"
+            description: "Performance monitoring service {{ $labels.instance }} has been down for more than 1 minute"
+
+        # Performance analyzer metrics
+        - alert: QuantumBeamPerformanceAnalyzerHighLatency
+          expr: histogram_quantile(0.95, rate(performance_analyzer_duration_seconds_bucket[5m])) > 60
+          for: 2m
+          labels:
+            severity: warning
+            team: sre
+            service: performance-monitoring
+          annotations:
+            summary: "Performance Analyzer High Latency"
+            description: "95th percentile analyzer duration is {{ $value }}s, indicating performance issues"
+
+        # Anomaly detection alerts
+        - alert: QuantumBeamHighAnomalyRate
+          expr: rate(performance_anomalies_detected_total[5m]) > 10
+          for: 3m
+          labels:
+            severity: warning
+            team: sre
+            service: performance-monitoring
+          annotations:
+            summary: "High Anomaly Detection Rate"
+            description: "Anomaly detection rate is {{ $value }} anomalies/minute, indicating potential system instability"
+
+        # Optimization execution alerts
+        - alert: QuantumBeamPerformanceOptimizationFailed
+          expr: increase(performance_optimizations_failed_total[5m]) > 5
+          for: 2m
+          labels:
+            severity: warning
+            team: sre
+            service: performance-monitoring
+          annotations:
+            summary: "Performance Optimization Failures"
+            description: "{{ $value }} optimization failures in the last 5 minutes"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-dashboard-config
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: performance-monitoring
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+        # API proxy
+        location /api/ {
+            proxy_pass http://localhost:8090/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Timeouts
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+        }
+
+        # Static files
+        location / {
+            try_files $uri $uri/ /index.html;
+            expires 1h;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # Health check
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: performance-dashboard-static
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: performance-monitoring
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>QuantumBeam Performance Dashboard</title>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background-color: #f8f9fa;
+                color: #333;
+            }
+
+            .header {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 1rem 2rem;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+                font-weight: 600;
+            }
+
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+                padding: 2rem;
+            }
+
+            .metrics-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 1.5rem;
+                margin-bottom: 2rem;
+            }
+
+            .metric-card {
+                background: white;
+                border-radius: 12px;
+                padding: 1.5rem;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                transition: transform 0.2s ease;
+            }
+
+            .metric-card:hover {
+                transform: translateY(-2px);
+            }
+
+            .metric-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 1rem;
+            }
+
+            .metric-title {
+                font-size: 0.9rem;
+                font-weight: 600;
+                color: #666;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .metric-value {
+                font-size: 2rem;
+                font-weight: 700;
+                margin-bottom: 0.5rem;
+            }
+
+            .metric-change {
+                font-size: 0.85rem;
+                font-weight: 500;
+            }
+
+            .positive {
+                color: #10b981;
+            }
+
+            .negative {
+                color: #ef4444;
+            }
+
+            .neutral {
+                color: #6b7280;
+            }
+
+            .chart-container {
+                background: white;
+                border-radius: 12px;
+                padding: 1.5rem;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                margin-bottom: 2rem;
+            }
+
+            .chart-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 1.5rem;
+            }
+
+            .chart-title {
+                font-size: 1.2rem;
+                font-weight: 600;
+                color: #333;
+            }
+
+            .time-selector {
+                display: flex;
+                gap: 0.5rem;
+            }
+
+            .time-btn {
+                padding: 0.5rem 1rem;
+                border: 1px solid #d1d5db;
+                background: white;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .time-btn:hover {
+                background: #f3f4f6;
+            }
+
+            .time-btn.active {
+                background: #667eea;
+                color: white;
+                border-color: #667eea;
+            }
+
+            .anomalies-section {
+                background: white;
+                border-radius: 12px;
+                padding: 1.5rem;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+
+            .anomaly-item {
+                padding: 1rem;
+                border-left: 4px solid #ef4444;
+                background: #fef2f2;
+                margin-bottom: 1rem;
+                border-radius: 0 6px 6px 0;
+            }
+
+            .anomaly-item.warning {
+                border-left-color: #f59e0b;
+                background: #fffbeb;
+            }
+
+            .anomaly-item.info {
+                border-left-color: #3b82f6;
+                background: #eff6ff;
+            }
+
+            .anomaly-title {
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+            }
+
+            .anomaly-description {
+                color: #666;
+                font-size: 0.9rem;
+            }
+
+            .loading {
+                text-align: center;
+                padding: 2rem;
+                color: #666;
+            }
+
+            .status-indicator {
+                display: inline-block;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                margin-right: 0.5rem;
+            }
+
+            .status-healthy {
+                background: #10b981;
+            }
+
+            .status-warning {
+                background: #f59e0b;
+            }
+
+            .status-critical {
+                background: #ef4444;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>🚀 QuantumBeam Performance Dashboard</h1>
+        </div>
+
+        <div class="container">
+            <div class="loading" id="loading">
+                <p>Loading performance data...</p>
+            </div>
+
+            <div id="dashboard-content" style="display: none;">
+                <!-- Metrics Grid -->
+                <div class="metrics-grid" id="metrics-grid">
+                    <!-- Metrics cards will be populated here -->
+                </div>
+
+                <!-- Performance Chart -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h2 class="chart-title">Performance Trends</h2>
+                        <div class="time-selector">
+                            <button class="time-btn active" data-range="1h">1H</button>
+                            <button class="time-btn" data-range="6h">6H</button>
+                            <button class="time-btn" data-range="24h">24H</button>
+                            <button class="time-btn" data-range="7d">7D</button>
+                        </div>
+                    </div>
+                    <canvas id="performance-chart" width="400" height="200"></canvas>
+                </div>
+
+                <!-- Anomalies Section -->
+                <div class="anomalies-section">
+                    <h2 style="margin-bottom: 1rem;">Recent Anomalies</h2>
+                    <div id="anomalies-list">
+                        <!-- Anomalies will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            class PerformanceDashboard {
+                constructor() {
+                    this.charts = {};
+                    this.currentTimeRange = '1h';
+                    this.refreshInterval = 30000; // 30 seconds
+
+                    this.init();
+                }
+
+                async init() {
+                    await this.loadDashboardData();
+                    this.setupEventListeners();
+                    this.startAutoRefresh();
+                }
+
+                setupEventListeners() {
+                    document.querySelectorAll('.time-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+                            e.target.classList.add('active');
+                            this.currentTimeRange = e.target.dataset.range;
+                            this.loadDashboardData();
+                        });
+                    });
+                }
+
+                startAutoRefresh() {
+                    setInterval(() => {
+                        this.loadDashboardData();
+                    }, this.refreshInterval);
+                }
+
+                async loadDashboardData() {
+                    try {
+                        const response = await fetch('/api/dashboard-data');
+                        const data = await response.json();
+
+                        this.renderMetrics(data.metrics);
+                        this.renderPerformanceChart(data.performanceData);
+                        this.renderAnomalies(data.anomalies);
+
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('dashboard-content').style.display = 'block';
+
+                    } catch (error) {
+                        console.error('Error loading dashboard data:', error);
+                        document.getElementById('loading').innerHTML = '<p>Error loading performance data</p>';
+                    }
+                }
+
+                renderMetrics(metrics) {
+                    const grid = document.getElementById('metrics-grid');
+                    grid.innerHTML = '';
+
+                    const metricConfigs = [
+                        {
+                            title: 'API Response Time',
+                            value: metrics.latency?.current || 0,
+                            unit: 'ms',
+                            change: metrics.latency?.trend || 0,
+                            format: 'number'
+                        },
+                        {
+                            title: 'Throughput',
+                            value: metrics.throughput?.current || 0,
+                            unit: 'req/s',
+                            change: metrics.throughput?.trend || 0,
+                            format: 'number'
+                        },
+                        {
+                            title: 'Error Rate',
+                            value: metrics.errorRate?.current || 0,
+                            unit: '%',
+                            change: metrics.errorRate?.trend || 0,
+                            format: 'percentage'
+                        },
+                        {
+                            title: 'CPU Usage',
+                            value: metrics.cpuUsage?.current || 0,
+                            unit: '%',
+                            change: metrics.cpuUsage?.trend || 0,
+                            format: 'percentage'
+                        },
+                        {
+                            title: 'Memory Usage',
+                            value: metrics.memoryUsage?.current || 0,
+                            unit: '%',
+                            change: metrics.memoryUsage?.trend || 0,
+                            format: 'percentage'
+                        },
+                        {
+                            title: 'SLO Compliance',
+                            value: metrics.sloCompliance?.current || 0,
+                            unit: '%',
+                            change: metrics.sloCompliance?.trend || 0,
+                            format: 'percentage'
+                        }
+                    ];
+
+                    metricConfigs.forEach(config => {
+                        const card = this.createMetricCard(config);
+                        grid.appendChild(card);
+                    });
+                }
+
+                createMetricCard(config) {
+                    const card = document.createElement('div');
+                    card.className = 'metric-card';
+
+                    const changeClass = config.change > 5 ? 'positive' : config.change < -5 ? 'negative' : 'neutral';
+                    const changeSymbol = config.change > 0 ? '+' : '';
+
+                    card.innerHTML = `
+                        <div class="metric-header">
+                            <span class="metric-title">${config.title}</span>
+                            <span class="status-indicator status-${this.getStatusClass(config.value, config.title)}"></span>
+                        </div>
+                        <div class="metric-value">${this.formatValue(config.value, config.format)}${config.unit}</div>
+                        <div class="metric-change ${changeClass}">
+                            ${changeSymbol}${config.change.toFixed(1)}% from baseline
+                        </div>
+                    `;
+
+                    return card;
+                }
+
+                getStatusClass(value, title) {
+                    if (title.includes('Error Rate')) {
+                        return value > 1 ? 'critical' : value > 0.1 ? 'warning' : 'healthy';
+                    } else if (title.includes('Response Time')) {
+                        return value > 500 ? 'critical' : value > 200 ? 'warning' : 'healthy';
+                    } else if (title.includes('CPU') || title.includes('Memory')) {
+                        return value > 90 ? 'critical' : value > 75 ? 'warning' : 'healthy';
+                    } else if (title.includes('SLO')) {
+                        return value < 95 ? 'critical' : value < 99 ? 'warning' : 'healthy';
+                    }
+                    return 'healthy';
+                }
+
+                formatValue(value, format) {
+                    if (format === 'percentage') {
+                        return value.toFixed(1);
+                    } else if (format === 'number') {
+                        return value.toFixed(0);
+                    }
+                    return value.toString();
+                }
+
+                renderPerformanceChart(data) {
+                    const ctx = document.getElementById('performance-chart').getContext('2d');
+
+                    if (this.charts.performance) {
+                        this.charts.performance.destroy();
+                    }
+
+                    this.charts.performance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels || [],
+                            datasets: [
+                                {
+                                    label: 'Response Time (ms)',
+                                    data: data.latency || [],
+                                    borderColor: '#3b82f6',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    tension: 0.4
+                                },
+                                {
+                                    label: 'Throughput (req/s)',
+                                    data: data.throughput || [],
+                                    borderColor: '#10b981',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    tension: 0.4,
+                                    yAxisID: 'y1'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    title: {
+                                        display: true,
+                                        text: 'Response Time (ms)'
+                                    }
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    title: {
+                                        display: true,
+                                        text: 'Throughput (req/s)'
+                                    },
+                                    grid: {
+                                        drawOnChartArea: false
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    position: 'top'
+                                }
+                            }
+                        }
+                    });
+                }
+
+                renderAnomalies(anomalies) {
+                    const list = document.getElementById('anomalies-list');
+                    list.innerHTML = '';
+
+                    if (!anomalies || anomalies.length === 0) {
+                        list.innerHTML = '<p style="color: #666; text-align: center;">No anomalies detected</p>';
+                        return;
+                    }
+
+                    anomalies.forEach(anomaly => {
+                        const item = document.createElement('div');
+                        item.className = `anomaly-item ${anomaly.severity}`;
+
+                        item.innerHTML = `
+                            <div class="anomaly-title">
+                                <span class="status-indicator status-${anomaly.severity}"></span>
+                                ${anomaly.title}
+                            </div>
+                            <div class="anomaly-description">${anomaly.description}</div>
+                            <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #888;">
+                                ${new Date(anomaly.timestamp).toLocaleString()}
+                            </div>
+                        `;
+
+                        list.appendChild(item);
+                    });
+                }
+            }
+
+            // Initialize dashboard when page loads
+            document.addEventListener('DOMContentLoaded', () => {
+                new PerformanceDashboard();
+            });
+        </script>
+    </body>
+    </html>

@@ -1,0 +1,121 @@
+# Pre-commit hooks configuration for QuantumBeam.io
+# See https://pre-commit.com for more information
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=10000']
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+      - id: check-json
+      - id: check-toml
+      - id: check-xml
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+      - id: go-vet-mod
+      - id: go-mod-tidy
+      - id: golangci-lint-mod
+        args: [--timeout=5m]
+
+  - repo: https://github.com/securecodewarrior/github-action-add-sarif
+    rev: v0.0.8
+    hooks:
+      - id: add-sarif
+        args: [--sarif-file, 'security-scan-results.sarif']
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: 'go.sum|package-lock.json|yarn.lock'
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.0.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [
+          feat, fix, docs, style, refactor, perf, test, chore, security,
+          --optional-scopes, fraud, auth, billing, ai, monitoring, backup, api, ui,
+          --parser-args=--preset-angular
+        ]
+
+  - repo: local
+    hooks:
+      - id: go-unit-tests
+        name: Go unit tests
+        entry: go test -race ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: go-build
+        name: Go build check
+        entry: go build -o /dev/null ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      - id: gosec-security-scan
+        name: Go security scan
+        entry: gosec ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+        exclude: '.*_test.go$'
+
+      - id: go-mod-audit
+        name: Go module audit
+        entry: go list -json -m all | nancy sleuth
+        language: system
+        pass_filenames: false
+        always_run: false
+
+      - id: check-gofmt
+        name: Check gofmt
+        entry: scripts/check-gofmt.sh
+        language: script
+        types: [go]
+
+      - id: dockerfile-lint
+        name: Dockerfile lint
+        entry: hadolint
+        language: system
+        files: Dockerfile.*
+
+      - id: shellcheck
+        name: Shell script lint
+        entry: shellcheck
+        language: system
+        types: [shell]
+
+# Configuration options
+default_stages: [commit]
+fail_fast: false
+default_language_version:
+  go: '1.21'
+
+# CI configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: []
+  submodules: false

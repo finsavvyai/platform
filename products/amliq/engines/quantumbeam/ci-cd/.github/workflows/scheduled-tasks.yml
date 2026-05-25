@@ -1,0 +1,533 @@
+name: QuantumBeam Scheduled Tasks
+
+on:
+  schedule:
+    # Daily security scans at 2 AM UTC
+    - cron: '0 2 * * *'
+    # Weekly performance tests on Sunday at 4 AM UTC
+    - cron: '0 4 * * 0'
+    # Monthly dependency updates on the 1st at 6 AM UTC
+    - cron: '0 6 1 * *'
+    # Weekly backup verification on Saturday at 8 AM UTC
+    - cron: '0 8 * * 6'
+    # Quarterly security audit on the 1st of quarter months at 10 AM UTC
+    - cron: '0 10 1 1,4,7,10 *'
+  workflow_dispatch:
+    inputs:
+      task_type:
+        description: 'Type of task to run'
+        required: true
+        default: 'security-scan'
+        type: choice
+        options:
+        - security-scan
+        - performance-test
+        - dependency-update
+        - backup-verification
+        - security-audit
+      environment:
+        description: 'Target environment'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+        - staging
+        - production
+        - all
+
+env:
+  GO_VERSION: '1.21'
+  NODE_VERSION: '18'
+
+jobs:
+  # Security Scan Job
+  security-scan:
+    name: Comprehensive Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 2 * * *' || github.event.inputs.task_type == 'security-scan'
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run comprehensive security scan
+        run: |
+          echo "🔒 Running comprehensive security scan..."
+
+          # Run dependency vulnerability check
+          govulncheck ./...
+
+          # Run SAST analysis
+          golangci-lint run --timeout=15m
+
+          # Run container security scan
+          docker pull ghcr.io/${{ github.repository }}:latest
+          trivy image --format json --output trivy-report.json ghcr.io/${{ github.repository }}:latest
+
+          # Run code secrets scan
+          trufflehog fs . --json --output secrets-report.json
+
+          # Check for supply chain vulnerabilities
+          go list -json -m all | nancy sleuth
+
+      - name: Scan running containers
+        run: |
+          echo "🔍 Scanning running containers..."
+
+          # Setup kubectl for production access
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+
+          # Get running container images
+          kubectl get pods -n production -o jsonpath='{.items[*].spec.containers[*].image}' | tr ' ' '\n' | sort -u > running-images.txt
+
+          # Scan each running image
+          while read -r image; do
+            echo "Scanning $image..."
+            trivy image --format table "$image" || true
+          done < running-images.txt
+
+      - name: Generate security report
+        run: |
+          chmod +x ci-cd/scripts/generate-security-report.sh
+          ci-cd/scripts/generate-security-report.sh
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-reports
+          path: |
+            security-report.html
+            trivy-report.json
+            secrets-report.json
+
+      - name: Send security notification
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#security'
+          text: |
+            🔒 **Security Scan Failed**
+
+            **Repository**: ${{ github.repository }}
+            **Environment**: ${{ github.event.inputs.environment || 'production' }}
+            **Scan Date**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+            ⚠️ Please review the security scan results immediately.
+
+  # Performance Test Job
+  performance-test:
+    name: Performance Test Suite
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 4 * * 0' || github.event.inputs.task_type == 'performance-test'
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install K6
+        run: |
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Setup test environment
+        run: |
+          chmod +x ci-cd/scripts/setup-perf-test-env.sh
+          ci-cd/scripts/setup-perf-test-env.sh
+
+      - name: Run load tests
+        run: |
+          echo "⚡ Running load tests..."
+          k6 run --out json=load-results.json ci-cd/performance/load-test.js
+
+      - name: Run stress tests
+        run: |
+          echo "💪 Running stress tests..."
+          k6 run --out json=stress-results.json ci-cd/performance/stress-test.js
+
+      - name: Run spike tests
+        run: |
+          echo "📈 Running spike tests..."
+          k6 run --out json=spike-results.json ci-cd/performance/spike-test.js
+
+      - name: Run endurance tests
+        run: |
+          echo "🏃 Running endurance tests..."
+          k6 run --out json=endurance-results.json ci-cd/performance/endurance-test.js
+
+      - name: Generate performance report
+        run: |
+          chmod +x ci-cd/scripts/generate-perf-report.sh
+          ci-cd/scripts/generate-perf-report.sh load-results.json stress-results.json spike-results.json endurance-results.json
+
+      - name: Upload performance reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-test-reports
+          path: |
+            performance-report.html
+            performance-data.json
+
+      - name: Check performance thresholds
+        run: |
+          chmod +x ci-cd/scripts/check-perf-thresholds.sh
+          ci-cd/scripts/check-perf-thresholds.sh performance-data.json
+
+      - name: Send performance notification
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#performance'
+          text: |
+            ⚡ **Performance Test Failed**
+
+            **Repository**: ${{ github.repository }}
+            **Environment**: ${{ github.event.inputs.environment || 'staging' }}
+            **Test Date**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+            ⚠️ Performance thresholds were not met. Please investigate immediately.
+
+  # Dependency Update Job
+  dependency-update:
+    name: Dependency Update
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 6 1 * *' || github.event.inputs.task_type == 'dependency-update'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Update Go dependencies
+        run: |
+          echo "📦 Updating Go dependencies..."
+
+          # Get latest versions
+          go list -u -m -json all | grep -E '"Path"|"Version"|"Time"'
+
+          # Update direct dependencies
+          go get -u ./...
+
+          # Tidy up go.mod
+          go mod tidy
+
+          # Check for breaking changes
+          go mod verify
+
+      - name: Check for vulnerabilities in updated dependencies
+        run: |
+          govulncheck ./...
+
+      - name: Run tests with updated dependencies
+        run: |
+          go test -v ./...
+
+      - name: Create dependency update PR
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update Go dependencies'
+          title: '🔄 Automated Dependency Update'
+          body: |
+            ## 🔄 Automated Dependency Update
+
+            This PR updates Go modules to their latest compatible versions.
+
+            ### Changes:
+            - Updated direct dependencies to latest compatible versions
+            - Ran `go mod tidy` to clean up go.mod
+            - Verified no new vulnerabilities were introduced
+            - All tests pass with updated dependencies
+
+            ### Security:
+            - ✅ No new vulnerabilities detected
+            - ✅ All dependencies verified
+
+            Please review the changes and merge if everything looks good.
+
+          branch: automated-dependency-update
+          delete-branch: true
+
+      - name: Update Node.js dependencies
+        run: |
+          echo "📦 Updating Node.js dependencies..."
+
+          # Check if package.json exists
+          if [ -f "package.json" ]; then
+            npm update
+            npm audit fix
+          fi
+
+      - name: Send dependency update notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#dependencies'
+          text: |
+            📦 **Dependencies Updated Successfully**
+
+            **Repository**: ${{ github.repository }}
+            **Update Date**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+            ✅ Go and Node.js dependencies have been updated to their latest compatible versions.
+
+  # Backup Verification Job
+  backup-verification:
+    name: Backup Verification
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 8 * * 6' || github.event.inputs.task_type == 'backup-verification'
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+
+      - name: Verify database backups
+        run: |
+          echo "💾 Verifying database backups..."
+
+          chmod +x ci-cd/scripts/verify-backups.sh
+          ci-cd/scripts/verify-backups.sh production
+
+      - name: Verify application configuration backups
+        run: |
+          echo "⚙️ Verifying configuration backups..."
+
+          # Backup current configurations
+          mkdir -p config-backups
+          kubectl get configmaps -n production -o yaml > config-backups/configmaps-backup.yaml
+          kubectl get secrets -n production -o yaml > config-backups/secrets-backup.yaml
+
+          # Verify backup integrity
+          kubectl apply --dry-run=client -f config-backups/configmaps-backup.yaml
+          kubectl apply --dry-run=client -f config-backups/secrets-backup.yaml
+
+      - name: Test restore process
+        run: |
+          echo "🔄 Testing restore process..."
+
+          chmod +x ci-cd/scripts/test-restore.sh
+          ci-cd/scripts/test-restore.sh staging
+
+      - name: Upload backup verification reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: backup-verification-reports
+          path: |
+            backup-verification-report.html
+            config-backups/
+
+      - name: Send backup notification
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#backups'
+          text: |
+            💾 **Backup Verification Failed**
+
+            **Repository**: ${{ github.repository }}
+            **Environment**: ${{ github.event.inputs.environment || 'production' }}
+            **Verification Date**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+            ⚠️ Backup verification failed. Please investigate immediately.
+
+  # Security Audit Job
+  security-audit:
+    name: Quarterly Security Audit
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 10 1 1,4,7,10 *' || github.event.inputs.task_type == 'security-audit'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup comprehensive security audit environment
+        run: |
+          echo "🔒 Setting up comprehensive security audit environment..."
+
+          # Install security tools
+          pip install safety bandit semgrep
+          npm install -g audit-ci
+          go install -a github.com/securecodewarrior/sdlc-scanner@latest
+
+      - name: Run comprehensive security audit
+        run: |
+          echo "🔍 Running comprehensive security audit..."
+
+          chmod +x ci-cd/scripts/comprehensive-security-audit.sh
+          ci-cd/scripts/comprehensive-security-audit.sh
+
+      - name: Generate security audit report
+        run: |
+          chmod +x ci-cd/scripts/generate-security-audit-report.sh
+          ci-cd/scripts/generate-security-audit-report.sh
+
+      - name: Upload security audit reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-audit-reports
+          path: |
+            security-audit-report.html
+            security-audit-report.pdf
+            compliance-report.json
+
+      - name: Create security audit issue
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🔒 Quarterly Security Audit - Action Required',
+              body: `
+              ## 🔒 Quarterly Security Audit Results
+
+              **Audit Date**: ${new Date().toISOString()}
+              **Repository**: ${context.repository}
+
+              The quarterly security audit has identified issues that require attention.
+
+              ### 🚨 Critical Issues:
+              [List of critical security issues found]
+
+              ### ⚠️ High Priority Issues:
+              [List of high priority issues]
+
+              ### 📋 Recommendations:
+              [List of security recommendations]
+
+              ### 🔧 Next Steps:
+              1. Review the detailed security audit report
+              2. Address critical and high priority issues
+              3. Update security policies and procedures
+              4. Schedule follow-up audit
+
+              **Action Required**: Please address these security issues promptly.
+
+              ---
+              This issue was automatically created by the quarterly security audit workflow.
+              `,
+              labels: ['security', 'audit', 'critical']
+            })
+
+      - name: Send security audit notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#security'
+          text: |
+            🔒 **Quarterly Security Audit Completed**
+
+            **Repository**: ${{ github.repository }}
+            **Audit Date**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+            **Status**: ${{ job.status }}
+
+            ${{ job.status == 'failure' && '⚠️ Security issues were found. Please review the audit report immediately.' || '✅ Security audit completed with no critical issues.' }}
+
+  # System Health Check
+  health-check:
+    name: System Health Check
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Check cluster health
+        run: |
+          echo "🏥 Checking cluster health..."
+
+          # Setup kubectl
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
+
+          # Check cluster nodes
+          kubectl get nodes -o wide
+
+          # Check cluster resources
+          kubectl top nodes
+
+          # Check pod health
+          kubectl get pods -A --field-selector=status.phase!=Running
+
+          # Check events
+          kubectl get events -A --sort-by='.lastTimestamp' | tail -20
+
+      - name: Check application health
+        run: |
+          echo "🔍 Checking application health..."
+
+          PRODUCTION_URL="https://api.quantumbeam.io"
+
+          # Check health endpoints
+          curl -f "$PRODUCTION_URL/health" || echo "❌ Health check failed"
+          curl -f "$PRODUCTION_URL/ready" || echo "❌ Ready check failed"
+          curl -f "$PRODUCTION_URL/metrics" || echo "❌ Metrics check failed"
+
+      - name: Check monitoring systems
+        run: |
+          echo "📊 Checking monitoring systems..."
+
+          # Check Prometheus
+          curl -f "http://prometheus.quantumbeam.io/-/healthy" || echo "❌ Prometheus unhealthy"
+
+          # Check Grafana
+          curl -f "http://grafana.quantumbeam.io/api/health" || echo "❌ Grafana unhealthy"
+
+          # Check Jaeger
+          curl -f "http://jaeger.quantumbeam.io/" || echo "❌ Jaeger unhealthy"
+
+      - name: Generate health report
+        run: |
+          chmod +x ci-cd/scripts/generate-health-report.sh
+          ci-cd/scripts/generate-health-report.sh
+
+      - name: Upload health report
+        uses: actions/upload-artifact@v3
+        with:
+          name: health-check-reports
+          path: health-report.html

@@ -1,0 +1,130 @@
+global:
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@quantumbeam.io'
+  smtp_auth_username: 'alerts@quantumbeam.io'
+  smtp_auth_password: 'your-smtp-password'
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default-receiver'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 5s
+      repeat_interval: 5m
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      repeat_interval: 2h
+    - match:
+        alertname: DatabaseDown
+      receiver: 'database-alerts'
+    - match:
+        service: billing
+      receiver: 'billing-alerts'
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+
+receivers:
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'ops@quantumbeam.io'
+        subject: '[QuantumBeam] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+          {{ end }}
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'critical@quantumbeam.io'
+        subject: '[CRITICAL] QuantumBeam Production Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          CRITICAL ALERT TRIGGERED
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+
+          Immediate action required!
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts-critical'
+        title: 'CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'warnings@quantumbeam.io'
+        subject: '[WARNING] QuantumBeam Production Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          Warning alert triggered
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts-warning'
+        title: 'WARNING: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+
+  - name: 'database-alerts'
+    email_configs:
+      - to: 'dba@quantumbeam.io'
+        subject: '[DATABASE] QuantumBeam Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          Database alert triggered
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Database: {{ .Labels.instance }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+
+  - name: 'billing-alerts'
+    email_configs:
+      - to: 'billing@quantumbeam.io'
+        subject: '[BILLING] QuantumBeam Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          Billing service alert triggered
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Started: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

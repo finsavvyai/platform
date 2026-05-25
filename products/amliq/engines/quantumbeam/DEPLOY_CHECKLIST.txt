@@ -1,0 +1,356 @@
+================================================================================
+  QuantumBeam - Pre-Deployment Checklist
+================================================================================
+
+Use this checklist before deploying to production.
+
+================================================================================
+  STEP 1: VERIFY PRODUCTION READINESS
+================================================================================
+
+[✓] Run production check:
+    $ ./check-production.sh
+
+    Expected: ✅ PRODUCTION READY! (18/18 checks pass)
+
+[✓] Verify all components exist:
+    $ ls -la internal/fraud/production_features.go
+    $ ls -la Dockerfile.production
+    $ ls -la docker-compose.production.yml
+    $ ls -la QUICK_DEPLOY.sh
+
+[✓] Check website builds:
+    $ cd web/marketing && npm run build
+
+    Expected: ✓ Generating static pages (8/8)
+
+================================================================================
+  STEP 2: CONFIGURE ENVIRONMENT
+================================================================================
+
+[ ] Copy environment template:
+    $ cp .env.production.example .env.production
+
+[ ] Generate secrets:
+    $ openssl rand -hex 32
+    # Use output for JWT_SECRET
+
+    $ openssl rand -hex 16
+    # Use output for API_KEY_ENCRYPTION_KEY
+
+[ ] Edit .env.production:
+    $ nano .env.production
+
+    Required variables:
+    [ ] JWT_SECRET=<64-character-random-string>
+    [ ] POSTGRES_PASSWORD=<strong-password>
+    [ ] API_KEY_ENCRYPTION_KEY=<32-character-random-string>
+    [ ] DATABASE_URL=postgres://...
+
+    Optional (quantum features work with classical fallback):
+    [ ] IBM_QUANTUM_TOKEN=<optional>
+    [ ] AWS_BRAKET_ACCESS_KEY=<optional>
+    [ ] AWS_BRAKET_SECRET_KEY=<optional>
+
+[ ] Verify environment file:
+    $ cat .env.production | grep -E "(JWT_SECRET|POSTGRES_PASSWORD)" | wc -l
+
+    Expected: At least 2 lines
+
+================================================================================
+  STEP 3: CHOOSE DEPLOYMENT METHOD
+================================================================================
+
+Select ONE of the following deployment methods:
+
+OPTION A: Local Testing (Recommended for first deploy)
+-------------------------------------------------------
+[ ] Deploy locally:
+    $ ./QUICK_DEPLOY.sh
+
+[ ] Wait for services to start (about 30 seconds)
+
+[ ] Verify health:
+    $ curl http://localhost:8080/health/detailed
+
+    Expected: {"status":"healthy",...}
+
+OPTION B: Railway (Recommended for cloud)
+-----------------------------------------
+[ ] Install Railway CLI:
+    $ curl -fsSL https://railway.app/install.sh | sh
+
+[ ] Login:
+    $ railway login
+
+[ ] Deploy:
+    $ railway up
+
+[ ] Note the deployed URL from Railway dashboard
+
+OPTION C: Fly.io (Global edge deployment)
+-----------------------------------------
+[ ] Install Fly CLI:
+    $ curl -L https://fly.io/install.sh | sh
+
+[ ] Login:
+    $ fly auth login
+
+[ ] Launch:
+    $ fly launch
+
+[ ] Deploy:
+    $ fly deploy
+
+[ ] Note the deployed URL (*.fly.dev)
+
+OPTION D: Kubernetes
+--------------------
+[ ] Ensure kubectl is configured:
+    $ kubectl cluster-info
+
+[ ] Create namespace:
+    $ kubectl create namespace quantumbeam
+
+[ ] Create secrets:
+    $ kubectl create secret generic quantumbeam-secrets \
+        --from-env-file=.env.production \
+        -n quantumbeam
+
+[ ] Deploy:
+    $ kubectl apply -f k8s/production/ -n quantumbeam
+
+[ ] Check rollout:
+    $ kubectl rollout status deployment/quantumbeam-api -n quantumbeam
+
+[ ] Get external IP:
+    $ kubectl get service quantumbeam-api -n quantumbeam
+
+================================================================================
+  STEP 4: POST-DEPLOYMENT VERIFICATION
+================================================================================
+
+[ ] Health check (basic):
+    $ curl http://YOUR_URL/health
+
+    Expected: {"status":"healthy"}
+
+[ ] Health check (detailed):
+    $ curl http://YOUR_URL/health/detailed
+
+    Expected: Complete health report with all components
+
+[ ] Liveness probe:
+    $ curl http://YOUR_URL/health/live
+
+    Expected: 200 OK
+
+[ ] Readiness probe:
+    $ curl http://YOUR_URL/health/ready
+
+    Expected: 200 OK
+
+[ ] Metrics endpoint:
+    $ curl http://YOUR_URL/metrics
+
+    Expected: Prometheus-formatted metrics
+
+[ ] API test (fraud detection):
+    $ curl -X POST http://YOUR_URL/api/v1/fraud/analyze \
+        -H "Authorization: Bearer YOUR_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d '{
+          "transaction_id": "test_123",
+          "amount": 1500.00,
+          "user_id": "user_123"
+        }'
+
+    Expected: JSON response with fraud_score
+
+================================================================================
+  STEP 5: MONITORING SETUP
+================================================================================
+
+[ ] Access Grafana:
+    http://YOUR_URL:3000 (local)
+    or configured URL (cloud)
+
+    Default credentials: admin / (check .env.production)
+
+[ ] Import dashboards:
+    - Navigate to Dashboards → Import
+    - Upload dashboards from config/grafana/
+
+[ ] Verify Prometheus:
+    http://YOUR_URL:9090 (local)
+
+    Check that targets are up
+
+[ ] Configure alerts:
+    - Edit AlertManager configuration
+    - Add Slack/email webhook URLs
+    - Test alert delivery
+
+[ ] Set up log aggregation (optional):
+    - Configure log forwarding to preferred service
+    - Options: CloudWatch, Datadog, New Relic, etc.
+
+================================================================================
+  STEP 6: WEBSITE DEPLOYMENT
+================================================================================
+
+[ ] Build website:
+    $ cd web/marketing
+    $ npm run build
+
+    Expected: ✓ Generating static pages (8/8)
+
+[ ] Deploy to Vercel:
+    $ vercel --prod
+
+    Follow prompts to connect GitHub repo
+
+[ ] Verify website:
+    - Open deployed URL
+    - Check homepage loads with Qodo-style design
+    - Test responsive design on mobile
+    - Verify all links work
+
+[ ] Configure custom domain (optional):
+    - Add domain in Vercel dashboard
+    - Update DNS records
+    - Wait for SSL certificate
+
+================================================================================
+  STEP 7: SECURITY VERIFICATION
+================================================================================
+
+[ ] Verify secrets are set:
+    $ grep -q "changeme" .env.production && echo "WARNING: Default secrets detected!" || echo "Secrets configured"
+
+    Expected: "Secrets configured"
+
+[ ] Check container is running as non-root:
+    $ docker-compose exec api whoami
+
+    Expected: "appuser" (not "root")
+
+[ ] Verify TLS/SSL is enabled:
+    $ curl -I https://YOUR_URL
+
+    Expected: Valid SSL certificate
+
+[ ] Test rate limiting:
+    $ for i in {1..150}; do curl -s http://YOUR_URL/health > /dev/null & done
+
+    Expected: Some requests get 429 Too Many Requests
+
+[ ] Verify CORS configuration:
+    $ curl -H "Origin: http://evil.com" http://YOUR_URL/health -v
+
+    Expected: CORS headers present or request blocked
+
+================================================================================
+  STEP 8: PERFORMANCE TESTING
+================================================================================
+
+[ ] Baseline latency test:
+    $ curl -w "@curl-format.txt" -o /dev/null -s http://YOUR_URL/health
+
+    Expected: <100ms response time
+
+[ ] Load test (using Apache Bench):
+    $ ab -n 1000 -c 10 http://YOUR_URL/health
+
+    Expected: >99% success rate
+
+[ ] Monitor resource usage:
+    $ docker stats
+
+    Expected: <80% CPU, <2GB memory per container
+
+[ ] Check database performance:
+    $ docker-compose exec postgres psql -U quantumbeam -c "SELECT pg_size_pretty(pg_database_size('quantumbeam'));"
+
+    Monitor database size growth
+
+================================================================================
+  STEP 9: DOCUMENTATION REVIEW
+================================================================================
+
+[ ] Review deployment documentation:
+    [ ] START_HERE.md
+    [ ] PRODUCTION_STATUS.md
+    [ ] DEPLOY_TO_PRODUCTION.md
+    [ ] QUICK_REFERENCE.md
+
+[ ] Share with team:
+    [ ] Send link to START_HERE.md
+    [ ] Document any environment-specific changes
+    [ ] Update runbook with production URLs
+
+================================================================================
+  STEP 10: FINAL CHECKS
+================================================================================
+
+[ ] All services are running:
+    $ docker-compose ps
+
+    Expected: All containers show "Up" status
+
+[ ] Logs are clean:
+    $ docker-compose logs --tail=100
+
+    Expected: No ERROR or FATAL messages
+
+[ ] Circuit breaker is functioning:
+    Check metrics endpoint for circuit_breaker_state
+
+[ ] Backup strategy is in place:
+    $ ls -la database/backups/
+    or verify cloud backup configuration
+
+[ ] Monitoring dashboards are accessible:
+    [ ] Grafana: http://YOUR_URL:3000
+    [ ] Prometheus: http://YOUR_URL:9090
+    [ ] Application metrics: http://YOUR_URL/metrics
+
+[ ] Documentation is accessible:
+    [ ] Website is live
+    [ ] API docs are available
+    [ ] Health endpoints respond correctly
+
+================================================================================
+  DEPLOYMENT COMPLETE!
+================================================================================
+
+Congratulations! Your QuantumBeam deployment is complete.
+
+Key URLs:
+  API:        http://YOUR_URL
+  Health:     http://YOUR_URL/health/detailed
+  Metrics:    http://YOUR_URL/metrics
+  Grafana:    http://YOUR_URL:3000
+  Prometheus: http://YOUR_URL:9090
+  Website:    http://YOUR_WEBSITE_URL
+
+Next Steps:
+  1. Monitor application logs for the first 24 hours
+  2. Set up automated backups
+  3. Configure CI/CD pipeline
+  4. Schedule regular security audits
+  5. Plan capacity scaling based on usage
+
+Support:
+  Documentation: See START_HERE.md
+  Quick Reference: QUICK_REFERENCE.md
+  Email: support@quantumbeam.io
+
+================================================================================
+
+Deployment Date: __________________
+Deployed By: __________________
+Environment: __________________
+Notes: __________________
+
+================================================================================

@@ -1,0 +1,572 @@
+# OpenTelemetry Configuration for Distributed Tracing
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    name: observability
+    purpose: tracing-monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opentelemetry-collector-config
+  namespace: observability
+data:
+  collector.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      jaeger:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:14250
+          thrift_http:
+            endpoint: 0.0.0.0:14268
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: 'opentelemetry-collector'
+              static_configs:
+                - targets: ['0.0.0.0:8888']
+
+    processors:
+      batch:
+        timeout: 1s
+        send_batch_size: 1024
+      memory_limiter:
+        limit_mib: 512
+      resource:
+        attributes:
+          - key: service.namespace
+            value: production
+            action: upsert
+      transform:
+        trace_statements:
+          - context: span
+            statements:
+              - set(name, string(name).replace("-", "_"))
+              - set(attributes["service.name"], attributes["service.name"])
+      spanmetrics:
+        metrics_exporter: prometheus
+        dimensions:
+          - name: service.name
+            default: unknown_service
+          - name: operation
+          - name: status.code
+          - name: status.message
+
+    exporters:
+      # Export traces to Jaeger
+      jaeger:
+        endpoint: jaeger-collector.observability.svc.cluster.local:14250
+        tls:
+          insecure: true
+
+      # Export metrics to Prometheus
+      prometheus:
+        endpoint: "0.0.0.0:8889"
+        namespace: "otelcol"
+
+      # Export logs to Loki (optional)
+      loki:
+        endpoint: "http://loki.observability.svc.cluster.local:3100/loki/api/v1/push"
+        labels:
+          job: "opentelemetry-collector"
+          service: "${service.name}"
+          trace_id: "${trace.id}"
+          span_id: "${span.id}"
+
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+      zpages:
+        endpoint: 0.0.0.0:55679
+      memory_ballast:
+        limit_mib: 300
+
+    service:
+      extensions: [health_check, zpages, memory_ballast]
+      pipelines:
+        traces:
+          receivers: [otlp, jaeger]
+          processors: [memory_limiter, batch, resource, transform]
+          exporters: [jaeger]
+        metrics:
+          receivers: [otlp, prometheus]
+          processors: [memory_limiter, batch, resource]
+          exporters: [prometheus]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, batch, resource]
+          exporters: [loki]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opentelemetry-collector
+  namespace: observability
+  labels:
+    app: opentelemetry-collector
+    component: collector
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: opentelemetry-collector
+  template:
+    metadata:
+      labels:
+        app: opentelemetry-collector
+        component: collector
+    spec:
+      containers:
+      - name: opentelemetry-collector
+        image: otel/opentelemetry-collector-contrib:0.89.0
+        imagePullPolicy: IfNotPresent
+        command:
+        - "/otelcol-contrib"
+        - "--config=/etc/otelcol-contrib/config.yaml"
+        ports:
+        - containerPort: 4317
+          name: otlp-grpc
+          protocol: TCP
+        - containerPort: 4318
+          name: otlp-http
+          protocol: TCP
+        - containerPort: 8888
+          name: metrics
+          protocol: TCP
+        - containerPort: 8889
+          name: prometheus
+          protocol: TCP
+        - containerPort: 13133
+          name: health-check
+          protocol: TCP
+        - containerPort: 55679
+          name: zpages
+          protocol: TCP
+        env:
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/otelcol-contrib
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 13133
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 13133
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: opentelemetry-collector-config
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opentelemetry-collector
+  namespace: observability
+  labels:
+    app: opentelemetry-collector
+    component: collector
+spec:
+  selector:
+    app: opentelemetry-collector
+  ports:
+  - name: otlp-grpc
+    port: 4317
+    targetPort: 4317
+    protocol: TCP
+  - name: otlp-http
+    port: 4318
+    targetPort: 4318
+    protocol: TCP
+  - name: metrics
+    port: 8888
+    targetPort: 8888
+    protocol: TCP
+  - name: prometheus
+    port: 8889
+    targetPort: 8889
+    protocol: TCP
+  - name: health-check
+    port: 13133
+    targetPort: 13133
+    protocol: TCP
+  - name: zpages
+    port: 55679
+    targetPort: 55679
+    protocol: TCP
+  type: ClusterIP
+---
+# Jaeger Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: observability
+  labels:
+    app: jaeger
+    component: all-in-one
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+        component: all-in-one
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.50
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: COLLECTOR_ZIPKIN_HOST_PORT
+          value: "9411"
+        - name: SPAN_STORAGE_TYPE
+          value: "memory"
+        ports:
+        - containerPort: 16686
+          name: ui
+          protocol: TCP
+        - containerPort: 14250
+          name: grpc
+          protocol: TCP
+        - containerPort: 14268
+          name: http
+          protocol: TCP
+        - containerPort: 9411
+          name: zipkin
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: observability
+  labels:
+    app: jaeger
+    component: all-in-one
+spec:
+  selector:
+    app: jaeger
+  ports:
+  - name: ui
+    port: 16686
+    targetPort: 16686
+    protocol: TCP
+  - name: grpc
+    port: 14250
+    targetPort: 14250
+    protocol: TCP
+  - name: http
+    port: 14268
+    targetPort: 14268
+    protocol: TCP
+  - name: zipkin
+    port: 9411
+    targetPort: 9411
+    protocol: TCP
+  type: ClusterIP
+---
+# ServiceMonitor for OpenTelemetry Collector
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: opentelemetry-collector
+  namespace: observability
+  labels:
+    app: opentelemetry-collector
+    component: collector
+spec:
+  selector:
+    matchLabels:
+      app: opentelemetry-collector
+  endpoints:
+  - port: prometheus
+    interval: 30s
+    path: /metrics
+---
+# ServiceMonitor for Jaeger
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: jaeger
+  namespace: observability
+  labels:
+    app: jaeger
+    component: all-in-one
+spec:
+  selector:
+    matchLabels:
+      app: jaeger
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+---
+# OpenTelemetry Configuration for Applications
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opentelemetry-instrumentation
+  namespace: production
+data:
+  instrumentation.yaml: |
+    # OpenTelemetry Auto-Instrumentation Configuration
+    instrumentation:
+      enabled: true
+      service_name: quantumbeam
+      service_version: "1.0.0"
+      environment: production
+
+      # Exporter Configuration
+      exporters:
+        otlp:
+          endpoint: "http://opentelemetry-collector.observability.svc.cluster.local:4318"
+          protocol: "http/protobuf"
+          headers:
+            "api-key": "your-api-key-here"
+
+      # Resource Detection
+      resource:
+        detectors:
+          - "env"
+          - "detector"
+
+      # Samplers
+      sampler:
+        type: "traceidratio"
+        ratio: 0.1  # Sample 10% of traces in production
+
+      # Instrumentation Libraries
+      libraries:
+        http:
+          enabled: true
+          capture_request_headers: ["authorization", "x-request-id"]
+          capture_response_headers: ["x-request-id"]
+
+        grpc:
+          enabled: true
+
+        database:
+          enabled: true
+          capture_parameters: false  # Don't capture SQL parameters for security
+
+        messaging:
+          enabled: true
+          capture_headers: ["message-id", "correlation-id"]
+
+        redis:
+          enabled: true
+          capture_statement: false
+
+        mongodb:
+          enabled: true
+          capture_statement: false
+
+      # Span Processors
+      processors:
+        batch:
+          max_queue_size: 2048
+          max_export_batch_size: 512
+          max_export_timeout: 30s
+
+        resource:
+          attributes:
+            - key: "service.namespace"
+              value: "production"
+              action: upsert
+            - key: "k8s.pod.name"
+              value: "${POD_NAME}"
+              action: upsert
+            - key: "k8s.namespace.name"
+              value: "${POD_NAMESPACE}"
+              action: upsert
+            - key: "k8s.node.name"
+              value: "${NODE_NAME}"
+              action: upsert
+
+      # Propagation
+      propagators:
+        - "tracecontext"
+        - "baggage"
+        - "jaeger"
+        - "b3"
+        - "b3multi"
+        - "xray"
+
+      # Span Limits
+      span_limits:
+        attribute_count_limit: 128
+        event_count_limit: 128
+        link_count_limit: 128
+        attribute_per_event_count_limit: 128
+        attribute_per_link_count_limit: 128
+---
+# Application Instrumentation Example - API Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-service
+  namespace: production
+spec:
+  template:
+    spec:
+      containers:
+      - name: api-service
+        image: quantumbeam/api-service:latest
+        env:
+        - name: OTEL_SERVICE_NAME
+          value: "api-service"
+        - name: OTEL_SERVICE_VERSION
+          value: "1.0.0"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://opentelemetry-collector.observability.svc.cluster.local:4318"
+        - name: OTEL_EXPORTER_OTLP_HEADERS
+          value: "api-key=your-api-key-here"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.namespace=production,service.version=1.0.0"
+        - name: OTEL_PROPAGATORS
+          value: "tracecontext,baggage,jaeger,b3"
+        - name: OTEL_TRACES_SAMPLER
+          value: "traceidratio"
+        - name: OTEL_TRACES_SAMPLER_ARG
+          value: "0.1"
+        - name: JAVA_OPTS
+          value: "-javaagent:/opentelemetry-javaagent.jar"
+        volumeMounts:
+        - name: opentelemetry-config
+          mountPath: /etc/otel
+      volumes:
+      - name: opentelemetry-config
+        configMap:
+          name: opentelemetry-instrumentation
+---
+# Python Service Instrumentation Example - Fraud Detection
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-detection
+  namespace: production
+spec:
+  template:
+    spec:
+      containers:
+      - name: fraud-detection
+        image: quantumbeam/fraud-detection:latest
+        env:
+        - name: OTEL_SERVICE_NAME
+          value: "fraud-detection"
+        - name: OTEL_SERVICE_VERSION
+          value: "1.0.0"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://opentelemetry-collector.observability.svc.cluster.local:4318"
+        - name: OTEL_EXPORTER_OTLP_HEADERS
+          value: "api-key=your-api-key-here"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.namespace=production,service.version=1.0.0"
+        - name: OTEL_PROPAGATORS
+          value: "tracecontext,baggage,jaeger,b3"
+        - name: OTEL_TRACES_SAMPLER
+          value: "traceidratio"
+        - name: OTEL_TRACES_SAMPLER_ARG
+          value: "0.1"
+        - name: OTEL_EXPORTER_OTLP_CERTIFICATE
+          value: "/etc/ssl/cert.pem"
+        - name: PYTHONPATH
+          value: "/app"
+        command:
+        - "python"
+        - "-m"
+        - "opentelemetry-instrument"
+        - "app.main"
+---
+# Go Service Instrumentation Example - AI Engine
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-engine
+  namespace: production
+spec:
+  template:
+    spec:
+      containers:
+      - name: ai-engine
+        image: quantumbeam/ai-engine:latest
+        env:
+        - name: OTEL_SERVICE_NAME
+          value: "ai-engine"
+        - name: OTEL_SERVICE_VERSION
+          value: "1.0.0"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://opentelemetry-collector.observability.svc.cluster.local:4318"
+        - name: OTEL_EXPORTER_OTLP_HEADERS
+          value: "api-key=your-api-key-here"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.namespace=production,service.version=1.0.0"
+        - name: OTEL_PROPAGATORS
+          value: "tracecontext,baggage,jaeger,b3"
+        - name: OTEL_TRACES_SAMPLER
+          value: "traceidratio"
+        - name: OTEL_TRACES_SAMPLER_ARG
+          value: "0.1"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        command:
+        - "/app/ai-engine"
+        - "--otel-exporter-otlp-endpoint"
+        - "http://opentelemetry-collector.observability.svc.cluster.local:4318"
+        - "--otel-service-name"
+        - "ai-engine"
+        - "--otel-service-version"
+        - "1.0.0"
+        - "--otel-traces-sampler"
+        - "traceidratio"
+        - "--otel-traces-sampler-arg"
+        - "0.1"

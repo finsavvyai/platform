@@ -1,0 +1,457 @@
+# QuantumBeam Load Testing Configuration
+# Comprehensive load testing scenarios and settings
+
+# Default settings
+default_target: "http://localhost:8080"
+default_duration: 60
+default_users: 10
+default_timeout: 30
+
+# Tool-specific configurations
+tools:
+  apache_bench:
+    version: "2.5+"
+    install_command: "apt-get install apache2-utils"
+
+  wrk:
+    version: "4.2+"
+    install_command: "https://github.com/wg/wrk"
+
+  locust:
+    version: "2.15+"
+    install_command: "pip install locust"
+    python_packages:
+      - "locust"
+      - "requests"
+
+# Load testing scenarios
+scenarios:
+  # Basic functionality tests
+  - name: "health_check"
+    description: "Test health check endpoint"
+    target_url: "http://localhost:8080/health"
+    method: "GET"
+    duration: 30
+    concurrent_users: 5
+    ramp_up_time: 5
+    think_time: 0.5
+    timeout: 10
+    expected_status_codes: [200]
+    assertions:
+      - type: "status_code"
+        expected: 200
+      - type: "response_time"
+        max_time: 500
+
+  - name: "api_status"
+    description: "Test API status endpoint"
+    target_url: "http://localhost:8080/api/v1/status"
+    method: "GET"
+    duration: 60
+    concurrent_users: 10
+    ramp_up_time: 10
+    think_time: 1.0
+    timeout: 15
+    headers:
+      Accept: "application/json"
+      User-Agent: "QuantumBeam-LoadTester/1.0"
+    expected_status_codes: [200]
+    assertions:
+      - type: "status_code"
+        expected: 200
+      - type: "response_time"
+        max_time: 1000
+
+  # API endpoint tests
+  - name: "api_list_transactions"
+    description: "Test transaction listing API"
+    target_url: "http://localhost:8080/api/v1/transactions"
+    method: "GET"
+    duration: 120
+    concurrent_users: 20
+    ramp_up_time: 30
+    think_time: 2.0
+    timeout: 30
+    headers:
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+      User-Agent: "QuantumBeam-LoadTester/1.0"
+    expected_status_codes: [200, 401]
+    assertions:
+      - type: "status_code"
+        expected: 200
+
+  - name: "api_create_transaction"
+    description: "Test transaction creation API"
+    target_url: "http://localhost:8080/api/v1/transactions"
+    method: "POST"
+    duration: 120
+    concurrent_users: 15
+    ramp_up_time: 20
+    think_time: 1.5
+    timeout: 30
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+      User-Agent: "QuantumBeam-LoadTester/1.0"
+    body: |
+      {
+        "amount": 100.00,
+        "currency": "USD",
+        "recipient": "test@example.com",
+        "description": "Load test transaction",
+        "category": "test"
+      }
+    expected_status_codes: [201, 400, 401]
+    assertions:
+      - type: "status_code"
+        expected: 201
+      - type: "response_time"
+        max_time: 2000
+
+  - name: "api_analytics"
+    description: "Test analytics API endpoint"
+    target_url: "http://localhost:8080/api/v1/analytics/dashboard"
+    method: "GET"
+    duration: 180
+    concurrent_users: 25
+    ramp_up_time: 30
+    think_time: 3.0
+    timeout: 45
+    headers:
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+      User-Agent: "QuantumBeam-LoadTester/1.0"
+    expected_status_codes: [200]
+    assertions:
+      - type: "status_code"
+        expected: 200
+      - type: "response_time"
+        max_time: 3000
+
+  # Performance stress tests
+  - name: "stress_test_low"
+    description: "Low-intensity stress test"
+    target_url: "http://localhost:8080/api/v1/transactions"
+    method: "GET"
+    duration: 300
+    concurrent_users: 50
+    ramp_up_time: 60
+    think_time: 1.0
+    timeout: 30
+    headers:
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+    expected_status_codes: [200]
+
+  - name: "stress_test_medium"
+    description: "Medium-intensity stress test"
+    target_url: "http://localhost:8080/api/v1/transactions"
+    method: "GET"
+    duration: 600
+    concurrent_users: 100
+    ramp_up_time: 120
+    think_time: 0.8
+    timeout: 30
+    headers:
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+    expected_status_codes: [200]
+
+  - name: "stress_test_high"
+    description: "High-intensity stress test"
+    target_url: "http://localhost:8080/api/v1/transactions"
+    method: "GET"
+    duration: 900
+    concurrent_users: 200
+    ramp_up_time: 180
+    think_time: 0.5
+    timeout: 60
+    headers:
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+    expected_status_codes: [200]
+
+  # Spike tests
+  - name: "spike_test"
+    description: "Spike load test"
+    target_url: "http://localhost:8080/api/v1/status"
+    method: "GET"
+    duration: 300
+    concurrent_users: 500
+    ramp_up_time: 10  # Very fast ramp-up
+    think_time: 0.1
+    timeout: 30
+    headers:
+      Accept: "application/json"
+    expected_status_codes: [200, 503]
+
+  # Soak tests
+  - name: "soak_test_short"
+    description: "Short duration soak test"
+    target_url: "http://localhost:8080/api/v1/transactions"
+    method: "GET"
+    duration: 1800  # 30 minutes
+    concurrent_users: 30
+    ramp_up_time: 60
+    think_time: 2.0
+    timeout: 30
+    headers:
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+    expected_status_codes: [200]
+
+  - name: "soak_test_long"
+    description: "Long duration soak test"
+    target_url: "http://localhost:8080/api/v1/status"
+    method: "GET"
+    duration: 7200  # 2 hours
+    concurrent_users: 20
+    ramp_up_time: 30
+    think_time: 5.0
+    timeout: 30
+    headers:
+      Accept: "application/json"
+    expected_status_codes: [200]
+
+  # Database-intensive tests
+  - name: "db_intensive_read"
+    description: "Database read-intensive test"
+    target_url: "http://localhost:8080/api/v1/transactions/search"
+    method: "POST"
+    duration: 300
+    concurrent_users: 30
+    ramp_up_time: 30
+    think_time: 1.5
+    timeout: 45
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+    body: |
+      {
+        "query": "amount > 100",
+        "limit": 50,
+        "offset": 0
+      }
+    expected_status_codes: [200]
+
+  - name: "db_intensive_write"
+    description: "Database write-intensive test"
+    target_url: "http://localhost:8080/api/v1/transactions"
+    method: "POST"
+    duration: 300
+    concurrent_users: 40
+    ramp_up_time: 40
+    think_time: 1.0
+    timeout: 60
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+    body: |
+      {
+        "amount": "{{random_amount}}",
+        "currency": "USD",
+        "recipient": "user{{random_id}}@example.com",
+        "description": "Load test transaction {{random_id}}",
+        "category": "load_test"
+      }
+    expected_status_codes: [201, 429]
+
+  # Cache performance tests
+  - name: "cache_hit_test"
+    description: "Cache hit performance test"
+    target_url: "http://localhost:8080/api/v1/analytics/dashboard"
+    method: "GET"
+    duration: 180
+    concurrent_users: 100
+    ramp_up_time: 30
+    think_time: 0.5
+    timeout: 15
+    headers:
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+    expected_status_codes: [200]
+
+  - name: "cache_miss_test"
+    description: "Cache miss performance test"
+    target_url: "http://localhost:8080/api/v1/analytics/dashboard?user={{random_user}}"
+    method: "GET"
+    duration: 180
+    concurrent_users: 50
+    ramp_up_time: 25
+    think_time: 1.0
+    timeout: 30
+    headers:
+      Accept: "application/json"
+      Authorization: "Bearer test-token"
+    expected_status_codes: [200]
+
+  # Authentication and authorization tests
+  - name: "auth_login"
+    description: "Authentication login test"
+    target_url: "http://localhost:8080/api/v1/auth/login"
+    method: "POST"
+    duration: 120
+    concurrent_users: 20
+    ramp_up_time: 20
+    think_time: 2.0
+    timeout: 30
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+    body: |
+      {
+        "email": "testuser{{random_id}}@example.com",
+        "password": "testpassword123"
+      }
+    expected_status_codes: [200, 401, 400]
+
+  - name: "auth_protected_api"
+    description: "Protected API access test"
+    target_url: "http://localhost:8080/api/v1/user/profile"
+    method: "GET"
+    duration: 180
+    concurrent_users: 30
+    ramp_up_time: 30
+    think_time: 1.5
+    timeout: 30
+    headers:
+      Accept: "application/json"
+      Authorization: "Bearer test-token-{{random_user}}"
+    expected_status_codes: [200, 401]
+
+# Report configuration
+reports:
+  output_dir: "./reports"
+  formats: ["html", "json", "csv"]
+  include_charts: true
+  include_raw_data: false
+
+# Alerting configuration
+alerts:
+  enabled: true
+  thresholds:
+    max_response_time: 2000        # ms
+    max_error_rate: 0.05            # 5%
+    min_rps: 50                     # requests per second
+    max_cpu_usage: 80               # percentage
+    max_memory_usage: 85            # percentage
+    max_disk_usage: 90              # percentage
+
+  notifications:
+    email:
+      enabled: false
+      recipients: ["team@quantumbeam.io"]
+    slack:
+      enabled: false
+      webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    pagerduty:
+      enabled: false
+      service_key: "your-pagerduty-key"
+
+# Monitoring integration
+monitoring:
+  prometheus:
+    enabled: true
+    push_gateway: "http://localhost:9091"
+    metrics_prefix: "quantumbeam_loadtest"
+
+  datadog:
+    enabled: false
+    api_key: "your-datadog-key"
+    app_key: "your-datadog-app-key"
+
+  cloudwatch:
+    enabled: false
+    region: "us-east-1"
+    namespace: "QuantumBeam/LoadTesting"
+
+# Performance baselines
+baselines:
+  production:
+    api_response_time:
+      p50: 200      # ms
+      p95: 500      # ms
+      p99: 1000     # ms
+    throughput:
+      min_rps: 100  # requests per second
+    availability:
+      target: 99.9   # percentage
+    error_rate:
+      max: 0.01     # 1%
+
+  staging:
+    api_response_time:
+      p50: 300      # ms
+      p95: 800      # ms
+      p99: 1500     # ms
+    throughput:
+      min_rps: 50   # requests per second
+    availability:
+      target: 99.0   # percentage
+    error_rate:
+      max: 0.05     # 5%
+
+# Environment-specific settings
+environments:
+  development:
+    target: "http://localhost:8080"
+    default_users: 5
+    default_duration: 30
+
+  staging:
+    target: "https://api.staging.quantumbeam.io"
+    default_users: 20
+    default_duration: 120
+    headers:
+      Authorization: "Bearer staging-test-token"
+
+  production:
+    target: "https://api.quantumbeam.io"
+    default_users: 50
+    default_duration: 300
+    headers:
+      Authorization: "Bearer production-test-token"
+    read_only: true  # Prevent accidental writes to production
+
+# Custom test data generators
+data_generators:
+  random_amount:
+    type: "float"
+    min: 1.00
+    max: 10000.00
+    decimals: 2
+
+  random_user:
+    type: "int"
+    min: 1
+    max: 1000
+
+  random_id:
+    type: "string"
+    length: 10
+    charset: "alphanumeric"
+
+  timestamp:
+    type: "timestamp"
+    format: "iso8601"
+
+# Test orchestration
+orchestration:
+  parallel_execution: true
+  max_concurrent_tests: 3
+  test_dependencies:
+    - test: "health_check"
+      depends_on: []
+    - test: "api_status"
+      depends_on: ["health_check"]
+    - test: "auth_login"
+      depends_on: ["health_check"]
+
+  cleanup:
+    test_data_cleanup: true
+    container_cleanup: false
+    temp_file_cleanup: true

@@ -1,0 +1,611 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quantumbeam-maintenance-procedures
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: operational-procedures
+    type: maintenance
+data:
+  maintenance-procedures.yaml: |
+    # QuantumBeam Maintenance Procedures
+    maintenanceProcedures:
+      version: "1.0"
+      lastUpdated: "2024-01-15T00:00:00Z"
+
+      # Zero-Downtime Maintenance
+      zeroDowntimeMaintenance:
+        applicationUpdates:
+          name: "Application Update Procedure"
+          description: "Zero-downtime application updates using blue-green deployment"
+          estimatedDuration: "30-60 minutes"
+          impactLevel: "low"
+
+          preMaintenance:
+            - step: 1
+              title: "Pre-Maintenance Planning"
+              duration: "15-30 minutes"
+              tasks:
+                - "Schedule maintenance window during low-traffic period"
+                - "Verify staging environment tests are passing"
+                - "Create full system backup"
+                - "Prepare rollback plan and test procedures"
+                - "Notify all stakeholders of maintenance window"
+              responsible: "DevOps Engineer"
+              approvalRequired: true
+
+            - step: 2
+              title: "System Health Assessment"
+              duration: "5-10 minutes"
+              tasks:
+                - "Check current system health and performance metrics"
+                - "Verify all services are in healthy state"
+                - "Document current system metrics for comparison"
+                - "Ensure monitoring and alerting systems are active"
+              responsible: "Site Reliability Engineer"
+
+          execution:
+            - step: 3
+              title: "Blue-Green Deployment"
+              duration: "15-30 minutes"
+              tasks:
+                - "Deploy new version to green environment"
+                - "Run smoke tests on green environment"
+                - "Monitor green environment for stability (5 minutes)"
+                - "Gradually switch traffic: 10% -> 50% -> 100%"
+                - "Monitor system metrics during traffic switch"
+              responsible: "DevOps Engineer"
+              rollbackCriteria:
+                - "Error rate > 1%"
+                - "Response time P95 > 500ms"
+                - "Any service health check failure"
+
+            - step: 4
+              title: "Post-Deployment Validation"
+              duration: "10-20 minutes"
+              tasks:
+                - "Run comprehensive health checks on all services"
+                - "Validate all critical functionalities"
+                - "Monitor system metrics for 10 minutes"
+                - "Check database connectivity and performance"
+                - "Verify external service integrations"
+              responsible: "QA Engineer"
+
+          postMaintenance:
+            - step: 5
+              title: "Stabilization and Cleanup"
+              duration: "10-15 minutes"
+              tasks:
+                - "Monitor system stability for 10 minutes"
+                - "Clean up old (blue) environment if stable"
+                - "Update deployment documentation"
+                - "Close maintenance window in status page"
+                - "Send completion notification to stakeholders"
+              responsible: "DevOps Engineer"
+
+        databaseMaintenance:
+          name: "Database Maintenance Procedure"
+          description: "Zero-downtime database maintenance operations"
+          estimatedDuration: "1-3 hours"
+          impactLevel: "medium"
+
+          procedures:
+            schemaUpdates:
+              name: "Database Schema Updates"
+              description: "Safe database schema modifications"
+              duration: "1-2 hours"
+
+              preChecks:
+                - "Verify schema changes in staging environment"
+                - "Create full database backup"
+                - "Check current database size and performance"
+                - "Ensure sufficient disk space for operation"
+                - "Schedule during low-traffic period"
+
+              execution:
+                - "Apply schema changes using transaction"
+                - "Monitor database performance during changes"
+                - "Validate data integrity post-change"
+                - "Update application compatibility if needed"
+                - "Monitor for performance regressions"
+
+              rollback:
+                - "Rollback schema changes if issues detected"
+                - "Restore database from backup if necessary"
+                - "Revert application to previous version"
+
+            indexOptimization:
+              name: "Index Optimization"
+              description: "Database index creation and optimization"
+              duration: "30-90 minutes"
+
+              procedure:
+                - "Analyze query performance and identify missing indexes"
+                - "Create indexes during maintenance window"
+                - "Monitor index creation progress and resource usage"
+                - "Update query statistics after index creation"
+                - "Validate query performance improvements"
+
+            vacuumAndAnalyze:
+              name: "PostgreSQL VACUUM and ANALYZE"
+              description: "Database maintenance operations"
+              duration: "1-2 hours"
+
+              procedure:
+                - "Schedule during low-traffic period"
+                - "Create database backup"
+                - "Run VACUUM ANALYZE on large tables"
+                - "Update table statistics"
+                - "Monitor database performance post-maintenance"
+
+        infrastructureMaintenance:
+          name: "Infrastructure Maintenance"
+          description: "Underlying infrastructure maintenance"
+          estimatedDuration: "2-4 hours"
+          impactLevel: "medium"
+
+          procedures:
+            kubernetesClusterMaintenance:
+              name: "Kubernetes Cluster Maintenance"
+              description: "Kubernetes cluster updates and maintenance"
+
+              nodeMaintenance:
+                procedure:
+                  - "Drain nodes gracefully using kubectl drain"
+                  - "Monitor pod rescheduling and availability"
+                  - "Perform node maintenance/updates"
+                  - "Uncordon nodes and verify pod scheduling"
+                  - "Monitor cluster health post-maintenance"
+
+              controlPlaneMaintenance:
+                procedure:
+                  - "Schedule maintenance during low-traffic period"
+                  - "Backup etcd data"
+                  - "Update control plane components"
+                  - "Verify API server availability"
+                  - "Monitor cluster functionality"
+
+            networkMaintenance:
+              name: "Network Infrastructure Maintenance"
+              description: "Network configuration updates and maintenance"
+
+              procedure:
+                - "Backup current network configuration"
+                - "Schedule maintenance during off-peak hours"
+                - "Apply network changes gradually"
+                - "Test connectivity and performance"
+                - "Monitor for network issues"
+
+      # Scheduled Maintenance
+      scheduledMaintenance:
+        daily:
+          - name: "Daily Health Check"
+            description: "Daily system health verification"
+            time: "02:00 UTC"
+            duration: "15 minutes"
+            tasks:
+              - "Verify all services are healthy"
+              - "Check backup completion status"
+              - "Review system metrics and alerts"
+              - "Update daily operational status"
+
+        weekly:
+          - name: "Weekly Security Updates"
+            description: "Apply security patches and updates"
+            day: "Sunday"
+            time: "03:00 UTC"
+            duration: "1-2 hours"
+            tasks:
+              - "Apply OS security patches"
+              - "Update container images"
+              - "Scan for vulnerabilities"
+              - "Test system functionality post-update"
+
+          - name: "Weekly Performance Review"
+            description: "Review system performance and capacity"
+            day: "Friday"
+            time: "16:00 UTC"
+            duration: "30 minutes"
+            tasks:
+              - "Analyze performance trends"
+              - "Review capacity utilization"
+              - "Identify optimization opportunities"
+              - "Plan capacity adjustments if needed"
+
+        monthly:
+          - name: "Monthly Comprehensive Maintenance"
+            description: "Complete system maintenance and optimization"
+            day: "First Sunday"
+            time: "02:00 UTC"
+            duration: "4-6 hours"
+            tasks:
+              - "Apply major updates and patches"
+              - "Perform database optimization"
+              - "Review and update documentation"
+              - "Conduct security audit"
+              - "Test disaster recovery procedures"
+
+          - name: "Monthly Capacity Planning"
+            description: "Review capacity and plan for growth"
+            day: "Last Business Day"
+            time: "17:00 UTC"
+            duration: "1 hour"
+            tasks:
+              - "Analyze growth trends"
+              - "Update capacity forecasts"
+              - "Plan infrastructure scaling"
+              - "Review cost optimization opportunities"
+
+        quarterly:
+          - name: "Quarterly System Review"
+            description: "Comprehensive system review and planning"
+            frequency: "Every 3 months"
+            duration: "1-2 days"
+            tasks:
+              - "Architecture review and optimization"
+              - "Security assessment and improvements"
+              - "Performance optimization initiatives"
+              - "Disaster recovery testing"
+              - "Documentation updates"
+
+      # Emergency Maintenance
+      emergencyMaintenance:
+        procedure:
+          name: "Emergency Maintenance Procedure"
+          description: "Unplanned maintenance for critical issues"
+
+          triggers:
+            - "Critical security vulnerability"
+            - "System performance degradation"
+            - "Hardware failure"
+            - "Data corruption risk"
+
+          responseTime:
+            critical: "< 15 minutes"
+            high: "< 30 minutes"
+            medium: "< 1 hour"
+            low: "< 4 hours"
+
+          procedure:
+            - step: 1
+              title: "Immediate Assessment (0-15 minutes)"
+              tasks:
+                - "Assess issue severity and impact"
+                - "Notify on-call team and stakeholders"
+                - "Determine maintenance urgency"
+                - "Initialize communication channels"
+
+            - step: 2
+              title: "Emergency Response (15-60 minutes)"
+              tasks:
+                - "Implement immediate mitigation"
+                - "Schedule emergency maintenance window"
+                - "Notify users of upcoming maintenance"
+                - "Prepare rollback procedures"
+
+            - step: 3
+              title: "Emergency Maintenance (1-4 hours)"
+              tasks:
+                - "Execute emergency fix or maintenance"
+                - "Monitor system during maintenance"
+                - "Validate fix effectiveness"
+                - "Restore normal operations"
+
+            - step: 4
+              title: "Post-Emergency Review (4-24 hours)"
+              tasks:
+                - "Document incident and response"
+                - "Conduct root cause analysis"
+                - "Update procedures to prevent recurrence"
+                - "Review with all stakeholders"
+
+      # Maintenance Coordination
+      coordination:
+        communication:
+          preMaintenance:
+            channels: ["Email", "Slack", "Status Page"]
+            noticePeriod:
+              planned: "7 days"
+              emergency: "Immediate"
+            stakeholders:
+              - "Engineering Team"
+              - "Product Team"
+              - "Customer Support"
+              - "Leadership Team"
+
+          duringMaintenance:
+            channels: ["Slack", "Status Page"]
+            frequency: "Every 15 minutes"
+            content:
+              - "Current maintenance progress"
+              - "Estimated completion time"
+              - "Current system status"
+              - "Any issues encountered"
+
+          postMaintenance:
+            channels: ["Email", "Slack", "Status Page"]
+            timing: "Immediately after completion"
+            content:
+              - "Maintenance completion confirmation"
+              - "Changes implemented"
+              - "Current system status"
+              - "Next scheduled maintenance"
+
+        approvalWorkflow:
+          plannedMaintenance:
+            requiredApprovals:
+              - "Engineering Manager"
+              - "DevOps Lead"
+            approvalTimeframe: "48 hours before maintenance"
+
+          emergencyMaintenance:
+            requiredApprovals:
+              - "On-call Engineering Manager"
+            approvalTimeframe: "Immediate"
+
+        documentation:
+          preMaintenance:
+            - "Maintenance plan and objectives"
+            - "Risk assessment and mitigation"
+            - "Rollback procedures"
+            - "Communication plan"
+
+          duringMaintenance:
+            - "Execution log with timestamps"
+            - "Issues encountered and resolutions"
+            - "System metrics during maintenance"
+
+          postMaintenance:
+            - "Completion report"
+            - "Lessons learned"
+            - "Recommendations for future maintenance"
+            - "Updated procedures and documentation"
+
+      # Maintenance Tools and Automation
+      automation:
+        scripts:
+          preMaintenanceChecks:
+            description: "Automated pre-maintenance health checks"
+            script: |
+              #!/bin/bash
+              echo "Running pre-maintenance health checks..."
+
+              # Check service health
+              kubectl get pods -n quantumbeam
+
+              # Check system metrics
+              kubectl top nodes
+              kubectl top pods -n quantumbeam
+
+              # Check backup status
+              ./scripts/check-backup-status.sh
+
+              # Verify monitoring systems
+              curl -f http://prometheus.monitoring.svc.cluster.local:9090/-/healthy
+              curl -f http://grafana.monitoring.svc.cluster.local:3000/api/health
+
+          blueGreenDeployment:
+            description: "Automated blue-green deployment"
+            script: |
+              #!/bin/bash
+              set -e
+
+              SERVICE=$1
+              NEW_IMAGE=$2
+
+              echo "Starting blue-green deployment for $SERVICE"
+
+              # Deploy to green environment
+              helm upgrade --install $SERVICE-green ./charts/$SERVICE \
+                --namespace quantumbeam \
+                --set image.tag=$NEW_IMAGE \
+                --set fullnameOverride=$SERVICE-green \
+                --set service.enabled=false
+
+              # Wait for green deployment
+              kubectl rollout status deployment/$SERVICE-green -n quantumbeam --timeout=300s
+
+              # Run health checks
+              ./scripts/health-check.sh $SERVICE-green
+
+              # Switch traffic
+              kubectl patch service $SERVICE -n quantumbeam \
+                -p '{"spec":{"selector":{"version":"green"}}}'
+
+              echo "Traffic switched to green environment"
+
+          postMaintenanceValidation:
+            description: "Automated post-maintenance validation"
+            script: |
+              #!/bin/bash
+              echo "Running post-maintenance validation..."
+
+              # Check all services are healthy
+              ./scripts/check-all-services.sh
+
+              # Run smoke tests
+              ./scripts/run-smoke-tests.sh
+
+              # Check performance metrics
+              ./scripts/validate-performance.sh
+
+              # Verify database connectivity
+              ./scripts/check-database-connectivity.sh
+
+              echo "Post-maintenance validation completed"
+
+        monitoring:
+          maintenanceMetrics:
+            - name: "maintenance_duration_seconds"
+              description: "Duration of maintenance operations"
+              labels: ["maintenance_type", "service"]
+
+            - name: "maintenance_success_total"
+              description: "Number of successful maintenance operations"
+              labels: ["maintenance_type", "service"]
+
+            - name: "maintenance_rollback_total"
+              description: "Number of maintenance rollbacks"
+              labels: ["maintenance_type", "service", "reason"]
+
+          alerts:
+            maintenanceRunning:
+              condition: "up{job=\"maintenance-monitor\"} == 1"
+              duration: "1m"
+              severity: "info"
+              annotations:
+                summary: "Maintenance operation in progress"
+
+            maintenanceOverrun:
+              condition: "time() - maintenance_start_time > maintenance_expected_duration"
+              duration: "5m"
+              severity: "warning"
+              annotations:
+                summary: "Maintenance operation exceeding expected duration"
+
+  maintenance-scheduler.yaml: |
+    # Kubernetes CronJobs for Scheduled Maintenance
+    apiVersion: batch/v1
+    kind: CronJob
+    metadata:
+      name: daily-health-check
+      namespace: quantumbeam
+      labels:
+        app: quantumbeam
+        component: maintenance
+        schedule-type: daily
+    spec:
+      schedule: "0 2 * * *"  # 2 AM UTC daily
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 3
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              serviceAccountName: quantumbeam-maintenance
+              restartPolicy: OnFailure
+              containers:
+                - name: health-check
+                  image: quantumbeam/maintenance-tools:latest
+                  command: ["/app/scripts/daily-health-check.sh"]
+                  env:
+                    - name: NAMESPACE
+                      value: "quantumbeam"
+                    - name: SLACK_WEBHOOK_URL
+                      valueFrom:
+                        secretKeyRef:
+                          name: monitoring-secrets
+                          key: slack-webhook-url
+                          optional: true
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 128Mi
+                    limits:
+                      cpu: 200m
+                      memory: 256Mi
+                  volumeMounts:
+                    - name: scripts
+                      mountPath: /app/scripts
+                      readOnly: true
+              volumes:
+                - name: scripts
+                  configMap:
+                    name: maintenance-scripts
+                    defaultMode: 0755
+
+    ---
+    apiVersion: batch/v1
+    kind: CronJob
+    metadata:
+      name: weekly-security-updates
+      namespace: quantumbeam
+      labels:
+        app: quantumbeam
+        component: maintenance
+        schedule-type: weekly
+    spec:
+      schedule: "0 3 * * 0"  # 3 AM UTC Sunday
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 2
+      failedJobsHistoryLimit: 2
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              serviceAccountName: quantumbeam-maintenance
+              restartPolicy: OnFailure
+              containers:
+                - name: security-updates
+                  image: quantumbeam/maintenance-tools:latest
+                  command: ["/app/scripts/weekly-security-updates.sh"]
+                  env:
+                    - name: NAMESPACE
+                      value: "quantumbeam"
+                    - name: REGISTRY
+                      value: "quay.io/quantumbeam"
+                  resources:
+                    requests:
+                      cpu: 200m
+                      memory: 256Mi
+                    limits:
+                      cpu: 500m
+                      memory: 512Mi
+                  volumeMounts:
+                    - name: scripts
+                      mountPath: /app/scripts
+                      readOnly: true
+              volumes:
+                - name: scripts
+                  configMap:
+                    name: maintenance-scripts
+                    defaultMode: 0755
+
+    ---
+    apiVersion: batch/v1
+    kind: CronJob
+    metadata:
+      name: monthly-capacity-planning
+      namespace: quantumbeam
+      labels:
+        app: quantumbeam
+        component: maintenance
+        schedule-type: monthly
+    spec:
+      schedule: "0 4 1 * *"  # 4 AM UTC on 1st of month
+      concurrencyPolicy: Forbid
+      successfulJobsHistoryLimit: 1
+      failedJobsHistoryLimit: 1
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              serviceAccountName: quantumbeam-maintenance
+              restartPolicy: OnFailure
+              containers:
+                - name: capacity-planning
+                  image: quantumbeam/maintenance-tools:latest
+                  command: ["/app/scripts/monthly-capacity-planning.sh"]
+                  env:
+                    - name: NAMESPACE
+                      value: "quantumbeam"
+                    - name: PROMETHEUS_URL
+                      value: "http://prometheus.monitoring.svc.cluster.local:9090"
+                  resources:
+                    requests:
+                      cpu: 200m
+                      memory: 256Mi
+                    limits:
+                      cpu: 500m
+                      memory: 512Mi
+                  volumeMounts:
+                    - name: scripts
+                      mountPath: /app/scripts
+                      readOnly: true
+              volumes:
+                - name: scripts
+                  configMap:
+                    name: maintenance-scripts
+                    defaultMode: 0755

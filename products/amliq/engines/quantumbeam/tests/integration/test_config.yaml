@@ -1,0 +1,226 @@
+# Integration Test Configuration
+version: "1.0"
+environment: "test"
+
+# Database Configuration
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "password"
+  dbname: "quantumbeam_test"
+  sslmode: "disable"
+  max_connections: 10
+  connection_timeout: "30s"
+
+# Server Configuration
+server:
+  host: "localhost"
+  port: 8081
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "60s"
+
+# Test Configuration
+test:
+  timeout: "30m"
+  cleanup_after: true
+  parallel_tests: false
+  verbose: false
+  skip_database_tests: false
+  skip_performance_tests: false
+
+  # Test Data Configuration
+  test_data:
+    users:
+      - username: "testuser"
+        email: "test@example.com"
+        password: "testpassword123"
+        full_name: "Test User"
+        country: "US"
+
+    merchants:
+      - name: "Test Merchant"
+        business_name: "Test Merchant Inc"
+        email: "merchant@test.com"
+        category: "electronics"
+        country: "US"
+
+  # Performance Test Configuration
+  performance:
+    concurrent_requests: 50
+    requests_per_second: 100
+    test_duration: "30s"
+    memory_limit_mb: 512
+    response_time_threshold_ms: 500
+
+    # Load Test Scenarios
+    load_scenarios:
+      - name: "moderate_load"
+        qps: 50
+        duration: "30s"
+        users: 10
+
+      - name: "high_load"
+        qps: 100
+        duration: "60s"
+        users: 50
+
+      - name: "spike_test"
+        normal_qps: 10
+        spike_qps: 200
+        spike_duration: "5s"
+        total_duration: "30s"
+
+  # Fraud Analysis Test Configuration
+  fraud_analysis:
+    test_transactions:
+      - amount: 100.00
+        currency: "USD"
+        risk_level: "low"
+
+      - amount: 5000.00
+        currency: "USD"
+        risk_level: "medium"
+        ai_analysis: true
+
+      - amount: 25000.00
+        currency: "USD"
+        risk_level: "high"
+        ai_analysis: true
+        quantum_analysis: true
+
+  # Error Scenarios to Test
+  error_scenarios:
+    - name: "invalid_authentication"
+      endpoint: "/protected"
+      method: "GET"
+      expected_status: 401
+
+    - name: "missing_permissions"
+      endpoint: "/admin/users"
+      method: "GET"
+      expected_status: 403
+
+    - name: "rate_limit_exceeded"
+      endpoint: "/api/endpoint"
+      method: "GET"
+      rapid_requests: 100
+      expected_status: 429
+
+    - name: "invalid_request_data"
+      endpoint: "/auth/register"
+      method: "POST"
+      invalid_data: true
+      expected_status: 400
+
+# Monitoring and Logging
+monitoring:
+  log_level: "debug"
+  metrics_enabled: true
+  trace_enabled: true
+
+  # Performance Metrics
+  metrics:
+    response_time_histogram: true
+    request_rate_counter: true
+    error_rate_gauge: true
+    memory_usage_gauge: true
+
+# External Services Configuration
+external_services:
+  # AI Service Configuration
+  ai_service:
+    enabled: true
+    mock_mode: true
+    response_time_ms: 100
+    error_rate: 0.01
+
+  # Quantum Computing Service Configuration
+  quantum_service:
+    enabled: true
+    mock_mode: true
+    response_time_ms: 500
+    error_rate: 0.05
+
+# Security Configuration
+security:
+  jwt_secret: "test-jwt-secret-key-for-integration-testing"
+  jwt_expiry: "24h"
+
+  # API Key Configuration
+  api_keys:
+    default_rate_limit_per_minute: 1000
+    default_rate_limit_per_hour: 100000
+
+  # Rate Limiting Configuration
+  rate_limiting:
+    enabled: true
+    algorithm: "token_bucket"
+    cleanup_interval: "1h"
+
+# Report Configuration
+reports:
+  output_dir: "test_results"
+  formats: ["json", "html", "junit"]
+
+  # Coverage Configuration
+  coverage:
+    enabled: true
+    threshold: 80.0
+    output_file: "coverage.out"
+
+  # Performance Report Configuration
+  performance_report:
+    enabled: true
+    include_memory_usage: true
+    include_response_times: true
+    include_error_rates: true
+
+# CI/CD Configuration
+ci:
+  parallel: true
+  fail_fast: true
+  retry_failed_tests: 1
+
+  # GitHub Actions Configuration
+  github_actions:
+    artifacts: true
+    reports: true
+    coverage: true
+
+  # Docker Configuration
+  docker:
+    enabled: false
+    image: "quantumbeam:test"
+    compose_file: "docker-compose.test.yml"
+
+# Environment-specific overrides
+environments:
+  test:
+    database:
+      dbname: "quantumbeam_test"
+    server:
+      port: 8081
+    test:
+      timeout: "30m"
+      parallel_tests: false
+
+  staging:
+    database:
+      dbname: "quantumbeam_staging"
+    server:
+      port: 8082
+    test:
+      timeout: "60m"
+      parallel_tests: true
+
+  production:
+    database:
+      dbname: "quantumbeam_prod_readonly"
+    server:
+      port: 443
+    test:
+      timeout: "120m"
+      parallel_tests: true
+      skip_performance_tests: true # Don't run performance tests against production

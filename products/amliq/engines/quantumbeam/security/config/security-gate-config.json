@@ -1,0 +1,155 @@
+{
+  "version": "1.0",
+  "description": "Security gate configuration for QuantumBeam",
+  "rules": [
+    {
+      "name": "no_critical_vulnerabilities",
+      "description": "No critical vulnerabilities allowed",
+      "threshold_type": "severity",
+      "threshold_value": 0,
+      "severity_filter": ["CRITICAL"],
+      "action": "fail",
+      "enabled": true
+    },
+    {
+      "name": "limited_high_vulnerabilities",
+      "description": "Maximum 5 high vulnerabilities allowed",
+      "threshold_type": "severity",
+      "threshold_value": 5,
+      "severity_filter": ["HIGH"],
+      "action": "fail",
+      "enabled": true
+    },
+    {
+      "name": "limited_medium_vulnerabilities",
+      "description": "Maximum 20 medium vulnerabilities allowed",
+      "threshold_type": "severity",
+      "threshold_value": 20,
+      "severity_filter": ["MEDIUM"],
+      "action": "warn",
+      "enabled": true
+    },
+    {
+      "name": "no_sql_injection",
+      "description": "No SQL injection vulnerabilities allowed",
+      "threshold_type": "pattern",
+      "threshold_value": 0,
+      "pattern_filter": ["sql-injection", "sqli"],
+      "action": "fail",
+      "enabled": true
+    },
+    {
+      "name": "no_xss_vulnerabilities",
+      "description": "No XSS vulnerabilities allowed",
+      "threshold_type": "pattern",
+      "threshold_value": 0,
+      "pattern_filter": ["xss", "cross-site-scripting"],
+      "action": "fail",
+      "enabled": true
+    },
+    {
+      "name": "no_hardcoded_secrets",
+      "description": "No hardcoded secrets allowed",
+      "threshold_type": "pattern",
+      "threshold_value": 0,
+      "pattern_filter": ["secret", "password", "token", "key"],
+      "action": "fail",
+      "enabled": true
+    },
+    {
+      "name": "infrastructure_compliance",
+      "description": "Infrastructure must pass security compliance",
+      "threshold_type": "tool",
+      "threshold_value": 5,
+      "tool_filter": ["Checkov"],
+      "action": "fail",
+      "enabled": true
+    },
+    {
+      "name": "container_security",
+      "description": "Container images must pass security scan",
+      "threshold_type": "tool",
+      "threshold_value": 3,
+      "tool_filter": ["Trivy"],
+      "action": "fail",
+      "enabled": true
+    },
+    {
+      "name": "dependency_security",
+      "description": "Dependencies must not have critical vulnerabilities",
+      "threshold_type": "tool",
+      "threshold_value": 2,
+      "tool_filter": ["Safety", "Nancy"],
+      "action": "warn",
+      "enabled": true
+    },
+    {
+      "name": "code_quality",
+      "description": "Code must meet minimum quality standards",
+      "threshold_type": "tool",
+      "threshold_value": 10,
+      "tool_filter": ["Gosec", "Bandit"],
+      "action": "warn",
+      "enabled": true
+    }
+  ],
+  "environments": {
+    "production": {
+      "overrides": {
+        "no_critical_vulnerabilities": {
+          "threshold_value": 0,
+          "action": "fail"
+        },
+        "limited_high_vulnerabilities": {
+          "threshold_value": 0,
+          "action": "fail"
+        },
+        "limited_medium_vulnerabilities": {
+          "threshold_value": 5,
+          "action": "fail"
+        }
+      }
+    },
+    "staging": {
+      "overrides": {
+        "no_critical_vulnerabilities": {
+          "threshold_value": 0,
+          "action": "fail"
+        },
+        "limited_high_vulnerabilities": {
+          "threshold_value": 3,
+          "action": "warn"
+        },
+        "limited_medium_vulnerabilities": {
+          "threshold_value": 15,
+          "action": "warn"
+        }
+      }
+    },
+    "development": {
+      "overrides": {
+        "no_critical_vulnerabilities": {
+          "threshold_value": 0,
+          "action": "fail"
+        },
+        "limited_high_vulnerabilities": {
+          "threshold_value": 10,
+          "action": "warn"
+        },
+        "limited_medium_vulnerabilities": {
+          "threshold_value": 50,
+          "action": "warn"
+        }
+      }
+    }
+  },
+  "notifications": {
+    "channels": ["slack", "email"],
+    "on_failure": true,
+    "on_warning": true,
+    "recipients": {
+      "slack": ["#security-alerts"],
+      "email": ["security-team@quantumbeam.io", "devops@quantumbeam.io"]
+    }
+  }
+}

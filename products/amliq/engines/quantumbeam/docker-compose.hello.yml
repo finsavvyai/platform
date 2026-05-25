@@ -1,0 +1,80 @@
+version: "3.8"
+
+services:
+  # QuantumBeam Hello World API
+  hello-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.hello
+    container_name: quantumbeam-hello-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - GIN_MODE=release
+    networks:
+      - quantumbeam-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      - postgres
+      - redis
+
+  # PostgreSQL Database (for future use)
+  postgres:
+    image: postgres:16-alpine
+    container_name: quantumbeam-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quantumbeam_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    networks:
+      - quantumbeam-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d quantumbeam_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis Cache (for future use)
+  redis:
+    image: redis:7-alpine
+    container_name: quantumbeam-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    networks:
+      - quantumbeam-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+networks:
+  quantumbeam-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data_dev:
+    driver: local
+  redis_data_dev:
+    driver: local

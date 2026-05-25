@@ -1,0 +1,72 @@
+# Multi-stage production Dockerfile for QuantumBeam API Server
+# Build stage with security optimizations
+FROM golang:1.21-alpine AS builder
+
+# Install build dependencies and security tools
+RUN apk add --no-cache \
+    git \
+    ca-certificates \
+    tzdata \
+    && update-ca-certificates
+
+# Create appuser
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Set working directory
+WORKDIR /build
+
+# Copy go mod files and download dependencies
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+# Copy source code
+COPY . .
+
+# Build the application with production optimizations
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags='-w -s -extldflags "-static"' \
+    -a -installsuffix cgo \
+    -o quantumbeam-api \
+    ./cmd/api-server
+
+# Verify the binary
+RUN ./quantumbeam-api --version || echo "Version check not implemented"
+
+# Production stage with minimal attack surface
+FROM scratch
+
+# Import CA certificates from builder
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+# Import timezone data
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+
+# Create non-root user from scratch
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+
+# Set working directory
+WORKDIR /home/appuser
+
+# Copy the binary from builder stage
+COPY --from=builder /build/quantumbeam-api .
+
+# Copy configuration files
+COPY --from=builder /build/config ./config
+
+# Change ownership to appuser
+USER appuser:appgroup
+
+# Expose port
+EXPOSE 8080
+
+# Set environment variables for production
+ENV GIN_MODE=release
+ENV PORT=8080
+
+# Health check with proper security
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD ["/home/appuser/quantumbeam-api", "healthcheck"] || exit 1
+
+# Security-focused run command
+ENTRYPOINT ["/home/appuser/quantumbeam-api"]

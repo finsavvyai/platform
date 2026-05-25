@@ -1,15 +1,20 @@
+import { timingSafeEqual } from "node:crypto";
 import { base64UrlEncode } from "./token-utils.js";
 
 const encoder = new TextEncoder();
 
-const importHmacKey = async (secret: string): Promise<CryptoKey> =>
-  crypto.subtle.importKey(
+const importHmacKey = async (secret: string): Promise<CryptoKey> => {
+  if (secret.length === 0) {
+    throw new Error("hmac secret must be non-empty");
+  }
+  return crypto.subtle.importKey(
     "raw",
     encoder.encode(secret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign", "verify"],
   );
+};
 
 export const hmacSign = async (
   secret: string,
@@ -29,13 +34,23 @@ export const hmacVerify = async (
   return timingSafeEqualStr(expected, signature);
 };
 
+// Constant-time equality for base64url/hex strings.
+// Uses node:crypto.timingSafeEqual, which requires equal-length buffers.
+// On length mismatch we still consume work proportional to the longer input
+// (so the duration does not leak which side was shorter), then return false.
 export const timingSafeEqualStr = (a: string, b: string): boolean => {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  const ab = encoder.encode(a);
+  const bb = encoder.encode(b);
+  if (ab.length !== bb.length) {
+    const maxLen = Math.max(ab.length, bb.length, 1);
+    const left = new Uint8Array(maxLen);
+    const right = new Uint8Array(maxLen);
+    left.set(ab);
+    right.set(bb);
+    timingSafeEqual(left, right);
+    return false;
   }
-  return diff === 0;
+  return timingSafeEqual(ab, bb);
 };
 
 export const hashApiKey = async (

@@ -1,0 +1,608 @@
+# QuantumBeam Production Environment Configuration
+# This file contains production-specific values for Kubernetes deployments
+
+# Global configuration
+global:
+  environment: production
+  namespace: quantumbeam
+  region: us-west-2
+
+  # Image registry configuration
+  imageRegistry: quay.io/quantumbeam
+  imagePullSecrets:
+  - name: registry-secret
+
+  # Common labels
+  commonLabels:
+    environment: production
+    managed-by: argocd
+    cost-center: engineering
+
+  # Common annotations
+  commonAnnotations:
+    kubernetes.io/managed-by: argocd
+    argocd.argoproj.io/sync-options: CreateNamespace=true
+
+# Image configuration
+image:
+  registry: quay.io/quantumbeam
+  repository: quantumbeam-api
+  tag: "v1.0.0"
+  pullPolicy: Always
+
+  # Security scan results
+  securityScan:
+    enabled: true
+    scanDate: "2024-01-15T10:00:00Z"
+    vulnerabilities: "0 critical, 2 high, 5 medium"
+
+# API Server configuration
+api:
+  # Replicas and scaling
+  replicas: 3
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+  # Resource requests and limits
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Autoscaling configuration
+  autoscaling:
+    enabled: true
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 60
+        policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+
+  # Pod configuration
+  pod:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9090"
+      prometheus.io/path: "/metrics"
+      iam.amazonaws.com/role: "arn:aws:iam::123456789012:role/quantumbeam-api-role"
+
+    labels:
+      app.kubernetes.io/name: quantumbeam-api
+      app.kubernetes.io/version: "v1.0.0"
+      app.kubernetes.io/component: api
+      app.kubernetes.io/part-of: quantumbeam
+
+    # Security context
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+
+    # Container security context
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+        - ALL
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+
+    # Node selector
+    nodeSelector:
+      kubernetes.io/os: linux
+      node-type: application
+      performance-class: standard
+      environment: production
+
+    # Tolerations
+    tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "quantumbeam"
+      effect: "NoSchedule"
+    - key: "environment"
+      operator: "Equal"
+      value: "production"
+      effect: "NoSchedule"
+
+    # Affinity
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - quantumbeam-api
+            topologyKey: kubernetes.io/hostname
+        - weight: 50
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                - quantumbeam-api
+            topologyKey: failure-domain.beta.kubernetes.io/zone
+      podAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - postgres
+            topologyKey: kubernetes.io/zone
+
+  # Service configuration
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+      service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+      service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+      service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy: "ELBSecurityPolicy-TLS-1-2-2017-01"
+      service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Environment=production,Service=quantumbeam-api,ManagedBy=kubernetes"
+
+    ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 8080
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+
+    # Session affinity
+    sessionAffinity: None
+    externalTrafficPolicy: Local
+
+  # Ingress configuration
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      kubernetes.io/ingress.class: "nginx"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/use-regex: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/rate-limit: "1000"
+      nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+      nginx.ingress.kubernetes.io/rate-limit-connections: "100"
+      nginx.ingress.kubernetes.io/rate-limit-requests-per-second: "100"
+      nginx.ingress.kubernetes.io/rate-limit-burst: "200"
+      nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+
+    hosts:
+    - host: api.quantumbeam.io
+      paths:
+      - path: /api(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: quantumbeam-api-active
+            port:
+              number: 80
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: quantumbeam-api-active
+            port:
+              number: 80
+
+    tls:
+    - hosts:
+      - api.quantumbeam.io
+      secretName: quantumbeam-api-tls
+
+  # Blue-Green deployment configuration
+  blueGreen:
+    enabled: true
+    activeService: quantumbeam-api-active
+    previewService: quantumbeam-api-preview
+    autoPromotionEnabled: false
+    scaleDownDelaySeconds: 30
+
+    # Pre-promotion analysis
+    prePromotionAnalysis:
+      templates:
+      - success-rate
+      - latency
+      args:
+      - name: service-name
+        value: quantumbeam-api-preview
+
+    # Post-promotion analysis
+    postPromotionAnalysis:
+      templates:
+      - success-rate
+      - latency
+      - error-rate
+      args:
+      - name: service-name
+        value: quantumbeam-api-active
+
+  # Health check configuration
+  healthChecks:
+    # Liveness probe
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: http
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 3
+      successThreshold: 1
+      failureThreshold: 3
+
+    # Readiness probe
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: http
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      timeoutSeconds: 3
+      successThreshold: 1
+      failureThreshold: 3
+
+    # Startup probe
+    startupProbe:
+      httpGet:
+        path: /ready
+        port: http
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      successThreshold: 1
+      failureThreshold: 30
+
+# Database configuration
+database:
+  postgres:
+    enabled: true
+    host: "postgres.production.svc.cluster.local"
+    port: 5432
+    database: "quantumbeam"
+    username: "quantumbeam"
+
+    # Connection pooling
+    maxConnections: 100
+    maxIdleConnections: 10
+    connectionMaxLifetime: "1h"
+    connectionMaxIdleTime: "10m"
+
+    # SSL configuration
+    sslMode: "require"
+    sslCert: "/etc/ssl/certs/postgres.crt"
+    sslKey: "/etc/ssl/private/postgres.key"
+    sslRootCert: "/etc/ssl/certs/ca.crt"
+
+  redis:
+    enabled: true
+    host: "redis.production.svc.cluster.local"
+    port: 6379
+    database: 0
+
+    # Connection pooling
+    maxConnections: 50
+    minConnections: 5
+    poolTimeout: "5s"
+    idleTimeout: "5m"
+    idleCheckFrequency: "1m"
+
+# Monitoring configuration
+monitoring:
+  # Prometheus metrics
+  prometheus:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+    interval: "30s"
+    scrapeTimeout: "10s"
+
+    # Service monitor
+    serviceMonitor:
+      enabled: true
+      interval: "30s"
+      scrapeTimeout: "10s"
+      honorLabels: true
+
+      # Relabel configurations
+      relabelings:
+      - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        targetLabel: app
+      - sourceLabels: [__meta_kubernetes_pod_label_app_kubernetes_io_version]
+        targetLabel: version
+
+    # Pod monitor
+    podMonitor:
+      enabled: true
+      interval: "30s"
+      scrapeTimeout: "10s"
+      honorLabels: true
+
+  # Jaeger tracing
+  jaeger:
+    enabled: true
+    endpoint: "http://jaeger-collector.monitoring.svc.cluster.local:14268/api/traces"
+    serviceName: "quantumbeam-api"
+    sampleRate: 0.1
+
+  # Custom metrics
+  customMetrics:
+    enabled: true
+    rules:
+    - name: quantumbeam_api_requests_total
+      type: Counter
+      help: "Total number of API requests"
+    - name: quantumbeam_api_request_duration_seconds
+      type: Histogram
+      help: "API request duration in seconds"
+    - name: quantumbeam_fraud_detections_total
+      type: Counter
+      help: "Total number of fraud detections"
+    - name: quantumbeam_quantum_algorithm_executions_total
+      type: Counter
+      help: "Total number of quantum algorithm executions"
+
+# Security configuration
+security:
+  # RBAC
+  rbac:
+    enabled: true
+    serviceAccount:
+      create: true
+      name: "quantumbeam-api"
+      annotations:
+        iam.amazonaws.com/role: "arn:aws:iam::123456789012:role/quantumbeam-api-role"
+
+    # Role rules
+    rules:
+    - apiGroups: [""]
+      resources: ["configmaps", "secrets"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["apps"]
+      resources: ["deployments"]
+      verbs: ["get", "list", "watch"]
+
+  # Pod security policies
+  podSecurityPolicy:
+    enabled: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsUser:
+      rule: MustRunAsNonRoot
+    fsGroup:
+      rule: MustRunAs
+      ranges:
+      - min: 1000
+        max: 1000
+    seccomp:
+      type: RuntimeDefault
+    volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+
+  # Network policies
+  networkPolicy:
+    enabled: true
+    ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 8080
+      - protocol: TCP
+        port: 9090
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+      ports:
+      - protocol: TCP
+        port: 9090
+    egress:
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: kube-system
+      ports:
+      - protocol: TCP
+        port: 53
+      - protocol: UDP
+        port: 53
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: quantumbeam
+      ports:
+      - protocol: TCP
+        port: 5432  # PostgreSQL
+      - protocol: TCP
+        port: 6379  # Redis
+
+# Configuration management
+config:
+  # Application configuration
+  appConfig:
+    environment: production
+    logLevel: info
+    debug: false
+
+    # Feature flags
+    featureFlags:
+      quantumEnhancement: false
+      mlModelV2: false
+      realTimeScoring: true
+      advancedAnalytics: true
+      customRules: true
+
+    # Performance tuning
+    performance:
+      maxRequestSize: 10485760  # 10MB
+      readBufferSize: 4096
+      writeBufferSize: 4096
+      timeout: 30s
+
+  # Secret management
+  secrets:
+    enabled: true
+    externalSecrets:
+      enabled: true
+      backend: awsSecretsManager
+      region: us-west-2
+
+    secrets:
+    - name: postgres-secret
+      key: postgres/production
+      propertyMap:
+        host: host
+        port: port
+        database: database
+        username: username
+        password: password
+    - name: redis-secret
+      key: redis/production
+      propertyMap:
+        host: host
+        port: port
+        password: password
+    - name: jwt-secret
+      key: jwt/production
+      propertyMap:
+        secret: secret
+
+# External services configuration
+externalServices:
+  # AI/ML service
+  aiMl:
+    url: "http://quantumbeam-ai-ml.quantumbeam.svc.cluster.local:8000"
+    timeout: 30s
+    retries: 3
+    retryDelay: 1s
+
+  # Payment processor
+  payment:
+    url: "https://api.paymentprocessor.com"
+    timeout: 30s
+    retries: 3
+    retryDelay: 1s
+
+  # Notification services
+  notifications:
+    slack:
+      webhookUrl: "https://hooks.slack.com/services/..."
+      channel: "#quantumbeam-alerts"
+      username: "QuantumBeam Bot"
+    email:
+      smtpHost: "smtp.sendgrid.net"
+      smtpPort: 587
+      fromAddress: "noreply@quantumbeam.io"
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+
+  # S3 backup
+  s3:
+    bucket: "quantumbeam-backups"
+    region: us-west-2
+    prefix: "postgresql/"
+
+  # Database backup
+  database:
+    enabled: true
+    schedule: "0 3 * * *"  # Daily at 3 AM
+    retention: "30d"
+    compression: true
+    encryption: true
+
+# Cost optimization
+costOptimization:
+  # Resource optimization
+  resourceOptimization:
+    enabled: true
+    schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+    recommendations: true
+
+  # Spot instances
+  spotInstances:
+    enabled: false
+    maxPercentage: 20
+
+  # Autoscaling
+  autoscaling:
+    enabled: true
+    scaleUpCooldown: 1m
+    scaleDownCooldown: 5m
+    targetCPUUtilization: 70
+    targetMemoryUtilization: 80
+
+# Compliance and audit
+compliance:
+  # Audit logging
+  auditLogging:
+    enabled: true
+    retention: "7y"
+    includeRequestBody: false
+    includeResponseBody: false
+
+  # Security scanning
+  securityScanning:
+    enabled: true
+    schedule: "0 1 * * *"  # Daily at 1 AM
+    vulnerabilityThreshold: "HIGH,CRITICAL"
+
+  # Compliance reporting
+  complianceReporting:
+    enabled: true
+    schedule: "0 6 * * 1"  # Weekly on Monday at 6 AM
+    frameworks: ["SOC2", "GDPR", "PCI-DSS"]

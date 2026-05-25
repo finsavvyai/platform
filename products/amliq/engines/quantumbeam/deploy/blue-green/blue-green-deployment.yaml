@@ -1,0 +1,490 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: quantumbeam-api
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    version: v1
+    component: api
+    managed-by: argocd
+spec:
+  replicas: 3
+  strategy:
+    type: BlueGreen
+    blueGreen:
+      # Active service determines which service the Rollout should update during a blue-green deployment
+      activeService: quantumbeam-api-active
+      # Preview service is the service that points to the new (green) version during a blue-green deployment
+      previewService: quantumbeam-api-preview
+      # AutoPromotionEnabled indicates whether the Rollout should automatically promote the new ReplicaSet
+      autoPromotionEnabled: false
+      # ScaleDownDelaySeconds is the duration to wait before scaling down the previous ReplicaSet
+      scaleDownDelaySeconds: 30
+      # PrePromotionAnalysis runs analysis before traffic is shifted to the new version
+      prePromotionAnalysis:
+        templates:
+        - templateName: success-rate
+        - templateName: latency
+        args:
+        - name: service-name
+          value: quantumbeam-api-preview
+      # PostPromotionAnalysis runs analysis after traffic is shifted to the new version
+      postPromotionAnalysis:
+        templates:
+        - templateName: success-rate
+        - templateName: latency
+        - templateName: error-rate
+        args:
+        - name: service-name
+          value: quantumbeam-api-active
+  # RevisionHistoryLimit limits the number of old ReplicaSets to retain
+  revisionHistoryLimit: 3
+  # Selector for pods
+  selector:
+    matchLabels:
+      app: quantumbeam-api
+      component: api
+  # Pod template
+  template:
+    metadata:
+      labels:
+        app: quantumbeam-api
+        component: api
+        version: v1
+        # Add security labels
+        security.policy.level: "strict"
+        security.scan.status: "completed"
+      annotations:
+        # Prometheus metrics annotations
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+        # Security annotations
+        container.security.context: "true"
+        iam.amazonaws.com/role: "quantumbeam-api-role"
+        # Version and build info
+        app.kubernetes.io/version: "${VERSION}"
+        app.kubernetes.io/build-date: "${BUILD_TIME}"
+        app.kubernetes.io/commit: "${COMMIT}"
+    spec:
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+      # Service account
+      serviceAccountName: quantumbeam-api
+      serviceAccountName: quantumbeam-api
+      # Node selector
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-type: application
+        performance-class: standard
+      # Affinity rules
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - quantumbeam-api
+              topologyKey: kubernetes.io/hostname
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - postgres
+              topologyKey: kubernetes.io/zone
+      # Tolerations
+      tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "quantumbeam"
+        effect: "NoSchedule"
+      # Containers
+      containers:
+      - name: quantumbeam-api
+        image: quay.io/quantumbeam/quantumbeam-api:latest
+        imagePullPolicy: Always
+        # Security context for container
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+        # Ports
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        # Environment variables
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: VERSION
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['app.kubernetes.io/version']
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        # Database configuration
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: host
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: port
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: database
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: password
+        # Redis configuration
+        - name: REDIS_HOST
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: host
+        - name: REDIS_PORT
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: port
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: password
+        # JWT configuration
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secret
+              key: secret
+        - name: JWT_EXPIRATION
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: jwt.expiration
+        # Monitoring configuration
+        - name: JAEGER_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: monitoring-config
+              key: jaeger.endpoint
+        # External services
+        - name: AI_ML_URL
+          valueFrom:
+            configMapKeyRef:
+              name: service-config
+              key: ai-ml.url
+        # Volume mounts
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: models-volume
+          mountPath: /app/models
+          readOnly: true
+        # Resource limits and requests
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        # Health checks
+        startupProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 30
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+      # Volumes
+      volumes:
+      - name: config-volume
+        configMap:
+          name: app-config
+      - name: tmp-volume
+        emptyDir: {}
+      - name: models-volume
+        configMap:
+          name: fraud-models
+      # Image pull secrets
+      imagePullSecrets:
+      - name: registry-secret
+      # Termination grace period
+      terminationGracePeriodSeconds: 30
+      # Init containers
+      initContainers:
+      - name: check-dependencies
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          # Wait for database to be ready
+          until nc -z postgres 5432; do
+            echo "Waiting for database..."
+            sleep 2
+          done
+          # Wait for Redis to be ready
+          until nc -z redis 6379; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+          echo "Dependencies are ready"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 50m
+            memory: 64Mi
+---
+# Active service (points to the current production version)
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-api-active
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    component: api
+    role: active
+  annotations:
+    # Load balancer annotations
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy: "ELBSecurityPolicy-TLS-1-2-2017-01"
+    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "Environment=production,Service=quantumbeam-api,ManagedBy=kubernetes"
+spec:
+  type: LoadBalancer
+  selector:
+    app: quantumbeam-api
+    component: api
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  sessionAffinity: None
+  externalTrafficPolicy: Local
+---
+# Preview service (points to the new version during deployment)
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-api-preview
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    component: api
+    role: preview
+  annotations:
+    # Internal service annotations
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+spec:
+  type: ClusterIP
+  selector:
+    app: quantumbeam-api
+    component: api
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+---
+# Analysis templates for canary analysis
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+  namespace: quantumbeam
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: success-rate
+    interval: 30s
+    count: 10
+    # NOTE: prometheus client will query prometheus server every 30 seconds for 10 times
+    successCondition: result[0] >= 0.99
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://prometheus-operator-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(rate(http_requests_total{service="{{args.service-name}}",status!~"5.."}[5m])) /
+          sum(rate(http_requests_total{service="{{args.service-name}}"}[5m]))
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: latency
+  namespace: quantumbeam
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: latency
+    interval: 30s
+    count: 10
+    successCondition: result[0] <= 0.5
+    provider:
+      prometheus:
+        address: http://prometheus-operator-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{service="{{args.service-name}}"}[5m])) by (le)
+          )
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: error-rate
+  namespace: quantumbeam
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: error-rate
+    interval: 30s
+    count: 10
+    successCondition: result[0] <= 0.01
+    provider:
+      prometheus:
+        address: http://prometheus-operator-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(rate(http_requests_total{service="{{args.service-name}}",status=~"5.."}[5m])) /
+          sum(rate(http_requests_total{service="{{args.service-name}}"}[5m]))
+---
+# Ingress for the active service
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quantumbeam-api-ingress
+  namespace: quantumbeam
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/rate-limit-connections: "100"
+    nginx.ingress.kubernetes.io/rate-limit-requests-per-second: "100"
+    nginx.ingress.kubernetes.io/rate-limit-burst: "200"
+spec:
+  tls:
+  - hosts:
+    - api.quantumbeam.io
+    secretName: quantumbeam-api-tls
+  rules:
+  - host: api.quantumbeam.io
+    http:
+      paths:
+      - path: /api(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: quantumbeam-api-active
+            port:
+              number: 80
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: quantumbeam-api-active
+            port:
+              number: 80

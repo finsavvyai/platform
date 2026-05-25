@@ -1,0 +1,624 @@
+# QuantumBeam Blue-Green Deployment Manifests
+# Complete blue-green deployment configuration
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quantumbeam
+  labels:
+    name: quantumbeam
+    environment: production
+    app: quantumbeam
+---
+# Blue Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quantumbeam-blue
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    color: blue
+    version: production
+    deployment-type: blue-green
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: quantumbeam
+      color: blue
+  template:
+    metadata:
+      labels:
+        app: quantumbeam
+        color: blue
+        version: production
+        deployment-type: blue-green
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: quantumbeam
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: quantumbeam
+        image: ghcr.io/quantumbeam/quantumbeam:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DEPLOYMENT_COLOR
+          value: "blue"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: PROMETHEUS_PORT
+          value: "9090"
+        - name: TRACING_ENABLED
+          value: "true"
+        - name: TRACING_SERVICE_NAME
+          value: "quantumbeam-blue"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: redis-url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: jwt-secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: logs
+          mountPath: /var/log/quantumbeam
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 300
+      - key: node.kubernetes.io/unreachable
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 300
+---
+# Green Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quantumbeam-green
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    color: green
+    version: production
+    deployment-type: blue-green
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: quantumbeam
+      color: green
+  template:
+    metadata:
+      labels:
+        app: quantumbeam
+        color: green
+        version: production
+        deployment-type: blue-green
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: quantumbeam
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: quantumbeam
+        image: ghcr.io/quantumbeam/quantumbeam:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: DEPLOYMENT_COLOR
+          value: "green"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: PROMETHEUS_PORT
+          value: "9090"
+        - name: TRACING_ENABLED
+          value: "true"
+        - name: TRACING_SERVICE_NAME
+          value: "quantumbeam-green"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: database-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: redis-url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: jwt-secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: logs
+          mountPath: /var/log/quantumbeam
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: logs
+        emptyDir: {}
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 300
+      - key: node.kubernetes.io/unreachable
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 300
+---
+# Blue Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-blue
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    color: blue
+    service-type: blue-green
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  selector:
+    app: quantumbeam
+    color: blue
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+---
+# Green Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-green
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    color: green
+    service-type: blue-green
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  selector:
+    app: quantumbeam
+    color: green
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+---
+# Main Service (Traffic Router)
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-service
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    service-type: main
+    role: traffic-router
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  selector:
+    app: quantumbeam
+    color: blue  # Default to blue, will be updated by deployment script
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+---
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quantumbeam
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+---
+# RBAC: Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: quantumbeam-role
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+---
+# RBAC: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: quantumbeam-rolebinding
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+subjects:
+- kind: ServiceAccount
+  name: quantumbeam
+  namespace: quantumbeam
+roleRef:
+  kind: Role
+  name: quantumbeam-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: quantumbeam-network-policy
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+spec:
+  podSelector:
+    matchLabels:
+      app: quantumbeam
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app: quantumbeam
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: quantumbeam-pdb
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: quantumbeam
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: quantumbeam-hpa
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-blue  # Will be updated to target active deployment
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: quantumbeam-ingress
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+spec:
+  tls:
+  - hosts:
+    - api.quantumbeam.io
+    secretName: quantumbeam-tls
+  rules:
+  - host: api.quantumbeam.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: quantumbeam-service
+            port:
+              number: 80
+---
+# ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quantumbeam-config
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+data:
+  config.yaml: |
+    environment: production
+    log_level: info
+    prometheus_enabled: true
+    prometheus_port: "9090"
+    tracing_enabled: true
+    tracing_service_name: quantumbeam
+    rate_limit_enabled: true
+    rate_limit_requests: "1000"
+    rate_limit_window: "1m"
+    cors_enabled: true
+    cors_allowed_origins: "https://quantumbeam.io,https://app.quantumbeam.io"
+    cors_allowed_methods: "GET,POST,PUT,DELETE,OPTIONS"
+    cors_allowed_headers: "Content-Type,Authorization"
+    security_headers_enabled: true
+    request_timeout: "30s"
+    shutdown_timeout: "30s"
+    health_check_interval: "30s"
+    readiness_check_interval: "5s"

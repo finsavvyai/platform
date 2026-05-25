@@ -1,0 +1,273 @@
+name: Security Scan
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '**.go'
+      - '**/requirements.txt'
+      - 'Dockerfile*'
+      - 'docker-compose*.yml'
+
+jobs:
+  code-security-scan:
+    name: Code Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Run Gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: '-fmt sarif -out gosec.sarif ./...'
+
+    - name: Upload Gosec results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: gosec.sarif
+
+    - name: Run Semgrep
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: >-
+          p/security-audit
+          p/owasp-top-ten
+          p/secrets
+          p/golang
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        languages: go
+        queries: security-extended,security-and-quality
+
+  dependency-security-scan:
+    name: Dependency Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Run Go vulnerability check
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+
+    - name: Run Snyk to check for vulnerabilities
+      uses: snyk/actions/golang@master
+      continue-on-error: true
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Run Python vulnerability check
+      run: |
+        pip install safety
+        safety check --json --output safety-report.json || true
+        find . -name 'requirements.txt' -exec safety check -r {} \; || true
+
+    - name: Upload safety report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: safety-report
+        path: safety-report.json
+        retention-days: 30
+
+  container-security-scan:
+    name: Container Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      matrix:
+        service: [api, quantum, ai-ml]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build ${{ matrix.service }} image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ${{ matrix.service == 'api' && 'Dockerfile.production' || format('services/{0}/Dockerfile.production', matrix.service) }}
+        load: true
+        tags: quantumbeam-${{ matrix.service }}:security-scan
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: quantumbeam-${{ matrix.service }}:security-scan
+        format: 'sarif'
+        output: 'trivy-results-${{ matrix.service }}.sarif'
+        exit-code: '1'
+        ignore-unfixed: true
+        vuln-type: 'os,library'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: trivy-results-${{ matrix.service }}.sarif
+
+    - name: Run Grype vulnerability scanner
+      uses: anchore/scan-action@v3
+      with:
+        image: quantumbeam-${{ matrix.service }}:security-scan
+        format: sarif
+        output: grype-results-${{ matrix.service }}.sarif
+        fail-build: false
+
+    - name: Upload Grype scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: grype-results-${{ matrix.service }}.sarif
+
+  secrets-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run TruffleHog OSS
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --json
+
+    - name: Run gitleaks
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+    - name: Scan for secrets in commits
+      uses: divyatanwar/secret-scanner-action@v0.0.1
+      with:
+        path: './'
+
+  infrastructure-security-scan:
+    name: Infrastructure Security Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Checkov on Terraform files
+      if: hashFiles('**/*.tf') != ''
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: deployment/
+        framework: terraform
+        output_format: sarif
+        output_file_path: reports/checkov-results.sarif
+
+    - name: Run Checkov on Kubernetes manifests
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: deployment/kubernetes/
+        framework: kubernetes
+        output_format: sarif
+        output_file_path: reports/checkov-k8s-results.sarif
+
+    - name: Run tfsec on Terraform files
+      if: hashFiles('**/*.tf') != ''
+      uses: aquasecurity/tfsec-action@master
+      with:
+        soft_fail: true
+        output_format: sarif
+        output_file: tfsec-results.sarif
+
+    - name: Run kube-score on Kubernetes manifests
+      run: |
+        docker run --rm -v $(pwd)/deployment/kubernetes:/workdir zegl/kube-score score \
+          --output-format ci \
+          --exit-one-on-warning /workdir/*.yaml > kube-score-results.txt || true
+
+    - name: Upload infrastructure scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: infrastructure-security-reports
+        path: |
+          reports/
+          kube-score-results.txt
+        retention-days: 30
+
+  security-report:
+    name: Security Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [code-security-scan, dependency-security-scan, container-security-scan, secrets-scan, infrastructure-security-scan]
+    if: always()
+
+    steps:
+    - name: Create security summary
+      run: |
+        echo "# QuantumBeam Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Code Security Analysis: ${{ needs.code-security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Dependency Security Analysis: ${{ needs.dependency-security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Container Security Analysis: ${{ needs.container-security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Secrets Detection: ${{ needs.secrets-scan.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Infrastructure Security Analysis: ${{ needs.infrastructure-security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "All security scans completed. Check individual job outputs for detailed findings." >> $GITHUB_STEP_SUMMARY
+
+    - name: Notify security team on failure
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        channel: '#security'
+        webhook_url: ${{ secrets.SECURITY_SLACK_WEBHOOK }}
+        message: |
+          🚨 Security scan failed in QuantumBeam repository!
+          Repository: ${{ github.repository }}
+          Commit: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+          Please review the security scan results and address any critical issues.

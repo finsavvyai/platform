@@ -73,4 +73,42 @@ describe("subjectFromClaims", () => {
     const s = await r.resolveByToken({ claims: baseClaims(), raw: "raw" });
     expect(s.kind).toBe("basic");
   });
+
+  it("subjectFromClaims with only orgId stays basic (needs tenantIds too)", () => {
+    const s = subjectFromClaims(baseClaims({ orgId: "o1" }));
+    expect(s.kind).toBe("basic");
+  });
+
+  it("subjectFromClaims with only tenantIds stays basic (needs orgId too)", () => {
+    const s = subjectFromClaims(baseClaims({ tenantIds: ["t1"] }));
+    expect(s.kind).toBe("basic");
+  });
+});
+
+describe("JtiRevocationStore.size + delete-on-expiry", () => {
+  it("InMemoryJtiStore.size reports active entries", async () => {
+    const store = new InMemoryJtiStore();
+    expect(store.size()).toBe(0);
+    await store.revoke("a", 60);
+    await store.revoke("b", 60);
+    expect(store.size()).toBe(2);
+  });
+
+  it("InMemoryJtiStore drops the entry after observing it as expired", async () => {
+    const store = new InMemoryJtiStore();
+    await store.revoke("x", -1);
+    expect(await store.isRevoked("x")).toBe(false);
+    expect(store.size()).toBe(0);
+  });
+});
+
+describe("InMemorySessionStore.size + expiry cleanup", () => {
+  it("size reports live entries and drops expired ones on get", async () => {
+    const store = new InMemorySessionStore<number>();
+    await store.set("k1", 1, 60);
+    await store.set("k2", 2, -1);
+    expect(store.size()).toBe(2);
+    expect(await store.get("k2")).toBeUndefined();
+    expect(store.size()).toBe(1);
+  });
 });

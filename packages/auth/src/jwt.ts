@@ -53,10 +53,20 @@ export const verifyToken = async (
   token: string,
   options: VerifyOptions,
 ): Promise<VerifyResult> => {
+  // Defense-in-depth: refuse to verify without an explicit issuer + audience.
+  // Misconfiguration should fail closed, not silently skip the check.
+  if (!options.issuer || !options.audience) {
+    return { ok: false, error: "invalid_token" };
+  }
+  if (typeof token !== "string" || token.length === 0) {
+    return { ok: false, error: "invalid_token" };
+  }
   try {
     const { payload } = await jwtVerify(token, key.key, {
       issuer: options.issuer,
       audience: options.audience,
+      // Pin to the exact algorithm of this key — blocks alg=none and
+      // alg-confusion attacks where an attacker swaps RS256<->HS256.
       algorithms: [key.alg],
     });
     if (options.revocations && payload.jti) {

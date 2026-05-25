@@ -1,0 +1,381 @@
+# Production Docker Compose Configuration for QuantumBeam
+version: '3.8'
+
+services:
+  # PostgreSQL Database with production optimizations
+  postgres:
+    image: postgres:15-alpine
+    container_name: quantumbeam-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quantumbeam}
+      POSTGRES_USER: ${POSTGRES_USER:-quantumbeam}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+      - ./config/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-quantumbeam} -d ${POSTGRES_DB:-quantumbeam}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    networks:
+      - quantumbeam-network
+
+  # Redis Cache with production configuration
+  redis:
+    image: redis:7-alpine
+    container_name: quantumbeam-redis-prod
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data_prod:/data
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    networks:
+      - quantumbeam-network
+
+  # Quantum Fraud Detection Service
+  quantum:
+    build:
+      context: ./services/quantum
+      dockerfile: Dockerfile.production
+    container_name: quantumbeam-quantum-prod
+    restart: unless-stopped
+    ports:
+      - "${QUANTUM_PORT:-8002}:8001"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - POSTGRES_URL=postgres://${POSTGRES_USER:-quantumbeam}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-quantumbeam}?sslmode=require
+      - QUANTUM_SERVICE_ENV=production
+      - LOG_LEVEL=info
+      - IBM_QUANTUM_TOKEN=${IBM_QUANTUM_TOKEN}
+      - AWS_BRAKET_ACCESS_KEY=${AWS_BRAKET_ACCESS_KEY}
+      - AWS_BRAKET_SECRET_KEY=${AWS_BRAKET_SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - quantum_models:/app/models
+      - quantum_logs:/app/logs
+      - ./config/quantum:/app/config:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    networks:
+      - quantumbeam-network
+
+  # AI/ML Service
+  ai-ml:
+    build:
+      context: ./services/ai-ml
+      dockerfile: Dockerfile.production
+    container_name: quantumbeam-ai-ml-prod
+    restart: unless-stopped
+    ports:
+      - "${AI_ML_PORT:-8001}:8001"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - AI_SERVICE_ENV=production
+      - LOG_LEVEL=info
+      - HF_HOME=/app/models
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ai_models:/app/models
+      - ai_cache:/app/cache
+      - ai_logs:/app/logs
+      - ./config/ai-ml:/app/config:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 45s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    networks:
+      - quantumbeam-network
+
+  # Main API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    container_name: quantumbeam-api-prod
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8080}:8080"
+    environment:
+      - DATABASE_URL=postgres://${POSTGRES_USER:-quantumbeam}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-quantumbeam}?sslmode=require
+      - REDIS_URL=redis://redis:6379
+      - QUANTUM_SERVICE_URL=http://quantum:8001
+      - AI_SERVICE_URL=http://ai-ml:8001
+      - JWT_SECRET=${JWT_SECRET}
+      - LEMONSQUEEZY_API_KEY=${LEMONSQUEEZY_API_KEY}
+      - GIN_MODE=release
+      - LOG_LEVEL=info
+      - ENVIRONMENT=production
+      - PROMETHEUS_URL=http://prometheus:9090
+      - ALERT_WEBHOOK_URL=${ALERT_WEBHOOK_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      quantum:
+        condition: service_healthy
+      ai-ml:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/home/appuser/quantumbeam-api", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    networks:
+      - quantumbeam-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: quantumbeam-nginx-prod
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    networks:
+      - quantumbeam-network
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: quantumbeam-prometheus-prod
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    networks:
+      - quantumbeam-network
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: quantumbeam-grafana-prod
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    networks:
+      - quantumbeam-network
+
+  # AlertManager
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: quantumbeam-alertmanager-prod
+    restart: unless-stopped
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    networks:
+      - quantumbeam-network
+
+# Network configuration
+networks:
+  quantumbeam-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Production volumes with backup considerations
+volumes:
+  postgres_data_prod:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/quantumbeam/postgres
+  redis_data_prod:
+    driver: local
+  quantum_models:
+    driver: local
+  quantum_logs:
+    driver: local
+  ai_models:
+    driver: local
+  ai_cache:
+    driver: local
+  ai_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+  nginx_logs:
+    driver: local

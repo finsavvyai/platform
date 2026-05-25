@@ -1,0 +1,242 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quantumbeam-config
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: config
+data:
+  # API Configuration
+  API_ENVIRONMENT: "production"
+  API_LOG_LEVEL: "info"
+  API_METRICS_PORT: "8080"
+  API_HEALTH_CHECK_INTERVAL: "30s"
+
+  # Database Configuration
+  POSTGRES_HOST: "postgres-service"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "quantumbeam"
+  POSTGRES_SSLMODE: "require"
+  POSTGRES_MAX_CONNECTIONS: "20"
+  POSTGRES_MAX_IDLE_CONNECTIONS: "10"
+  POSTGRES_CONNECTION_MAX_LIFETIME: "1h"
+
+  # Redis Configuration
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_POOL_SIZE: "10"
+  REDIS_MIN_IDLE_CONNECTIONS: "3"
+
+  # Service Configuration
+  QUANTUM_SERVICE_HOST: "quantum-service"
+  QUANTUM_SERVICE_PORT: "8001"
+  AI_SERVICE_HOST: "ai-ml-service"
+  AI_SERVICE_PORT: "8001"
+
+  # Monitoring Configuration
+  PROMETHEUS_HOST: "prometheus-service"
+  PROMETHEUS_PORT: "9090"
+  GRAFANA_HOST: "grafana-service"
+  GRAFANA_PORT: "3000"
+
+  # Security Configuration
+  JWT_EXPIRY: "24h"
+  REFRESH_TOKEN_EXPIRY: "168h"
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "100"
+  RATE_LIMIT_BURST: "20"
+
+  # Performance Configuration
+  GIN_MODE: "release"
+  READ_TIMEOUT: "30s"
+  WRITE_TIMEOUT: "30s"
+  IDLE_TIMEOUT: "60s"
+  MAX_HEADER_BYTES: "1048576"
+
+  # Quantum Configuration
+  QUANTUM_BACKEND_TIMEOUT: "30s"
+  QUANTUM_MAX_RETRIES: "3"
+  QUANTUM_CIRCUIT_BREAKER_THRESHOLD: "5"
+  QUANTUM_ADVANTAGE_THRESHOLD: "1.1"
+
+  # AI/ML Configuration
+  AI_MODEL_TIMEOUT: "60s"
+  AI_MAX_CONCURRENT_REQUESTS: "10"
+  AI_CACHE_TTL: "3600s"
+  AI_FALLBACK_ENABLED: "true"
+
+---
+# API Server Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-server-config
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    component: config
+data:
+  config.yaml: |
+    server:
+      port: 8080
+      host: "0.0.0.0"
+      read_timeout: 30s
+      write_timeout: 30s
+      idle_timeout: 60s
+
+    database:
+      host: "postgres-service"
+      port: 5432
+      name: "quantumbeam"
+      user: "quantumbeam"
+      ssl_mode: "require"
+      max_connections: 20
+      max_idle_connections: 10
+      connection_max_lifetime: "1h"
+
+    redis:
+      host: "redis-service"
+      port: 6379
+      db: 0
+      pool_size: 10
+      min_idle_connections: 3
+
+    auth:
+      jwt_expiry: "24h"
+      refresh_token_expiry: "168h"
+      rate_limit_rpm: 100
+      rate_limit_burst: 20
+
+    services:
+      quantum:
+        host: "quantum-service"
+        port: 8001
+        timeout: "30s"
+        max_retries: 3
+        circuit_breaker_threshold: 5
+      ai_ml:
+        host: "ai-ml-service"
+        port: 8001
+        timeout: "60s"
+        max_concurrent_requests: 10
+        cache_ttl: "3600s"
+
+    monitoring:
+      prometheus_url: "http://prometheus-service:9090"
+      metrics_port: 8080
+      health_check_interval: "30s"
+
+    logging:
+      level: "info"
+      format: "json"
+      enable_audit_log: true
+      enable_correlation_ids: true
+
+---
+# Quantum Service Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quantum-service-config
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-quantum
+    component: config
+data:
+  config.yaml: |
+    service:
+      port: 8001
+      host: "0.0.0.0"
+      timeout: "30s"
+
+    quantum:
+      backends:
+        - name: "ibm_quantum"
+          provider: "ibm"
+          endpoint: "https://quantum-computing.ibm.com"
+          priority: 1
+          max_qubits: 27
+          availability_threshold: 0.95
+        - name: "aws_braket"
+          provider: "aws"
+          endpoint: "https://braket.aws"
+          priority: 2
+          max_qubits: 32
+          availability_threshold: 0.90
+
+      algorithms:
+        vqc:
+          qubits: 8
+          depth: 10
+          shots: 1000
+          optimization_method: "adam"
+          learning_rate: 0.01
+        qaoa:
+          qubits: 16
+          depth: 5
+          shots: 5000
+          optimization_method: "cobyla"
+
+      classical_fallback:
+        enabled: true
+        models:
+          - "random_forest"
+          - "gradient_boosting"
+          - "neural_network"
+
+    performance:
+      circuit_optimization: true
+      noise_mitigation: true
+      error_correction: false
+      parallel_execution: true
+
+    monitoring:
+      metrics_enabled: true
+      tracing_enabled: true
+      log_level: "info"
+
+---
+# AI/ML Service Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-ml-service-config
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-ai-ml
+    component: config
+data:
+  config.yaml: |
+    service:
+      port: 8001
+      host: "0.0.0.0"
+      timeout: "60s"
+
+    models:
+      explanation:
+        provider: "openai"
+        model: "gpt-4"
+        max_tokens: 1000
+        temperature: 0.7
+      pattern_recognition:
+        provider: "huggingface"
+        model: "microsoft/DialoGPT-medium"
+        max_length: 512
+      fallback_providers:
+        - "anthropic"
+        - "cohere"
+
+    cache:
+      enabled: true
+      ttl: 3600
+      max_size: 1000
+
+    performance:
+      max_concurrent_requests: 10
+      request_timeout: 60
+      batch_size: 32
+
+    monitoring:
+      metrics_enabled: true
+      log_level: "info"

@@ -1,0 +1,32 @@
+{
+  "name": "finsavvy-ai-gateway-workers-logs",
+  "destination_conf": "r2://finsavvy-audit-${ENV}/workers-logs/{DATE}?account-id=${CF_ACCOUNT_ID}&access-key-id=${R2_ACCESS_KEY_ID}&secret-access-key=${R2_SECRET_ACCESS_KEY}",
+  "dataset": "workers_trace_events",
+  "enabled": true,
+  "frequency": "high",
+  "kind": "",
+  "output_options": {
+    "field_names": [
+      "EventTimestampMs",
+      "Outcome",
+      "ScriptName",
+      "ScriptVersion",
+      "RequestHeaders",
+      "ResponseHeaders",
+      "Logs",
+      "Exceptions",
+      "DispatchNamespace",
+      "Entrypoint",
+      "EventType",
+      "CPUTimeMs",
+      "WallTimeMs"
+    ],
+    "output_type": "ndjson",
+    "timestamp_format": "rfc3339",
+    "batch_prefix": "",
+    "batch_suffix": ""
+  },
+  "filter": "{\"where\":{\"and\":[{\"key\":\"ScriptName\",\"operator\":\"contains\",\"value\":\"finsavvy-ai-gateway\"}]}}",
+  "_comment_env_substitution": "Replace ${ENV} with staging|production, ${CF_ACCOUNT_ID}/${R2_ACCESS_KEY_ID}/${R2_SECRET_ACCESS_KEY} from your provisioning secrets before POSTing. Cloudflare does NOT expand these — substitute via envsubst or jq before submission.",
+  "_comment_create": "curl -X POST https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/logpush/jobs -H 'Authorization: Bearer $CF_API_TOKEN' -H 'Content-Type: application/json' --data @logpush.json"
+}

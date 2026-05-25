@@ -1,0 +1,320 @@
+# API Server Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantumbeam-api-service
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    component: api-server
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: quantumbeam-api
+    component: api-server
+
+---
+
+# Quantum Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: quantum-service
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-quantum
+    component: quantum-service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: http
+  selector:
+    app: quantumbeam-quantum
+    component: quantum-service
+
+---
+
+# AI/ML Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-ml-service
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-ai-ml
+    component: ai-ml-service
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: http
+  selector:
+    app: quantumbeam-ai-ml
+    component: ai-ml-service
+
+---
+
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-postgres
+    component: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+  selector:
+    app: quantumbeam-postgres
+    component: database
+
+---
+
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-redis
+    component: cache
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  selector:
+    app: quantumbeam-redis
+    component: cache
+
+---
+
+# Prometheus Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-prometheus
+    component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: http
+  selector:
+    app: quantumbeam-prometheus
+    component: monitoring
+
+---
+
+# Grafana Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-grafana
+    component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: quantumbeam-grafana
+    component: monitoring
+
+---
+
+# AlertManager Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-service
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-alertmanager
+    component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9093
+    targetPort: 9093
+    protocol: TCP
+    name: http
+  selector:
+    app: quantumbeam-alertmanager
+    component: monitoring
+
+---
+
+# Horizontal Pod Autoscaler for API Server
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: quantumbeam-api-hpa
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    component: hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-api-deployment
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+
+---
+
+# Horizontal Pod Autoscaler for Quantum Service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: quantumbeam-quantum-hpa
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-quantum
+    component: hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-quantum-deployment
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+
+---
+
+# Horizontal Pod Autoscaler for AI/ML Service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: quantumbeam-ai-ml-hpa
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-ai-ml
+    component: hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-ai-ml-deployment
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 90
+      policies:
+      - type: Percent
+        value: 75
+        periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 60

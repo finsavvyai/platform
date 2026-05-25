@@ -1,0 +1,261 @@
+================================================================================
+  QuantumBeam - Wrangler Quick Commands
+================================================================================
+
+📍 Your API: https://quantumbeam-api.broad-dew-49ad.workers.dev
+
+================================================================================
+  DEPLOYMENT
+================================================================================
+
+# Deploy worker
+wrangler deploy
+
+# Test before deploying
+wrangler deploy --dry-run
+
+# Run locally
+wrangler dev
+
+# Run with remote resources
+wrangler dev --remote
+
+================================================================================
+  DATABASE (D1)
+================================================================================
+
+# Query database
+wrangler d1 execute quantumbeam-production --remote \
+  --command="SELECT * FROM fraud_results LIMIT 10"
+
+# Run SQL file
+wrangler d1 execute quantumbeam-production --remote \
+  --file=migration.sql
+
+# List databases
+wrangler d1 list
+
+# Database info
+wrangler d1 info quantumbeam-production
+
+# Common queries
+wrangler d1 execute quantumbeam-production --remote \
+  --command="SELECT COUNT(*) FROM fraud_results"
+
+wrangler d1 execute quantumbeam-production --remote \
+  --command="SELECT * FROM fraud_results WHERE risk_level='high'"
+
+================================================================================
+  CACHE (KV)
+================================================================================
+
+NAMESPACE_ID=33e0206e23f14c798f21ed7a803e0267
+
+# Put key-value
+wrangler kv:key put --namespace-id=$NAMESPACE_ID "key" "value"
+
+# Get value
+wrangler kv:key get --namespace-id=$NAMESPACE_ID "key"
+
+# List all keys
+wrangler kv:key list --namespace-id=$NAMESPACE_ID
+
+# Delete key
+wrangler kv:key delete --namespace-id=$NAMESPACE_ID "key"
+
+# Bulk import from JSON
+wrangler kv:bulk put --namespace-id=$NAMESPACE_ID data.json
+
+================================================================================
+  STORAGE (R2)
+================================================================================
+
+# List buckets
+wrangler r2 bucket list
+
+# Upload file
+wrangler r2 object put quantumbeam-storage/path/file.txt \
+  --file=local-file.txt
+
+# Download file
+wrangler r2 object get quantumbeam-storage/path/file.txt \
+  --file=output.txt
+
+# List objects
+wrangler r2 object list quantumbeam-storage
+
+# Delete object
+wrangler r2 object delete quantumbeam-storage/path/file.txt
+
+================================================================================
+  SECRETS
+================================================================================
+
+# Set secret
+echo "secret-value" | wrangler secret put SECRET_NAME
+
+# Generate and set JWT secret
+echo "$(openssl rand -hex 32)" | wrangler secret put JWT_SECRET
+
+# List secrets (names only, values are hidden)
+wrangler secret list
+
+# Delete secret
+wrangler secret delete SECRET_NAME
+
+================================================================================
+  LOGS & MONITORING
+================================================================================
+
+# Real-time logs
+wrangler tail
+
+# Filtered by status
+wrangler tail --status=error
+wrangler tail --status=ok
+
+# Pretty format
+wrangler tail --format=pretty
+
+# JSON format
+wrangler tail --format=json
+
+# Sample rate (10%)
+wrangler tail --sampling-rate=0.1
+
+================================================================================
+  DEPLOYMENTS
+================================================================================
+
+# List deployments
+wrangler deployments list
+
+# View specific deployment
+wrangler deployments view <VERSION_ID>
+
+# Rollback to previous version
+wrangler rollback
+
+# Rollback to specific version
+wrangler rollback <VERSION_ID>
+
+================================================================================
+  TESTING
+================================================================================
+
+# Health check
+curl https://quantumbeam-api.broad-dew-49ad.workers.dev/health
+
+# Detailed health
+curl https://quantumbeam-api.broad-dew-49ad.workers.dev/health/detailed
+
+# Fraud detection test
+curl -X POST https://quantumbeam-api.broad-dew-49ad.workers.dev/api/v1/fraud/analyze \
+  -H "Authorization: Bearer test" \
+  -H "Content-Type: application/json" \
+  -d '{"transaction_id":"test_123","amount":1500,"user_id":"user1"}'
+
+# Load test (100 requests)
+for i in {1..100}; do
+  curl -s https://quantumbeam-api.broad-dew-49ad.workers.dev/health > /dev/null &
+done
+wait
+
+================================================================================
+  COMMON WORKFLOWS
+================================================================================
+
+# Update worker code
+nano cloudflare/worker.js
+wrangler deploy
+
+# Add database migration
+cat > migration.sql << 'EOF'
+ALTER TABLE fraud_results ADD COLUMN new_field TEXT;
+EOF
+wrangler d1 execute quantumbeam-production --remote --file=migration.sql
+
+# Update configuration
+nano cloudflare/wrangler.toml
+wrangler deploy
+
+# Debug issues
+wrangler tail --format=pretty
+wrangler deployments list
+
+# Backup database
+wrangler d1 execute quantumbeam-production --remote \
+  --command="SELECT * FROM fraud_results" > backup.json
+
+================================================================================
+  TROUBLESHOOTING
+================================================================================
+
+# Worker not responding
+wrangler deployments list
+wrangler tail
+wrangler deploy
+
+# Database connection error
+wrangler d1 list
+wrangler d1 execute quantumbeam-production --remote --command="SELECT 1"
+
+# Cache not working
+wrangler kv:key put --namespace-id=33e0206e23f14c798f21ed7a803e0267 test test
+wrangler kv:key get --namespace-id=33e0206e23f14c798f21ed7a803e0267 test
+
+# Check configuration
+cat cloudflare/wrangler.toml
+wrangler deploy --dry-run
+
+================================================================================
+  USEFUL ALIASES (add to ~/.bashrc or ~/.zshrc)
+================================================================================
+
+alias wr='wrangler'
+alias wrd='wrangler deploy'
+alias wrt='wrangler tail'
+alias wrl='wrangler tail --format=pretty'
+alias wdev='wrangler dev'
+
+alias qb-deploy='cd cloudflare && wrangler deploy'
+alias qb-logs='wrangler tail --format=pretty'
+alias qb-health='curl -s https://quantumbeam-api.broad-dew-49ad.workers.dev/health/detailed | python3 -m json.tool'
+alias qb-db='wrangler d1 execute quantumbeam-production --remote --command'
+
+================================================================================
+  CLOUDFLARE DASHBOARD
+================================================================================
+
+Workers:  https://dash.cloudflare.com > Workers & Pages > quantumbeam-api
+D1:       https://dash.cloudflare.com > D1 > quantumbeam-production
+KV:       https://dash.cloudflare.com > KV > QUANTUMBEAM_CACHE
+R2:       https://dash.cloudflare.com > R2 > quantumbeam-storage
+
+================================================================================
+  DOCUMENTATION
+================================================================================
+
+Local Docs:
+  - WRANGLER_DEPLOYMENT_VERIFIED.md    Complete verification report
+  - CLOUDFLARE_COMPLETE_SETUP.md       Full setup guide
+  - DEPLOY_CLOUDFLARE.md                Deployment guide
+  - QUICK_REFERENCE.md                  General commands
+
+Online Docs:
+  - Wrangler: https://developers.cloudflare.com/workers/wrangler/
+  - D1:       https://developers.cloudflare.com/d1/
+  - KV:       https://developers.cloudflare.com/kv/
+  - R2:       https://developers.cloudflare.com/r2/
+
+================================================================================
+  SUPPORT
+================================================================================
+
+Account:  info@finsavvyai.com
+Project:  quantumbeam-api
+Region:   WEUR (Western Europe)
+
+Status:   ✅ All systems operational
+
+================================================================================

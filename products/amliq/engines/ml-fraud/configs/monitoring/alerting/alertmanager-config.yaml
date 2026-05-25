@@ -1,0 +1,386 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  config.yml: |
+    global:
+      # SMTP configuration for email alerts
+      smtp_smarthost: 'smtp.quantumbeam.io:587'
+      smtp_from: 'alerts@quantumbeam.io'
+      smtp_hello: 'quantumbeam.io'
+      smtp_auth_username: 'alerts@quantumbeam.io'
+      smtp_auth_password: '${SMTP_PASSWORD}'
+
+      # Slack configuration
+      slack_api_url: '${SLACK_WEBHOOK_CRITICAL}'
+
+    # Template files
+    templates:
+      - '/etc/alertmanager/templates/*.tmpl'
+
+    # Alert routing configuration
+    route:
+      group_by: ['alertname', 'cluster', 'service', 'severity']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      receiver: 'default'
+      routes:
+        # Critical alerts - immediate PagerDuty escalation
+        - match:
+            severity: critical
+          group_wait: 5s
+          group_interval: 5s
+          repeat_interval: 5m
+          receiver: 'pagerduty-critical'
+          routes:
+            - match:
+                service: database
+              receiver: 'pagerduty-database-critical'
+            - match:
+                service: application
+              receiver: 'pagerduty-application-critical'
+
+        # High severity alerts - PagerDuty and Slack
+        - match:
+            severity: high
+          group_wait: 30s
+          group_interval: 5m
+          repeat_interval: 15m
+          receiver: 'pagerduty-high'
+          routes:
+            - match:
+                service: database
+              receiver: 'slack-database-high'
+            - match:
+                service: application
+              receiver: 'slack-application-high'
+
+        # Medium severity alerts - Slack only
+        - match:
+            severity: medium
+          group_wait: 2m
+          group_interval: 10m
+          repeat_interval: 1h
+          receiver: 'slack-medium'
+          routes:
+            - match:
+                service: database
+              receiver: 'slack-database-medium'
+            - match:
+                service: application
+              receiver: 'slack-application-medium'
+
+        # Low severity alerts - Email only
+        - match:
+            severity: low
+          group_wait: 5m
+          group_interval: 30m
+          repeat_interval: 4h
+          receiver: 'email-low'
+
+        # Business hours routing
+        - match:
+            severity: info
+          active_time_intervals:
+            - business-hours
+          receiver: 'slack-info'
+
+        # Maintenance mode suppression
+        - match:
+            alertname: 'MaintenanceWindow'
+          receiver: 'null'
+
+        # Known issues suppression
+        - match:
+            alertname: 'KnownIssue'
+          receiver: 'null'
+
+    # Inhibit rules to suppress less critical alerts
+    inhibit_rules:
+      # Inhibit info alerts if critical alert is firing
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'info'
+        equal: ['alertname', 'cluster', 'service']
+
+      # Inhibit warning alerts if critical alert is firing
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'cluster', 'service']
+
+      # Inhibit pod alerts if node is down
+      - source_match:
+          alertname: 'NodeDown'
+        target_match_re:
+          alertname: '(PodCrashLooping|PodNotReady)'
+        equal: ['node']
+
+    # Time intervals for business hours
+    time_intervals:
+      - name: business-hours
+        time_intervals:
+          - times:
+              - start_time: '09:00'
+                end_time: '17:00'
+            weekdays: ['monday:friday']
+            location: 'UTC'
+
+    # Receivers configuration
+    receivers:
+      - name: 'default'
+        slack_configs:
+          - api_url: '${SLACK_CRITICAL_WEBHOOK}'
+            channel: '#alerts-default'
+            title: 'QuantumBeam Alert'
+            text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+            send_resolved: true
+            color: 'danger'
+
+      - name: 'null'
+        # Black hole receiver for suppressed alerts
+
+      # PagerDuty critical receivers
+      - name: 'pagerduty-critical'
+        pagerduty_configs:
+          - service_key: '${PAGERDUTY_INTEGRATION_KEY}'
+            description: '{{ .CommonAnnotations.summary }}'
+            severity: 'critical'
+            class: '{{ .CommonLabels.service }}'
+            component: '{{ .CommonLabels.component }}'
+            group: '{{ .GroupLabels.alertname }}'
+            details:
+              cluster: '{{ .CommonLabels.cluster }}'
+              namespace: '{{ .CommonLabels.namespace }}'
+              runbook: '{{ .CommonAnnotations.runbook_url }}'
+        slack_configs:
+          - api_url: '${SLACK_CRITICAL_WEBHOOK}'
+            channel: '#alerts-critical'
+            title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary*: {{ .CommonAnnotations.summary }}
+              *Description*: {{ .CommonAnnotations.description }}
+              *Cluster*: {{ .CommonLabels.cluster }}
+              *Service*: {{ .CommonLabels.service }}
+              *Runbook*: {{ .CommonAnnotations.runbook_url }}
+              *Impact*: {{ .CommonAnnotations.impact }}
+            send_resolved: true
+            color: 'danger'
+
+      - name: 'pagerduty-database-critical'
+        pagerduty_configs:
+          - service_key: '${PAGERDUTY_DB_INTEGRATION_KEY}'
+            description: 'Database Critical Alert: {{ .CommonAnnotations.summary }}'
+            severity: 'critical'
+            class: 'database'
+            component: 'postgresql'
+        slack_configs:
+          - api_url: '${SLACK_CRITICAL_WEBHOOK}'
+            channel: '#alerts-database'
+            title: '🚨 DATABASE CRITICAL: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary*: {{ .CommonAnnotations.summary }}
+              *Database*: {{ .CommonLabels.database }}
+              *Instance*: {{ .CommonLabels.instance }}
+              *Query*: {{ .CommonAnnotations.query }}
+              *Impact*: Database service impact
+            send_resolved: true
+            color: 'danger'
+
+      - name: 'pagerduty-application-critical'
+        pagerduty_configs:
+          - service_key: '${PAGERDUTY_APP_INTEGRATION_KEY}'
+            description: 'Application Critical Alert: {{ .CommonAnnotations.summary }}'
+            severity: 'critical'
+            class: 'application'
+        slack_configs:
+          - api_url: '${SLACK_CRITICAL_WEBHOOK}'
+            channel: '#alerts-application'
+            title: '🚨 APP CRITICAL: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary*: {{ .CommonAnnotations.summary }}
+              *Application*: {{ .CommonLabels.application }}
+              *Version*: {{ .CommonLabels.version }}
+              *Environment*: {{ .CommonLabels.environment }}
+              *Impact*: {{ .CommonAnnotations.impact }}
+            send_resolved: true
+            color: 'danger'
+
+      - name: 'pagerduty-high'
+        pagerduty_configs:
+          - service_key: '${PAGERDUTY_HIGH_INTEGRATION_KEY}'
+            description: '{{ .CommonAnnotations.summary }}'
+            severity: 'high'
+            class: '{{ .CommonLabels.service }}'
+        slack_configs:
+          - api_url: '${SLACK_HIGH_WEBHOOK}'
+            channel: '#alerts-high'
+            title: '⚠️ HIGH: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary*: {{ .CommonAnnotations.summary }}
+              *Description*: {{ .CommonAnnotations.description }}
+              *Service*: {{ .CommonLabels.service }}
+              *Runbook*: {{ .CommonAnnotations.runbook_url }}
+            send_resolved: true
+            color: 'warning'
+
+      # Slack receivers
+      - name: 'slack-database-high'
+        slack_configs:
+          - api_url: '${SLACK_HIGH_WEBHOOK}'
+            channel: '#alerts-database'
+            title: '⚠️ DATABASE HIGH: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary*: {{ .CommonAnnotations.summary }}
+              *Database*: {{ .CommonLabels.database }}
+              *Instance*: {{ .CommonLabels.instance }}
+              *Metric*: {{ .CommonAnnotations.metric }}
+              *Threshold*: {{ .CommonAnnotations.threshold }}
+            send_resolved: true
+            color: 'warning'
+
+      - name: 'slack-database-medium'
+        slack_configs:
+          - api_url: '${SLACK_MEDIUM_WEBHOOK}'
+            channel: '#alerts-database'
+            title: 'ℹ️ DATABASE: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary*: {{ .CommonAnnotations.summary }}
+              *Database*: {{ .CommonLabels.database }}
+              *Metric*: {{ .CommonAnnotations.metric }}
+              *Value*: {{ .CommonAnnotations.value }}
+            send_resolved: true
+            color: 'good'
+
+      - name: 'slack-application-high'
+        slack_configs:
+          - api_url: '${SLACK_HIGH_WEBHOOK}'
+            channel: '#alerts-application'
+            title: '⚠️ APP HIGH: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary*: {{ .CommonAnnotations.summary }}
+              *Application*: {{ .CommonLabels.application }}
+              *Version*: {{ .CommonLabels.version }}
+              *Endpoint*: {{ .CommonLabels.endpoint }}
+              *Error Rate*: {{ .CommonAnnotations.error_rate }}
+            send_resolved: true
+            color: 'warning'
+
+      - name: 'slack-application-medium'
+        slack_configs:
+          - api_url: '${SLACK_MEDIUM_WEBHOOK}'
+            channel: '#alerts-application'
+            title: 'ℹ️ APP: {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary*: {{ .CommonAnnotations.summary }}
+              *Application*: {{ .CommonLabels.application }}
+              *Metric*: {{ .CommonAnnotations.metric }}
+              *Value*: {{ .CommonAnnotations.value }}
+            send_resolved: true
+            color: 'good'
+
+      - name: 'slack-medium'
+        slack_configs:
+          - api_url: '${SLACK_MEDIUM_WEBHOOK}'
+            channel: '#alerts-medium'
+            title: 'ℹ️ {{ .GroupLabels.alertname }}'
+            text: |
+              *Summary*: {{ .CommonAnnotations.summary }}
+              *Description*: {{ .CommonAnnotations.description }}
+              *Service*: {{ .CommonLabels.service }}
+            send_resolved: true
+            color: 'good'
+
+      - name: 'slack-info'
+        slack_configs:
+          - api_url: '${SLACK_LOW_WEBHOOK}'
+            channel: '#alerts-info'
+            title: 'ℹ️ INFO: {{ .GroupLabels.alertname }}'
+            text: '{{ .CommonAnnotations.summary }}'
+            send_resolved: true
+            color: 'good'
+
+      - name: 'email-low'
+        email_configs:
+          - to: 'team@quantumbeam.io'
+            from: 'alerts@quantumbeam.io'
+            smarthost: 'smtp.quantumbeam.io:587'
+            auth_username: 'alerts@quantumbeam.io'
+            auth_password: '${SMTP_PASSWORD}'
+            headers:
+              subject: '[QUANTUMBEAM] INFO: {{ .GroupLabels.alertname }}'
+            body: |
+              {{ range .Alerts }}
+              Alert: {{ .Annotations.summary }}
+              Description: {{ .Annotations.description }}
+              Severity: {{ .Labels.severity }}
+              Service: {{ .Labels.service }}
+              Time: {{ .StartsAt }}
+              {{ end }}
+            send_resolved: true
+
+  # Custom alert templates
+  templates.tmpl: |
+    {{ define "slack.default.title" }}
+    {{- if .CommonLabels.severity -}}
+    {{- if eq .CommonLabels.severity "critical" }}🚨 CRITICAL{{- else if eq .CommonLabels.severity "high" }}⚠️ HIGH{{- else if eq .CommonLabels.severity "medium" }}ℹ️ MEDIUM{{- else if eq .CommonLabels.severity "low" }}ℹ️ LOW{{- else }}ℹ️ INFO{{- end -}}: {{ .GroupLabels.alertname }}
+    {{- else -}}
+    ℹ️ ALERT: {{ .GroupLabels.alertname }}
+    {{- end -}}
+    {{- end }}
+
+    {{ define "slack.default.text" }}
+    *Summary*: {{ .CommonAnnotations.summary }}
+    {{- if .CommonAnnotations.description }}
+    *Description*: {{ .CommonAnnotations.description }}
+    {{- end }}
+    {{- if .CommonLabels.service }}
+    *Service*: {{ .CommonLabels.service }}
+    {{- end }}
+    {{- if .CommonLabels.cluster }}
+    *Cluster*: {{ .CommonLabels.cluster }}
+    {{- end }}
+    {{- if .CommonLabels.namespace }}
+    *Namespace*: {{ .CommonLabels.namespace }}
+    {{- end }}
+    {{- if .CommonLabels.instance }}
+    *Instance*: {{ .CommonLabels.instance }}
+    {{- end }}
+    {{- if .CommonAnnotations.runbook_url }}
+    *Runbook*: <{{ .CommonAnnotations.runbook_url }}|Runbook>
+    {{- end }}
+    {{- if .CommonAnnotations.impact }}
+    *Impact*: {{ .CommonAnnotations.impact }}
+    {{- end }}
+    {{ range .Alerts }}
+    *Firing since*: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+    {{- if .EndsAt }}
+    *Resolved*: {{ .EndsAt.Format "2006-01-02 15:04:05 UTC" }}
+    {{- end }}
+    {{ end }}
+    {{- end }}
+
+    {{ define "pagerduty.default.description" }}
+    {{ .CommonAnnotations.summary }}
+    {{- if .CommonAnnotations.description }}
+
+    Description: {{ .CommonAnnotations.description }}
+    {{- end }}
+    {{- if .CommonLabels.service }}
+    Service: {{ .CommonLabels.service }}
+    {{- end }}
+    {{- if .CommonLabels.cluster }}
+    Cluster: {{ .CommonLabels.cluster }}
+    {{- end }}
+    {{- if .CommonLabels.namespace }}
+    Namespace: {{ .CommonLabels.namespace }}
+    {{- end }}
+    {{- if .CommonAnnotations.runbook_url }}
+    Runbook: {{ .CommonAnnotations.runbook_url }}
+    {{- end }}
+    {{- end }}

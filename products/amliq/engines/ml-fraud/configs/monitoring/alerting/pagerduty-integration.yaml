@@ -1,0 +1,242 @@
+# PagerDuty Integration Configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pagerduty-secrets
+  namespace: monitoring
+type: Opaque
+data:
+  # Base64 encoded PagerDuty integration key
+  integration_key: <PAGERDUTY_INTEGRATION_KEY_BASE64>
+  # Base64 encoded PagerDuty API token
+  api_token: <PAGERDUTY_API_TOKEN_BASE64>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pagerduty-config
+  namespace: monitoring
+data:
+  config.yaml: |
+    # PagerDuty Configuration
+    pagerduty:
+      # Service Integration
+      service_integration:
+        name: "QuantumBeam Production"
+        integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+        escalation_policy: "quantumbeam-production-escalation"
+        alert_grouping: "intelligent"
+        alert_grouping_timeout: "30m"
+
+      # Alert Routing
+      alert_routing:
+        critical:
+          service: "quantumbeam-critical"
+          urgency: "high"
+          escalation_timeout: "5m"
+
+        high:
+          service: "quantumbeam-high"
+          urgency: "high"
+          escalation_timeout: "15m"
+
+        medium:
+          service: "quantumbeam-medium"
+          urgency: "low"
+          escalation_timeout: "1h"
+
+        low:
+          service: "quantumbeam-low"
+          urgency: "low"
+          escalation_timeout: "4h"
+
+      # Incident Rules
+      incident_rules:
+        - conditions:
+            severity: "critical"
+          actions:
+            create_incident: true
+            urgency: "high"
+            suppress_notifications: false
+
+        - conditions:
+            severity: "high"
+            severity_duration: "5m"
+          actions:
+            create_incident: true
+            urgency: "high"
+            suppress_notifications: false
+
+        - conditions:
+            severity: "medium"
+            severity_duration: "15m"
+          actions:
+            create_incident: true
+            urgency: "low"
+            suppress_notifications: true
+
+        - conditions:
+            severity: "low"
+            severity_duration: "1h"
+          actions:
+            create_incident: false
+            suppress_notifications: true
+
+      # Notification Settings
+      notifications:
+        critical:
+          channels: ["phone", "sms", "email", "push"]
+          repeat_interval: "5m"
+          resolve_timeout: "24h"
+
+        high:
+          channels: ["sms", "email", "push"]
+          repeat_interval: "15m"
+          resolve_timeout: "24h"
+
+        medium:
+          channels: ["email", "push"]
+          repeat_interval: "1h"
+          resolve_timeout: "72h"
+
+        low:
+          channels: ["email"]
+          repeat_interval: "4h"
+          resolve_timeout: "7d"
+
+      # Business Hours
+      business_hours:
+        enabled: true
+        timezone: "UTC"
+        hours:
+          start: "09:00"
+          end: "17:00"
+        days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+        holidays: ["new_years_day", "christmas_day", "thanksgiving_day"]
+
+        # Outside business hours behavior
+        after_hours:
+          escalate_critical: true
+          escalate_high: true
+          suppress_medium: false
+          suppress_low: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pagerduty-webhook
+  namespace: monitoring
+  labels:
+    app: pagerduty-webhook
+    component: alerting
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pagerduty-webhook
+  template:
+    metadata:
+      labels:
+        app: pagerduty-webhook
+        component: alerting
+    spec:
+      containers:
+      - name: pagerduty-webhook
+        image: prom/alertmanager:v0.26.0
+        imagePullPolicy: IfNotPresent
+        args:
+        - "--config.file=/etc/alertmanager/config.yml"
+        - "--storage.path=/alertmanager"
+        - "--web.external-url=http://alertmanager.monitoring.svc.cluster.local:9093"
+        - "--web.route-prefix=/"
+        - "--log.level=info"
+        ports:
+        - containerPort: 9093
+          name: web
+        - containerPort: 9094
+          name: mesh
+        volumeMounts:
+        - name: config
+          mountPath: /etc/alertmanager
+        - name: pagerduty-config
+          mountPath: /etc/pagerduty
+        env:
+        - name: PAGERDUTY_INTEGRATION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pagerduty-secrets
+              key: integration_key
+        - name: PAGERDUTY_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: pagerduty-secrets
+              key: api_token
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9093
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: alertmanager-config
+      - name: pagerduty-config
+        configMap:
+          name: pagerduty-config
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pagerduty-webhook
+  namespace: monitoring
+  labels:
+    app: pagerduty-webhook
+    component: alerting
+spec:
+  selector:
+    app: pagerduty-webhook
+  ports:
+  - name: web
+    port: 9093
+    targetPort: 9093
+    protocol: TCP
+  - name: mesh
+    port: 9094
+    targetPort: 9094
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pagerduty-webhook
+  namespace: monitoring
+  labels:
+    app: pagerduty-webhook
+    component: alerting
+spec:
+  selector:
+    matchLabels:
+      app: pagerduty-webhook
+  endpoints:
+  - port: web
+    interval: 30s
+    path: /metrics

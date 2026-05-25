@@ -1,0 +1,766 @@
+# Comprehensive Monitoring and Alerting Configuration
+
+# Main Monitoring Configuration
+monitoring:
+  enabled: true
+  environment: "production"
+  service_name: "quantumbeam-api"
+  service_version: "1.0.0"
+  region: "us-east-1"
+  zone: "us-east-1a"
+  debug: false
+
+# Alerting Configuration
+alerting:
+  enabled: true
+  evaluation_interval: "15s"
+  notification_timeout: "30s"
+  max_active_alerts: 1000
+  alert_retention: "168h"  # 7 days
+  group_wait_interval: "10s"
+  group_interval: "10s"
+  repeat_interval: "1h"
+
+# Metrics Configuration
+metrics:
+  enabled: true
+  port: 9090
+  path: "/metrics"
+  namespace: "quantumbeam"
+  subsystem: "api"
+  collection_interval: "15s"
+  retention_period: "24h"
+  max_metrics: 10000
+  enable_histograms: true
+  enable_summaries: true
+  enable_gauges: true
+  enable_counters: true
+  buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 25, 50, 100]
+  objectives:
+    0.5: 0.05
+    0.9: 0.01
+    0.95: 0.005
+    0.99: 0.001
+  labels: ["method", "path", "status", "service", "environment"]
+
+# Health Check Configuration
+health:
+  enabled: true
+  check_interval: "30s"
+  timeout: "10s"
+  max_failures: 3
+  success_threshold: 2
+  failure_threshold: 3
+  retry_interval: "5s"
+  grace_period: "30s"
+  disable_deep_checks: false
+  include_metrics: true
+  include_dependencies: true
+  alert_on_failure: true
+  auto_recovery: true
+
+# Notification Configuration
+notifications:
+  enabled: true
+  default_ttl: "24h"
+  max_retries: 3
+  retry_delay: "5s"
+  timeout: "30s"
+  rate_limit: 100
+  deduplication:
+    enabled: true
+    window: "5m"
+    key_fields: ["alert_name", "service"]
+    max_count: 3
+    action: "group"
+
+# Tracing Configuration
+tracing:
+  enabled: true
+  provider: "jaeger"
+  service_name: "quantumbeam-api"
+  sample_rate: 0.1
+  endpoint: "http://jaeger:14268/api/traces"
+  timeout: "5s"
+  headers:
+    "X-Trace-ID": "trace-id"
+  tags:
+    "environment": "production"
+    "version": "1.0.0"
+
+# Logging Configuration
+logging:
+  level: "info"
+  format: "json"
+  output: ["stdout"]
+  fields: ["timestamp", "level", "message", "service", "trace_id", "span_id"]
+  structured: true
+  colors: false
+  timestamp: true
+  caller: false
+  stacktrace: false
+  metrics: true
+  rotation:
+    enabled: true
+    max_size: 100
+    max_age: 7
+    max_backups: 30
+    compress: true
+    interval: "24h"
+  filters:
+    - field: "level"
+      operator: "!="
+      value: "debug"
+      action: "exclude"
+  sampling:
+    enabled: true
+    rate: 0.1
+    level: "debug"
+    fields: ["trace_id"]
+    window: "1m"
+
+# Dashboard Configuration
+dashboards:
+  enabled: true
+  provider: "grafana"
+  url: "http://grafana:3000"
+  api_key: ""
+  auto_sync: true
+  sync_interval: "5m"
+  dashboards:
+    - id: "quantumbeam-overview"
+      name: "QuantumBeam Overview"
+      description: "Overview dashboard for QuantumBeam API"
+      tags: ["quantumbeam", "overview", "production"]
+      refresh: "1m"
+      time:
+        from: "now-1h"
+        to: "now"
+      panels:
+        - id: 1
+          title: "Request Rate"
+          type: "graph"
+          grid_pos: {x: 0, y: 0, w: 12, h: 8}
+          targets:
+            - ref_id: "A"
+              expr: "rate(http_requests_total[5m])"
+              legendFormat: "{{method}} {{path}}"
+        - id: 2
+          title: "Response Time"
+          type: "graph"
+          grid_pos: {x: 12, y: 0, w: 12, h: 8}
+          targets:
+            - ref_id: "A"
+              expr: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"
+              legendFormat: "95th percentile"
+            - ref_id: "B"
+              expr: "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))"
+              legendFormat: "99th percentile"
+
+    - id: "fraud-detection"
+      name: "Fraud Detection Metrics"
+      description: "Fraud detection and analysis metrics"
+      tags: ["quantumbeam", "fraud", "security"]
+      refresh: "30s"
+      time:
+        from: "now-6h"
+        to: "now"
+      panels:
+        - id: 1
+          title: "Fraud Analysis Rate"
+          type: "graph"
+          grid_pos: {x: 0, y: 0, w: 12, h: 8}
+          targets:
+            - ref_id: "A"
+              expr: "rate(fraud_analysis_total[5m])"
+              legendFormat: "{{result}}"
+        - id: 2
+          title: "Fraud Score Distribution"
+          type: "heatmap"
+          grid_pos: {x: 12, y: 0, w: 12, h: 8}
+          targets:
+            - ref_id: "A"
+              expr: "rate(fraud_scores_bucket[5m])"
+              legendFormat: "{{le}}"
+
+    - id: "system-health"
+      name: "System Health"
+      description: "System health and resource metrics"
+      tags: ["quantumbeam", "health", "infrastructure"]
+      refresh: "1m"
+      time:
+        from: "now-1h"
+        to: "now"
+      panels:
+        - id: 1
+          title: "System Uptime"
+          type: "stat"
+          grid_pos: {x: 0, y: 0, w: 6, h: 4}
+          targets:
+            - ref_id: "A"
+              expr: "time() - process_start_time_seconds"
+              legendFormat: "Uptime"
+        - id: 2
+          title: "Memory Usage"
+          type: "graph"
+          grid_pos: {x: 6, y: 0, w: 12, h: 8}
+          targets:
+            - ref_id: "A"
+              expr: "process_resident_memory_bytes"
+              legendFormat: "RSS Memory"
+            - ref_id: "B"
+              expr: "go_memstats_heap_inuse_bytes"
+              legendFormat: "Heap Inuse"
+
+# Profiling Configuration
+profiling:
+  enabled: false
+  type: "pprof"
+  port: 6060
+  path: "/debug/pprof"
+  timeout: "30s"
+  rate: 100
+  buffer_size: 1000000
+  sample_rate: 0.1
+
+# Reporting Configuration
+reporting:
+  enabled: true
+  provider: "email"
+  schedule: "0 8 * * *"  # Daily at 8 AM
+  recipients: ["admin@quantumbeam.io", "ops@quantumbeam.io"]
+  retention: "720h"  # 30 days
+  storage:
+    type: "s3"
+    settings:
+      bucket: "quantumbeam-reports"
+      region: "us-east-1"
+  reports:
+    - id: "daily-summary"
+      name: "Daily Summary Report"
+      description: "Daily system summary and performance report"
+      type: "summary"
+      schedule: "0 8 * * *"
+      recipients: ["admin@quantumbeam.io"]
+      template: "daily_summary"
+      format: "html"
+      queries:
+        - name: "total_requests"
+          query: "sum(increase(http_requests_total[24h]))"
+          data_source: "prometheus"
+        - name: "error_rate"
+          query: "sum(rate(http_requests_total{status=~\"5..\"}[24h])) / sum(rate(http_requests_total[24h]))"
+          data_source: "prometheus"
+        - name: "avg_response_time"
+          query: "avg(http_request_duration_seconds)"
+          data_source: "prometheus"
+
+# Integration Configuration
+integration:
+  prometheus:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+    timeout: "10s"
+    labels:
+      "service": "quantumbeam-api"
+      "environment": "production"
+    retention: "360h"  # 15 days
+    remote_write:
+      - url: "https://prometheus-remote.example.com/api/v1/write"
+        timeout: "30s"
+        headers:
+          "Authorization": "Bearer ${PROMETHEUS_REMOTE_TOKEN}"
+        queue_size: 10000
+        max_samples_per_second: 100000
+
+  grafana:
+    enabled: true
+    url: "http://grafana:3000"
+    api_key: "${GRAFANA_API_KEY}"
+    auto_provision: true
+    datasources:
+      - name: "Prometheus"
+        type: "prometheus"
+        url: "http://prometheus:9090"
+        access: "proxy"
+        is_default: true
+        json_data:
+          timeInterval: "5s"
+
+  jaeger:
+    enabled: true
+    endpoint: "http://jaeger:14268/api/traces"
+    service_name: "quantumbeam-api"
+    timeout: "5s"
+    max_packet_size: 65000
+    agent_host: "jaeger-agent"
+    agent_port: 6831
+
+  elk:
+    enabled: false
+    elasticsearch:
+      urls: ["http://elasticsearch:9200"]
+      username: "elastic"
+      password: "${ELASTIC_PASSWORD}"
+      index: "quantumbeam-logs"
+      shards: 3
+      replicas: 1
+      timeout: "30s"
+      bulk_size: 1000
+      flush_interval: "5s"
+    logstash:
+      host: "logstash"
+      port: 5044
+      timeout: "10s"
+    kibana:
+      url: "http://kibana:5601"
+      timeout: "10s"
+
+  datadog:
+    enabled: false
+    api_key: "${DATADOG_API_KEY}"
+    app_key: "${DATADOG_APP_KEY}"
+    site: "us1.datadoghq.com"
+    hostname: "quantumbeam-api"
+    tags: ["environment:production", "service:quantumbeam"]
+    metrics:
+      enabled: true
+      namespace: "quantumbeam"
+      histograms: true
+    logs:
+      enabled: true
+      source: "quantumbeam"
+      service: "api"
+      tags: ["environment:production"]
+    traces:
+      enabled: true
+      service: "quantumbeam-api"
+      env: "production"
+      version: "1.0.0"
+      sample_rate: 0.1
+
+  newrelic:
+    enabled: false
+    license_key: "${NEW_RELIC_LICENSE_KEY}"
+    app_name: "QuantumBeam API"
+    region: "US"
+    log_level: "info"
+    labels:
+      "environment": "production"
+      "team": "platform"
+
+# Custom Alert Rules
+alert_rules:
+  # Critical Alerts
+  - id: "high_error_rate"
+    name: "High Error Rate"
+    description: "Error rate is above 5%"
+    query: "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m])"
+    condition: "gt"
+    threshold: 0.05
+    duration: "5m"
+    severity: "critical"
+    labels:
+      "team": "platform"
+      "service": "api"
+    annotations:
+      "summary": "High error rate detected"
+      "description": "Error rate is {{ $value | humanizePercentage }}"
+    enabled: true
+    notifications:
+      - type: "slack"
+        enabled: true
+        settings:
+          "channel": "#alerts-critical"
+      - type: "pagerduty"
+        enabled: true
+        settings:
+          "severity": "critical"
+
+  - id: "service_down"
+    name: "Service Down"
+    description: "Service is not responding"
+    query: "up{job=\"quantumbeam-api\"}"
+    condition: "eq"
+    threshold: 0
+    duration: "1m"
+    severity: "critical"
+    labels:
+      "team": "platform"
+      "service": "api"
+    annotations:
+      "summary": "Service is down"
+      "description": "QuantumBeam API service is not responding"
+    enabled: true
+    notifications:
+      - type: "pagerduty"
+        enabled: true
+      - type: "slack"
+        enabled: true
+        settings:
+          "channel": "#alerts-critical"
+
+  - id: "database_connection_failure"
+    name: "Database Connection Failure"
+    description: "Database connection is failing"
+    query: "db_connections_active"
+    condition: "eq"
+    threshold: 0
+    duration: "2m"
+    severity: "critical"
+    labels:
+      "team": "platform"
+      "component": "database"
+    annotations:
+      "summary": "Database connection failure"
+      "description": "Unable to connect to the database"
+    enabled: true
+    notifications:
+      - type: "pagerduty"
+        enabled: true
+      - type: "slack"
+        enabled: true
+
+  # Warning Alerts
+  - id: "high_response_time"
+    name: "High Response Time"
+    description: "95th percentile response time is above 1 second"
+    query: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"
+    condition: "gt"
+    threshold: 1.0
+    duration: "5m"
+    severity: "warning"
+    labels:
+      "team": "platform"
+      "service": "api"
+    annotations:
+      "summary": "High response time detected"
+      "description": "95th percentile response time is {{ $value }}s"
+    enabled: true
+    notifications:
+      - type: "slack"
+        enabled: true
+        settings:
+          "channel": "#alerts-warning"
+
+  - id: "high_memory_usage"
+    name: "High Memory Usage"
+    description: "Memory usage is above 80%"
+    query: "process_resident_memory_bytes / (1024 * 1024 * 1024)"
+    condition: "gt"
+    threshold: 80  # GB
+    duration: "10m"
+    severity: "warning"
+    labels:
+      "team": "platform"
+      "component": "system"
+    annotations:
+      "summary": "High memory usage"
+      "description": "Memory usage is {{ $value }}GB"
+    enabled: true
+    notifications:
+      - type: "slack"
+        enabled: true
+
+  - id: "fraud_detection_anomaly"
+    name: "Fraud Detection Anomaly"
+    description: "Unusual fraud detection activity"
+    query: "rate(fraud_analysis_total[5m])"
+    condition: "gt"
+    threshold: 100
+    duration: "2m"
+    severity: "warning"
+    labels:
+      "team": "fraud"
+      "service": "fraud-detection"
+    annotations:
+      "summary": "Fraud detection anomaly"
+      "description": "Fraud analysis rate is {{ $value }} per second"
+    enabled: true
+    notifications:
+      - type: "slack"
+        enabled: true
+        settings:
+          "channel": "#fraud-alerts"
+
+  # Info Alerts
+  - id: "low_request_rate"
+    name: "Low Request Rate"
+    description: "Request rate is unusually low"
+    query: "rate(http_requests_total[5m])"
+    condition: "lt"
+    threshold: 1
+    duration: "15m"
+    severity: "info"
+    labels:
+      "team": "platform"
+      "service": "api"
+    annotations:
+      "summary": "Low request rate"
+      "description": "Request rate is {{ $value }} per second"
+    enabled: true
+    notifications:
+      - type: "slack"
+        enabled: true
+        settings:
+          "channel": "#alerts-info"
+
+# Channel Configurations
+channels:
+  slack:
+    type: "slack"
+    enabled: true
+    settings:
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#alerts"
+      username: "QuantumBeam"
+      icon_emoji: ":warning:"
+    rate_limit: 100
+    template: "slack_alert"
+    conditions:
+      - field: "severity"
+        operator: "in"
+        value: ["critical", "warning", "info"]
+
+  email:
+    type: "email"
+    enabled: true
+    settings:
+      smtp_host: "smtp.gmail.com"
+      smtp_port: 587
+      username: "${EMAIL_USERNAME}"
+      password: "${EMAIL_PASSWORD}"
+      from: "alerts@quantumbeam.io"
+      to: ["admin@quantumbeam.io", "ops@quantumbeam.io"]
+    rate_limit: 50
+    template: "email_alert"
+    conditions:
+      - field: "severity"
+        operator: "in"
+        value: ["critical", "warning"]
+
+  pagerduty:
+    type: "pagerduty"
+    enabled: true
+    settings:
+      integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+      severity: "critical"
+    rate_limit: 10
+    template: "pagerduty_alert"
+    conditions:
+      - field: "severity"
+        operator: "eq"
+        value: "critical"
+
+  webhook:
+    type: "webhook"
+    enabled: true
+    settings:
+      url: "${WEBHOOK_URL}"
+      method: "POST"
+      headers:
+        "Content-Type": "application/json"
+        "Authorization": "Bearer ${WEBHOOK_TOKEN}"
+    rate_limit: 200
+    template: "webhook_alert"
+
+# Template Configurations
+templates:
+  slack_alert:
+    subject: "🚨 {{.Severity}}: {{.AlertName}}"
+    body: |
+      *Alert:* {{.AlertName}}
+      *Severity:* {{.Severity}}
+      *Description:* {{.Description}}
+      *Started:* {{.StartTime}}
+      *Value:* {{.Value}}
+      *Threshold:* {{.Threshold}}
+      *Runbook:* {{.Runbook}}
+    format: "text"
+
+  email_alert:
+    subject: "🚨 {{.Severity}} Alert: {{.AlertName}}"
+    html_body: |
+      <h2>🚨 {{.Severity}} Alert: {{.AlertName}}</h2>
+      <p><strong>Description:</strong> {{.Description}}</p>
+      <p><strong>Severity:</strong> {{.Severity}}</p>
+      <p><strong>Started:</strong> {{.StartTime}}</p>
+      <p><strong>Value:</strong> {{.Value}}</p>
+      <p><strong>Threshold:</strong> {{.Threshold}}</p>
+      {{if .Runbook}}<p><strong>Runbook:</strong> <a href="{{.Runbook}}">View Runbook</a></p>{{end}}
+    format: "html"
+
+  pagerduty_alert:
+    subject: "{{.AlertName}}"
+    body: |
+      {
+        "routing_key": "{{.IntegrationKey}}",
+        "event_action": "trigger",
+        "payload": {
+          "summary": "{{.AlertName}}",
+          "source": "quantumbeam-api",
+          "severity": "{{.Severity}}",
+          "timestamp": "{{.StartTime}}",
+          "component": "{{.Component}}",
+          "group": "{{.Team}}",
+          "class": "{{.Class}}",
+          "custom_details": {
+            "description": "{{.Description}}",
+            "value": {{.Value}},
+            "threshold": {{.Threshold}},
+            "runbook": "{{.Runbook}}"
+          }
+        }
+      }
+    format: "json"
+
+# Escalation Configuration
+escalation:
+  enabled: true
+  timeout: "30m"
+  max_level: 3
+  cooldown: "15m"
+  rules:
+    - id: "critical_escalation"
+      name: "Critical Alert Escalation"
+      conditions:
+        - field: "severity"
+          operator: "eq"
+          value: "critical"
+        - field: "duration"
+          operator: "gt"
+          value: "15m"
+      actions:
+        - type: "pagerduty"
+          channel: "pagerduty"
+          recipients: ["manager-oncall"]
+        - type: "slack"
+          channel: "#alerts-escalation"
+          recipients: ["@manager", "@director"]
+      level: 1
+      timeout: "15m"
+
+    - id: "critical_escalation_level2"
+      name: "Critical Alert Escalation Level 2"
+      conditions:
+        - field: "severity"
+          operator: "eq"
+          value: "critical"
+        - field: "duration"
+          operator: "gt"
+          value: "30m"
+      actions:
+        - type: "pagerduty"
+          channel: "pagerduty"
+          recipients: ["vp-oncall"]
+        - type: "email"
+          channel: "email"
+          recipients: ["vp@quantumbeam.io"]
+      level: 2
+      timeout: "30m"
+
+# Health Check Definitions
+health_checks:
+  database:
+    id: "database"
+    name: "Database Connection"
+    description: "Checks database connectivity and performance"
+    type: "database"
+    enabled: true
+    critical: true
+    timeout: "5s"
+    interval: "30s"
+    retries: 3
+    config:
+      query: "SELECT 1"
+    labels:
+      "component": "database"
+      "tier": "storage"
+    owner: "platform-team"
+    team: "platform"
+
+  redis:
+    id: "redis"
+    name: "Redis Connection"
+    description: "Checks Redis connectivity and performance"
+    type: "redis"
+    enabled: true
+    critical: true
+    timeout: "3s"
+    interval: "15s"
+    retries: 3
+    config:
+      command: "PING"
+    labels:
+      "component": "cache"
+      "tier": "storage"
+    owner: "platform-team"
+    team: "platform"
+
+  api:
+    id: "api"
+    name: "API Endpoint"
+    description: "Checks API endpoint availability and response time"
+    type: "http"
+    enabled: true
+    critical: true
+    timeout: "5s"
+    interval: "30s"
+    retries: 2
+    config:
+      url: "http://localhost:8080/health"
+      method: "GET"
+      expected_status: 200
+      headers:
+        "User-Agent": "QuantumBeam-HealthChecker/1.0"
+    labels:
+      "component": "api"
+      "tier": "application"
+    owner: "api-team"
+    team: "platform"
+
+  external_services:
+    id: "external_services"
+    name: "External Services"
+    description: "Checks connectivity to external services"
+    type: "http"
+    enabled: true
+    critical: false
+    timeout: "10s"
+    interval: "60s"
+    retries: 2
+    config:
+      services:
+        - name: "openai"
+          url: "https://api.openai.com/v1/models"
+          timeout: "10s"
+          expected_status: 200
+        - name: "quantum"
+          url: "https://quantum-computing.ibm.com"
+          timeout: "15s"
+          expected_status: 200
+    labels:
+      "component": "external"
+      "tier": "integration"
+    owner: "integration-team"
+    team: "platform"
+
+  disk_space:
+    id: "disk_space"
+    name: "Disk Space"
+    description: "Checks available disk space"
+    type: "command"
+    enabled: true
+    critical: true
+    timeout: "5s"
+    interval: "60s"
+    retries: 2
+    config:
+      command: "df -h /"
+      threshold: 90  # percentage
+    labels:
+      "component": "system"
+      "tier": "infrastructure"
+    owner: "ops-team"
+    team: "platform"

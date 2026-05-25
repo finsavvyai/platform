@@ -1,0 +1,123 @@
+{
+  "$schema": "https://docs.datadoghq.com/monitors/_schema.json",
+  "_comment": "Generated mirror of rules.yaml. Keep in sync. Placeholders: <DD_PD_SERVICE>, <SLACK_ONCALL>, <SLACK_SECURITY>, <SLACK_STATUS>, <SLACK_FINANCE>. Tag convention: env:production|staging, service:<name>.",
+  "monitors": [
+    {
+      "id": "HEALTH_DOWN",
+      "name": "[FINSAVVY][SEV1] Service health endpoint reporting down",
+      "type": "metric alert",
+      "query": "sum(last_5m):sum:finsavvy.synthetic.ok{probe:health,env:production}.as_count() <= 0",
+      "message": "Synthetic 'health' failing >=2 consecutive runs.\nRunbook: docs/runbooks/HEALTH_DOWN.md\nNotify: @pagerduty-<DD_PD_SERVICE> @slack-<SLACK_ONCALL> @slack-<SLACK_STATUS>",
+      "tags": ["severity:critical", "team:platform", "service:ai-gateway"],
+      "options": { "thresholds": { "critical": 0 }, "notify_no_data": true, "no_data_timeframe": 10, "renotify_interval": 30 }
+    },
+    {
+      "id": "GATEWAY_ROUTE_FAIL",
+      "name": "[FINSAVVY][SEV1] AI gateway route synthetic failing",
+      "type": "metric alert",
+      "query": "sum(last_5m):sum:finsavvy.synthetic.ok{probe:gateway-route,env:production}.as_count() <= 0",
+      "message": "Gateway routing broken. Runbook: docs/runbooks/GATEWAY_ROUTE_FAIL.md\nNotify: @pagerduty-<DD_PD_SERVICE> @slack-<SLACK_ONCALL>",
+      "tags": ["severity:critical", "team:platform", "service:ai-gateway"],
+      "options": { "thresholds": { "critical": 0 }, "notify_no_data": true, "no_data_timeframe": 10 }
+    },
+    {
+      "id": "GATEWAY_ERROR_RATE",
+      "name": "[FINSAVVY][SEV2] Gateway 5xx rate >1% (5m)",
+      "type": "metric alert",
+      "query": "avg(last_5m):avg:finsavvy.gateway.error_rate{env:production} > 0.01",
+      "message": "Runbook: docs/runbooks/GATEWAY_ERROR_RATE.md\nNotify: @pagerduty-<DD_PD_SERVICE> @slack-<SLACK_ONCALL>",
+      "tags": ["severity:high", "team:platform", "service:ai-gateway"],
+      "options": { "thresholds": { "critical": 0.01, "warning": 0.005 }, "renotify_interval": 60 }
+    },
+    {
+      "id": "GATEWAY_LATENCY_P95",
+      "name": "[FINSAVVY][SEV2] Gateway p95 latency >500ms (10m)",
+      "type": "metric alert",
+      "query": "avg(last_10m):avg:finsavvy.gateway.latency_ms_p95{env:production} > 500",
+      "message": "Runbook: docs/runbooks/GATEWAY_LATENCY_P95.md\nNotify: @slack-<SLACK_ONCALL>",
+      "tags": ["severity:high", "team:platform", "service:ai-gateway"],
+      "options": { "thresholds": { "critical": 500, "warning": 350 } }
+    },
+    {
+      "id": "STRIPE_WEBHOOK_SIG_FAIL",
+      "name": "[FINSAVVY][SEV1] Stripe webhook signature failures spike",
+      "type": "metric alert",
+      "query": "sum(last_5m):sum:finsavvy.audit.code.billing_webhook_signature_invalid{provider:stripe,env:production}.as_count() > 5",
+      "message": "Possible forged webhooks or rotated secret.\nRunbook: docs/runbooks/STRIPE_WEBHOOK_SIG_FAIL.md\nNotify: @pagerduty-<DD_PD_SERVICE> @slack-<SLACK_ONCALL> @slack-<SLACK_SECURITY>",
+      "tags": ["severity:critical", "team:billing", "service:billing", "provider:stripe"],
+      "options": { "thresholds": { "critical": 5 } }
+    },
+    {
+      "id": "LEMONSQUEEZY_WEBHOOK_SIG_FAIL",
+      "name": "[FINSAVVY][SEV1] LemonSqueezy webhook signature failures spike",
+      "type": "metric alert",
+      "query": "sum(last_5m):sum:finsavvy.audit.code.billing_webhook_signature_invalid{provider:lemonsqueezy,env:production}.as_count() > 5",
+      "message": "Runbook: docs/runbooks/LEMONSQUEEZY_WEBHOOK_SIG_FAIL.md\nNotify: @pagerduty-<DD_PD_SERVICE> @slack-<SLACK_ONCALL> @slack-<SLACK_SECURITY>",
+      "tags": ["severity:critical", "team:billing", "service:billing", "provider:lemonsqueezy"],
+      "options": { "thresholds": { "critical": 5 } }
+    },
+    {
+      "id": "WEBHOOK_REPLAY_DETECTED",
+      "name": "[FINSAVVY][SEV1] Webhook replay attempt detected",
+      "type": "metric alert",
+      "query": "sum(last_5m):sum:finsavvy.audit.code.billing_webhook_replay{env:production}.as_count() > 0",
+      "message": "Runbook: docs/runbooks/WEBHOOK_REPLAY_DETECTED.md\nNotify: @pagerduty-<DD_PD_SERVICE> @slack-<SLACK_ONCALL> @slack-<SLACK_SECURITY>",
+      "tags": ["severity:critical", "team:security", "service:billing"],
+      "options": { "thresholds": { "critical": 0 } }
+    },
+    {
+      "id": "AUTH_JWT_SPIKE",
+      "name": "[FINSAVVY][SEV2] Auth failure rate spike >50/min",
+      "type": "metric alert",
+      "query": "avg(last_5m):per_minute(sum:finsavvy.auth.failures_total{env:production}.as_count()) > 50",
+      "message": "Runbook: docs/runbooks/AUTH_JWT_SPIKE.md\nNotify: @pagerduty-<DD_PD_SERVICE> @slack-<SLACK_ONCALL> @slack-<SLACK_SECURITY>",
+      "tags": ["severity:high", "team:platform", "service:auth"],
+      "options": { "thresholds": { "critical": 50, "warning": 25 } }
+    },
+    {
+      "id": "RATE_LIMIT_SPIKE",
+      "name": "[FINSAVVY][SEV3] Rate-limit rejections spike >100/min",
+      "type": "metric alert",
+      "query": "avg(last_5m):per_minute(sum:finsavvy.gateway.rate_limit_rejected_total{env:production}.as_count()) > 100",
+      "message": "Runbook: docs/runbooks/RATE_LIMIT_SPIKE.md\nNotify: @slack-<SLACK_ONCALL>",
+      "tags": ["severity:medium", "team:platform", "service:ai-gateway"],
+      "options": { "thresholds": { "critical": 100, "warning": 50 } }
+    },
+    {
+      "id": "TOKEN_SPEND_BUDGET",
+      "name": "[FINSAVVY][SEV2] Per-tenant token spend over budget",
+      "type": "metric alert",
+      "query": "sum(last_1h):sum:finsavvy.gateway.token_cost_usd_total{env:production} by {tenant_id} > 50",
+      "message": "Threshold $50/h placeholder. Runbook: docs/runbooks/TOKEN_SPEND_BUDGET.md\nNotify: @slack-<SLACK_ONCALL> @slack-<SLACK_FINANCE>",
+      "tags": ["severity:high", "team:platform", "service:ai-gateway"],
+      "options": { "thresholds": { "critical": 50, "warning": 30 }, "groupby_simple_monitor": false }
+    },
+    {
+      "id": "POLICY_DENY_SPIKE",
+      "name": "[FINSAVVY][SEV2] Policy engine denial/error spike",
+      "type": "metric alert",
+      "query": "sum(last_5m):sum:finsavvy.audit.code.policy_*{env:production}.as_count() > 20",
+      "message": "Runbook: docs/runbooks/POLICY_DENY_SPIKE.md\nNotify: @slack-<SLACK_ONCALL>",
+      "tags": ["severity:high", "team:platform", "service:policy-engine"],
+      "options": { "thresholds": { "critical": 20 } }
+    },
+    {
+      "id": "AMLIQ_DECISION_FAIL",
+      "name": "[FINSAVVY][SEV2] AMLIQ decision synthetic failing",
+      "type": "metric alert",
+      "query": "sum(last_5m):sum:finsavvy.synthetic.ok{probe:amliq-decision,env:production}.as_count() <= 0",
+      "message": "Runbook: docs/runbooks/AMLIQ_DECISION_FAIL.md\nNotify: @pagerduty-<DD_PD_SERVICE> @slack-<SLACK_ONCALL>",
+      "tags": ["severity:high", "team:amliq", "service:amliq"],
+      "options": { "thresholds": { "critical": 0 }, "notify_no_data": true, "no_data_timeframe": 15 }
+    },
+    {
+      "id": "WORKER_CPU_LIMIT",
+      "name": "[FINSAVVY][SEV2] Cloudflare Worker CPU >50ms (5m avg)",
+      "type": "metric alert",
+      "query": "avg(last_5m):avg:finsavvy.worker.cpu_ms{env:production} > 50",
+      "message": "Runbook: docs/runbooks/WORKER_CPU_LIMIT.md\nNotify: @slack-<SLACK_ONCALL>",
+      "tags": ["severity:high", "team:platform", "service:ai-gateway"],
+      "options": { "thresholds": { "critical": 50, "warning": 40 } }
+    }
+  ]
+}

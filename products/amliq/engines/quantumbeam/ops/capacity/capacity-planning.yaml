@@ -1,0 +1,1382 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quantumbeam-capacity-planning
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: capacity-planning
+    type: config
+data:
+  capacity-planning.yaml: |
+    # QuantumBeam Capacity Planning System
+    capacityPlanning:
+      version: "1.0"
+      lastUpdated: "2024-01-15T00:00:00Z"
+
+      # Capacity Planning Configuration
+      configuration:
+        planningHorizon: "12 months"  # Planning horizon for projections
+        reviewCycle: "monthly"  # How often to review capacity
+        dataRetention: "24 months"  # How long to keep historical data
+        alertThresholds:
+          cpu: 80  # Alert when CPU usage exceeds 80%
+          memory: 85  # Alert when memory usage exceeds 85%
+          storage: 90  # Alert when storage usage exceeds 90%
+          network: 75  # Alert when network usage exceeds 75%
+
+      # Resource Categories
+      resources:
+        compute:
+          kubernetesCluster:
+            name: "EKS Production Cluster"
+            type: "managed-kubernetes"
+            provider: "AWS"
+            currentCapacity:
+              nodes: 6
+              vCPUs: 24
+              memory: "96 GiB"
+              instanceTypes: ["m5.large", "m5.xlarge", "m5.2xlarge"]
+
+            scalingPolicy:
+              minNodes: 3
+              maxNodes: 20
+              targetUtilization: 70
+              scaleUpCooldown: "3 minutes"
+              scaleDownCooldown: "10 minutes"
+
+            growthFactors:
+              businessGrowth: 1.15  # 15% annual business growth
+              seasonalMultiplier: 1.3  # 30% increase during peak season
+              technologyEfficiency: 0.95  # 5% annual efficiency improvement
+
+            projections:
+              monthly: [
+                { "month": "Jan-2024", "vcpus": 24, "memory": 96, "nodes": 6 },
+                { "month": "Feb-2024", "vcpus": 26, "memory": 104, "nodes": 7 },
+                { "month": "Mar-2024", "vcpus": 28, "memory": 112, "nodes": 7 },
+                { "month": "Apr-2024", "vcpus": 30, "memory": 120, "nodes": 8 },
+                { "month": "May-2024", "vcpus": 32, "memory": 128, "nodes": 8 },
+                { "month": "Jun-2024", "vcpus": 35, "memory": 140, "nodes": 9 }
+              ]
+
+        storage:
+          databases:
+            name: "PostgreSQL Databases"
+            type: "relational-database"
+            provider: "AWS RDS"
+            currentCapacity:
+              storage: "500 GiB"
+              iops: 3000
+              throughput: "125 MiB/s"
+
+            growthProjections:
+              storageGrowthRate: 0.2  # 20% annual growth
+              iopsGrowthRate: 0.15  # 15% annual growth
+              dataRetentionPolicy: "7 years"
+
+            scalingPolicy:
+              storageIncrement: "100 GiB"
+              maxStorage: "10 TiB"
+              minIOPS: 1000
+              maxIOPS: 40000
+
+          objectStorage:
+            name: "S3 Storage"
+            type: "object-storage"
+            provider: "AWS S3"
+            currentCapacity:
+              storage: "2 TiB"
+              objects: 50000000
+
+            growthProjections:
+              storageGrowthRate: 0.4  # 40% annual growth
+              objectGrowthRate: 0.35  # 35% annual growth
+
+        network:
+          loadBalancer:
+            name: "Application Load Balancer"
+            type: "application-load-balancer"
+            provider: "AWS ALB"
+            currentCapacity:
+              bandwidth: "10 Gbps"
+              connections: 50000
+              requestsPerSecond: 25000
+
+            scalingPolicy:
+              maxBandwidth: "40 Gbps"
+              maxConnections: 100000
+              maxRequestsPerSecond: 100000
+
+          cdn:
+            name: "CloudFront CDN"
+            type: "cdn"
+            provider: "AWS CloudFront"
+            currentCapacity:
+              bandwidth: "5 Tbps"
+              requestsPerMonth: 10000000000
+
+      # Application-Specific Capacity Planning
+      applications:
+        quantumbeamApi:
+          name: "QuantumBeam API Service"
+          type: "microservice"
+          resourceProfile:
+            cpu:
+              request: "100m"
+              limit: "500m"
+              averageUtilization: 45
+              peakUtilization: 80
+            memory:
+              request: "256Mi"
+              limit: "1Gi"
+              averageUtilization: 60
+              peakUtilization: 85
+            replicas:
+              min: 3
+              max: 20
+              current: 5
+              target: 70
+
+          workloadProfile:
+            requestPattern: "variable"
+            peakHours: ["09:00-17:00 UTC", "20:00-22:00 UTC"]
+            seasonalPattern: "higher during business hours"
+            growthDrivers: ["user_growth", "feature_adoption", "api_usage"]
+
+          scalingTriggers:
+            - metric: "cpu_utilization"
+              threshold: 70
+              action: "scale_up"
+            - metric: "memory_utilization"
+              threshold: 80
+              action: "scale_up"
+            - metric: "requests_per_second"
+              threshold: 1000
+              action: "scale_up"
+
+          capacityProjections:
+            quarterly: [
+              {
+                "quarter": "Q1-2024",
+                "averageReplicas": 6,
+                "peakReplicas": 12,
+                "totalCPU": "3 vCPUs",
+                "totalMemory": "6 GiB"
+              },
+              {
+                "quarter": "Q2-2024",
+                "averageReplicas": 7,
+                "peakReplicas": 15,
+                "totalCPU": "3.5 vCPUs",
+                "totalMemory": "7 GiB"
+              }
+            ]
+
+        fraudDetection:
+          name: "Fraud Detection Service"
+          type: "compute-intensive"
+          resourceProfile:
+            cpu:
+              request: "500m"
+              limit: "2000m"
+              averageUtilization: 65
+              peakUtilization: 90
+            memory:
+              request: "1Gi"
+              limit: "4Gi"
+              averageUtilization: 70
+              peakUtilization: 95
+            replicas:
+              min: 2
+              max: 10
+              current: 4
+              target: 75
+
+          workloadProfile:
+            requestPattern: "transaction-driven"
+            peakHours: ["08:00-18:00 UTC"]
+            seasonalPattern: "higher during business days"
+            growthDrivers: ["transaction_volume", "model_complexity", "accuracy_requirements"]
+
+          specialRequirements:
+            - "GPU acceleration for ML models"
+            - "High memory for model loading"
+            - "Fast storage for model weights"
+            - "Low latency network"
+
+          capacityProjections:
+            quarterly: [
+              {
+                "quarter": "Q1-2024",
+                "averageReplicas": 5,
+                "peakReplicas": 8,
+                "totalCPU": "10 vCPUs",
+                "totalMemory": "20 GiB",
+                "gpuRequired": true
+              },
+              {
+                "quarter": "Q2-2024",
+                "averageReplicas": 6,
+                "peakReplicas": 10,
+                "totalCPU": "12 vCPUs",
+                "totalMemory": "24 GiB",
+                "gpuRequired": true
+              }
+            ]
+
+        aiMLService:
+          name: "AI/ML Service"
+          type: "ml-workload"
+          resourceProfile:
+            cpu:
+              request: "1000m"
+              limit: "4000m"
+              averageUtilization: 75
+              peakUtilization: 95
+            memory:
+              request: "2Gi"
+              limit: "16Gi"
+              averageUtilization: 80
+              peakUtilization: 98
+            replicas:
+              min: 1
+              max: 5
+              current: 2
+              target: 80
+
+          workloadProfile:
+            requestPattern: "batch_and_realtime"
+            peakHours: ["06:00-08:00 UTC", "18:00-20:00 UTC"]
+            seasonalPattern: "model training runs during off-peak hours"
+            growthDrivers: ["model_complexity", "training_data_size", "inference_volume"]
+
+          specialRequirements:
+            - "High-performance computing"
+            - "Large memory for model training"
+            - "Fast storage for datasets"
+            - "GPU acceleration"
+
+          capacityProjections:
+            quarterly: [
+              {
+                "quarter": "Q1-2024",
+                "averageReplicas": 2,
+                "peakReplicas": 4,
+                "totalCPU": "8 vCPUs",
+                "totalMemory": "32 GiB",
+                "gpuRequired": true,
+                "storageType": "nvme"
+              },
+              {
+                "quarter": "Q2-2024",
+                "averageReplicas": 3,
+                "peakReplicas": 5,
+                "totalCPU": "12 vCPUs",
+                "totalMemory": "48 GiB",
+                "gpuRequired": true,
+                "storageType": "nvme"
+              }
+            ]
+
+      # Growth Projections and Forecasting
+      forecasting:
+        methodology: "hybrid"  # Combination of historical trends and business projections
+
+        growthDrivers:
+          business:
+            - name: "User Growth"
+              currentUsers: 100000
+              projectedGrowth: 0.25  # 25% annual growth
+              impact: "medium"
+
+            - name: "Transaction Volume"
+              currentTransactions: 1000000  # per month
+              projectedGrowth: 0.40  # 40% annual growth
+              impact: "high"
+
+            - name: "Feature Adoption"
+              newFeaturesPerQuarter: 3
+              adoptionRate: 0.60  # 60% adoption rate
+              impact: "medium"
+
+          technical:
+            - name: "Service Efficiency"
+              efficiencyImprovement: 0.10  # 10% annual improvement
+              impact: "positive"
+
+            - name: "Infrastructure Optimization"
+              costReduction: 0.15  # 15% annual cost reduction
+              impact: "positive"
+
+        seasonalPatterns:
+          holidaySeason:
+            months: ["November", "December"]
+            multiplier: 2.0  # 2x traffic during holiday season
+            duration: "8 weeks"
+
+          businessSeason:
+            months: ["January", "February", "March", "April"]
+            multiplier: 1.5  # 1.5x traffic during business season
+            duration: "4 months"
+
+          offPeakSeason:
+            months: ["May", "June", "July", "August", "September"]
+            multiplier: 0.8  # 0.8x traffic during off-peak
+            duration: "5 months"
+
+        projections:
+          year2024:
+            Q1:
+              userGrowth: 0.05  # 5% quarterly growth
+              transactionGrowth: 0.08  # 8% quarterly growth
+              resourceMultiplier: 1.10  # 10% resource increase
+
+            Q2:
+              userGrowth: 0.06  # 6% quarterly growth
+              transactionGrowth: 0.09  # 9% quarterly growth
+              resourceMultiplier: 1.15  # 15% resource increase
+
+            Q3:
+              userGrowth: 0.07  # 7% quarterly growth
+              transactionGrowth: 0.11  # 11% quarterly growth
+              resourceMultiplier: 1.20  # 20% resource increase
+
+            Q4:
+              userGrowth: 0.08  # 8% quarterly growth
+              transactionGrowth: 0.15  # 15% quarterly growth
+              resourceMultiplier: 1.40  # 40% resource increase (holiday season)
+
+      # Cost Optimization
+      costOptimization:
+        currentCosts:
+          monthly: "$15,000"
+          breakdown:
+            compute: "$8,000 (53%)"
+            storage: "$3,000 (20%)"
+            network: "$2,000 (13%)"
+            database: "$1,500 (10%)"
+            other: "$500 (4%)"
+
+        optimizationOpportunities:
+          rightsizing:
+            description: "Right-size instances based on actual usage"
+            potentialSavings: "$2,000/month (13%)"
+            implementationTime: "2 months"
+
+          spotInstances:
+            description: "Use spot instances for non-critical workloads"
+            potentialSavings: "$1,500/month (10%)"
+            implementationTime: "1 month"
+
+          storageOptimization:
+            description: "Optimize storage tiers and lifecycle policies"
+            potentialSavings: "$800/month (5%)"
+            implementationTime: "1 month"
+
+          scheduling:
+            description: "Schedule non-urgent workloads during off-peak hours"
+            potentialSavings: "$1,200/month (8%)"
+            implementationTime: "1 month"
+
+        totalPotentialSavings: "$5,500/month (37%)"
+
+      # Monitoring and Alerting
+      monitoring:
+        metrics:
+          resourceUtilization:
+            - name: "cluster_cpu_utilization"
+              description: "Overall cluster CPU utilization"
+              query: "avg(rate(container_cpu_usage_seconds_total[5m])) * 100"
+              alertThreshold: 80
+              warningThreshold: 70
+
+            - name: "cluster_memory_utilization"
+              description: "Overall cluster memory utilization"
+              query: "avg(container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100"
+              alertThreshold: 85
+              warningThreshold: 75
+
+            - name: "storage_utilization"
+              description: "Storage utilization across all persistent volumes"
+              query: "avg(kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100"
+              alertThreshold: 90
+              warningThreshold: 80
+
+          growthMetrics:
+            - name: "pod_count_growth"
+              description: "Growth in pod count over time"
+              query: "increase(kube_pod_info[30d])"
+              alertThreshold: 50  # Alert if more than 50 new pods in 30 days
+
+            - name: "request_rate_growth"
+              description: "Growth in API request rate"
+              query: "increase(rate(http_requests_total[1h])[30d:1h])"
+              alertThreshold: 1000  # Alert if request rate increases by 1000/sec
+
+        alerts:
+          capacityExhaustion:
+            name: "Capacity Exhaustion Warning"
+            condition: "resource utilization exceeds 85%"
+            severity: "critical"
+            actions:
+              - "Scale up resources automatically"
+              - "Notify on-call team"
+              - "Create capacity planning ticket"
+
+          rapidGrowth:
+            name: "Rapid Growth Detected"
+            condition: "resource growth exceeds 20% in 7 days"
+            severity: "warning"
+            actions:
+              - "Analyze growth drivers"
+              - "Update capacity projections"
+              - "Plan resource scaling"
+
+          costOverrun:
+            name: "Cost Overrun Warning"
+            condition: "monthly costs exceed budget by 10%"
+            severity: "warning"
+            actions:
+              - "Review cost drivers"
+              - "Implement cost optimization"
+              - "Notify finance team"
+
+      # Reporting and Documentation
+      reporting:
+        reports:
+          monthlyCapacityReport:
+            frequency: "monthly"
+            recipients: ["engineering@quantumbeam.io", "finance@quantumbeam.io"]
+            sections:
+              - "Current capacity utilization"
+              - "Growth trends and projections"
+              - "Upcoming capacity needs"
+              - "Cost analysis and optimization opportunities"
+              - "Recommendations and action items"
+
+          quarterlyCapacityReview:
+            frequency: "quarterly"
+            recipients: ["leadership@quantumbeam.io", "engineering@quantumbeam.io"]
+            sections:
+              - "Quarterly capacity performance"
+              - "Forecast accuracy review"
+              - "Infrastructure investment recommendations"
+              - "Budget planning for next quarter"
+              - "Strategic capacity planning"
+
+          annualCapacityPlan:
+            frequency: "annually"
+            recipients: ["executives@quantumbeam.io", "board@quantumbeam.io"]
+            sections:
+              - "Annual capacity review"
+              - "Long-term infrastructure strategy"
+              - "Capital expenditure planning"
+              - "Technology roadmap impact on capacity"
+              - "Risk assessment and mitigation"
+
+        dashboards:
+          capacityOverview:
+            title: "Capacity Planning Overview"
+            panels:
+              - "Current resource utilization"
+              - "Growth trends"
+              - "Cost analysis"
+              - "Upcoming capacity alerts"
+              - "Forecast vs actual"
+
+          costOptimization:
+            title: "Cost Optimization Dashboard"
+            panels:
+              - "Current cost breakdown"
+              - "Optimization opportunities"
+              - "Savings tracking"
+              - "ROI on optimizations"
+              - "Budget vs actual"
+
+  capacity-planning-scripts.yaml: |
+    # Capacity Planning Automation Scripts
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: capacity-planning-scripts
+      namespace: quantumbeam
+      labels:
+        app: quantumbeam
+        component: capacity-planning
+        type: scripts
+    data:
+      capacity-analyzer.py: |
+        #!/usr/bin/env python3
+        """
+        QuantumBeam Capacity Planning Analyzer
+        Automated capacity analysis and recommendations
+        """
+
+        import asyncio
+        import json
+        logging
+        os
+        time
+        from datetime import datetime, timedelta
+        from typing import Dict, List, Optional, Tuple
+
+        import aiohttp
+        import numpy as np
+        import pandas as pd
+        from sklearn.linear_model import LinearRegression
+        from sklearn.metrics import r2_score
+
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+
+        class CapacityPlanningAnalyzer:
+            """Advanced capacity planning and analysis system"""
+
+            def __init__(self):
+                self.prometheus_url = os.getenv('PROMETHEUS_URL', 'http://prometheus.monitoring.svc.cluster.local:9090')
+                self.namespace = os.getenv('NAMESPACE', 'quantumbeam')
+                self.planning_horizon_months = int(os.getenv('PLANNING_HORIZON_MONTHS', '12'))
+
+                # Growth factors
+                self.growth_factors = {
+                    'user_growth': 0.25,  # 25% annual growth
+                    'transaction_growth': 0.40,  # 40% annual growth
+                    'feature_adoption': 0.15,  # 15% annual growth
+                    'efficiency_improvement': 0.10  # 10% annual efficiency improvement
+                }
+
+                # Alert thresholds
+                self.thresholds = {
+                    'cpu_warning': 70,
+                    'cpu_critical': 85,
+                    'memory_warning': 75,
+                    'memory_critical': 90,
+                    'storage_warning': 80,
+                    'storage_critical': 95
+                }
+
+            async def analyze_current_capacity(self) -> Dict:
+                """Analyze current resource utilization and capacity"""
+                logger.info("Analyzing current capacity utilization")
+
+                capacity_data = {
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'cluster_metrics': {},
+                    'application_metrics': {},
+                    'storage_metrics': {},
+                    'recommendations': []
+                }
+
+                # Analyze cluster metrics
+                capacity_data['cluster_metrics'] = await self.get_cluster_metrics()
+
+                # Analyze application-specific metrics
+                applications = ['quantumbeam-api', 'quantumbeam-fraud-detector', 'quantumbeam-ai-ml']
+                for app in applications:
+                    capacity_data['application_metrics'][app] = await self.get_application_metrics(app)
+
+                # Analyze storage metrics
+                capacity_data['storage_metrics'] = await self.get_storage_metrics()
+
+                # Generate recommendations
+                capacity_data['recommendations'] = self.generate_capacity_recommendations(capacity_data)
+
+                return capacity_data
+
+            async def get_cluster_metrics(self) -> Dict:
+                """Get cluster-level capacity metrics"""
+                try:
+                    queries = {
+                        'cpu_utilization': 'avg(rate(container_cpu_usage_seconds_total{namespace="' + self.namespace + '"}[5m])) * 100',
+                        'memory_utilization': 'avg(container_memory_usage_bytes{namespace="' + self.namespace + '"} / container_spec_memory_limit_bytes) * 100',
+                        'node_count': 'count(kube_node_info)',
+                        'pod_count': 'count(kube_pod_info{namespace="' + self.namespace + '"})',
+                        'cpu_capacity': 'sum(kube_node_status_capacity_cores)',
+                        'memory_capacity': 'sum(kube_node_status_capacity_memory_bytes) / (1024*1024*1024)'  # Convert to GB
+                    }
+
+                    metrics = {}
+                    async with aiohttp.ClientSession() as session:
+                        for metric_name, query in queries.items():
+                            try:
+                                result = await self.query_prometheus(session, query, '1h')
+                                if result:
+                                    values = []
+                                    for series in result:
+                                        for timestamp, value in series['values']:
+                                            values.append(float(value))
+
+                                    if values:
+                                        metrics[metric_name] = {
+                                            'current': values[-1],
+                                            'average': np.mean(values),
+                                            'peak': np.max(values),
+                                            'trend': self.calculate_trend(values)
+                                        }
+
+                            except Exception as e:
+                                logger.error(f"Error getting metric {metric_name}: {e}")
+                                metrics[metric_name] = {'error': str(e)}
+
+                    return metrics
+
+                except Exception as e:
+                    logger.error(f"Error getting cluster metrics: {e}")
+                    return {'error': str(e)}
+
+            async def get_application_metrics(self, app_name: str) -> Dict:
+                """Get application-specific capacity metrics"""
+                try:
+                    queries = {
+                        'cpu_utilization': f'avg(rate(container_cpu_usage_seconds_total{{namespace="{self.namespace}",pod=~"{app_name}-.*"}}[5m])) * 100',
+                        'memory_utilization': f'avg(container_memory_usage_bytes{{namespace="{self.namespace}",pod=~"{app_name}-.*"}} / container_spec_memory_limit_bytes) * 100',
+                        'replica_count': f'kube_deployment_spec_replicas{{namespace="{self.namespace}",deployment="{app_name}"}}',
+                        'request_rate': f'sum(rate(http_requests_total{{service="{app_name}"}}[5m]))',
+                        'response_time_p95': f'histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{{service="{app_name}"}}[5m])) by (le)) * 1000'
+                    }
+
+                    metrics = {}
+                    async with aiohttp.ClientSession() as session:
+                        for metric_name, query in queries.items():
+                            try:
+                                result = await self.query_prometheus(session, query, '1h')
+                                if result:
+                                    values = []
+                                    for series in result:
+                                        for timestamp, value in series['values']:
+                                            values.append(float(value))
+
+                                    if values:
+                                        metrics[metric_name] = {
+                                            'current': values[-1],
+                                            'average': np.mean(values),
+                                            'peak': np.max(values),
+                                            'trend': self.calculate_trend(values)
+                                        }
+
+                            except Exception as e:
+                                logger.error(f"Error getting metric {metric_name} for {app_name}: {e}")
+
+                    # Add application-specific metadata
+                    metadata = await self.get_application_metadata(app_name)
+                    metrics.update(metadata)
+
+                    return metrics
+
+                except Exception as e:
+                    logger.error(f"Error getting application metrics for {app_name}: {e}")
+                    return {'error': str(e)}
+
+            async def get_application_metadata(self, app_name: str) -> Dict:
+                """Get application metadata for capacity planning"""
+                # This would typically come from application configuration or service discovery
+                metadata_map = {
+                    'quantumbeam-api': {
+                        'type': 'api-service',
+                        'criticality': 'high',
+                        'peak_hours': ['09:00-17:00 UTC', '20:00-22:00 UTC'],
+                        'seasonal_multiplier': 1.3
+                    },
+                    'quantumbeam-fraud-detector': {
+                        'type': 'ml-service',
+                        'criticality': 'high',
+                        'peak_hours': ['08:00-18:00 UTC'],
+                        'seasonal_multiplier': 1.5,
+                        'gpu_required': True
+                    },
+                    'quantumbeam-ai-ml': {
+                        'type': 'ai-service',
+                        'criticality': 'medium',
+                        'peak_hours': ['06:00-08:00 UTC', '18:00-20:00 UTC'],
+                        'seasonal_multiplier': 1.2,
+                        'gpu_required': True
+                    }
+                }
+
+                return {
+                    'metadata': metadata_map.get(app_name, {
+                        'type': 'unknown',
+                        'criticality': 'medium',
+                        'peak_hours': [],
+                        'seasonal_multiplier': 1.0
+                    })
+                }
+
+            async def get_storage_metrics(self) -> Dict:
+                """Get storage capacity metrics"""
+                try:
+                    queries = {
+                        'persistent_volume_usage': 'avg(kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100',
+                        'total_storage_capacity': 'sum(kubelet_volume_stats_capacity_bytes) / (1024*1024*1024)',  # GB
+                        'total_storage_used': 'sum(kubelet_volume_stats_used_bytes) / (1024*1024*1024)',  # GB
+                        'database_size': 'pg_database_size_bytes / (1024*1024*1024)',  # GB
+                        'object_storage_size': 's3_bucket_size_bytes / (1024*1024*1024)'  # GB
+                    }
+
+                    metrics = {}
+                    async with aiohttp.ClientSession() as session:
+                        for metric_name, query in queries.items():
+                            try:
+                                result = await self.query_prometheus(session, query, '1h')
+                                if result:
+                                    values = []
+                                    for series in result:
+                                        for timestamp, value in series['values']:
+                                            values.append(float(value))
+
+                                    if values:
+                                        metrics[metric_name] = {
+                                            'current': values[-1],
+                                            'average': np.mean(values),
+                                            'peak': np.max(values),
+                                            'trend': self.calculate_trend(values)
+                                        }
+
+                            except Exception as e:
+                                logger.error(f"Error getting storage metric {metric_name}: {e}")
+
+                    return metrics
+
+                except Exception as e:
+                    logger.error(f"Error getting storage metrics: {e}")
+                    return {'error': str(e)}
+
+            async def query_prometheus(self, session: aiohttp.ClientSession, query: str, time_range: str = '1h') -> Optional[List]:
+                """Query Prometheus for metrics"""
+                try:
+                    end_time = time.time()
+                    start_time = end_time - (3600 if time_range == '1h' else 86400)
+
+                    params = {
+                        'query': query,
+                        'start': start_time,
+                        'end': end_time,
+                        'step': '60'
+                    }
+
+                    async with session.get(
+                        f"{self.prometheus_url}/api/v1/query_range",
+                        params=params
+                    ) as response:
+                        result = await response.json()
+
+                        if result['status'] == 'success':
+                            return result['data']['result']
+                        else:
+                            logger.error(f"Prometheus query failed: {result}")
+                            return None
+
+                except Exception as e:
+                    logger.error(f"Error querying Prometheus: {e}")
+                    return None
+
+            def calculate_trend(self, values: List[float]) -> float:
+                """Calculate trend direction and magnitude"""
+                if len(values) < 2:
+                    return 0.0
+
+                # Simple linear regression
+                x = np.arange(len(values)).reshape(-1, 1)
+                y = np.array(values)
+
+                model = LinearRegression()
+                model.fit(x, y)
+
+                # Calculate trend as percentage change
+                if len(values) > 0 and np.mean(values) != 0:
+                    return (model.coef_[0] / np.mean(values)) * 100
+                return 0.0
+
+            def generate_capacity_recommendations(self, capacity_data: Dict) -> List[Dict]:
+                """Generate capacity planning recommendations"""
+                recommendations = []
+
+                # Cluster-level recommendations
+                cluster_metrics = capacity_data.get('cluster_metrics', {})
+
+                # CPU recommendations
+                if 'cpu_utilization' in cluster_metrics:
+                    cpu_current = cluster_metrics['cpu_utilization'].get('current', 0)
+                    cpu_trend = cluster_metrics['cpu_utilization'].get('trend', 0)
+
+                    if cpu_current > self.thresholds['cpu_critical']:
+                        recommendations.append({
+                            'type': 'urgent',
+                            'category': 'scaling',
+                            'resource': 'cpu',
+                            'message': f'Critical CPU utilization at {cpu_current:.1f}%',
+                            'action': 'scale_horizontal',
+                            'priority': 'high',
+                            'estimated_impact': 'Immediate performance improvement'
+                        })
+                    elif cpu_current > self.thresholds['cpu_warning']:
+                        recommendations.append({
+                            'type': 'warning',
+                            'category': 'capacity',
+                            'resource': 'cpu',
+                            'message': f'High CPU utilization at {cpu_current:.1f}%',
+                            'action': 'monitor_and_plan_scale',
+                            'priority': 'medium',
+                            'estimated_impact': 'Prevent performance degradation'
+                        })
+
+                    if cpu_trend > 5:  # Growing faster than 5% per time period
+                        recommendations.append({
+                            'type': 'proactive',
+                            'category': 'forecasting',
+                            'resource': 'cpu',
+                            'message': f'CPU usage trending up at {cpu_trend:.1f}% per period',
+                            'action': 'plan_capacity_increase',
+                            'priority': 'medium',
+                            'estimated_impact': 'Accommodate future growth'
+                        })
+
+                # Memory recommendations
+                if 'memory_utilization' in cluster_metrics:
+                    memory_current = cluster_metrics['memory_utilization'].get('current', 0)
+                    memory_trend = cluster_metrics['memory_utilization'].get('trend', 0)
+
+                    if memory_current > self.thresholds['memory_critical']:
+                        recommendations.append({
+                            'type': 'urgent',
+                            'category': 'scaling',
+                            'resource': 'memory',
+                            'message': f'Critical memory utilization at {memory_current:.1f}%',
+                            'action': 'scale_memory_or_horizontal',
+                            'priority': 'high',
+                            'estimated_impact': 'Prevent OOM and service disruption'
+                        })
+                    elif memory_current > self.thresholds['memory_warning']:
+                        recommendations.append({
+                            'type': 'warning',
+                            'category': 'capacity',
+                            'resource': 'memory',
+                            'message': f'High memory utilization at {memory_current:.1f}%',
+                            'action': 'investigate_memory_usage',
+                            'priority': 'medium',
+                            'estimated_impact': 'Optimize memory efficiency'
+                        })
+
+                # Application-specific recommendations
+                app_metrics = capacity_data.get('application_metrics', {})
+                for app_name, metrics in app_metrics.items():
+                    if 'error' in metrics:
+                        continue
+
+                    # Check for application-specific scaling needs
+                    if 'request_rate' in metrics:
+                        request_rate = metrics['request_rate'].get('current', 0)
+                        if request_rate > 1000:  # High request rate threshold
+                            recommendations.append({
+                                'type': 'proactive',
+                                'category': 'application',
+                                'resource': 'horizontal_scaling',
+                                'message': f'High request rate for {app_name}: {request_rate:.0f} req/s',
+                                'action': 'configure_autoscaling',
+                                'priority': 'medium',
+                                'application': app_name,
+                                'estimated_impact': 'Improve response times and availability'
+                            })
+
+                    # Check response times
+                    if 'response_time_p95' in metrics:
+                        response_time = metrics['response_time_p95'].get('current', 0)
+                        if response_time > 500:  # 500ms threshold
+                            recommendations.append({
+                                'type': 'performance',
+                                'category': 'application',
+                                'resource': 'optimization',
+                                'message': f'High response time for {app_name}: {response_time:.0f}ms',
+                                'action': 'optimize_application_or_scale',
+                                'priority': 'high',
+                                'application': app_name,
+                                'estimated_impact': 'Improve user experience'
+                            })
+
+                # Storage recommendations
+                storage_metrics = capacity_data.get('storage_metrics', {})
+                if 'persistent_volume_usage' in storage_metrics:
+                    storage_usage = storage_metrics['persistent_volume_usage'].get('current', 0)
+                    if storage_usage > self.thresholds['storage_critical']:
+                        recommendations.append({
+                            'type': 'urgent',
+                            'category': 'storage',
+                            'resource': 'disk_space',
+                            'message': f'Critical storage usage at {storage_usage:.1f}%',
+                            'action': 'expand_storage_or_cleanup',
+                            'priority': 'high',
+                            'estimated_impact': 'Prevent service disruption'
+                        })
+                    elif storage_usage > self.thresholds['storage_warning']:
+                        recommendations.append({
+                            'type': 'warning',
+                            'category': 'storage',
+                            'resource': 'disk_space',
+                            'message': f'High storage usage at {storage_usage:.1f}%',
+                            'action': 'plan_storage_expansion',
+                            'priority': 'medium',
+                            'estimated_impact': 'Ensure future capacity'
+                        })
+
+                # Sort recommendations by priority
+                priority_order = {'high': 3, 'medium': 2, 'low': 1}
+                recommendations.sort(key=lambda x: priority_order.get(x.get('priority', 'low'), 0), reverse=True)
+
+                return recommendations
+
+            async def generate_forecast(self, current_data: Dict) -> Dict:
+                """Generate capacity forecasts based on historical data and growth factors"""
+                logger.info("Generating capacity forecasts")
+
+                forecast = {
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'horizon_months': self.planning_horizon_months,
+                    'assumptions': self.growth_factors,
+                    'forecasts': {}
+                }
+
+                # Generate forecasts for each resource category
+                forecasts = {}
+
+                # Cluster resource forecasts
+                cluster_metrics = current_data.get('cluster_metrics', {})
+                if 'cpu_utilization' in cluster_metrics and 'memory_utilization' in cluster_metrics:
+                    forecasts['cluster'] = await self.forecast_cluster_resources(cluster_metrics)
+
+                # Application-specific forecasts
+                app_metrics = current_data.get('application_metrics', {})
+                for app_name, metrics in app_metrics.items():
+                    if 'error' not in metrics:
+                        forecasts[app_name] = await self.forecast_application_resources(app_name, metrics)
+
+                # Storage forecasts
+                storage_metrics = current_data.get('storage_metrics', {})
+                if storage_metrics:
+                    forecasts['storage'] = await self.forecast_storage_resources(storage_metrics)
+
+                forecast['forecasts'] = forecasts
+                return forecast
+
+            async def forecast_cluster_resources(self, cluster_metrics: Dict) -> Dict:
+                """Forecast cluster resource needs"""
+                current_cpu = cluster_metrics.get('cpu_utilization', {}).get('current', 50)
+                current_memory = cluster_metrics.get('memory_utilization', {}).get('current', 60)
+
+                # Apply growth factors with seasonal adjustments
+                monthly_forecasts = []
+                base_cpu = current_cpu
+                base_memory = current_memory
+
+                for month in range(1, self.planning_horizon_months + 1):
+                    # Apply compound growth
+                    cpu_growth_factor = (1 + self.growth_factors['user_growth']) ** (month / 12)
+                    memory_growth_factor = (1 + self.growth_factors['transaction_growth']) ** (month / 12)
+
+                    # Apply efficiency improvements
+                    efficiency_factor = (1 - self.growth_factors['efficiency_improvement']) ** (month / 12)
+
+                    # Apply seasonal multipliers (simplified)
+                    seasonal_factor = self.get_seasonal_factor(month)
+
+                    projected_cpu = min(95, base_cpu * cpu_growth_factor * seasonal_factor / efficiency_factor)
+                    projected_memory = min(95, base_memory * memory_growth_factor * seasonal_factor / efficiency_factor)
+
+                    monthly_forecasts.append({
+                        'month': month,
+                        'date': (datetime.utcnow() + timedelta(days=30 * month)).strftime('%Y-%m'),
+                        'projected_cpu_utilization': projected_cpu,
+                        'projected_memory_utilization': projected_memory,
+                        'seasonal_factor': seasonal_factor,
+                        'scaling_needed': projected_cpu > 80 or projected_memory > 85
+                    })
+
+                return {
+                    'type': 'cluster',
+                    'monthly_forecasts': monthly_forecasts,
+                    'recommendations': self.generate_forecast_recommendations(monthly_forecasts, 'cluster')
+                }
+
+            async def forecast_application_resources(self, app_name: str, app_metrics: Dict) -> Dict:
+                """Forecast application-specific resource needs"""
+                metadata = app_metrics.get('metadata', {})
+                app_type = metadata.get('type', 'unknown')
+                seasonal_multiplier = metadata.get('seasonal_multiplier', 1.0)
+
+                # Base metrics
+                current_replicas = app_metrics.get('replica_count', {}).get('current', 1)
+                current_cpu = app_metrics.get('cpu_utilization', {}).get('current', 50)
+                current_memory = app_metrics.get('memory_utilization', {}).get('current', 60)
+
+                # Application-specific growth factors
+                if app_type == 'api-service':
+                    growth_rate = self.growth_factors['user_growth']
+                elif app_type == 'ml-service':
+                    growth_rate = self.growth_factors['transaction_growth']
+                else:
+                    growth_rate = 0.20  # Default 20% annual growth
+
+                monthly_forecasts = []
+                for month in range(1, self.planning_horizon_months + 1):
+                    growth_factor = (1 + growth_rate) ** (month / 12)
+                    efficiency_factor = (1 - self.growth_factors['efficiency_improvement']) ** (month / 12)
+                    seasonal_factor = self.get_seasonal_factor(month)
+
+                    projected_replicas = max(1, int(current_replicas * growth_factor * seasonal_factor))
+                    projected_cpu = min(95, current_cpu * growth_factor * seasonal_multiplier * seasonal_factor / efficiency_factor)
+                    projected_memory = min(95, current_memory * growth_factor * seasonal_multiplier * seasonal_factor / efficiency_factor)
+
+                    monthly_forecasts.append({
+                        'month': month,
+                        'date': (datetime.utcnow() + timedelta(days=30 * month)).strftime('%Y-%m'),
+                        'projected_replicas': projected_replicas,
+                        'projected_cpu_utilization': projected_cpu,
+                        'projected_memory_utilization': projected_memory,
+                        'scaling_needed': projected_cpu > 80 or projected_memory > 85
+                    })
+
+                return {
+                    'type': 'application',
+                    'application': app_name,
+                    'monthly_forecasts': monthly_forecasts,
+                    'recommendations': self.generate_forecast_recommendations(monthly_forecasts, app_name)
+                }
+
+            async def forecast_storage_resources(self, storage_metrics: Dict) -> Dict:
+                """Forecast storage resource needs"""
+                current_usage = storage_metrics.get('persistent_volume_usage', {}).get('current', 50)
+                current_capacity = storage_metrics.get('total_storage_capacity', {}).get('current', 1000)  # GB
+
+                # Storage growth is typically steady with some seasonal variation
+                storage_growth_rate = 0.25  # 25% annual storage growth
+
+                monthly_forecasts = []
+                for month in range(1, self.planning_horizon_months + 1):
+                    growth_factor = (1 + storage_growth_rate) ** (month / 12)
+                    seasonal_factor = self.get_seasonal_factor(month)
+
+                    projected_usage = min(95, current_usage * growth_factor * seasonal_factor)
+                    projected_capacity = current_capacity * growth_factor * seasonal_factor
+
+                    monthly_forecasts.append({
+                        'month': month,
+                        'date': (datetime.utcnow() + timedelta(days=30 * month)).strftime('%Y-%m'),
+                        'projected_usage_percent': projected_usage,
+                        'projected_capacity_gb': projected_capacity,
+                        'expansion_needed': projected_usage > 80
+                    })
+
+                return {
+                    'type': 'storage',
+                    'monthly_forecasts': monthly_forecasts,
+                    'recommendations': self.generate_forecast_recommendations(monthly_forecasts, 'storage')
+                }
+
+            def get_seasonal_factor(self, month: int) -> float:
+                """Get seasonal adjustment factor for a given month"""
+                # Simplified seasonal pattern - would be more sophisticated in production
+                current_month = datetime.utcnow().month
+                target_month = (current_month + month - 1) % 12 + 1
+
+                # Holiday season (Nov-Dec)
+                if target_month in [11, 12]:
+                    return 1.5
+                # Business season (Jan-Apr)
+                elif target_month in [1, 2, 3, 4]:
+                    return 1.2
+                # Off-peak (May-Sep)
+                elif target_month in [5, 6, 7, 8, 9]:
+                    return 0.9
+                # Normal (Oct)
+                else:
+                    return 1.0
+
+            def generate_forecast_recommendations(self, forecasts: List[Dict], resource_type: str) -> List[Dict]:
+                """Generate recommendations based on forecasts"""
+                recommendations = []
+
+                # Find months where scaling is needed
+                scaling_months = [f for f in forecasts if f.get('scaling_needed', False)]
+
+                if scaling_months:
+                    first_scaling_month = scaling_months[0]
+                    month_name = first_scaling_month.get('date', 'Unknown')
+
+                    recommendations.append({
+                        'type': 'proactive',
+                        'category': 'capacity_planning',
+                        'resource': resource_type,
+                        'message': f'Scaling needed by {month_name}',
+                        'action': 'plan_capacity_increase',
+                        'priority': 'high' if first_scaling_month['month'] <= 3 else 'medium',
+                        'timeline': f'{first_scaling_month["month"]} months',
+                        'estimated_impact': 'Ensure adequate capacity for growth'
+                    })
+
+                # Check for consistent high utilization
+                high_utilization_months = [f for f in forecasts if any([
+                    f.get('projected_cpu_utilization', 0) > 80,
+                    f.get('projected_memory_utilization', 0) > 85,
+                    f.get('projected_usage_percent', 0) > 80
+                ])]
+
+                if len(high_utilization_months) > len(forecasts) * 0.5:  # More than 50% of months
+                    recommendations.append({
+                        'type': 'strategic',
+                        'category': 'architecture',
+                        'resource': resource_type,
+                        'message': 'Consistently high utilization projected',
+                        'action': 'consider_architecture_optimization',
+                        'priority': 'medium',
+                        'timeline': '6-12 months',
+                        'estimated_impact': 'Improve efficiency and reduce costs'
+                    })
+
+                return recommendations
+
+            async def generate_capacity_report(self) -> Dict:
+                """Generate comprehensive capacity planning report"""
+                try:
+                    logger.info("Generating capacity planning report")
+
+                    # Analyze current capacity
+                    current_analysis = await self.analyze_current_capacity()
+
+                    # Generate forecasts
+                    forecast_analysis = await self.generate_forecast(current_analysis)
+
+                    # Combine into comprehensive report
+                    report = {
+                        'report_metadata': {
+                            'generated_at': datetime.utcnow().isoformat(),
+                            'planning_horizon_months': self.planning_horizon_months,
+                            'data_period': 'Last 30 days',
+                            'version': '1.0'
+                        },
+                        'executive_summary': self.generate_executive_summary(current_analysis, forecast_analysis),
+                        'current_capacity_analysis': current_analysis,
+                        'forecast_analysis': forecast_analysis,
+                        'action_items': self.generate_action_items(current_analysis, forecast_analysis),
+                        'cost_projections': self.generate_cost_projections(forecast_analysis)
+                    }
+
+                    # Store report (would typically save to database or file system)
+                    await self.store_capacity_report(report)
+
+                    return report
+
+                except Exception as e:
+                    logger.error(f"Error generating capacity report: {e}")
+                    return {
+                        'error': str(e),
+                        'timestamp': datetime.utcnow().isoformat()
+                    }
+
+            def generate_executive_summary(self, current_analysis: Dict, forecast_analysis: Dict) -> Dict:
+                """Generate executive summary for leadership"""
+                cluster_metrics = current_analysis.get('cluster_metrics', {})
+                current_cpu = cluster_metrics.get('cpu_utilization', {}).get('current', 0)
+                current_memory = cluster_metrics.get('memory_utilization', {}).get('current', 0)
+
+                # Count recommendations by priority
+                recommendations = current_analysis.get('recommendations', [])
+                high_priority = len([r for r in recommendations if r.get('priority') == 'high'])
+                medium_priority = len([r for r in recommendations if r.get('priority') == 'medium'])
+
+                # Find urgent scaling needs from forecast
+                forecast = forecast_analysis.get('forecasts', {})
+                urgent_scaling = []
+                for resource_type, resource_forecast in forecast.items():
+                    if 'monthly_forecasts' in resource_forecast:
+                        for month_data in resource_forecast['monthly_forecasts']:
+                            if month_data.get('scaling_needed', False) and month_data['month'] <= 3:
+                                urgent_scaling.append(f"{resource_type}: {month_data['date']}")
+
+                return {
+                    'overall_health': 'healthy' if current_cpu < 70 and current_memory < 75 else 'attention_needed',
+                    'key_metrics': {
+                        'current_cpu_utilization': current_cpu,
+                        'current_memory_utilization': current_memory,
+                        'high_priority_issues': high_priority,
+                        'medium_priority_issues': medium_priority
+                    },
+                    'critical_insights': [
+                        f"Current CPU utilization is at {current_cpu:.1f}%",
+                        f"Current memory utilization is at {current_memory:.1f}%",
+                        f"{high_priority} high-priority capacity issues identified",
+                        f"{len(urgent_scaling)} resources need scaling within 3 months"
+                    ],
+                    'urgent_scaling_needs': urgent_scaling,
+                    'recommended_actions': [
+                        "Address high-priority capacity issues immediately",
+                        "Plan for forecasted scaling needs",
+                        "Implement proactive monitoring for growth trends",
+                        "Consider efficiency improvements to control costs"
+                    ]
+                }
+
+            def generate_action_items(self, current_analysis: Dict, forecast_analysis: Dict) -> List[Dict]:
+                """Generate actionable items from analysis"""
+                action_items = []
+
+                # Current capacity actions
+                for rec in current_analysis.get('recommendations', []):
+                    action_items.append({
+                        'category': 'immediate',
+                        'priority': rec.get('priority', 'medium'),
+                        'description': rec.get('message', ''),
+                        'action': rec.get('action', ''),
+                        'resource': rec.get('resource', ''),
+                        'estimated_impact': rec.get('estimated_impact', ''),
+                        'timeline': '1-4 weeks',
+                        'owner': self.assign_owner(rec.get('category', ''), rec.get('resource', ''))
+                    })
+
+                # Forecast-based actions
+                forecast = forecast_analysis.get('forecasts', {})
+                for resource_type, resource_forecast in forecast.items():
+                    if 'recommendations' in resource_forecast:
+                        for rec in resource_forecast['recommendations']:
+                            action_items.append({
+                                'category': 'planned',
+                                'priority': rec.get('priority', 'medium'),
+                                'description': rec.get('message', ''),
+                                'action': rec.get('action', ''),
+                                'resource': resource_type,
+                                'estimated_impact': rec.get('estimated_impact', ''),
+                                'timeline': rec.get('timeline', '3-6 months'),
+                                'owner': self.assign_owner(rec.get('category', ''), resource_type)
+                            })
+
+                # Sort by priority and timeline
+                action_items.sort(key=lambda x: (
+                    {'high': 3, 'medium': 2, 'low': 1}.get(x.get('priority', 'low'), 0),
+                    {'immediate': 3, 'planned': 1}.get(x.get('category', 'planned'), 0)
+                ), reverse=True)
+
+                return action_items
+
+            def assign_owner(self, category: str, resource: str) -> str:
+                """Assign owner based on category and resource"""
+                if 'scaling' in category or resource in ['cpu', 'memory', 'cluster']:
+                    return 'DevOps Team'
+                elif 'storage' in category or resource == 'storage':
+                    return 'Database Team'
+                elif 'application' in category:
+                    return 'Application Team'
+                elif 'architecture' in category:
+                    return 'Architecture Team'
+                else:
+                    return 'Engineering Team'
+
+            def generate_cost_projections(self, forecast_analysis: Dict) -> Dict:
+                """Generate cost projections based on capacity forecasts"""
+                # Simplified cost model - would integrate with actual billing data
+                current_monthly_cost = 15000  # $15,000 per month
+
+                cost_projections = {
+                    'current_monthly_cost': current_monthly_cost,
+                    'cost_breakdown': {
+                        'compute': 8000,
+                        'storage': 3000,
+                        'network': 2000,
+                        'database': 1500,
+                        'other': 500
+                    },
+                    'monthly_projections': []
+                }
+
+                forecast = forecast_analysis.get('forecasts', {})
+                for month in range(1, min(13, self.planning_horizon_months + 1)):
+                    # Calculate cost increase based on resource growth
+                    cost_multiplier = 1.0
+
+                    # Apply growth factors
+                    for resource_type, resource_forecast in forecast.items():
+                        if 'monthly_forecasts' in resource_forecast:
+                            month_data = next((m for m in resource_forecast['monthly_forecasts'] if m['month'] == month), None)
+                            if month_data and month_data.get('scaling_needed', False):
+                                # Estimate cost increase for this resource
+                                if resource_type == 'cluster':
+                                    cost_multiplier += 0.05  # 5% increase for cluster scaling
+                                elif 'application' in resource_type:
+                                    cost_multiplier += 0.03  # 3% increase for application scaling
+                                elif resource_type == 'storage':
+                                    cost_multiplier += 0.02  # 2% increase for storage
+
+                    projected_cost = current_monthly_cost * cost_multiplier
+                    cost_projections['monthly_projections'].append({
+                        'month': month,
+                        'date': (datetime.utcnow() + timedelta(days=30 * month)).strftime('%Y-%m'),
+                        'projected_monthly_cost': projected_cost,
+                        'cost_increase_percentage': (projected_cost - current_monthly_cost) / current_monthly_cost * 100,
+                        'cumulative_cost': projected_cost * month
+                    })
+
+                # Calculate optimization opportunities
+                cost_projections['optimization_opportunities'] = [
+                    {
+                        'category': 'rightsizing',
+                        'potential_savings': 2000,
+                        'implementation_time': '2 months',
+                        'description': 'Right-size instances based on actual usage'
+                    },
+                    {
+                        'category': 'spot_instances',
+                        'potential_savings': 1500,
+                        'implementation_time': '1 month',
+                        'description': 'Use spot instances for non-critical workloads'
+                    },
+                    {
+                        'category': 'storage_optimization',
+                        'potential_savings': 800,
+                        'implementation_time': '1 month',
+                        'description': 'Optimize storage tiers and lifecycle policies'
+                    }
+                ]
+
+                cost_projections['total_optimization_potential'] = sum(
+                    opp['potential_savings'] for opp in cost_projections['optimization_opportunities']
+                )
+
+                return cost_projections
+
+            async def store_capacity_report(self, report: Dict):
+                """Store capacity planning report"""
+                # In a real implementation, this would store to database or file system
+                logger.info(f"Capacity report generated at {report['report_metadata']['generated_at']}")
+                logger.info(f"Report contains {len(report.get('action_items', []))} action items")
+
+        async def main():
+            """Main execution function"""
+            analyzer = CapacityPlanningAnalyzer()
+
+            try:
+                # Generate comprehensive capacity report
+                report = await analyzer.generate_capacity_report()
+
+                # Output summary
+                print("=== QuantumBeam Capacity Planning Report ===")
+                print(f"Generated: {report['report_metadata']['generated_at']}")
+                print(f"Planning Horizon: {report['report_metadata']['planning_horizon_months']} months")
+
+                summary = report.get('executive_summary', {})
+                print(f"Overall Health: {summary.get('overall_health', 'unknown')}")
+                print(f"High Priority Issues: {summary.get('key_metrics', {}).get('high_priority_issues', 0)}")
+                print(f"Action Items: {len(report.get('action_items', []))}")
+
+                print("\n=== Key Recommendations ===")
+                for action in report.get('action_items', [])[:5]:  # Show top 5
+                    print(f"- {action.get('description', '')} ({action.get('priority', 'medium')} priority)")
+
+                # Save full report to file (in production, would save to database)
+                with open('/tmp/capacity-report.json', 'w') as f:
+                    json.dump(report, f, indent=2)
+
+                print("\nFull report saved to /tmp/capacity-report.json")
+
+            except Exception as e:
+                logger.error(f"Error in capacity planning: {e}")
+
+        if __name__ == "__main__":
+            asyncio.run(main())

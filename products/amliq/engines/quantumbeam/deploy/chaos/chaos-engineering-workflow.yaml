@@ -1,0 +1,755 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: quantumbeam-chaos-engineering-workflow
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: chaos-engineering
+    workflow-type: chaos
+spec:
+  entrypoint: chaos-workflow
+  arguments:
+    parameters:
+      - name: experiment-name
+        value: "scheduled-chaos-test"
+      - name: experiment-type
+        value: "pod-delete"
+      - name: blast-radius
+        value: "10"
+      - name: duration
+        value: "2m"
+      - name: dry-run
+        value: "false"
+      - name: notification-enabled
+        value: "true"
+
+  serviceAccountName: quantumbeam-chaos-engineering
+
+  # Workflow templates
+  templates:
+    - name: chaos-workflow
+      steps:
+        - - name: validate-safety
+            template: safety-validation
+            arguments:
+              parameters:
+                - name: blast-radius
+                  value: "{{workflow.parameters.blast-radius}}"
+                - name: experiment-type
+                  value: "{{workflow.parameters.experiment-type}}"
+
+        - - name: prepare-experiment
+            template: prepare-chaos-experiment
+            arguments:
+              parameters:
+                - name: experiment-name
+                  value: "{{workflow.parameters.experiment-name}}"
+                - name: experiment-type
+                  value: "{{workflow.parameters.experiment-type}}"
+                - name: blast-radius
+                  value: "{{workflow.parameters.blast-radius}}"
+                - name: duration
+                  value: "{{workflow.parameters.duration}}"
+
+        - - name: run-chaos-experiment
+            template: execute-chaos-experiment
+            arguments:
+              parameters:
+                - name: experiment-name
+                  value: "{{workflow.parameters.experiment-name}}"
+                - name: experiment-manifest
+                  value: "{{steps.prepare-experiment.outputs.result}}"
+                - name: dry-run
+                  value: "{{workflow.parameters.dry-run}}"
+
+        - - name: monitor-experiment
+            template: monitor-chaos-experiment
+            arguments:
+              parameters:
+                - name: experiment-name
+                  value: "{{workflow.parameters.experiment-name}}"
+                - name: duration
+                  value: "{{workflow.parameters.duration}}"
+
+        - - name: analyze-results
+            template: analyze-experiment-results
+            arguments:
+              parameters:
+                - name: experiment-name
+                  value: "{{workflow.parameters.experiment-name}}"
+                - name: monitoring-data
+                  value: "{{steps.monitor-experiment.outputs.result}}"
+
+        - - name: send-notification
+            template: send-experiment-notification
+            arguments:
+              parameters:
+                - name: experiment-name
+                  value: "{{workflow.parameters.experiment-name}}"
+                - name: experiment-results
+                  value: "{{steps.analyze-results.outputs.result}}"
+                - name: notification-enabled
+                  value: "{{workflow.parameters.notification-enabled}}"
+
+        - - name: cleanup-experiment
+            template: cleanup-chaos-experiment
+            arguments:
+              parameters:
+                - name: experiment-name
+                  value: "{{workflow.parameters.experiment-name}}"
+
+    - name: safety-validation
+      inputs:
+        parameters:
+          - name: blast-radius
+          - name: experiment-type
+      container:
+        name: safety-validator
+        image: python:3.9-alpine
+        command: [python, -c]
+        args:
+          - |
+            import os
+            import sys
+            import json
+            import logging
+
+            logging.basicConfig(level=logging.INFO)
+            logger = logging.getLogger(__name__)
+
+            blast_radius = int('{{inputs.parameters.blast-radius}}')
+            experiment_type = '{{inputs.parameters.experiment-type}}'
+
+            # Safety checks
+            max_blast_radius = 30
+            critical_experiments = ['node-drain', 'zone-failure', 'full-cluster']
+
+            if blast_radius > max_blast_radius:
+                logger.error(f"Blast radius {blast_radius}% exceeds maximum {max_blast_radius}%")
+                sys.exit(1)
+
+            if experiment_type in critical_experiments:
+                logger.warning(f"Critical experiment type: {experiment_type}")
+                # Require manual approval for critical experiments
+                manual_approval = os.getenv('MANUAL_APPROVAL', 'false')
+                if manual_approval != 'true':
+                    logger.error("Manual approval required for critical experiments")
+                    sys.exit(1)
+
+            # Check system health
+            # This would integrate with health checking systems
+            logger.info("Safety validation passed")
+
+            result = {
+                "status": "passed",
+                "blast_radius": blast_radius,
+                "experiment_type": experiment_type,
+                "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }
+
+            print(json.dumps(result))
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+    - name: prepare-chaos-experiment
+      inputs:
+        parameters:
+          - name: experiment-name
+          - name: experiment-type
+          - name: blast-radius
+          - name: duration
+      script:
+        image: python:3.9-alpine
+        command: [python]
+        source: |
+          import json
+          import yaml
+          from datetime import datetime
+
+          experiment_name = '{{inputs.parameters.experiment-name}}'
+          experiment_type = '{{inputs.parameters.experiment-type}}'
+          blast_radius = '{{inputs.parameters.blast-radius}}'
+          duration = '{{inputs.parameters.duration}}'
+
+          # Create chaos experiment manifest based on type
+          if experiment_type == 'pod-delete':
+            manifest = {
+              "apiVersion": "chaos-mesh.org/v1alpha1",
+              "kind": "PodChaos",
+              "metadata": {
+                "name": experiment_name,
+                "namespace": "quantumbeam",
+                "labels": {
+                  "app": "quantumbeam",
+                  "component": "chaos-engineering",
+                  "experiment-type": experiment_type
+                }
+              },
+              "spec": {
+                "selector": {
+                  "labelSelectors": {
+                    "app": "quantumbeam-api"
+                  }
+                },
+                "mode": "fixed-percent" if blast_radius.endswith('%') else "fixed",
+                "value": blast_radius.rstrip('%'),
+                "action": "pod-kill",
+                "gracePeriodSeconds": 30
+              }
+            }
+
+          elif experiment_type == 'network-latency':
+            manifest = {
+              "apiVersion": "chaos-mesh.org/v1alpha1",
+              "kind": "NetworkChaos",
+              "metadata": {
+                "name": experiment_name,
+                "namespace": "quantumbeam",
+                "labels": {
+                  "app": "quantumbeam",
+                  "component": "chaos-engineering",
+                  "experiment-type": experiment_type
+                }
+              },
+              "spec": {
+                "selector": {
+                  "labelSelectors": {
+                    "app": "quantumbeam-api"
+                  }
+                },
+                "mode": "fixed-percent",
+                "value": blast_radius.rstrip('%'),
+                "action": "delay",
+                "delay": {
+                  "latency": "200ms",
+                  "jitter": "50ms",
+                  "correlation": "25"
+                },
+                "direction": "both"
+              }
+            }
+
+          elif experiment_type == 'cpu-hog':
+            manifest = {
+              "apiVersion": "chaos-mesh.org/v1alpha1",
+              "kind": "StressChaos",
+              "metadata": {
+                "name": experiment_name,
+                "namespace": "quantumbeam",
+                "labels": {
+                  "app": "quantumbeam",
+                  "component": "chaos-engineering",
+                  "experiment-type": experiment_type
+                }
+              },
+              "spec": {
+                "selector": {
+                  "labelSelectors": {
+                    "app": "quantumbeam-fraud-detector"
+                  }
+                },
+                "mode": "fixed",
+                "value": "1",
+                "stressors": {
+                  "cpu": {
+                    "workers": 2,
+                    "load": 80
+                  }
+                }
+              }
+            }
+
+          else:
+            # Default to pod-delete
+            manifest = {
+              "apiVersion": "chaos-mesh.org/v1alpha1",
+              "kind": "PodChaos",
+              "metadata": {
+                "name": experiment_name,
+                "namespace": "quantumbeam"
+              },
+              "spec": {
+                "selector": {
+                  "labelSelectors": {
+                    "app": "quantumbeam-api"
+                  }
+                },
+                "mode": "fixed-percent",
+                "value": blast_radius.rstrip('%'),
+                "action": "pod-kill"
+              }
+            }
+
+          # Add metadata
+          manifest['metadata']['annotations'] = {
+            "chaos-mesh.org/experiment": "quantumbeam",
+            "chaos-mesh.org/created-by": "argo-workflow",
+            "chaos-mesh.org/created-at": datetime.utcnow().isoformat()
+          }
+
+          print(json.dumps(manifest))
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+    - name: execute-chaos-experiment
+      inputs:
+        parameters:
+          - name: experiment-name
+          - name: experiment-manifest
+          - name: dry-run
+      container:
+        name: chaos-executor
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            set -e
+
+            EXPERIMENT_NAME="{{inputs.parameters.experiment-name}}"
+            DRY_RUN="{{inputs.parameters.dry-run}}"
+
+            # Write experiment manifest to file
+            echo '{{inputs.parameters.experiment-manifest}}' > /tmp/experiment.yaml
+
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "DRY RUN: Would create experiment $EXPERIMENT_NAME"
+              cat /tmp/experiment.yaml
+              echo '{"status": "dry_run", "experiment": "'$EXPERIMENT_NAME'"}'
+            else
+              echo "Creating chaos experiment: $EXPERIMENT_NAME"
+              kubectl apply -f /tmp/experiment.yaml
+
+              # Wait for experiment to be created
+              kubectl wait --for=condition=created podchaos/$EXPERIMENT_NAME -n quantumbeam --timeout=60s || true
+
+              echo '{"status": "created", "experiment": "'$EXPERIMENT_NAME'", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'
+            fi
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+    - name: monitor-chaos-experiment
+      inputs:
+        parameters:
+          - name: experiment-name
+          - name: duration
+      container:
+        name: chaos-monitor
+        image: python:3.9-alpine
+        command: [python, -c]
+        args:
+          - |
+            import json
+            import time
+            import requests
+            import logging
+            from datetime import datetime
+
+            logging.basicConfig(level=logging.INFO)
+            logger = logging.getLogger(__name__)
+
+            experiment_name = '{{inputs.parameters.experiment-name}}'
+            duration_seconds = int('{{inputs.parameters.duration}}'.rstrip('s')) if '{{inputs.parameters.duration}}'.endswith('s') else int('{{inputs.parameters.duration}}'.rstrip('m')) * 60
+
+            monitoring_data = {
+              "experiment": experiment_name,
+              "start_time": datetime.utcnow().isoformat(),
+              "duration_seconds": duration_seconds,
+              "health_checks": [],
+              "metrics": []
+            }
+
+            # Health check endpoints
+            health_endpoints = [
+              {"name": "api-health", "url": "http://quantumbeam-api.quantumbeam.svc.cluster.local/health"},
+              {"name": "fraud-detection-health", "url": "http://quantumbeam-fraud-detector.quantumbeam.svc.cluster.local/health"}
+            ]
+
+            start_time = time.time()
+
+            while time.time() - start_time < duration_seconds:
+              timestamp = datetime.utcnow().isoformat()
+
+              # Run health checks
+              for endpoint in health_endpoints:
+                try:
+                  response = requests.get(endpoint["url"], timeout=10)
+                  health_result = {
+                    "timestamp": timestamp,
+                    "endpoint": endpoint["name"],
+                    "status_code": response.status_code,
+                    "response_time": response.elapsed.total_seconds() * 1000,
+                    "status": "healthy" if response.status_code == 200 else "unhealthy"
+                  }
+                  monitoring_data["health_checks"].append(health_result)
+                except Exception as e:
+                  health_result = {
+                    "timestamp": timestamp,
+                    "endpoint": endpoint["name"],
+                    "status": "error",
+                    "error": str(e)
+                  }
+                  monitoring_data["health_checks"].append(health_result)
+                  logger.warning(f"Health check failed for {endpoint['name']}: {e}")
+
+              # Collect metrics (simplified)
+              try:
+                # This would integrate with Prometheus for real metrics
+                monitoring_data["metrics"].append({
+                  "timestamp": timestamp,
+                  "cpu_utilization": 65.5,  # Placeholder
+                  "memory_utilization": 72.3,  # Placeholder
+                  "request_rate": 1250.8  # Placeholder
+                })
+              except Exception as e:
+                logger.warning(f"Failed to collect metrics: {e}")
+
+              # Sleep before next check
+              time.sleep(30)
+
+            monitoring_data["end_time"] = datetime.utcnow().isoformat()
+            monitoring_data["actual_duration"] = time.time() - start_time
+
+            # Analyze health check results
+            total_checks = len(monitoring_data["health_checks"])
+            healthy_checks = len([c for c in monitoring_data["health_checks"] if c.get("status") == "healthy"])
+            health_score = (healthy_checks / total_checks * 100) if total_checks > 0 else 0
+
+            monitoring_data["summary"] = {
+              "total_health_checks": total_checks,
+              "healthy_checks": healthy_checks,
+              "health_score": health_score,
+              "status": "passed" if health_score >= 80 else "failed"
+            }
+
+            print(json.dumps(monitoring_data))
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+    - name: analyze-experiment-results
+      inputs:
+        parameters:
+          - name: experiment-name
+          - name: monitoring-data
+      script:
+        image: python:3.9-alpine
+        command: [python]
+        source: |
+          import json
+          import numpy as np
+          from datetime import datetime
+
+          experiment_name = '{{inputs.parameters.experiment-name}}'
+          monitoring_data = json.loads('{{inputs.parameters.monitoring-data}}')
+
+          # Analyze results
+          health_checks = monitoring_data.get('health_checks', [])
+          metrics = monitoring_data.get('metrics', [])
+
+          analysis = {
+            "experiment_name": experiment_name,
+            "analysis_timestamp": datetime.utcnow().isoformat(),
+            "experiment_duration": monitoring_data.get('actual_duration', 0),
+            "health_analysis": {},
+            "performance_analysis": {},
+            "recommendations": [],
+            "overall_status": "passed"
+          }
+
+          # Health analysis
+          if health_checks:
+            health_scores = []
+            for endpoint in set([hc['endpoint'] for hc in health_checks]):
+              endpoint_checks = [hc for hc in health_checks if hc['endpoint'] == endpoint]
+              healthy_checks = [hc for hc in endpoint_checks if hc.get('status') == 'healthy']
+              health_score = len(healthy_checks) / len(endpoint_checks) * 100
+              health_scores.append(health_score)
+
+              analysis["health_analysis"][endpoint] = {
+                "total_checks": len(endpoint_checks),
+                "healthy_checks": len(healthy_checks),
+                "health_score": health_score,
+                "avg_response_time": np.mean([hc.get('response_time', 0) for hc in endpoint_checks if 'response_time' in hc])
+              }
+
+            overall_health_score = np.mean(health_scores) if health_scores else 0
+            analysis["health_analysis"]["overall_score"] = overall_health_score
+
+          # Performance analysis
+          if metrics:
+            cpu_values = [m.get('cpu_utilization', 0) for m in metrics]
+            memory_values = [m.get('memory_utilization', 0) for m in metrics]
+            request_rates = [m.get('request_rate', 0) for m in metrics]
+
+            analysis["performance_analysis"] = {
+              "cpu": {
+                "avg": np.mean(cpu_values),
+                "max": np.max(cpu_values),
+                "min": np.min(cpu_values)
+              },
+              "memory": {
+                "avg": np.mean(memory_values),
+                "max": np.max(memory_values),
+                "min": np.min(memory_values)
+              },
+              "request_rate": {
+                "avg": np.mean(request_rates),
+                "max": np.max(request_rates),
+                "min": np.min(request_rates)
+              }
+            }
+
+          # Generate recommendations
+          if overall_health_score < 95:
+            analysis["recommendations"].append({
+              "type": "resilience",
+              "priority": "high",
+              "description": f"Health score {overall_health_score:.1f}% is below optimal. Consider improving error handling."
+            })
+
+          if analysis["performance_analysis"].get("cpu", {}).get("max", 0) > 85:
+            analysis["recommendations"].append({
+              "type": "performance",
+              "priority": "medium",
+              "description": "High CPU utilization detected. Consider horizontal scaling."
+            })
+
+          if analysis["performance_analysis"].get("memory", {}).get("max", 0) > 90:
+            analysis["recommendations"].append({
+              "type": "performance",
+              "priority": "medium",
+              "description": "High memory utilization detected. Consider memory optimization."
+            })
+
+          # Determine overall status
+          if overall_health_score >= 95:
+            analysis["overall_status"] = "passed"
+          elif overall_health_score >= 80:
+            analysis["overall_status"] = "warning"
+          else:
+            analysis["overall_status"] = "failed"
+
+          print(json.dumps(analysis, indent=2))
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+    - name: send-experiment-notification
+      inputs:
+        parameters:
+          - name: experiment-name
+          - name: experiment-results
+          - name: notification-enabled
+      container:
+        name: notification-sender
+        image: curlimages/curl:latest
+        command: [sh, -c]
+        args:
+          - |
+            EXPERIMENT_NAME="{{inputs.parameters.experiment-name}}"
+            EXPERIMENT_RESULTS='{{inputs.parameters.experiment-results}}'
+            NOTIFICATION_ENABLED="{{inputs.parameters.notification-enabled}}"
+
+            if [ "$NOTIFICATION_ENABLED" != "true" ]; then
+              echo "Notifications disabled"
+              exit 0
+            fi
+
+            # Parse results for notification
+            STATUS=$(echo "$EXPERIMENT_RESULTS" | python3 -c "
+            import sys, json
+            data = json.load(sys.stdin)
+            print(data.get('overall_status', 'unknown'))
+            ")
+
+            # Send Slack notification
+            SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL:-}"
+            if [ -n "$SLACK_WEBHOOK_URL" ]; then
+              case $STATUS in
+                "passed")
+                  COLOR="good"
+                  EMOJI="✅"
+                  ;;
+                "warning")
+                  COLOR="warning"
+                  EMOJI="⚠️"
+                  ;;
+                "failed")
+                  COLOR="danger"
+                  EMOJI="❌"
+                  ;;
+                *)
+                  COLOR="info"
+                  EMOJI="ℹ️"
+                  ;;
+              esac
+
+              curl -X POST -H 'Content-type: application/json' \
+                --data "{
+                  \"text\": \"$EMOJI Chaos Experiment: $EXPERIMENT_NAME\",
+                  \"attachments\": [
+                    {
+                      \"color\": \"$COLOR\",
+                      \"fields\": [
+                        {\"title\": \"Experiment\", \"value\": \"$EXPERIMENT_NAME\", \"short\": true},
+                        {\"title\": \"Status\", \"value\": \"$STATUS\", \"short\": true},
+                        {\"title\": \"Time\", \"value\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"short\": true}
+                      ]
+                    }
+                  ]
+                }" \
+                "$SLACK_WEBHOOK_URL" || echo "Failed to send Slack notification"
+            fi
+
+            # Send PagerDuty alert for failed experiments
+            if [ "$STATUS" = "failed" ] && [ -n "$PAGERDUTY_INTEGRATION_KEY" ]; then
+              curl -X POST -H 'Content-type: application/json' \
+                --data "{
+                  \"routing_key\": \"$PAGERDUTY_INTEGRATION_KEY\",
+                  \"event_action\": \"trigger\",
+                  \"payload\": {
+                    \"summary\": \"Chaos Experiment Failed: $EXPERIMENT_NAME\",
+                    \"severity\": \"critical\",
+                    \"source\": \"quantumbeam-chaos-engineering\",
+                    \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+                  }
+                }" \
+                "https://events.pagerduty.com/v2/enqueue" || echo "Failed to send PagerDuty alert"
+            fi
+
+            echo "Notifications sent for experiment: $EXPERIMENT_NAME"
+        env:
+          - name: SLACK_WEBHOOK_URL
+            valueFrom:
+              secretKeyRef:
+                name: monitoring-secrets
+                key: slack-webhook-url
+                optional: true
+          - name: PAGERDUTY_INTEGRATION_KEY
+            valueFrom:
+              secretKeyRef:
+                name: monitoring-secrets
+                key: pagerduty-integration-key
+                optional: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+    - name: cleanup-chaos-experiment
+      inputs:
+        parameters:
+          - name: experiment-name
+      container:
+        name: chaos-cleanup
+        image: bitnami/kubectl:latest
+        command: [sh, -c]
+        args:
+          - |
+            EXPERIMENT_NAME="{{inputs.parameters.experiment-name}}"
+
+            echo "Cleaning up chaos experiment: $EXPERIMENT_NAME"
+
+            # Delete chaos experiment
+            kubectl delete podchaos/$EXPERIMENT_NAME -n quantumbeam --ignore-not-found=true || true
+            kubectl delete networkchaos/$EXPERIMENT_NAME -n quantumbeam --ignore-not-found=true || true
+            kubectl delete stresschaos/$EXPERIMENT_NAME -n quantumbeam --ignore-not-found=true || true
+
+            echo "Cleanup completed for experiment: $EXPERIMENT_NAME"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: quantumbeam-chaos-engineering
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: chaos-engineering
+rules:
+  # Chaos experiment management
+  - apiGroups: ["chaos-mesh.org"]
+    resources: ["*"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+
+  # Pod management
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+
+  # Service access for health checks
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+
+  # ConfigMap and Secret access
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+
+  # Events for logging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: quantumbeam-chaos-engineering
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: chaos-engineering
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: quantumbeam-chaos-engineering
+subjects:
+  - kind: ServiceAccount
+    name: quantumbeam-chaos-engineering
+    namespace: quantumbeam
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quantumbeam-chaos-engineering
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: chaos-engineering

@@ -1,0 +1,1426 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quantumbeam-audit-logging
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: compliance
+    type: audit-logging
+data:
+  audit-logging-config.yaml: |
+    # QuantumBeam Audit Logging and Compliance System
+    auditLogging:
+      version: "1.0"
+      lastUpdated: "2024-01-15T00:00:00Z"
+
+      # Compliance Frameworks
+      complianceFrameworks:
+        - name: "SOC 2 Type II"
+          description: "Service Organization Control 2 Type II compliance"
+          requirements:
+            - "Audit trail for all system access"
+            - "Change management documentation"
+            - "Security incident logging"
+            - "Data access monitoring"
+          retentionPeriod: "7 years"
+
+        - name: "PCI DSS"
+          description: "Payment Card Industry Data Security Standard"
+          requirements:
+            - "Access to cardholder data logging"
+            - "Authentication mechanism logging"
+            - "Network resource access logging"
+            - "Security event logging"
+          retentionPeriod: "1 year"
+
+        - name: "GDPR"
+          description: "General Data Protection Regulation"
+          requirements:
+            - "Data processing activity logging"
+            - "Consent management logging"
+            - "Data breach incident logging"
+            - "Data subject request logging"
+          retentionPeriod: "6 years"
+
+        - name: "HIPAA"
+          description: "Health Insurance Portability and Accountability Act"
+          requirements:
+            - "PHI access logging"
+            - "Authentication and authorization logging"
+            - "System activity logging"
+            - "Security incident logging"
+          retentionPeriod: "6 years"
+
+      # Audit Event Categories
+      eventCategories:
+        authentication:
+          name: "Authentication Events"
+          description: "All authentication and authorization activities"
+          priority: "high"
+          retentionPeriod: "7 years"
+          events:
+            - user_login
+            - user_logout
+            - login_failure
+            - password_change
+            - password_reset
+            - mfa_challenge
+            - mfa_success
+            - mfa_failure
+            - account_locked
+            - account_unlocked
+            - session_created
+            - session_expired
+            - privilege_escalation
+            - sudo_access
+
+        authorization:
+          name: "Authorization Events"
+          description: "Permission and access control activities"
+          priority: "high"
+          retentionPeriod: "7 years"
+          events:
+            - role_assigned
+            - role_revoked
+            - permission_granted
+            - permission_denied
+            - access_request
+            - access_approved
+            - access_denied
+            - resource_access
+            - api_access
+            - database_access
+
+        dataAccess:
+          name: "Data Access Events"
+          description: "Data read, write, and modification activities"
+          priority: "high"
+          retentionPeriod: "7 years"
+          events:
+            - data_read
+            - data_write
+            - data_delete
+            - data_export
+            - data_import
+            - data_download
+            - pii_access
+            - phi_access
+            - financial_data_access
+            - sensitive_data_access
+            - bulk_data_access
+
+        systemEvents:
+          name: "System Events"
+          description: "System configuration and operational activities"
+          priority: "medium"
+          retentionPeriod: "3 years"
+          events:
+            - system_start
+            - system_stop
+            - service_start
+            - service_stop
+            - configuration_change
+            - deployment
+            - rollback
+            - maintenance_mode
+            - backup_initiated
+            - backup_completed
+            - backup_failed
+            - restore_initiated
+            - restore_completed
+            - restore_failed
+
+        securityEvents:
+          name: "Security Events"
+          description: "Security-related activities and incidents"
+          priority: "critical"
+          retentionPeriod: "7 years"
+          events:
+            - security_violation
+            - suspicious_activity
+            - intrusion_detected
+            - malware_detected
+            - data_breach
+            - security_incident
+            - vulnerability_scan
+            - firewall_blocked
+            - failed_login_attemtps
+            - privilege_abuse
+            - data_exfiltration
+
+        apiEvents:
+          name: "API Events"
+          description: "API access and usage activities"
+          priority: "medium"
+          retentionPeriod: "2 years"
+          events:
+            - api_request
+            - api_response
+            - api_error
+            - rate_limit_exceeded
+            - api_authentication
+            - api_authorization
+            - throttling_applied
+            - schema_validation_failed
+            - invalid_request
+            - service_unavailable
+
+        fraudDetection:
+          name: "Fraud Detection Events"
+          description: "Fraud detection and prevention activities"
+          priority: "high"
+          retentionPeriod: "7 years"
+          events:
+            - fraud_score_calculated
+            - fraud_alert_triggered
+            - case_created
+            - case_updated
+            - case_closed
+            - rule_matched
+            - model_prediction
+            - manual_review
+            - false_positive
+            - confirmed_fraud
+            - investigation_started
+
+        complianceEvents:
+          name: "Compliance Events"
+          description: "Compliance-related activities"
+          priority: "high"
+          retentionPeriod: "7 years"
+          events:
+            - compliance_audit
+            - policy_violation
+            - regulatory_report
+            - risk_assessment
+            - control_test
+            - training_completed
+            - certification_updated
+            - consent_given
+            - consent_withdrawn
+            - data_subject_request
+
+      # Audit Log Structure
+      logStructure:
+        baseFields:
+          - name: "timestamp"
+            type: "datetime"
+            description: "Event timestamp in UTC"
+            required: true
+            format: "ISO 8601"
+
+          - name: "event_id"
+            type: "string"
+            description: "Unique event identifier"
+            required: true
+            format: "UUID"
+
+          - name: "event_category"
+            type: "string"
+            description: "Category of the event"
+            required: true
+            values: ["authentication", "authorization", "data_access", "system", "security", "api", "fraud_detection", "compliance"]
+
+          - name: "event_type"
+            type: "string"
+            description: "Specific type of event"
+            required: true
+
+          - name: "severity"
+            type: "string"
+            description: "Event severity level"
+            required: true
+            values: ["critical", "high", "medium", "low", "info"]
+
+          - name: "source_ip"
+            type: "string"
+            description: "Source IP address"
+            required: false
+
+          - name: "user_id"
+            type: "string"
+            description: "User identifier"
+            required: false
+
+          - name: "user_email"
+            type: "string"
+            description: "User email address"
+            required: false
+
+          - name: "session_id"
+            type: "string"
+            description: "Session identifier"
+            required: false
+
+          - name: "service_name"
+            type: "string"
+            description: "Service or application name"
+            required: true
+
+          - name: "resource_id"
+            type: "string"
+            description: "Affected resource identifier"
+            required: false
+
+          - name: "resource_type"
+            type: "string"
+            description: "Type of affected resource"
+            required: false
+
+          - name: "action"
+            type: "string"
+            description: "Action performed"
+            required: true
+
+          - name: "result"
+            type: "string"
+            description: "Result of the action"
+            required: true
+            values: ["success", "failure", "partial"]
+
+          - name: "description"
+            type: "string"
+            description: "Human-readable description"
+            required: true
+
+        additionalFields:
+          - name: "request_id"
+            type: "string"
+            description: "Request identifier for correlation"
+            required: false
+
+          - name: "correlation_id"
+            type: "string"
+            description: "Correlation identifier across services"
+            required: false
+
+          - name: "user_agent"
+            type: "string"
+            description: "User agent string"
+            required: false
+
+          - name: "geo_location"
+            type: "object"
+            description: "Geographic location information"
+            required: false
+            fields:
+              - country
+              - region
+              - city
+
+          - name: "risk_score"
+            type: "number"
+            description: "Risk score for security events"
+            required: false
+
+          - name: "compliance_tags"
+            type: "array"
+            description: "Compliance framework tags"
+            required: false
+
+          - name: "metadata"
+            type: "object"
+            description: "Additional metadata"
+            required: false
+
+      # Data Retention Policy
+      retentionPolicy:
+        defaultPeriod: "7 years"
+        archivePeriod: "10 years"
+        deletePeriod: "12 years"
+
+        categoryRetention:
+          authentication: "7 years"
+          authorization: "7 years"
+          data_access: "7 years"
+          system_events: "3 years"
+          security_events: "7 years"
+          api_events: "2 years"
+          fraud_detection: "7 years"
+          compliance_events: "7 years"
+
+        retentionTiers:
+          hot:
+            period: "6 months"
+            storage: "elasticsearch"
+            access: "fast"
+
+          warm:
+            period: "6 months - 2 years"
+            storage: "s3_standard"
+            access: "standard"
+
+          cold:
+            period: "2 - 7 years"
+            storage: "s3_glacier"
+            access: "slow"
+
+          archive:
+            period: "7 - 10 years"
+            storage: "s3_glacier_deep_archive"
+            access: "very_slow"
+
+          delete:
+            period: "after 10 years"
+            action: "secure_delete"
+            confirmation: "required"
+
+      # Audit Log Collection
+      collection:
+        sources:
+          application:
+            name: "Application Logs"
+            type: "structured_logs"
+            format: "json"
+            collection_method: "filebeat"
+            sources:
+              - "/var/log/quantumbeam/audit.log"
+              - "/var/log/quantumbeam/authentication.log"
+              - "/var/log/quantumbeam/authorization.log"
+              - "/var/log/quantumbeam/data_access.log"
+
+          api_gateway:
+            name: "API Gateway Logs"
+            type: "access_logs"
+            format: "json"
+            collection_method: "aws_cloudwatch"
+            sources:
+              - "application_load_balancer_logs"
+              - "api_gateway_logs"
+              - "cloudfront_logs"
+
+          database:
+            name: "Database Audit Logs"
+            type: "database_logs"
+            format: "csv"
+            collection_method: "database_export"
+            sources:
+              - "postgresql_audit_logs"
+              - "redis_slow_logs"
+
+          cloud_services:
+            name: "Cloud Service Logs"
+            type: "cloud_logs"
+            format: "json"
+            collection_method: "aws_cloudtrail"
+            sources:
+              - "aws_cloudtrail"
+              - "aws_config"
+              - "vpc_flow_logs"
+
+          security:
+            name: "Security Tool Logs"
+            type: "security_logs"
+            format: "json"
+            collection_method: "siem_agent"
+            sources:
+              - "waf_logs"
+              - "intrusion_detection_logs"
+              - "vulnerability_scan_logs"
+
+        processors:
+          enrichment:
+            name: "Log Enrichment"
+            description: "Enrich logs with additional context"
+            processors:
+              - geoip_enrichment
+              - user_enrichment
+              - threat_intelligence_enrichment
+              - compliance_mapping
+
+          parsing:
+            name: "Log Parsing"
+            description: "Parse and normalize log formats"
+            processors:
+              - json_parser
+              - csv_parser
+              - regex_parser
+              - timestamp_normalizer
+
+          filtering:
+            name: "Log Filtering"
+            description: "Filter logs based on rules"
+            processors:
+              - sensitive_data_filter
+              - noise_filter
+              - compliance_filter
+              - priority_filter
+
+      # Compliance Monitoring
+      complianceMonitoring:
+        controls:
+          access_control:
+            name: "Access Control Monitoring"
+            description: "Monitor access control compliance"
+            checks:
+              - name: "privilege_escalation_monitoring"
+                description: "Monitor for unauthorized privilege escalation"
+                severity: "high"
+                schedule: "real_time"
+                threshold: "0 incidents per hour"
+
+              - name: "access_review_compliance"
+                description: "Ensure access reviews are completed"
+                severity: "medium"
+                schedule: "weekly"
+                threshold: "100% completion"
+
+          data_protection:
+            name: "Data Protection Monitoring"
+            description: "Monitor data protection compliance"
+            checks:
+              - name: "data_access_logging"
+                description: "Ensure all data access is logged"
+                severity: "high"
+                schedule: "real_time"
+                threshold: "100% coverage"
+
+              - name: "encryption_compliance"
+                description: "Verify data encryption requirements"
+                severity: "critical"
+                schedule: "daily"
+                threshold: "100% encrypted"
+
+          security_incidents:
+            name: "Security Incident Monitoring"
+            description: "Monitor security incident response"
+            checks:
+              - name: "incident_detection_time"
+                description: "Monitor incident detection time"
+                severity: "high"
+                schedule: "ongoing"
+                threshold: "< 15 minutes"
+
+              - name: "incident_response_time"
+                description: "Monitor incident response time"
+                severity: "high"
+                schedule: "ongoing"
+                threshold: "< 1 hour"
+
+        reporting:
+          schedules:
+            - name: "daily_compliance_summary"
+              frequency: "daily"
+              recipients: ["compliance@quantumbeam.io", "security@quantumbeam.io"]
+              format: "dashboard"
+
+            - name: "weekly_compliance_report"
+              frequency: "weekly"
+              recipients: ["management@quantumbeam.io", "compliance@quantumbeam.io"]
+              format: "pdf"
+
+            - name: "monthly_compliance_review"
+              frequency: "monthly"
+              recipients: ["executives@quantumbeam.io", "board@quantumbeam.io"]
+              format: "comprehensive_report"
+
+            - name: "quarterly_audit_report"
+              frequency: "quarterly"
+              recipients: ["auditors@quantumbeam.io", "compliance@quantumbeam.io"]
+              format: "audit_report"
+
+      # Alerting and Notifications
+      alerting:
+        rules:
+          critical_events:
+            name: "Critical Security Events"
+            description: "Alert on critical security events"
+            conditions:
+              - event_severity: "critical"
+              - event_category: ["security", "authentication", "authorization"]
+            actions:
+              - immediate_slack_alert
+              - pagerduty_notification
+              - email_to_security_team
+
+          compliance_violations:
+            name: "Compliance Violations"
+            description: "Alert on compliance violations"
+            conditions:
+              - compliance_check_failed: true
+            actions:
+              - email_to_compliance_team
+              - create_jira_ticket
+              - slack_notification
+
+          data_breach:
+            name: "Data Breach Detection"
+            description: "Alert on potential data breaches"
+            conditions:
+              - data_exfiltration_detected: true
+              - unusual_data_access_pattern: true
+            actions:
+              - immediate_incident_response
+              - executive_notification
+              - legal_team_notification
+
+          audit_log_gaps:
+            name: "Audit Log Gaps"
+            description: "Alert on missing audit logs"
+            conditions:
+              - log_ingestion_gap: "> 5 minutes"
+              - missing_required_fields: true
+            actions:
+              - alert_devops_team
+              - create_investigation_ticket
+              - escalate_if_persistent
+
+        notification_channels:
+          slack:
+            critical_events:
+              channel: "#security-alerts"
+              webhook_url: "${SLACK_SECURITY_WEBHOOK}"
+              mention: "@security-team"
+
+            compliance:
+              channel: "#compliance"
+              webhook_url: "${SLACK_COMPLIANCE_WEBHOOK}"
+              mention: "@compliance-team"
+
+          pagerduty:
+            security_incidents:
+              service_key: "${PAGERDUTY_SECURITY_KEY}"
+              severity: "critical"
+              escalation_policy: "security-incident-escalation"
+
+          email:
+            compliance_reports:
+              recipients: ["compliance@quantumbeam.io", "management@quantumbeam.io"]
+              template: "compliance_report"
+
+            security_alerts:
+              recipients: ["security@quantumbeam.io", "cto@quantumbeam.io"]
+              template: "security_alert"
+
+      # Audit Trail Integrity
+      integrity:
+        hashing:
+          algorithm: "SHA-256"
+          frequency: "per_log_entry"
+          storage: "embedded_in_log"
+
+        signing:
+          algorithm: "RSA-4096"
+          frequency: "hourly"
+          key_rotation: "annually"
+          storage: "separate_integrity_log"
+
+        verification:
+          automatic_verification: true
+          verification_frequency: "daily"
+          alert_on_failure: true
+
+        tamper_detection:
+          methods:
+            - "cryptographic_hashing"
+            - "digital_signatures"
+            - "blockchain_storage"
+            - "witness_storage"
+
+        backup:
+          frequency: "daily"
+          retention: "90_days"
+          encryption: "AES-256"
+          offsite_storage: true
+
+  audit-log-automation.yaml: |
+    # Audit Log Automation Scripts
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: audit-log-automation-scripts
+      namespace: quantumbeam
+      labels:
+        app: quantumbeam
+        component: compliance
+        type: automation
+    data:
+      audit-log-processor.py: |
+        #!/usr/bin/env python3
+        """
+        QuantumBeam Audit Log Processor
+        Automated audit log processing, enrichment, and compliance monitoring
+        """
+
+        import asyncio
+        import hashlib
+        import json
+        logging
+        os
+        time
+        from datetime import datetime, timedelta
+        from typing import Dict, List, Optional, Tuple
+
+        import aiohttp
+        import boto3
+        import psycopg2
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+
+        class AuditLogProcessor:
+            """Advanced audit log processing and compliance monitoring system"""
+
+            def __init__(self):
+                self.elasticsearch_url = os.getenv('ELASTICSEARCH_URL', 'http://elasticsearch:9200')
+                self.postgres_url = os.getenv('POSTGRES_URL', 'postgresql://user:pass@postgres:5432/quantumbeam')
+                self.aws_region = os.getenv('AWS_REGION', 'us-west-2')
+
+                # Compliance requirements
+                self.retention_periods = {
+                    'authentication': 7 * 365,  # 7 years
+                    'authorization': 7 * 365,
+                    'data_access': 7 * 365,
+                    'system_events': 3 * 365,
+                    'security_events': 7 * 365,
+                    'api_events': 2 * 365,
+                    'fraud_detection': 7 * 365,
+                    'compliance_events': 7 * 365
+                }
+
+                # Initialize AWS clients
+                self.s3_client = boto3.client('s3', region_name=self.aws_region)
+                self.kms_client = boto3.client('kms', region_name=self.aws_region)
+
+                # Initialize database connection
+                self.postgres_conn = None
+
+            async def initialize(self):
+                """Initialize database connections and clients"""
+                try:
+                    self.postgres_conn = psycopg2.connect(self.postgres_url)
+                    logger.info("Audit log processor initialized successfully")
+                except Exception as e:
+                    logger.error(f"Failed to initialize audit log processor: {e}")
+                    raise
+
+            async def process_audit_log(self, log_entry: Dict) -> Dict:
+                """Process a single audit log entry"""
+                try:
+                    # Validate required fields
+                    validated_log = self.validate_log_entry(log_entry)
+                    if not validated_log:
+                        return {"status": "failed", "reason": "validation_failed"}
+
+                    # Enrich log entry
+                    enriched_log = await self.enrich_log_entry(validated_log)
+
+                    # Calculate integrity hash
+                    integrity_hash = self.calculate_integrity_hash(enriched_log)
+                    enriched_log['integrity_hash'] = integrity_hash
+
+                    # Apply compliance rules
+                    compliance_result = await self.apply_compliance_rules(enriched_log)
+                    enriched_log['compliance'] = compliance_result
+
+                    # Store in Elasticsearch
+                    storage_result = await self.store_log_entry(enriched_log)
+
+                    # Check for alerts
+                    await self.check_alert_conditions(enriched_log)
+
+                    return {
+                        "status": "success",
+                        "log_id": enriched_log.get('event_id'),
+                        "storage_result": storage_result,
+                        "compliance_status": compliance_result.get('status', 'compliant')
+                    }
+
+                except Exception as e:
+                    logger.error(f"Error processing audit log: {e}")
+                    return {"status": "failed", "error": str(e)}
+
+            def validate_log_entry(self, log_entry: Dict) -> Optional[Dict]:
+                """Validate audit log entry structure and required fields"""
+                required_fields = ['timestamp', 'event_id', 'event_category', 'event_type', 'severity', 'service_name', 'action', 'result', 'description']
+
+                for field in required_fields:
+                    if field not in log_entry:
+                        logger.error(f"Missing required field: {field}")
+                        return None
+
+                # Validate field formats
+                try:
+                    # Validate timestamp format
+                    datetime.fromisoformat(log_entry['timestamp'].replace('Z', '+00:00'))
+
+                    # Validate severity
+                    if log_entry['severity'] not in ['critical', 'high', 'medium', 'low', 'info']:
+                        logger.error(f"Invalid severity: {log_entry['severity']}")
+                        return None
+
+                    # Validate event category
+                    valid_categories = ['authentication', 'authorization', 'data_access', 'system_events', 'security_events', 'api_events', 'fraud_detection', 'compliance_events']
+                    if log_entry['event_category'] not in valid_categories:
+                        logger.error(f"Invalid event category: {log_entry['event_category']}")
+                        return None
+
+                except Exception as e:
+                    logger.error(f"Field validation error: {e}")
+                    return None
+
+                return log_entry.copy()
+
+            async def enrich_log_entry(self, log_entry: Dict) -> Dict:
+                """Enrich log entry with additional context"""
+                enriched = log_entry.copy()
+
+                # Add processing timestamp
+                enriched['processed_at'] = datetime.utcnow().isoformat()
+
+                # Enrich with user information if user_id is present
+                if 'user_id' in enriched and enriched['user_id']:
+                    user_info = await self.get_user_info(enriched['user_id'])
+                    if user_info:
+                        enriched['user_info'] = user_info
+
+                # Enrich with geolocation if source_ip is present
+                if 'source_ip' in enriched and enriched['source_ip']:
+                    geo_info = await self.get_geolocation(enriched['source_ip'])
+                    if geo_info:
+                        enriched['geo_location'] = geo_info
+
+                # Enrich with threat intelligence for security events
+                if enriched['event_category'] == 'security_events':
+                    threat_info = await self.get_threat_intelligence(enriched)
+                    if threat_info:
+                        enriched['threat_intelligence'] = threat_info
+
+                # Add compliance tags
+                compliance_tags = self.get_compliance_tags(enriched)
+                enriched['compliance_tags'] = compliance_tags
+
+                return enriched
+
+            async def get_user_info(self, user_id: str) -> Optional[Dict]:
+                """Get user information from database"""
+                try:
+                    with self.postgres_conn.cursor() as cursor:
+                        cursor.execute("""
+                            SELECT user_id, email, full_name, department, role, last_login
+                            FROM users WHERE user_id = %s
+                        """, (user_id,))
+                        result = cursor.fetchone()
+
+                        if result:
+                            return {
+                                'user_id': result[0],
+                                'email': result[1],
+                                'full_name': result[2],
+                                'department': result[3],
+                                'role': result[4],
+                                'last_login': result[5].isoformat() if result[5] else None
+                            }
+
+                except Exception as e:
+                    logger.error(f"Error getting user info for {user_id}: {e}")
+
+                return None
+
+            async def get_geolocation(self, ip_address: str) -> Optional[Dict]:
+                """Get geolocation information for IP address"""
+                try:
+                    # This would integrate with a geolocation service
+                    # For now, return mock data
+                    if ip_address.startswith('192.168.') or ip_address.startswith('10.'):
+                        return {'type': 'internal', 'location': 'corporate_network'}
+
+                    # Mock geolocation data
+                    return {
+                        'country': 'US',
+                        'region': 'California',
+                        'city': 'San Francisco',
+                        'latitude': 37.7749,
+                        'longitude': -122.4194
+                    }
+
+                except Exception as e:
+                    logger.error(f"Error getting geolocation for {ip_address}: {e}")
+
+                return None
+
+            async def get_threat_intelligence(self, log_entry: Dict) -> Optional[Dict]:
+                """Get threat intelligence for security events"""
+                try:
+                    threat_info = {}
+
+                    # Check source IP against threat feeds
+                    if 'source_ip' in log_entry:
+                        is_malicious = await self.check_ip_threat(log_entry['source_ip'])
+                        if is_malicious:
+                            threat_info['malicious_ip'] = True
+
+                    # Check user behavior patterns
+                    if 'user_id' in log_entry:
+                        suspicious_activity = await self.check_user_behavior(log_entry['user_id'], log_entry['event_type'])
+                        if suspicious_activity:
+                            threat_info['suspicious_behavior'] = True
+
+                    # Check for known attack patterns
+                    attack_pattern = await self.check_attack_patterns(log_entry)
+                    if attack_pattern:
+                        threat_info['attack_pattern'] = attack_pattern
+
+                    return threat_info if threat_info else None
+
+                except Exception as e:
+                    logger.error(f"Error getting threat intelligence: {e}")
+
+                return None
+
+            async def check_ip_threat(self, ip_address: str) -> bool:
+                """Check if IP address is in threat intelligence feeds"""
+                # This would integrate with threat intelligence providers
+                # For now, return False
+                return False
+
+            async def check_user_behavior(self, user_id: str, event_type: str) -> bool:
+                """Check for suspicious user behavior patterns"""
+                try:
+                    with self.postgres_conn.cursor() as cursor:
+                        # Check for unusual patterns
+                        cursor.execute("""
+                            SELECT COUNT(*) as recent_events
+                            FROM audit_logs
+                            WHERE user_id = %s AND event_type = %s
+                            AND timestamp >= NOW() - INTERVAL '1 hour'
+                        """, (user_id, event_type))
+                        result = cursor.fetchone()
+
+                        if result and result[0] > 100:  # More than 100 similar events in 1 hour
+                            return True
+
+                except Exception as e:
+                    logger.error(f"Error checking user behavior: {e}")
+
+                return False
+
+            async def check_attack_patterns(self, log_entry: Dict) -> Optional[str]:
+                """Check for known attack patterns"""
+                # This would integrate with security pattern matching
+                # For now, return None
+                return None
+
+            def get_compliance_tags(self, log_entry: Dict) -> List[str]:
+                """Get compliance framework tags for the log entry"""
+                tags = []
+
+                # SOC 2 tags
+                if log_entry['event_category'] in ['authentication', 'authorization', 'security_events']:
+                    tags.append('soc2_access_control')
+
+                if log_entry['event_category'] in ['data_access']:
+                    tags.append('soc2_data_management')
+
+                # PCI DSS tags
+                if 'financial_data' in log_entry.get('description', '').lower():
+                    tags.append('pci_dss')
+
+                # GDPR tags
+                if 'personal_data' in log_entry.get('description', '').lower():
+                    tags.append('gdpr')
+
+                # HIPAA tags
+                if 'phi' in log_entry.get('description', '').lower() or 'health' in log_entry.get('description', '').lower():
+                    tags.append('hipaa')
+
+                return tags
+
+            def calculate_integrity_hash(self, log_entry: Dict) -> str:
+                """Calculate cryptographic hash for log integrity"""
+                # Create canonical representation of log entry
+                canonical = json.dumps(log_entry, sort_keys=True, separators=(',', ':'))
+                return hashlib.sha256(canonical.encode()).hexdigest()
+
+            async def apply_compliance_rules(self, log_entry: Dict) -> Dict:
+                """Apply compliance rules to log entry"""
+                compliance_result = {
+                    'status': 'compliant',
+                    'violations': [],
+                    'required_actions': []
+                }
+
+                # Check retention requirements
+                retention_period = self.retention_periods.get(log_entry['event_category'], 7 * 365)
+                compliance_result['retention_period_days'] = retention_period
+
+                # Check for sensitive data handling
+                if log_entry['event_category'] == 'data_access':
+                    if not log_entry.get('user_id'):
+                        compliance_result['status'] = 'non_compliant'
+                        compliance_result['violations'].append('data_access_without_user_identification')
+                        compliance_result['required_actions'].append('implement_user_tracking')
+
+                # Check for proper encryption
+                if log_entry['event_category'] == 'compliance_events' and 'consent' in log_entry.get('event_type', ''):
+                    if not log_entry.get('user_id'):
+                        compliance_result['status'] = 'non_compliant'
+                        compliance_result['violations'].append('consent_management_without_user_identification')
+
+                return compliance_result
+
+            async def store_log_entry(self, log_entry: Dict) -> Dict:
+                """Store log entry in Elasticsearch and archive to S3"""
+                try:
+                    # Store in Elasticsearch for immediate access
+                    es_result = await self.store_in_elasticsearch(log_entry)
+
+                    # Archive to S3 for long-term storage
+                    s3_result = await self.archive_to_s3(log_entry)
+
+                    # Store metadata in PostgreSQL
+                    db_result = await self.store_log_metadata(log_entry)
+
+                    return {
+                        'elasticsearch': es_result,
+                        's3_archive': s3_result,
+                        'database': db_result
+                    }
+
+                except Exception as e:
+                    logger.error(f"Error storing log entry: {e}")
+                    return {"status": "failed", "error": str(e)}
+
+            async def store_in_elasticsearch(self, log_entry: Dict) -> Dict:
+                """Store log entry in Elasticsearch"""
+                try:
+                    index_name = f"audit-logs-{log_entry['event_category']}"
+                    doc_id = log_entry['event_id']
+
+                    async with aiohttp.ClientSession() as session:
+                        url = f"{self.elasticsearch_url}/{index_name}/_doc/{doc_id}"
+                        headers = {'Content-Type': 'application/json'}
+
+                        async with session.put(url, json=log_entry, headers=headers) as response:
+                            if response.status in [200, 201]:
+                                return {"status": "success", "index": index_name, "doc_id": doc_id}
+                            else:
+                                error_text = await response.text()
+                                return {"status": "failed", "error": error_text}
+
+                except Exception as e:
+                    logger.error(f"Error storing in Elasticsearch: {e}")
+                    return {"status": "failed", "error": str(e)}
+
+            async def archive_to_s3(self, log_entry: Dict) -> Dict:
+                """Archive log entry to S3"""
+                try:
+                    # Create S3 key based on date and category
+                    date = datetime.fromisoformat(log_entry['timestamp'].replace('Z', '+00:00'))
+                    s3_key = f"audit-logs/{log_entry['event_category']}/{date.strftime('%Y/%m/%d')}/{log_entry['event_id']}.json"
+
+                    # Encrypt log entry if required
+                    log_data = json.dumps(log_entry).encode('utf-8')
+                    if log_entry.get('compliance_tags'):
+                        # Encrypt sensitive compliance logs
+                        encrypted_data = await self.encrypt_log_data(log_data)
+                        log_data = encrypted_data
+
+                    # Upload to S3
+                    bucket_name = os.getenv('AUDIT_LOGS_BUCKET', 'quantumbeam-audit-logs')
+                    self.s3_client.put_object(
+                        Bucket=bucket_name,
+                        Key=s3_key,
+                        Body=log_data,
+                        ServerSideEncryption='AES256',
+                        Metadata={
+                            'event_category': log_entry['event_category'],
+                            'event_type': log_entry['event_type'],
+                            'timestamp': log_entry['timestamp'],
+                            'retention_period': str(self.retention_periods.get(log_entry['event_category'], 7 * 365))
+                        }
+                    )
+
+                    return {"status": "success", "s3_key": s3_key}
+
+                except Exception as e:
+                    logger.error(f"Error archiving to S3: {e}")
+                    return {"status": "failed", "error": str(e)}
+
+            async def encrypt_log_data(self, data: bytes) -> bytes:
+                """Encrypt log data using KMS"""
+                try:
+                    response = self.kms_client.encrypt(
+                        KeyId=os.getenv('AUDIT_LOGS_KMS_KEY'),
+                        Plaintext=data
+                    )
+                    return response['CiphertextBlob']
+
+                except Exception as e:
+                    logger.error(f"Error encrypting log data: {e}")
+                    return data  # Return unencrypted if encryption fails
+
+            async def store_log_metadata(self, log_entry: Dict) -> Dict:
+                """Store log metadata in PostgreSQL"""
+                try:
+                    with self.postgres_conn.cursor() as cursor:
+                        cursor.execute("""
+                            INSERT INTO audit_log_metadata (
+                                event_id, event_category, event_type, timestamp,
+                                user_id, source_ip, service_name, integrity_hash,
+                                compliance_status, retention_period, created_at
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (event_id) DO UPDATE SET
+                                integrity_hash = EXCLUDED.integrity_hash,
+                                compliance_status = EXCLUDED.compliance_status
+                        """, (
+                            log_entry['event_id'],
+                            log_entry['event_category'],
+                            log_entry['event_type'],
+                            log_entry['timestamp'],
+                            log_entry.get('user_id'),
+                            log_entry.get('source_ip'),
+                            log_entry['service_name'],
+                            log_entry['integrity_hash'],
+                            log_entry.get('compliance', {}).get('status', 'compliant'),
+                            log_entry.get('compliance', {}).get('retention_period_days', 7 * 365),
+                            datetime.utcnow()
+                        ))
+
+                        self.postgres_conn.commit()
+
+                    return {"status": "success", "event_id": log_entry['event_id']}
+
+                except Exception as e:
+                    logger.error(f"Error storing log metadata: {e}")
+                    self.postgres_conn.rollback()
+                    return {"status": "failed", "error": str(e)}
+
+            async def check_alert_conditions(self, log_entry: Dict):
+                """Check if log entry triggers any alerts"""
+                try:
+                    # Critical security events
+                    if log_entry['severity'] == 'critical' and log_entry['event_category'] in ['security_events', 'authentication', 'authorization']:
+                        await self.send_security_alert(log_entry)
+
+                    # Compliance violations
+                    compliance = log_entry.get('compliance', {})
+                    if compliance.get('status') == 'non_compliant':
+                        await self.send_compliance_alert(log_entry, compliance.get('violations', []))
+
+                    # Suspicious patterns
+                    if log_entry.get('threat_intelligence'):
+                        await self.send_threat_alert(log_entry)
+
+                except Exception as e:
+                    logger.error(f"Error checking alert conditions: {e}")
+
+            async def send_security_alert(self, log_entry: Dict):
+                """Send security alert"""
+                try:
+                    alert_data = {
+                        'alert_type': 'security_event',
+                        'severity': log_entry['severity'],
+                        'event_id': log_entry['event_id'],
+                        'event_type': log_entry['event_type'],
+                        'description': log_entry['description'],
+                        'user_id': log_entry.get('user_id'),
+                        'source_ip': log_entry.get('source_ip'),
+                        'timestamp': log_entry['timestamp'],
+                        'service': log_entry['service_name']
+                    }
+
+                    await self.send_alert_to_channels(alert_data, ['security'])
+
+                except Exception as e:
+                    logger.error(f"Error sending security alert: {e}")
+
+            async def send_compliance_alert(self, log_entry: Dict, violations: List[str]):
+                """Send compliance violation alert"""
+                try:
+                    alert_data = {
+                        'alert_type': 'compliance_violation',
+                        'severity': 'high',
+                        'event_id': log_entry['event_id'],
+                        'event_category': log_entry['event_category'],
+                        'violations': violations,
+                        'compliance_tags': log_entry.get('compliance_tags', []),
+                        'timestamp': log_entry['timestamp'],
+                        'service': log_entry['service_name']
+                    }
+
+                    await self.send_alert_to_channels(alert_data, ['compliance'])
+
+                except Exception as e:
+                    logger.error(f"Error sending compliance alert: {e}")
+
+            async def send_threat_alert(self, log_entry: Dict):
+                """Send threat intelligence alert"""
+                try:
+                    alert_data = {
+                        'alert_type': 'threat_detected',
+                        'severity': 'high',
+                        'event_id': log_entry['event_id'],
+                        'threat_intelligence': log_entry.get('threat_intelligence', {}),
+                        'timestamp': log_entry['timestamp'],
+                        'service': log_entry['service_name']
+                    }
+
+                    await self.send_alert_to_channels(alert_data, ['security', 'compliance'])
+
+                except Exception as e:
+                    logger.error(f"Error sending threat alert: {e}")
+
+            async def send_alert_to_channels(self, alert_data: Dict, channels: List[str]):
+                """Send alert to specified channels"""
+                try:
+                    # Send to Slack
+                    if 'slack' in channels or 'security' in channels:
+                        await self.send_slack_alert(alert_data)
+
+                    # Send to PagerDuty for critical alerts
+                    if alert_data.get('severity') == 'critical' and 'pagerduty' in channels:
+                        await self.send_pagerduty_alert(alert_data)
+
+                    # Send email
+                    if 'email' in channels:
+                        await self.send_email_alert(alert_data)
+
+                except Exception as e:
+                    logger.error(f"Error sending alert to channels: {e}")
+
+            async def send_slack_alert(self, alert_data: Dict):
+                """Send alert to Slack"""
+                try:
+                    webhook_url = os.getenv('SLACK_ALERT_WEBHOOK')
+                    if not webhook_url:
+                        return
+
+                    color = {
+                        'critical': 'danger',
+                        'high': 'warning',
+                        'medium': 'warning',
+                        'low': 'good',
+                        'info': 'good'
+                    }.get(alert_data.get('severity', 'info'), 'good')
+
+                    message = {
+                        "text": f"🚨 {alert_data.get('alert_type', 'Alert').replace('_', ' ').title()}: {alert_data.get('event_type', 'Unknown')}",
+                        "attachments": [
+                            {
+                                "color": color,
+                                "fields": [
+                                    {"title": "Event ID", "value": alert_data.get('event_id', 'Unknown'), "short": True},
+                                    {"title": "Severity", "value": alert_data.get('severity', 'Unknown'), "short": True},
+                                    {"title": "Service", "value": alert_data.get('service', 'Unknown'), "short": True},
+                                    {"title": "Time", "value": alert_data.get('timestamp', 'Unknown'), "short": True}
+                                ]
+                            }
+                        ]
+                    }
+
+                    # Add additional fields based on alert type
+                    if alert_data.get('alert_type') == 'compliance_violation':
+                        violations = alert_data.get('violations', [])
+                        if violations:
+                            message["attachments"][0]["fields"].append({
+                                "title": "Violations",
+                                "value": "\n".join(violations),
+                                "short": False
+                            })
+
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(webhook_url, json=message) as response:
+                            if response.status == 200:
+                                logger.info("Slack alert sent successfully")
+                            else:
+                                logger.error(f"Failed to send Slack alert: {response.status}")
+
+                except Exception as e:
+                    logger.error(f"Error sending Slack alert: {e}")
+
+            async def send_pagerduty_alert(self, alert_data: Dict):
+                """Send alert to PagerDuty"""
+                try:
+                    integration_key = os.getenv('PAGERDUTY_INTEGRATION_KEY')
+                    if not integration_key:
+                        return
+
+                    payload = {
+                        "routing_key": integration_key,
+                        "event_action": "trigger",
+                        "payload": {
+                            "summary": f"{alert_data.get('alert_type', 'Alert')}: {alert_data.get('description', 'Unknown')}",
+                            "severity": alert_data.get('severity', 'error'),
+                            "source": "quantumbeam-audit-system",
+                            "component": alert_data.get('service', 'unknown'),
+                            "custom_details": alert_data
+                        }
+                    }
+
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(
+                            "https://events.pagerduty.com/v2/enqueue",
+                            json=payload
+                        ) as response:
+                            if response.status == 202:
+                                logger.info("PagerDuty alert sent successfully")
+                            else:
+                                logger.error(f"Failed to send PagerDuty alert: {response.status}")
+
+                except Exception as e:
+                    logger.error(f"Error sending PagerDuty alert: {e}")
+
+            async def send_email_alert(self, alert_data: Dict):
+                """Send email alert"""
+                # This would integrate with an email service
+                # For now, just log the alert
+                logger.info(f"Email alert: {alert_data}")
+
+            async def cleanup_old_logs(self):
+                """Clean up logs that have exceeded retention period"""
+                try:
+                    logger.info("Starting log cleanup process")
+
+                    for category, retention_days in self.retention_periods.items():
+                        cutoff_date = datetime.utcnow() - timedelta(days=retention_days)
+
+                        # Clean up from Elasticsearch
+                        await self.cleanup_from_elasticsearch(category, cutoff_date)
+
+                        # Clean up from S3
+                        await self.cleanup_from_s3(category, cutoff_date)
+
+                        # Update metadata
+                        await self.update_cleanup_metadata(category, cutoff_date)
+
+                    logger.info("Log cleanup process completed")
+
+                except Exception as e:
+                    logger.error(f"Error during log cleanup: {e}")
+
+            async def cleanup_from_elasticsearch(self, category: str, cutoff_date: datetime):
+                """Clean up old logs from Elasticsearch"""
+                try:
+                    index_name = f"audit-logs-{category}"
+                    cutoff_iso = cutoff_date.isoformat()
+
+                    async with aiohttp.ClientSession() as session:
+                        # Delete old documents
+                        delete_query = {
+                            "query": {
+                                "range": {
+                                    "timestamp": {
+                                        "lt": cutoff_iso
+                                    }
+                                }
+                            }
+                        }
+
+                        url = f"{self.elasticsearch_url}/{index_name}/_delete_by_query"
+                        async with session.post(url, json=delete_query) as response:
+                            if response.status == 200:
+                                result = await response.json()
+                                deleted_count = result.get('deleted', 0)
+                                logger.info(f"Deleted {deleted_count} old {category} logs from Elasticsearch")
+                            else:
+                                logger.error(f"Failed to cleanup {category} logs from Elasticsearch: {response.status}")
+
+                except Exception as e:
+                    logger.error(f"Error cleaning up {category} logs from Elasticsearch: {e}")
+
+            async def cleanup_from_s3(self, category: str, cutoff_date: datetime):
+                """Clean up old logs from S3"""
+                try:
+                    bucket_name = os.getenv('AUDIT_LOGS_BUCKET', 'quantumbeam-audit-logs')
+                    prefix = f"audit-logs/{category}/"
+
+                    # List objects in the category
+                    paginator = self.s3_client.get_paginator('list_objects_v2')
+                    pages = paginator.paginate(Bucket=bucket_name, Prefix=prefix)
+
+                    deleted_count = 0
+                    for page in pages:
+                        if 'Contents' in page:
+                            for obj in page['Contents']:
+                                # Extract date from S3 key
+                                try:
+                                    key_parts = obj['Key'].split('/')
+                                    if len(key_parts) >= 4:
+                                        date_str = f"{key_parts[2]}-{key_parts[3]}-{key_parts[4]}"
+                                        obj_date = datetime.strptime(date_str, '%Y-%m-%d')
+
+                                        if obj_date < cutoff_date:
+                                            self.s3_client.delete_object(Bucket=bucket_name, Key=obj['Key'])
+                                            deleted_count += 1
+
+                                except (ValueError, IndexError):
+                                    # Skip if date parsing fails
+                                    continue
+
+                    logger.info(f"Deleted {deleted_count} old {category} logs from S3")
+
+                except Exception as e:
+                    logger.error(f"Error cleaning up {category} logs from S3: {e}")
+
+            async def update_cleanup_metadata(self, category: str, cutoff_date: datetime):
+                """Update metadata to reflect cleanup"""
+                try:
+                    with self.postgres_conn.cursor() as cursor:
+                        cursor.execute("""
+                            UPDATE audit_log_metadata
+                            SET archived = true, archived_at = %s
+                            WHERE event_category = %s AND timestamp < %s
+                        """, (datetime.utcnow(), category, cutoff_date))
+
+                        deleted_count = cursor.rowcount
+                        self.postgres_conn.commit()
+
+                        logger.info(f"Archived {deleted_count} {category} log metadata records")
+
+                except Exception as e:
+                    logger.error(f"Error updating cleanup metadata for {category}: {e}")
+
+        async def main():
+            """Main execution function"""
+            processor = AuditLogProcessor()
+
+            try:
+                await processor.initialize()
+
+                # Example usage - process sample log entries
+                sample_logs = [
+                    {
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "event_id": "audit-001",
+                        "event_category": "authentication",
+                        "event_type": "user_login",
+                        "severity": "info",
+                        "user_id": "user-123",
+                        "user_email": "user@example.com",
+                        "source_ip": "192.168.1.100",
+                        "service_name": "auth-service",
+                        "action": "login",
+                        "result": "success",
+                        "description": "User login successful"
+                    },
+                    {
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "event_id": "audit-002",
+                        "event_category": "security_events",
+                        "event_type": "suspicious_activity",
+                        "severity": "high",
+                        "user_id": "user-456",
+                        "source_ip": "203.0.113.1",
+                        "service_name": "fraud-detection",
+                        "action": "risk_analysis",
+                        "result": "alert_triggered",
+                        "description": "Suspicious activity detected for user"
+                    }
+                ]
+
+                for log in sample_logs:
+                    result = await processor.process_audit_log(log)
+                    print(f"Processed log {log['event_id']}: {result['status']}")
+
+                # Run cleanup (would typically run on schedule)
+                # await processor.cleanup_old_logs()
+
+            except Exception as e:
+                logger.error(f"Error in audit log processor: {e}")
+
+        if __name__ == "__main__":
+            asyncio.run(main())

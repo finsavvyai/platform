@@ -1,0 +1,567 @@
+# QuantumBeam Configuration - Base Configuration
+# This file contains the base configuration that applies to all environments
+# Environment-specific values will override these settings
+
+# Environment Configuration
+environment:
+  name: "development" # Overridden by environment files
+  debug: true
+  region: "us-east-1"
+  zone: "us-east-1a"
+  version: "1.0.0"
+  build_time: "" # Set during build
+  git_commit: "" # Set during build
+  instance_id: "" # Set at runtime
+  cluster_name: "" # Set at runtime
+
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "60s"
+  shutdown_timeout: "30s"
+
+  tls:
+    enabled: false # Overridden in production
+    cert_file: ""
+    key_file: ""
+    ca_file: ""
+    min_version: "TLS1.2"
+    ciphers: []
+    auto_cert: false
+    email: ""
+    hosts: []
+
+  cors:
+    allowed_origins: ["http://localhost:3000", "http://localhost:8080"]
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+    allowed_headers: ["Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-API-Version", "X-Feature-Flags"]
+    exposed_headers: ["X-Total-Count", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"]
+    allow_credentials: true
+    max_age: 86400
+
+  limits:
+    max_header_bytes: 1048576 # 1MB
+    max_body_bytes: 10485760 # 10MB
+    max_conns_per_ip: 100
+    max_conns_per_host: 1000
+    max_request_size: 10485760 # 10MB
+    max_file_upload_size: 52428800 # 50MB
+    request_timeout: "60s"
+    read_header_timeout: "30s"
+
+# Database Configuration
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "" # Loaded from environment variable DB_PASSWORD
+  dbname: "quantumbeam"
+  sslmode: "prefer" # Overridden in production
+  max_connections: 20
+  min_connections: 5
+  max_idle_connections: 10
+  max_lifetime: "1h"
+  max_idle_time: "30m"
+  connect_timeout: "10s"
+  query_timeout: "30s"
+  slow_query_threshold: "100ms"
+  enable_query_logger: false # Overridden in development
+  migration_path: "./migrations"
+  seed_data_path: "./seeds"
+  connection_attempts: 3
+  connection_retry_wait: "1s"
+
+# Redis Configuration
+redis:
+  host: "localhost"
+  port: 6379
+  password: "" # Loaded from environment variable REDIS_PASSWORD
+  db: 0
+  pool_size: 10
+  min_idle_conns: 3
+  max_retries: 3
+  dial_timeout: "5s"
+  read_timeout: "3s"
+  write_timeout: "3s"
+  pool_timeout: "4s"
+  idle_timeout: "5m"
+  idle_check_frequency: "1m"
+
+  cluster:
+    enabled: false
+    nodes: []
+    max_redirects: 3
+    read_only: false
+    route_by_latency: false
+    route_randomly: false
+
+# Security Configuration
+security:
+  jwt:
+    secret: "" # Loaded from environment variable JWT_SECRET
+    access_expiration: "15m"
+    refresh_expiration: "7d"
+    issuer: "quantumbeam"
+    audience: ""
+    algorithm: "HS256"
+    refresh_enabled: true
+    blacklist_enabled: true
+
+  password:
+    min_length: 8
+    max_length: 128
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_special: true
+    special_chars: "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    hash_algorithm: "bcrypt"
+    hash_iterations: 12
+    hash_memory: 0 # Not used for bcrypt
+    hash_parallelism: 0 # Not used for bcrypt
+    hash_salt_length: 16
+
+  rate_limit:
+    enabled: true
+    algorithm: "token_bucket"
+    global_limit: 1000
+    window: "1m"
+    burst_size: 100
+    storage: "redis"
+
+  encryption:
+    algorithm: "AES256-GCM"
+    key_length: 256
+    key_rotation: true
+    rotation_period: "90d"
+    key_derivation: "PBKDF2"
+
+  session:
+    store: "redis"
+    cookie_name: "quantumbeam_session"
+    max_age: "24h"
+    path: "/"
+    domain: ""
+    secure: false # Overridden in production
+    http_only: true
+    same_site: "Lax"
+
+  api_key:
+    default_rate_limit_per_minute: 1000
+    default_rate_limit_per_hour: 100000
+    max_keys_per_user: 10
+    key_length: 32
+    key_prefix: "qb_"
+    default_expiration: "365d"
+    max_expiration: "730d"
+    require_approval: false
+    auto_cleanup_expired: true
+    cleanup_interval: "1h"
+
+  web_security:
+    csp_enabled: false
+    csp_policy: ""
+    xss_protection: true
+    content_type_nosniff: true
+    x_frame_options: "DENY"
+    hsts_max_age: 31536000
+    hsts_include_subdomains: true
+    trusted_proxies: []
+    max_request_size: 10485760 # 10MB
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+    allowed_headers: ["Origin", "Content-Type", "Accept", "Authorization"]
+
+# AI/ML Configuration
+ai:
+  enabled: true
+  provider: "openai"
+  model: "gpt-4"
+  api_key: "" # Loaded from environment variable AI_API_KEY
+  endpoint: ""
+  timeout: "30s"
+  max_tokens: 4096
+  temperature: 0.7
+  top_p: 1.0
+  frequency_penalty: 0.0
+  presence_penalty: 0.0
+  retry_attempts: 3
+  retry_delay: "1s"
+  cache_enabled: true
+  cache_ttl: "1h"
+  confidence_threshold: 0.8
+
+# Quantum Computing Configuration
+quantum:
+  enabled: false # Typically disabled in development
+  provider: "ibm"
+  endpoint: ""
+  api_key: "" # Loaded from environment variable QUANTUM_API_KEY
+  timeout: "300s"
+  max_qubits: 32
+  backend: ""
+  shots: 1024
+  noise_model: ""
+  error_mitigation: true
+  transpile: true
+  optimization_level: 2
+  cache_enabled: true
+  cache_ttl: "24h"
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+
+  metrics:
+    enabled: true
+    provider: "prometheus"
+    port: 9090
+    path: "/metrics"
+    namespace: "quantumbeam"
+    subsystem: ""
+    labels: ["environment", "version"]
+    histogram: true
+    summary: true
+    gauge: true
+    counter: true
+
+  tracing:
+    enabled: true
+    provider: "jaeger"
+    endpoint: ""
+    service_name: "quantumbeam-api"
+    service_version: "1.0.0"
+    sample_rate: 0.1 # Overridden in production
+    timeout: "5s"
+    max_payload_size: 10240
+    propagators: ["trace-context", "baggage"]
+    tags: ["environment", "version"]
+
+  health_check:
+    enabled: true
+    port: 8081
+    path: "/health"
+    interval: "30s"
+    timeout: "5s"
+    failure_threshold: 3
+    success_threshold: 1
+    checkers: ["database", "redis", "external_services"]
+
+  alerting:
+    enabled: false
+    provider: "webhook"
+    rules: []
+    webhooks: []
+    email:
+      enabled: false
+      from: ""
+      to: []
+      smtp:
+        host: ""
+        port: 587
+        username: ""
+        password: ""
+        ssl: false
+        starttls: true
+      template: ""
+
+  profiling:
+    enabled: false # Can be enabled for debugging
+    provider: "pprof"
+    port: 6060
+    path: "/debug/pprof"
+    sample_rate: 0.1
+    types: ["cpu", "heap", "goroutine", "block", "mutex"]
+
+# Logging Configuration
+logging:
+  level: "info" # Overridden by environment
+  format: "json"
+  output: ["stdout"]
+
+  file:
+    enabled: false
+    path: "/var/log/quantumbeam/app.log"
+    max_size: 100 # MB
+    max_age: 30 # days
+    max_backups: 10
+    compress: true
+    local_time: false
+    rotate: true
+    filter: ""
+
+  syslog:
+    enabled: false
+    network: "udp"
+    r_addr: ""
+    priority: "info"
+    tag: "quantumbeam"
+    facility: "daemon"
+
+  console:
+    enabled: true
+    no_color: false
+    time_format: "2006-01-02T15:04:05.000Z07:00"
+    min_width: 80
+    tab_width: 4
+    padding: 3
+    prefix: ""
+
+  structured: true
+  fields: ["timestamp", "level", "logger", "message", "request_id", "user_id", "trace_id", "span_id"]
+  min_level: "trace"
+  max_level: "fatal"
+
+# Feature Flags Configuration
+features:
+  fraud_detection:
+    enabled: true
+    percentage: 100
+    rollout: {}
+    conditions: []
+
+  ai_analysis:
+    enabled: true
+    percentage: 100
+    rollout: {}
+    conditions: []
+
+  quantum_analysis:
+    enabled: false
+    percentage: 0
+    rollout: {}
+    conditions: []
+
+  advanced_analytics:
+    enabled: true
+    percentage: 100
+    rollout: {}
+    conditions: []
+
+  real_time_monitoring:
+    enabled: true
+    percentage: 100
+    rollout: {}
+    conditions: []
+
+  multi_currency:
+    enabled: true
+    percentage: 100
+    rollout: {}
+    conditions: []
+
+  batch_processing:
+    enabled: true
+    percentage: 100
+    rollout: {}
+    conditions: []
+
+  webhooks:
+    enabled: true
+    percentage: 100
+    rollout: {}
+    conditions: []
+
+  audit_logging:
+    enabled: true
+    percentage: 100
+    rollout: {}
+    conditions: []
+
+  data_export:
+    enabled: true
+    percentage: 100
+    rollout: {}
+    conditions: []
+
+# External Services Configuration
+external_services:
+  notifications:
+    enabled: true
+    channels: ["email", "sms", "webhook"]
+    providers:
+      email:
+        enabled: true
+        config: {}
+        rate_limit: {}
+      sms:
+        enabled: false
+        config: {}
+        rate_limit: {}
+      webhook:
+        enabled: true
+        config: {}
+        rate_limit: {}
+
+  payment:
+    enabled: false
+    providers: ["stripe", "paypal"]
+    default: "stripe"
+    webhook_url: ""
+    timeout: "30s"
+
+  email_service:
+    enabled: false
+    provider: "sendgrid"
+    config: {}
+    templates:
+      welcome: "welcome.html"
+      password_reset: "password_reset.html"
+      verification: "email_verification.html"
+      fraud_alert: "fraud_alert.html"
+
+  sms_service:
+    enabled: false
+    provider: "twilio"
+    config: {}
+
+  storage:
+    enabled: false
+    provider: "s3"
+    config: {}
+    buckets:
+      documents:
+        name: "quantumbeam-documents"
+        public: false
+        expiry: "24h"
+        max_size: 104857600 # 100MB
+      uploads:
+        name: "quantumbeam-uploads"
+        public: false
+        expiry: "1h"
+        max_size: 52428800 # 50MB
+      exports:
+        name: "quantumbeam-exports"
+        public: true
+        expiry: "7d"
+        max_size: 1073741824 # 1GB
+
+  cdn:
+    enabled: false
+    provider: "cloudflare"
+    domain: ""
+    cache_ttl: "1h"
+    compression: true
+    minify: true
+
+# Rate Limiting Configuration
+rate_limiting:
+  global:
+    enabled: true
+    limit: 10000
+    window: "1m"
+    burst: 1000
+
+  users:
+    enabled: true
+    default_limit: 1000
+    premium_limit: 5000
+    window: "1m"
+    burst: 100
+    storage: "redis"
+
+  api_keys:
+    enabled: true
+    default_limit: 1000
+    premium_limit: 5000
+    window: "1m"
+    burst: 100
+    storage: "redis"
+    per_key_limits: {}
+
+  ips:
+    enabled: true
+    default_limit: 500
+    window: "1m"
+    burst: 50
+    whitelist: []
+    blacklist: []
+    storage: "redis"
+
+# Cache Configuration
+cache:
+  enabled: true
+  provider: "redis"
+  default_ttl: "1h"
+  max_entries: 10000
+  eviction: "lru"
+  compression: false
+  encryption: false
+  prefix: "qb:"
+
+  caches:
+    user_sessions:
+      ttl: "24h"
+      max_size: 1000
+      eviction: "lru"
+      prefix: "session:"
+      enabled: true
+
+    api_responses:
+      ttl: "5m"
+      max_size: 5000
+      eviction: "lru"
+      prefix: "api:"
+      enabled: true
+
+    fraud_analysis:
+      ttl: "30m"
+      max_size: 10000
+      eviction: "lfu"
+      prefix: "fraud:"
+      enabled: true
+
+    ai_results:
+      ttl: "1h"
+      max_size: 5000
+      eviction: "lru"
+      prefix: "ai:"
+      enabled: true
+
+    quantum_results:
+      ttl: "6h"
+      max_size: 1000
+      eviction: "lru"
+      prefix: "quantum:"
+      enabled: true
+
+# Webhook Configuration
+webhook:
+  enabled: true
+  max_retries: 3
+  retry_delay: "1s"
+  timeout: "30s"
+  max_payload: 1048576 # 1MB
+  allowed_hosts: []
+  secret: "" # Loaded from environment variable WEBHOOK_SECRET
+  headers: {}
+
+  endpoints:
+    - name: "fraud_alerts"
+      url: "" # Set per environment
+      events: ["fraud.alert.created", "fraud.alert.resolved"]
+      enabled: true
+      secret: ""
+      headers: {}
+      timeout: "30s"
+      max_retries: 3
+
+    - name: "user_events"
+      url: "" # Set per environment
+      events: ["user.created", "user.updated", "user.deleted"]
+      enabled: true
+      secret: ""
+      headers: {}
+      timeout: "30s"
+      max_retries: 3
+
+    - name: "transaction_events"
+      url: "" # Set per environment
+      events: ["transaction.created", "transaction.analyzed", "transaction.flagged"]
+      enabled: true
+      secret: ""
+      headers: {}
+      timeout: "30s"
+      max_retries: 3

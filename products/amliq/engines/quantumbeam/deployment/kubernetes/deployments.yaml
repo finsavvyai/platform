@@ -1,0 +1,396 @@
+# API Server Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quantumbeam-api-deployment
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    component: api-server
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: quantumbeam-api
+      component: api-server
+  template:
+    metadata:
+      labels:
+        app: quantumbeam-api
+        component: api-server
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: api-server
+        image: quantumbeam/api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: POSTGRES_URL_STRING
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: JWT_SECRET
+        - name: LEMONSQUEEZY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: LEMONSQUEEZY_API_KEY
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: OPENAI_API_KEY
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: ANTHROPIC_API_KEY
+        - name: QUANTUM_SERVICE_URL
+          value: "http://quantum-service:8001"
+        - name: AI_SERVICE_URL
+          value: "http://ai-ml-service:8001"
+        - name: PROMETHEUS_URL
+          value: "http://prometheus-service:9090"
+        envFrom:
+        - configMapRef:
+            name: quantumbeam-config
+        - configMapRef:
+            name: api-server-config
+        - secretRef:
+            name: api-server-secrets
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: logs-volume
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config-volume
+        configMap:
+          name: api-server-config
+      - name: logs-volume
+        emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - quantumbeam-api
+              topologyKey: kubernetes.io/hostname
+
+---
+
+# Quantum Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quantumbeam-quantum-deployment
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-quantum
+    component: quantum-service
+    version: v1
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: quantumbeam-quantum
+      component: quantum-service
+  template:
+    metadata:
+      labels:
+        app: quantumbeam-quantum
+        component: quantum-service
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: quantum-service
+        image: quantumbeam/quantum:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8001
+          name: http
+          protocol: TCP
+        env:
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: POSTGRES_URL
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: POSTGRES_URL_STRING
+        - name: IBM_QUANTUM_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: IBM_QUANTUM_TOKEN
+        - name: AWS_BRAKET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: AWS_BRAKET_ACCESS_KEY
+        - name: AWS_BRAKET_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: AWS_BRAKET_SECRET_KEY
+        - name: QUANTUM_SERVICE_ENV
+          value: "production"
+        envFrom:
+        - configMapRef:
+            name: quantumbeam-config
+        - configMapRef:
+            name: quantum-service-config
+        - secretRef:
+            name: quantum-service-secrets
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: models-volume
+          mountPath: /app/models
+        - name: logs-volume
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config-volume
+        configMap:
+          name: quantum-service-config
+      - name: models-volume
+        persistentVolumeClaim:
+          claimName: quantum-models-pvc
+      - name: logs-volume
+        emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 60
+
+---
+
+# AI/ML Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quantumbeam-ai-ml-deployment
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-ai-ml
+    component: ai-ml-service
+    version: v1
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: quantumbeam-ai-ml
+      component: ai-ml-service
+  template:
+    metadata:
+      labels:
+        app: quantumbeam-ai-ml
+        component: ai-ml-service
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1002
+        fsGroup: 1002
+      containers:
+      - name: ai-ml-service
+        image: quantumbeam/ai-ml:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8001
+          name: http
+          protocol: TCP
+        env:
+        - name: REDIS_URL
+          value: "redis://redis-service:6379"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: OPENAI_API_KEY
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: ANTHROPIC_API_KEY
+        - name: HUGGINGFACE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: quantumbeam-secrets
+              key: HUGGINGFACE_TOKEN
+        - name: AI_SERVICE_ENV
+          value: "production"
+        - name: HF_HOME
+          value: "/app/models"
+        envFrom:
+        - configMapRef:
+            name: quantumbeam-config
+        - configMapRef:
+            name: ai-ml-service-config
+        - secretRef:
+            name: ai-ml-service-secrets
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: models-volume
+          mountPath: /app/models
+        - name: cache-volume
+          mountPath: /app/cache
+        - name: logs-volume
+          mountPath: /app/logs
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 45
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8001
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: config-volume
+        configMap:
+          name: ai-ml-service-config
+      - name: models-volume
+        persistentVolumeClaim:
+          claimName: ai-models-pvc
+      - name: cache-volume
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: logs-volume
+        emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 60

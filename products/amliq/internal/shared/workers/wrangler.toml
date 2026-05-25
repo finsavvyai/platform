@@ -1,0 +1,205 @@
+name = "fintech-unified-suite"
+main = "workers/src/main.ts"
+compatibility_date = "2024-10-14"
+compatibility_flags = ["nodejs_compat"]
+# Enable Node.js compatibility for better library support
+node_compat = true
+
+# Environment Configuration
+[env.development]
+name = "fintech-unified-suite-dev"
+vars = { ENVIRONMENT = "development", LOG_LEVEL = "debug", FRONTEND_URL = "http://localhost:3000", API_BASE_URL = "https://fintech-unified-suite-dev.shaharsolomon.workers.dev" }
+
+[env.staging]
+name = "fintech-unified-suite-staging"
+vars = { ENVIRONMENT = "staging", LOG_LEVEL = "info", FRONTEND_URL = "https://staging.finsavvyai.com", API_BASE_URL = "https://fintech-unified-suite-staging.shaharsolomon.workers.dev" }
+
+[env.production]
+name = "fintech-unified-suite-prod"
+vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn", FRONTEND_URL = "https://finsavvyai.com", API_BASE_URL = "https://api.finsavvyai.com" }
+
+# Global Environment Variables
+[vars]
+ENVIRONMENT = "production"
+LOG_LEVEL = "info"
+FRONTEND_URL = "https://finsavvyai.com"
+API_BASE_URL = "https://api.finsavvyai.com"
+DEFAULT_REGION = "US"
+ENABLE_AI_FEATURES = "true"
+ENABLE_COLLABORATION = "true"
+ENABLE_REAL_TIME_UPDATES = "true"
+ENABLE_ANALYTICS = "true"
+APP_VERSION = "1.0.0"
+DEPLOYMENT_TIMESTAMP = "2025-11-01T00:00:00Z"
+
+# AI and Machine Learning Configuration
+[ai]
+binding = "AI"
+
+# D1 Database Configuration
+# DB_PRIMARY: billing_us_*, billing_eu_*, intelligence_us_*, intelligence_eu_*
+[[d1_databases]]
+binding = "DB_PRIMARY"
+database_name = "fintech-unified-primary"
+database_id = "local-fintech-primary"
+migrations_dir = "workers/migrations/db-primary"
+
+# DB_SECONDARY: risk_*, organizations, audit_logs, api_keys, user_sessions
+[[d1_databases]]
+binding = "DB_SECONDARY"
+database_name = "fintech-unified-secondary"
+database_id = "local-fintech-secondary"
+migrations_dir = "workers/migrations/db-secondary"
+
+# DB_COMPLIANCE: compliance_us_*, compliance_eu_*, cases_*, evidence_*
+[[d1_databases]]
+binding = "DB_COMPLIANCE"
+database_name = "fintech-unified-compliance"
+database_id = "local-fintech-compliance"
+migrations_dir = "workers/migrations/db-compliance"
+
+# KV Namespace Configuration
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "73b427dc72c34f5c8809061bb90cfaaa"
+preview_id = "73b427dc72c34f5c8809061bb90cfaaa"
+
+[[kv_namespaces]]
+binding = "SESSIONS_KV"
+id = "7d70e7cf6cf9461cafb384e14d10bf2b"
+preview_id = "7d70e7cf6cf9461cafb384e14d10bf2b"
+
+[[kv_namespaces]]
+binding = "AGENT_MEMORY_KV"
+id = "a58a7ae0d27c47a5968a8585bf09b567"
+preview_id = "a58a7ae0d27c47a5968a8585bf09b567"
+
+[[kv_namespaces]]
+binding = "RATE_LIMITS_KV"
+id = "5f1264ee39304fb68628628b2fcf985b"
+preview_id = "5f1264ee39304fb68628628b2fcf985b"
+
+[[kv_namespaces]]
+binding = "USER_PREFERENCES_KV"
+id = "08d7cb62838c45e4b4c8f41fc1e8631d"
+preview_id = "08d7cb62838c45e4b4c8f41fc1e8631d"
+
+[[kv_namespaces]]
+binding = "ORGANIZATION_CONFIG_KV"
+id = "b2c847d19e6a4f0e9e5b4c3a8f7d2e1f"
+preview_id = "b2c847d19e6a4f0e9e5b4c3a8f7d2e1f"
+
+# R2 Storage Configuration
+[[r2_buckets]]
+binding = "DOCUMENTS_R2"
+bucket_name = "fintech-documents-storage"
+
+[[r2_buckets]]
+binding = "BACKUPS_R2"
+bucket_name = "fintech-backups-storage"
+
+[[r2_buckets]]
+binding = "EVIDENCE_R2"
+bucket_name = "fintech-evidence-storage"
+
+[[r2_buckets]]
+binding = "AI_MODELS_R2"
+bucket_name = "fintech-ai-models-storage"
+
+# Vectorize Configuration for RAG System
+[[vectorize]]
+binding = "RAG_VECTORIZE"
+index_name = "fintech-rag-index"
+
+[[vectorize]]
+binding = "DOCUMENT_VECTORIZE"
+index_name = "fintech-document-index"
+
+# Queue Configuration for Async Processing
+[[queues.producers]]
+binding = "BILLING_QUEUE"
+queue_name = "fintech-billing-queue"
+
+[[queues.producers]]
+binding = "COMPLIANCE_QUEUE"
+queue_name = "fintech-compliance-queue"
+
+[[queues.producers]]
+binding = "INTELLIGENCE_QUEUE"
+queue_name = "fintech-intelligence-queue"
+
+[[queues.producers]]
+binding = "RISK_QUEUE"
+queue_name = "fintech-risk-queue"
+
+[[queues.producers]]
+binding = "NOTIFICATION_QUEUE"
+queue_name = "fintech-notification-queue"
+
+# Durable Objects for State Management
+[[durable_objects.bindings]]
+name = "WEBSOCKET_MANAGER"
+class_name = "WebSocketManager"
+
+[[durable_objects.bindings]]
+name = "AGENT_ORCHESTRATOR"
+class_name = "AgentOrchestrator"
+
+# Route Configuration for Custom Domains
+[[routes]]
+pattern = "api.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+
+# Development routes
+[[routes]]
+pattern = "api-dev.finsavvyai.com/*"
+zone_name = "finsavvyai.com"
+custom_domain = true
+
+# Analytics Engine Configuration
+[analytics_engine]
+binding = "ANALYTICS_ENGINE"
+
+# Limits and Configuration
+[limits]
+cpu_ms = 50000  # 50 seconds CPU time
+memory = 128    # 128MB memory
+
+# Build Configuration
+[build]
+command = "npm run build:workers"
+watch_dir = "workers/src"
+
+# Services Configuration for Multi-Service Architecture
+[[services]]
+binding = "BILLING_SERVICE"
+service = "fintech-billing-service"
+environment = "production"
+
+[[services]]
+binding = "COMPLIANCE_SERVICE"
+service = "fintech-compliance-service"
+environment = "production"
+
+[[services]]
+binding = "INTELLIGENCE_SERVICE"
+service = "fintech-intelligence-service"
+environment = "production"
+
+[[services]]
+binding = "RISK_SERVICE"
+service = "fintech-risk-service"
+environment = "production"
+
+# Environment-specific overrides
+[env.production.limits]
+cpu_ms = 50000
+memory = 128
+
+[env.staging.limits]
+cpu_ms = 30000
+memory = 64
+
+[env.development.limits]
+cpu_ms = 15000
+memory = 32

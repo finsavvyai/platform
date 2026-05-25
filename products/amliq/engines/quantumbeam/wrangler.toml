@@ -1,0 +1,120 @@
+# QuantumBeam.io - Cloudflare Workers/Pages Configuration
+name = "quantumbeam"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Account Configuration
+account_id = "d2fe608a92dc9faa2ce5b0fd2cad5eb7"
+
+# Environment Variables
+[vars]
+ENVIRONMENT = "production"
+API_VERSION = "v1"
+
+# Production Environment
+[env.production]
+name = "quantumbeam-prod"
+vars = { ENVIRONMENT = "production" }
+
+# Staging Environment
+[env.staging]
+name = "quantumbeam-staging"
+vars = { ENVIRONMENT = "staging" }
+
+# Development Environment
+[env.dev]
+name = "quantumbeam-dev"
+vars = { ENVIRONMENT = "development" }
+
+# D1 Database Configuration
+[[d1_databases]]
+binding = "DB"
+database_name = "quantumbeam-production"
+database_id = "5a631097-a8ba-4746-8f29-2c9fa6eeba53"
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "CACHE"
+id = "33e0206e23f14c798f21ed7a803e0267"
+
+[[kv_namespaces]]
+binding = "CONFIG"
+id = "f0f495336c6b4af9a15340e8423dc403"
+
+# Durable Objects for WebSocket Connections
+[[durable_objects.bindings]]
+name = "WEBSOCKET_MANAGER"
+class_name = "WebSocketManager"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["WebSocketManager"]
+
+# R2 Storage Configuration
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "quantumbeam-storage"
+
+# Queue Configuration
+[[queues.producers]]
+binding = "ANALYTICS_QUEUE"
+queue = "analytics-events"
+
+[[queues.consumers]]
+queue = "analytics-events"
+max_batch_size = 10
+max_batch_timeout = 30
+
+# AI/ML Services Integration
+[ai]
+binding = "AI_MODEL"
+
+# Analytics Engine
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+
+# Workers for Services (uncomment when services are deployed)
+# [[services]]
+# binding = "ML_SERVICE"
+# service = "quantumbeam-ml-service"
+# environment = "production"
+
+# [[services]]
+# binding = "QUANTUM_SERVICE"
+# service = "quantumbeam-quantum-service"
+# environment = "production"
+
+# [[services]]
+# binding = "API_GATEWAY"
+# service = "quantumbeam-api-gateway"
+# environment = "production"
+
+# Route Configuration (uncomment when domain is configured)
+# [[routes]]
+# pattern = "api.quantumbeam.io/*"
+# zone_name = "quantumbeam.io"
+
+# [[routes]]
+# pattern = "quantumbeam.io/*"
+# zone_name = "quantumbeam.io"
+
+# Custom Domains (uncomment when domain is configured)
+# [env.production.custom_domains]
+# domains = ["api.quantumbeam.io", "app.quantumbeam.io"]
+
+# [env.staging.custom_domains]
+# domains = ["api-staging.quantumbeam.io", "app-staging.quantumbeam.io"]
+
+# Limits and Configuration
+[limits]
+cpu_ms = 50000
+
+# Build Configuration
+[build]
+command = ""
+
+# Observability
+[observability]
+enabled = true
+head_sampling_rate = 0.1

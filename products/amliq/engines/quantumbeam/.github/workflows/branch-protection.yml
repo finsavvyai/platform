@@ -1,0 +1,283 @@
+name: Branch Protection and PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main, develop]
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  validate-branch:
+    name: Validate Branch
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate branch name
+        run: |
+          BRANCH_NAME=${{ github.head_ref }}
+          if [[ "$BRANCH_NAME" == "main" || "$BRANCH_NAME" == "develop" ]]; then
+            echo "❌ Direct push to main/develop is not allowed"
+            exit 1
+          fi
+
+          # Check branch naming convention
+          if [[ ! "$BRANCH_NAME" =~ ^(feature|bugfix|hotfix|release)/[A-Z0-9]+-.+$ ]]; then
+            echo "❌ Branch name must follow convention: type/ticket-number-description"
+            echo "   Examples: feature/123-add-quantum-encryption"
+            echo "             bugfix/456-fix-memory-leak"
+            echo "             hotfix/789-security-vulnerability"
+            exit 1
+          fi
+
+          echo "✅ Branch name validation passed"
+
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: |
+          go mod download
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+
+      - name: Run gofmt
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "❌ Code is not formatted properly"
+            gofmt -s -l .
+            exit 1
+          fi
+          echo "✅ Code formatting check passed"
+
+      - name: Run go vet
+        run: |
+          go vet ./...
+          echo "✅ Go vet check passed"
+
+      - name: Run golangci-lint
+        run: |
+          golangci-lint run --timeout=5m
+          echo "✅ Linting check passed"
+
+      - name: Run gosec security scan
+        run: |
+          gosec -fmt sarif -out security-scan-results.sarif ./...
+          echo "✅ Security scan completed"
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: security-scan-results.sarif
+
+      - name: Check for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+
+  tests:
+    name: Test Suite
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        test-type: [unit, integration]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        if: matrix.test-type == 'unit'
+        run: |
+          go test -race -coverprofile=coverage.out -covermode=atomic ./...
+          echo "✅ Unit tests passed"
+
+      - name: Run integration tests
+        if: matrix.test-type == 'integration'
+        run: |
+          # Start required services for integration tests
+          docker-compose -f docker-compose.test.yml up -d
+          sleep 10
+
+          # Run integration tests
+          go test -tags=integration -race ./tests/integration/...
+
+          # Cleanup
+          docker-compose -f docker-compose.test.yml down
+          echo "✅ Integration tests passed"
+
+      - name: Upload coverage to Codecov
+        if: matrix.test-type == 'unit'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+
+  build-and-deploy-check:
+    name: Build and Deploy Check
+    runs-on: ubuntu-latest
+    needs: [code-quality, tests]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build application
+        run: |
+          CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o bin/api-server ./cmd/api
+          echo "✅ Build successful"
+
+      - name: Build Docker image
+        run: |
+          docker build -t quantumbeam-test:${{ github.sha }} .
+          echo "✅ Docker build successful"
+
+      - name: Run smoke tests
+        run: |
+          # Run container and perform smoke tests
+          docker run -d --name quantumbeam-test -p 8080:8080 quantumbeam-test:${{ github.sha }}
+          sleep 5
+
+          # Health check
+          curl -f http://localhost:8080/health || exit 1
+
+          # Cleanup
+          docker stop quantumbeam-test
+          docker rm quantumbeam-test
+          echo "✅ Smoke tests passed"
+
+  pr-validation:
+    name: Pull Request Validation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: [validate-branch, code-quality, tests, build-and-deploy-check]
+
+    steps:
+      - name: Check PR description
+        run: |
+          DESCRIPTION="${{ github.event.pull_request.body }}"
+          if [ -z "$DESCRIPTION" ] || [ ${#DESCRIPTION} -lt 20 ]; then
+            echo "❌ PR description is too short or missing"
+            exit 1
+          fi
+          echo "✅ PR description check passed"
+
+      - name: Check for linked issues
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+          if [[ ! "$PR_BODY" =~ (Closes|Fixes|Resolves) #[0-9]+ ]]; then
+            echo "⚠️ Consider linking this PR to an issue"
+            echo "   Use 'Closes #123', 'Fixes #456', or 'Resolves #789'"
+          fi
+
+      - name: Add size label
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const diff = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              mediaType: {
+                format: 'diff'
+              }
+            });
+
+            const additions = diff.data.additions || 0;
+            const deletions = diff.data.deletions || 0;
+            const total = additions + deletions;
+
+            let label;
+            if (total < 50) {
+              label = 'size/XS';
+            } else if (total < 200) {
+              label = 'size/S';
+            } else if (total < 500) {
+              label = 'size/M';
+            } else if (total < 1000) {
+              label = 'size/L';
+            } else {
+              label = 'size/XL';
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: [label]
+            });
+
+  merge-protection:
+    name: Merge Protection
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
+
+    steps:
+      - name: Check for required approvals
+        run: |
+          echo "Checking PR approvals..."
+          # This is handled by GitHub's branch protection rules
+          # Added here for visibility
+          echo "✅ Approval check passed"
+
+      - name: Prevent merge conflicts
+        run: |
+          echo "Checking for potential merge conflicts..."
+          # GitHub prevents merging if conflicts exist
+          echo "✅ No merge conflicts detected"

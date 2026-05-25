@@ -50,4 +50,18 @@ describe("webauthn challenge", () => {
     const store = new InMemorySessionStore<WebAuthnChallenge>();
     expect(await consumeChallenge(store, "u9")).toBeUndefined();
   });
+
+  it("returns undefined when the stored challenge has expired", async () => {
+    const store = new InMemorySessionStore<WebAuthnChallenge>();
+    // Hand-place an already-expired challenge with a long TTL on the wrapper
+    // so the session store keeps it but consumeChallenge filters on expiresAt.
+    const expired: WebAuthnChallenge = {
+      challenge: "deadbeef",
+      userId: "u1",
+      createdAt: Date.now() - 10_000,
+      expiresAt: Date.now() - 1,
+    };
+    await store.set("webauthn:challenge:u1", expired, 60);
+    expect(await consumeChallenge(store, "u1")).toBeUndefined();
+  });
 });

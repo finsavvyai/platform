@@ -1,0 +1,63 @@
+# Container Security Policy for Kubernetes Admission Controller
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: container-security-policy
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    policy: security
+data:
+  security-policy.yaml: |
+    apiVersion: policy/v1beta1
+    kind: PodSecurityPolicy
+    metadata:
+      name: quantumbeam-restricted
+      annotations:
+        seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+        seccomp.security.alpha.kubernetes.io/defaultProfileName: 'runtime/default'
+    spec:
+      privileged: false
+      allowPrivilegeEscalation: false
+      requiredDropCapabilities:
+        - ALL
+      volumes:
+        - 'configMap'
+        - 'emptyDir'
+        - 'projected'
+        - 'secret'
+        - 'downwardAPI'
+        - 'persistentVolumeClaim'
+      runAsUser:
+        rule: 'MustRunAsNonRoot'
+      seLinux:
+        rule: 'RunAsAny'
+      fsGroup:
+        rule: 'RunAsAny'
+      readOnlyRootFilesystem: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+        seccompProfile:
+          type: RuntimeDefault
+
+---
+# Pod Security Admission Configuration
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: quantumbeam
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/enforce-version: v1.28
+    pod-security.kubernetes.io/audit-version: v1.28
+    pod-security.kubernetes.io/warn-version: v1.28

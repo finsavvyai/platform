@@ -1,0 +1,557 @@
+# QuantumBeam Backup Configuration
+# Comprehensive backup and recovery settings
+
+# Global settings
+global_settings:
+  backup_user: "backup"
+  backup_group: "backup"
+  log_level: "INFO"
+  log_file: "/var/log/quantumbeam/backup-manager.log"
+  temp_dir: "/tmp/quantumbeam-backups"
+  max_concurrent_backups: 3
+  backup_timeout_seconds: 7200  # 2 hours
+
+# Storage configuration
+storage:
+  # Default storage type
+  default_type: "s3"
+
+  # S3 configuration
+  s3:
+    bucket_name: "quantumbeam-backups-prod"
+    region: "us-east-1"
+    aws_access_key_id: "${AWS_ACCESS_KEY_ID}"
+    aws_secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+    # Optional: Use IAM role instead of access keys
+    use_iam_role: true
+    # S3 lifecycle policy
+    lifecycle_policy:
+      enabled: true
+      transitions:
+        - days: 30
+          storage_class: "STANDARD_IA"
+        - days: 90
+          storage_class: "GLACIER"
+        - days: 365
+          storage_class: "DEEP_ARCHIVE"
+    # S3 versioning
+    versioning: true
+    # S3 encryption
+    server_side_encryption: "AES256"
+
+  # Local storage configuration
+  local:
+    backup_dir: "/var/backups/quantumbeam"
+    max_storage_gb: 500
+    create_subdirectories: true
+    # Local retention policies
+    cleanup_enabled: true
+    cleanup_schedule: "0 4 * * *"  # Daily at 4 AM
+
+  # NFS storage configuration
+  nfs:
+    nfs_mount: "/mnt/backups"
+    mount_options: "rw,hard,intr,tcp"
+    server: "nfs-server.internal"
+    export_path: "/exports/quantumbeam-backups"
+
+  # Google Cloud Storage
+  gcs:
+    bucket_name: "quantumbeam-backups"
+    credentials_file: "/etc/quantumbeam/gcs-credentials.json"
+    project_id: "quantumbeam-prod"
+
+  # Azure Blob Storage
+  azure:
+    account_name: "quantumbeamstorage"
+    account_key: "${AZURE_STORAGE_ACCOUNT_KEY}"
+    container_name: "backups"
+
+# Encryption settings
+encryption:
+  enabled: true
+  algorithm: "AES-256"
+  key_rotation_days: 90
+  key_file: "/etc/quantumbeam/backup-key.key"
+  # Use AWS KMS for key management
+  aws_kms:
+    enabled: false
+    key_id: "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+    region: "us-east-1"
+
+# Compression settings
+compression:
+  enabled: true
+  algorithm: "gzip"
+  compression_level: 6  # 1-9, 6 is default
+  # Skip compression for files already compressed
+  skip_compressed_extensions:
+    - ".gz"
+    - ".zip"
+    - ".bz2"
+    - ".xz"
+    - ".7z"
+
+# Database backup configurations
+databases:
+  # PostgreSQL configuration
+  postgresql:
+    host: "postgres.quantumbeam.svc.cluster.local"
+    port: 5432
+    username: "quantumbeam"
+    password: "${POSTGRES_PASSWORD}"
+    databases:
+      - "quantumbeam"
+      - "quantumbeam_analytics"
+    # pg_dump options
+    dump_options:
+      format: "custom"  # custom, directory, plain, tar
+      verbose: true
+      no_owner: true
+      no_privileges: true
+      clean: false
+      if_exists: false
+    # Exclude specific tables
+    exclude_tables:
+      - "temp_*"
+      - "cache_*"
+      - "session_*"
+    # Include specific tables only (overrides exclude)
+    include_tables: []
+
+  # Redis configuration
+  redis:
+    host: "redis.quantumbeam.svc.cluster.local"
+    port: 6379
+    password: "${REDIS_PASSWORD}"
+    database: 0
+    # Backup configuration
+    save_mode: "background"  # background, foreground
+    rdb_compression: true
+    rdb_checksum: true
+
+  # MongoDB configuration (if applicable)
+  mongodb:
+    host: "mongodb.quantumbeam.svc.cluster.local"
+    port: 27017
+    username: "quantumbeam"
+    password: "${MONGODB_PASSWORD}"
+    databases:
+      - "quantumbeam"
+    # mongodump options
+    dump_options:
+      gzip: true
+      archive: true
+      exclude_collections:
+        - "temp.*"
+        - "cache.*"
+
+# File backup configurations
+files:
+  # Application files
+  application:
+    paths:
+      - "/opt/quantumbeam"
+      - "/etc/quantumbeam"
+    exclude_patterns:
+      - "*.log"
+      - "*.tmp"
+      - "node_modules"
+      - ".git"
+      - "*.pid"
+      - "/opt/quantumbeam/logs"
+    follow_symlinks: false
+    preserve_permissions: true
+    preserve_timestamps: true
+
+  # Configuration files
+  configuration:
+    paths:
+      - "/etc/quantumbeam"
+      - "/etc/kubernetes/manifests"
+      - "/opt/quantumbeam/config"
+    include_patterns:
+      - "*.yaml"
+      - "*.yml"
+      - "*.json"
+      - "*.conf"
+      - "*.properties"
+    preserve_permissions: true
+
+  # Log files
+  logs:
+    paths:
+      - "/var/log/quantumbeam"
+      - "/opt/quantumbeam/logs"
+    include_patterns:
+      - "*.log"
+      - "*.out"
+    exclude_patterns:
+      - "*.tmp"
+    # Rotate logs before backup
+    rotate_before_backup: true
+
+  # SSL certificates
+  certificates:
+    paths:
+      - "/etc/ssl/certs/quantumbeam"
+      - "/etc/quantumbeam/certs"
+    preserve_permissions: true
+    encrypt: true  # Always encrypt certificates
+
+# Backup jobs configuration
+backup_jobs:
+  # Database backups
+  - name: "Primary Database Backup"
+    type: "database"
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention_days: 30
+    storage:
+      type: "s3"
+      bucket_prefix: "database/primary"
+    sources:
+      database_type: "postgresql"
+      databases: ["quantumbeam"]
+    encryption: true
+    compression: true
+    validation: true
+    notifications:
+      on_success: true
+      on_failure: true
+      on_validation_failure: true
+
+  - name: "Redis Backup"
+    type: "database"
+    schedule: "0 3 * * *"  # Daily at 3 AM
+    retention_days: 14
+    storage:
+      type: "s3"
+      bucket_prefix: "database/redis"
+    sources:
+      database_type: "redis"
+    encryption: true
+    compression: true
+    validation: true
+    notifications:
+      on_success: false  # Redis backups are frequent, no success notifications
+      on_failure: true
+      on_validation_failure: true
+
+  # File backups
+  - name: "Application Files Backup"
+    type: "files"
+    schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+    retention_days: 60
+    storage:
+      type: "s3"
+      bucket_prefix: "files/application"
+    sources:
+      file_type: "application"
+    encryption: true
+    compression: true
+    validation: true
+    notifications:
+      on_success: true
+      on_failure: true
+
+  - name: "Configuration Backup"
+    type: "files"
+    schedule: "0 5 * * *"  # Daily at 5 AM
+    retention_days: 90
+    storage:
+      type: "s3"
+      bucket_prefix: "files/configuration"
+    sources:
+      file_type: "configuration"
+    encryption: true
+    compression: true
+    validation: true
+    notifications:
+      on_success: true
+      on_failure: true
+
+  - name: "Log Backup"
+    type: "files"
+    schedule: "0 6 * * *"  # Daily at 6 AM
+    retention_days: 7
+    storage:
+      type: "s3"
+      bucket_prefix: "files/logs"
+    sources:
+      file_type: "logs"
+    encryption: true
+    compression: true
+    validation: false  # Skip validation for logs (too large)
+    notifications:
+      on_success: false
+      on_failure: true
+
+  # Complete backup
+  - name: "Complete System Backup"
+    type: "complete"
+    schedule: "0 1 * * 6"  # Weekly on Saturday at 1 AM
+    retention_days: 30
+    storage:
+      type: "s3"
+      bucket_prefix: "complete"
+    sources:
+      - database_type: "postgresql"
+        databases: ["quantumbeam"]
+      - database_type: "redis"
+      - file_type: "application"
+      - file_type: "configuration"
+    encryption: true
+    compression: true
+    validation: true
+    notifications:
+      on_success: true
+      on_failure: true
+      on_validation_failure: true
+
+# Retention policies
+retention_policies:
+  default_days: 30
+  max_storage_gb: 1000
+  policies:
+    daily:
+      retention_days: 7
+      keep_at_least: 7
+    weekly:
+      retention_days: 30
+      keep_at_least: 4
+    monthly:
+      retention_days: 365
+      keep_at_least: 12
+    yearly:
+      retention_days: 2555  # 7 years
+      keep_at_least: 7
+
+  # Storage quotas per type
+  quotas:
+    database:
+      max_gb: 500
+      alert_threshold: 80  # percentage
+    files:
+      max_gb: 300
+      alert_threshold: 85
+    logs:
+      max_gb: 100
+      alert_threshold: 90
+    complete:
+      max_gb: 100
+      alert_threshold: 75
+
+# Validation settings
+validation:
+  enabled: true
+  auto_repair: false
+  checksum_algorithm: "sha256"
+  # Validation types
+  types:
+    file_integrity: true
+    database_restore_test: false  # Expensive, run manually
+    file_size_check: true
+    checksum_verification: true
+    accessibility_test: true  # Can we download the backup?
+
+  # Validation schedule
+  schedule:
+    automatic_validation: "0 8 * * *"  # Daily at 8 AM
+    full_validation: "0 8 * * 0"      # Weekly on Sunday
+
+  # Test restore configuration
+  test_restore:
+    enabled: false
+    test_database: "quantumbeam_test"
+    test_frequency: "weekly"
+    cleanup_after_test: true
+
+# Notification settings
+notifications:
+  # Email configuration
+  email:
+    enabled: true
+    smtp:
+      host: "smtp.gmail.com"
+      port: 587
+      use_tls: true
+      username: "${SMTP_USERNAME}"
+      password: "${SMTP_PASSWORD}"
+      from: "QuantumBeam Backups <backups@quantumbeam.io>"
+    recipients:
+      success: ["devops@quantumbeam.io"]
+      failure: ["devops@quantumbeam.io", "engineering@quantumbeam.io", "management@quantumbeam.io"]
+      validation_failure: ["devops@quantumbeam.io", "engineering@quantumbeam.io"]
+
+  # Slack configuration
+  slack:
+    enabled: true
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channel: "#backups"
+    username: "QuantumBeam Backup Bot"
+    icon_emoji: ":floppy_disk:"
+    # Different channels for different severity
+    channels:
+      info: "#backups"
+      warning: "#alerts"
+      critical: "#emergency"
+
+  # PagerDuty configuration
+  pagerduty:
+    enabled: true
+    integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+    severity_mapping:
+      failure: "critical"
+      validation_failure: "warning"
+      storage_quota: "warning"
+
+  # Webhook configuration
+  webhook:
+    enabled: true
+    url: "${BACKUP_WEBHOOK_URL}"
+    headers:
+      Authorization: "Bearer ${WEBHOOK_AUTH_TOKEN}"
+      Content-Type: "application/json"
+    timeout_seconds: 30
+
+# Health monitoring
+health_monitoring:
+  enabled: true
+  # Metrics to collect
+  metrics:
+    - backup_success_rate
+    - backup_duration
+    - backup_size
+    - storage_usage
+    - validation_results
+    - error_counts
+
+  # Health checks
+  checks:
+    storage_connectivity: true
+    database_connectivity: true
+    disk_space: true
+    memory_usage: true
+    encryption_key_status: true
+
+  # Alert thresholds
+  thresholds:
+    success_rate:
+      warning: 95
+      critical: 90
+    backup_duration:
+      warning: 3600  # 1 hour
+      critical: 7200  # 2 hours
+    storage_usage:
+      warning: 80  # percentage
+      critical: 95
+    disk_space:
+      warning: 85
+      critical: 95
+
+# Security settings
+security:
+  # Access control
+  access_control:
+    enabled: true
+    backup_user: "backup"
+    allowed_users:
+      - "backup"
+      - "devops"
+    allowed_groups:
+      - "backup"
+      - "devops"
+
+  # Network security
+  network:
+    restrict_to_vpc: true
+    allowed_ips:
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+      - "192.168.0.0/16"
+
+  # Authentication
+  authentication:
+    method: "iam"  # iam, keys, oauth
+    token_expiration_hours: 24
+
+  # Audit logging
+  audit:
+    enabled: true
+    log_all_operations: true
+    log_file: "/var/log/quantumbeam/backup-audit.log"
+    retention_days: 365
+
+# Performance settings
+performance:
+  # Parallel processing
+  parallel_uploads: true
+  max_parallel_uploads: 3
+  upload_chunk_size: 8388608  # 8MB
+
+  # Compression
+  compression_threads: 2
+  compression_buffer_size: 1048576  # 1MB
+
+  # Database backup performance
+  database:
+    parallel_dump: false  # Can cause inconsistencies
+    dump_timeout: 3600  # 1 hour
+    connection_pool_size: 5
+
+  # File backup performance
+  files:
+    exclude_cache_dirs: true
+    max_file_size_mb: 1024  # Skip files larger than 1GB for regular backups
+    follow_symlinks: false
+
+# Environment-specific settings
+environments:
+  development:
+    retention_days: 7
+    storage:
+      type: "local"
+    notifications:
+      email:
+        enabled: false
+      slack:
+        enabled: true
+        channel: "#dev-alerts"
+    validation:
+      enabled: true
+      test_restore:
+        enabled: true
+
+  staging:
+    retention_days: 14
+    storage:
+      type: "s3"
+      bucket_prefix: "staging"
+    notifications:
+      email:
+        enabled: true
+        recipients:
+          success: ["dev-team@quantumbeam.io"]
+          failure: ["dev-team@quantumbeam.io", "ops-team@quantumbeam.io"]
+    validation:
+      enabled: true
+      test_restore:
+        enabled: true
+        test_frequency: "daily"
+
+  production:
+    retention_days: 30
+    storage:
+      type: "s3"
+      bucket_prefix: "production"
+    notifications:
+      email:
+        enabled: true
+      slack:
+        enabled: true
+      pagerduty:
+        enabled: true
+    validation:
+      enabled: true
+      test_restore:
+        enabled: false  # Manual only in production

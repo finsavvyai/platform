@@ -1,0 +1,249 @@
+# QuantumBeam.io - Production Redis Cluster Configuration
+# Redis 7.x cluster configuration for high availability and performance
+
+# Network configuration
+bind 0.0.0.0
+port 6379
+tls-port 6380
+tcp-backlog 511
+timeout 300
+tcp-keepalive 60
+
+# TLS Configuration (uncomment for production)
+# tls-cert-file /etc/redis/tls/redis.crt
+# tls-key-file /etc/redis/tls/redis.key
+# tls-ca-cert-file /etc/redis/tls/ca.crt
+
+# General configuration
+daemonize no
+supervised no
+pidfile /var/run/redis_6379.pid
+
+# Logging
+loglevel notice
+logfile ""
+syslog-enabled no
+
+# Database configuration
+databases 16
+always-show-logo no
+set-proc-title yes
+proc-title-template "{title} {listen-addr} {server-mode}"
+
+# Snapshotting (RDB)
+save 900 1
+save 300 10
+save 60 10000
+stop-writes-on-bgsave-error yes
+rdbcompression yes
+rdbchecksum yes
+dbfilename dump.rdb
+rdb-del-sync-files no
+dir /data
+
+# Append Only File (AOF) persistence
+appendonly yes
+appendfilename "appendonly.aof"
+appenddirname "appendonlydir"
+appendfsync everysec
+no-appendfsync-on-rewrite no
+auto-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+aof-load-truncated yes
+aof-use-rdb-preamble yes
+
+# Memory management
+maxmemory 1gb
+maxmemory-policy allkeys-lru
+maxmemory-samples 5
+replica-ignore-maxmemory yes
+active-expire-effort 1
+
+# Replication
+replica-serve-stale-data yes
+replica-read-only yes
+repl-diskless-sync no
+repl-diskless-sync-delay 5
+repl-diskless-load disabled
+repl-ping-replica-period 10
+repl-timeout 60
+repl-disable-tcp-nodelay no
+repl-backlog-size 1mb
+repl-backlog-ttl 3600
+replica-priority 100
+replica-announce-ip ""
+replica-announce-port 6379
+replica-announce-tls-port 6380
+
+# Security
+# requirepass your_strong_password_here
+# rename-command FLUSHDB ""
+# rename-command FLUSHALL ""
+# rename-command DEBUG ""
+# rename-command CONFIG ""
+# rename-command SHUTDOWN REDIS_SHUTDOWN_2024
+# rename-command EVAL ""
+# rename-command EVALSHA ""
+
+# Client configuration
+maxclients 10000
+tcp-keepalive 300
+
+# Memory optimization
+hash-max-ziplist-entries 512
+hash-max-ziplist-value 64
+list-max-ziplist-size -2
+list-compress-depth 0
+set-max-intset-entries 512
+zset-max-ziplist-entries 128
+zset-max-ziplist-value 64
+hll-sparse-max-bytes 3000
+stream-node-max-bytes 4096
+stream-node-max-entries 100
+
+# Active expire hash configuration
+active-expire-effort 1
+
+# Lazy expiration
+lazyfree-lazy-eviction no
+lazyfree-lazy-expire no
+lazyfree-lazy-server-del no
+replica-lazy-flush no
+lazyfree-lazy-user-del no
+lazyfree-lazy-user-flush no
+
+# Output buffers
+client-output-buffer-limit normal 0 0 0
+client-output-buffer-limit replica 256mb 64mb 60
+client-output-buffer-limit pubsub 32mb 8mb 60
+client-output-buffer-limit slave 256mb 64mb 60
+
+# Client query buffer limits
+client-query-buffer-limit 1gb
+
+# Protocol max bulk request
+proto-max-bulk-len 512mb
+
+# Frequency of rehashing
+hz 10
+dynamic-hz yes
+
+# AOF rewrite incremental fsync
+aof-rewrite-incremental-fsync yes
+
+# RDB save incremental fsync
+rdb-save-incremental-fsync yes
+
+# Command statistics
+command-stats-array-size 256
+
+# Cluster configuration (uncomment for cluster mode)
+# cluster-enabled yes
+# cluster-config-file nodes-6379.conf
+# cluster-node-timeout 15000
+# cluster-announce-ip ""
+# cluster-announce-port 6379
+# cluster-announce-tls-port 6380
+# cluster-announce-bus-port 16379
+# cluster-require-full-coverage yes
+# cluster-replica-validity-factor 10
+# cluster-migration-barrier 1
+# cluster-allow-replica-migration yes
+# cluster-replica-no-failover no
+# cluster-allow-reads-when-down no
+# cluster-allow-pubsubshard-when-down yes
+
+# Slow log
+slowlog-log-slower-than 10000
+slowlog-max-len 128
+
+# Latency monitoring
+latency-monitor-threshold 100
+
+# Event notification (Redis keyspace notifications)
+notify-keyspace-events "Ex"
+
+# Hash table settings
+hash-max-listpack-entries 512
+hash-max-listpack-value 64
+list-max-listpack-size -2
+set-max-intset-entries 512
+zset-max-listpack-entries 128
+zset-max-listpack-value 64
+hll-sparse-max-bytes 3000
+stream-node-max-bytes 4096
+stream-node-max-entries 100
+
+# HyperLogLog
+hll-sparse-max-bytes 3000
+
+# Stream
+stream-node-max-bytes 4096
+stream-node-max-entries 100
+
+# Active rehashing
+activerehashing yes
+
+# Client output buffer limits
+client-output-buffer-limit normal 0 0 0
+client-output-buffer-limit replica 256mb 64mb 60
+client-output-buffer-limit pubsub 32mb 8mb 60
+
+# Memory usage
+memory-frag-ratio-check-interval 60
+
+# Number of seconds after which a replica should be considered to have failed if it hasn't sent any replication traffic
+repl-ping-replica-period 10
+
+# Timeout in seconds for replica to acknowledge a write
+repl-timeout 60
+
+# Disable TCP_NODELAY on replica after a certain amount of bytes
+repl-disable-tcp-nodelay no
+
+# Size of the replication backlog
+repl-backlog-size 1mb
+
+# Time after which the replication backlog is released
+repl-backlog-ttl 3600
+
+# Priority of this replica when a master fails
+replica-priority 100
+
+# Minimum number of replicas that need to be connected for a master to accept writes
+min-replicas-to-write 0
+min-replicas-max-lag 10
+
+# Modules
+# loadmodule /path/to/redisgraph.so
+# loadmodule /path/to/redistimeseries.so
+# loadmodule /path/to/rejson.so
+# loadmodule /path/to/redisbloom.so
+
+# ACL (Access Control List)
+# aclfile /etc/redis/users.acl
+
+# Tracking
+tracking-table-max-keys 1000000
+tracking-table-max-fill 10
+
+# RESP3 protocol
+resp3-enabled no
+
+# IO threads
+io-threads 4
+io-threads-do-reads no
+
+# TLS replication
+# tls-replication yes
+# tls-cert-file /etc/redis/tls/redis.crt
+# tls-key-file /etc/redis/tls/redis.key
+# tls-ca-cert-file /etc/redis/tls/ca.crt
+# tls-dh-params-file /etc/redis/tls/redis.dh
+
+# Other optimizations
+jemalloc-bg-thread yes
+proc-title-template "{title} {listen-addr} {server-mode}"
+# Unix socket (uncomment if needed)
+# unixsocket /var/run/redis/redis.sock
+# unixsocketperm 777

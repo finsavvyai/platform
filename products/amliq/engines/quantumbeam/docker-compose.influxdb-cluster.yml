@@ -1,0 +1,360 @@
+version: "3.8"
+
+# QuantumBeam.io - InfluxDB Cluster Configuration
+# This file sets up a production-ready InfluxDB cluster with high availability
+
+services:
+  # InfluxDB Primary Node
+  influxdb-primary:
+    image: influxdb:2.7-alpine
+    container_name: quantumbeam-influxdb-primary
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: quantumbeam_admin_2024
+      DOCKER_INFLUXDB_INIT_ORG: quantumbeam
+      DOCKER_INFLUXDB_INIT_BUCKET: metrics
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: quantumbeam_primary_token_$(openssl rand -hex 32)
+      DOCKER_INFLUXDB_INIT_RETENTION: 30d
+      INFLUXD_ENGINE_PATH: /var/lib/influxdb2/engine
+      INFLUXD_BOLT_PATH: /var/lib/influxdb2/influxd.bolt
+      INFLUXD_META_DIR: /var/lib/influxdb2/meta
+      INFLUXD_DATA_DIR: /var/lib/influxdb2/data
+      INFLUXD_LOGS_PATH: /var/log/influxdb2
+      INFLUXD_HTTP_BIND_ADDRESS: :8086
+      INFLUXD_REPORTING_DISABLED: "false"
+      INFLUXD_META_ENGINE_PATH: /var/lib/influxdb2/meta
+      INFLUXD_TASKS_RUNTIME_PATH: /var/lib/influxdb2/tasks
+      INFLUXD_BOLT_PATH: /var/lib/influxdb2/influxd.bolt
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_primary_data:/var/lib/influxdb2
+      - influxdb_primary_config:/etc/influxdb2
+      - influxdb_primary_logs:/var/log/influxdb2
+      - ./config/influxdb.conf:/etc/influxdb2/influxdb.conf:ro
+    networks:
+      - quantumbeam-influxdb-cluster
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    command: >
+      bash -c "
+      influxd run
+      --config-path /etc/influxdb2/influxdb.conf
+      --engine-path /var/lib/influxdb2/engine
+      --bolt-path /var/lib/influxdb2/influxd.bolt
+      --meta-dir /var/lib/influxdb2/meta
+      --data-dir /var/lib/influxdb2/data
+      --log-path /var/log/influxdb2
+      --http-bind-address=:8086
+      "
+
+  # InfluxDB Replica Node 1
+  influxdb-replica-1:
+    image: influxdb:2.7-alpine
+    container_name: quantumbeam-influxdb-replica-1
+    restart: unless-stopped
+    environment:
+      INFLUXD_ENGINE_PATH: /var/lib/influxdb2/engine
+      INFLUXD_BOLT_PATH: /var/lib/influxdb2/influxd.bolt
+      INFLUXD_META_DIR: /var/lib/influxdb2/meta
+      INFLUXD_DATA_DIR: /var/lib/influxdb2/data
+      INFLUXD_LOGS_PATH: /var/log/influxdb2
+      INFLUXD_HTTP_BIND_ADDRESS: :8086
+      INFLUXD_REPORTING_DISABLED: "true"
+      INFLUXD_META_ENGINE_PATH: /var/lib/influxdb2/meta
+      INFLUXD_TASKS_RUNTIME_PATH: /var/lib/influxdb2/tasks
+    ports:
+      - "8087:8086"
+    volumes:
+      - influxdb_replica_1_data:/var/lib/influxdb2
+      - influxdb_replica_1_config:/etc/influxdb2
+      - influxdb_replica_1_logs:/var/log/influxdb2
+      - ./config/influxdb.conf:/etc/influxdb2/influxdb.conf:ro
+    networks:
+      - quantumbeam-influxdb-cluster
+    depends_on:
+      influxdb-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    command: >
+      bash -c "
+      influxd run
+      --config-path /etc/influxdb2/influxdb.conf
+      --engine-path /var/lib/influxdb2/engine
+      --bolt-path /var/lib/influxdb2/influxd.bolt
+      --meta-dir /var/lib/influxdb2/meta
+      --data-dir /var/lib/influxdb2/data
+      --log-path /var/log/influxdb2
+      --http-bind-address=:8086
+      "
+
+  # InfluxDB Replica Node 2
+  influxdb-replica-2:
+    image: influxdb:2.7-alpine
+    container_name: quantumbeam-influxdb-replica-2
+    restart: unless-stopped
+    environment:
+      INFLUXD_ENGINE_PATH: /var/lib/influxdb2/engine
+      INFLUXD_BOLT_PATH: /var/lib/influxdb2/influxd.bolt
+      INFLUXD_META_DIR: /var/lib/influxdb2/meta
+      INFLUXD_DATA_DIR: /var/lib/influxdb2/data
+      INFLUXD_LOGS_PATH: /var/log/influxdb2
+      INFLUXD_HTTP_BIND_ADDRESS: :8086
+      INFLUXD_REPORTING_DISABLED: "true"
+      INFLUXD_META_ENGINE_PATH: /var/lib/influxdb2/meta
+      INFLUXD_TASKS_RUNTIME_PATH: /var/lib/influxdb2/tasks
+    ports:
+      - "8088:8086"
+    volumes:
+      - influxdb_replica_2_data:/var/lib/influxdb2
+      - influxdb_replica_2_config:/etc/influxdb2
+      - influxdb_replica_2_logs:/var/log/influxdb2
+      - ./config/influxdb.conf:/etc/influxdb2/influxdb.conf:ro
+    networks:
+      - quantumbeam-influxdb-cluster
+    depends_on:
+      influxdb-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    command: >
+      bash -c "
+      influxd run
+      --config-path /etc/influxdb2/influxdb.conf
+      --engine-path /var/lib/influxdb2/engine
+      --bolt-path /var/lib/influxdb2/influxd.bolt
+      --meta-dir /var/lib/influxdb2/meta
+      --data-dir /var/lib/influxdb2/data
+      --log-path /var/log/influxdb2
+      --http-bind-address=:8086
+      "
+
+  # InfluxDB Load Balancer (Nginx)
+  influxdb-lb:
+    image: nginx:alpine
+    container_name: quantumbeam-influxdb-lb
+    restart: unless-stopped
+    ports:
+      - "8089:80"
+    volumes:
+      - ./config/nginx-influxdb.conf:/etc/nginx/nginx.conf:ro
+      - influxdb_lb_logs:/var/log/nginx
+    networks:
+      - quantumbeam-influxdb-cluster
+    depends_on:
+      - influxdb-primary
+      - influxdb-replica-1
+      - influxdb-replica-2
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Chronograf (InfluxDB Web UI)
+  chronograf:
+    image: chronograf:1.9-alpine
+    container_name: quantumbeam-chronograf
+    restart: unless-stopped
+    environment:
+      CHRONOGRAF_BIND_ADDRESS: "0.0.0.0:8888"
+      CHRONOGRAF_INFLUXDB_URL: "http://influxdb-lb:80"
+      CHRONOGRAF_DATABASE: "chronograf"
+      CHRONOGRAF_PUBLIC_URL: "http://localhost:8888"
+      CHRONOGRAF_LOG_LEVEL: "info"
+      CHRONOGRAF_TLS_VERIFY: "false"
+    ports:
+      - "8888:8888"
+    volumes:
+      - chronograf_data:/var/lib/chronograf
+    networks:
+      - quantumbeam-influxdb-cluster
+    depends_on:
+      influxdb-lb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8888/chronograf/v1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Kapacitor (Alerting and Automation)
+  kapacitor:
+    image: kapacitor:1.6-alpine
+    container_name: quantumbeam-kapacitor
+    restart: unless-stopped
+    environment:
+      KAPACITOR_BIND_ADDRESS: ":9092"
+      KAPACITOR_HTTP_BIND_ADDRESS = ":9092"
+      KAPACITOR_REPORTING_ENABLED: "false"
+      KAPACITOR_LOG_LEVEL: "info"
+      KAPACITOR_INFLUXDB_URL: "http://influxdb-lb:80"
+      KAPACITOR_INFLUXDB_USERNAME: "admin"
+      KAPACITOR_INFLUXDB_PASSWORD: "quantumbeam_admin_2024"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kapacitor_data:/var/lib/kapacitor
+      - ./config/kapacitor.conf:/etc/kapacitor/kapacitor.conf:ro
+    networks:
+      - quantumbeam-influxdb-cluster
+    depends_on:
+      influxdb-lb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9092/kapacitor/v1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Telegraf (Metrics Collection)
+  telegraf:
+    image: telegraf:1.29-alpine
+    container_name: quantumbeam-telegraf
+    restart: unless-stopped
+    environment:
+      HOST_PROC: /host/proc
+      HOST_SYS: /host/sys
+      HOST_ETC: /host/etc
+    volumes:
+      - ./config/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /:/host:ro
+      - telegraf_data:/var/lib/telegraf
+    networks:
+      - quantumbeam-influxdb-cluster
+    depends_on:
+      influxdb-lb:
+        condition: service_healthy
+    command: telegraf --config /etc/telegraf/telegraf.conf
+
+  # InfluxDB Exporter (Prometheus metrics)
+  influxdb-exporter:
+    image: prom/influxdb-exporter:latest
+    container_name: quantumbeam-influxdb-exporter
+    restart: unless-stopped
+    environment:
+      INFLUXDB_URL: "http://influxdb-lb:80"
+      INFLUXDB_USERNAME: "admin"
+      INFLUXDB_PASSWORD: "quantumbeam_admin_2024"
+      INFLUXDB_FETCH_DATABASE: "metrics"
+      INFLUXDB_FETCH_INTERVAL: "30s"
+      WEB_LISTEN_ADDRESS: ":9122"
+      WEB_TELEMETRY_PATH: "/metrics"
+      LOG_LEVEL: "info"
+    ports:
+      - "9122:9122"
+    networks:
+      - quantumbeam-influxdb-cluster
+    depends_on:
+      influxdb-lb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9122/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Grafana (Dashboarding)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: quantumbeam-grafana-influxdb
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: quantumbeam2024
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource,grafana-influxdb-flux-datasource
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "http://localhost:3000"
+      GF_SMTP_ENABLED: "false"
+      GF_LOG_LEVEL: "info"
+      GF_PATHS_DATA: /var/lib/grafana
+      GF_PATHS_LOGS: /var/log/grafana
+      GF_PATHS_PLUGINS: /var/lib/grafana/plugins
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - quantumbeam-influxdb-cluster
+    depends_on:
+      influxdb-lb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# Network configuration
+networks:
+  quantumbeam-influxdb-cluster:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+          gateway: 172.22.0.1
+
+# Volume configuration
+volumes:
+  # Primary node volumes
+  influxdb_primary_data:
+    driver: local
+  influxdb_primary_config:
+    driver: local
+  influxdb_primary_logs:
+    driver: local
+
+  # Replica node volumes
+  influxdb_replica_1_data:
+    driver: local
+  influxdb_replica_1_config:
+    driver: local
+  influxdb_replica_1_logs:
+    driver: local
+
+  influxdb_replica_2_data:
+    driver: local
+  influxdb_replica_2_config:
+    driver: local
+  influxdb_replica_2_logs:
+    driver: local
+
+  # Load balancer volumes
+  influxdb_lb_logs:
+    driver: local
+
+  # Service volumes
+  chronograf_data:
+    driver: local
+  kapacitor_data:
+    driver: local
+  telegraf_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# Health check script (external)
+# Use with: docker-compose -f docker-compose.influxdb-cluster.yml up --healthcheck-interval 30s

@@ -1,0 +1,531 @@
+name: Security Scanning and CI/CD Integration
+
+on:
+  push:
+    branches: [ main, develop, 'feature/*', 'release/*' ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run comprehensive security scan daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      scan_level:
+        description: 'Security scan level'
+        required: true
+        default: 'standard'
+        type: choice
+        options:
+          - quick
+          - standard
+          - comprehensive
+
+env:
+  # Global variables
+  NODE_VERSION: '20'
+  GO_VERSION: '1.21'
+  PYTHON_VERSION: '3.11'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Container Security Scanning
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build container image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/security-scan.tar
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Grype vulnerability scanner
+        uses: anchore/scan-action@v3
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan
+          format: 'sarif'
+          output-file: 'grype-results.sarif'
+
+      - name: Upload Grype scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'grype-results.sarif'
+
+  # Static Application Security Testing (SAST)
+  sast-scan:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Go security tools
+        run: |
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          go install github.com/mgechev/revive@latest
+          go install github.com/Yelp/detect-secrets@latest
+
+      - name: Install Node.js security tools
+        run: |
+          npm install -g eslint@^8
+          npm install -g npm-audit-resolver@^1
+          npm install -g snyk@^1
+
+      - name: Install Python security tools
+        run: |
+          pip install bandit safety semgrep
+
+      - name: Run Gosec (Go SAST)
+        run: |
+          gosec -fmt sarif -out gosec-results.sarif ./...
+        continue-on-error: true
+
+      - name: Upload Gosec results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'gosec-results.sarif'
+
+      - name: Run Semgrep (Multi-language SAST)
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/cwe-top-25
+            p/golang
+            p/javascript
+            p/python
+          publish: true
+          generate_sarif: true
+
+      - name: Run Bandit (Python SAST)
+        run: |
+          bandit -r services/ -f json -o bandit-results.json
+        continue-on-error: true
+
+      - name: Run Safety (Python Dependency Scan)
+        run: |
+          safety check --json --output safety-results.json
+        continue-on-error: true
+
+      - name: Run ESLint (JavaScript/TypeScript SAST)
+        run: |
+          cd web/dashboard && npm install && npm run lint:security || true
+        continue-on-error: true
+
+      - name: Detect secrets in code
+        run: |
+          detect-secrets scan --all-files --baseline .secrets.baseline || true
+
+  # Dynamic Application Security Testing (DAST)
+  dast-scan:
+    name: Dynamic Application Security Testing
+    runs-on: ubuntu-latest
+    needs: [container-security]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+
+      - name: Start test environment
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          sleep 30
+
+      - name: Run OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:8080'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+          fail_action: false
+
+      - name: Run Nuclei Vulnerability Scanner
+        uses: projectdiscovery/nuclei-action@main
+        with:
+          target: 'http://localhost:8080'
+          templates: 'cves/,vulnerabilities/,misconfiguration/'
+          output: 'nuclei-results.txt'
+
+      - name: Run Custom Security Tests
+        run: |
+          go run security/testing/run-security-tests.go -target http://localhost:8080 -output security-test-results.json
+
+      - name: Upload DAST results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: dast-results
+          path: |
+            report_html.html
+            nuclei-results.txt
+            security-test-results.json
+
+      - name: Cleanup test environment
+        if: always()
+        run: |
+          docker-compose -f docker-compose.test.yml down -v
+
+  # Infrastructure Security Scanning
+  infrastructure-security:
+    name: Infrastructure Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.5
+
+      - name: Install Checkov
+        run: pip install checkov
+
+      - name: Install Tfsec
+        run: |
+          go install github.com/aquasecurity/tfsec/cmd/tfsec@latest
+
+      - name: Run Checkov (IaC Security)
+        run: |
+          checkov --framework terraform --directory infrastructure/ --output junitxml --output-file-path checkov-results.xml
+        continue-on-error: true
+
+      - name: Run Tfsec (Terraform Security)
+        run: |
+          tfsec infrastructure/ --format json --out tfsec-results.json
+        continue-on-error: true
+
+      - name: Run Kubernetes Security Scan
+        run: |
+          checkov --framework kubernetes --directory deployment/kubernetes/ --output junitxml --output-file-path k8s-checkov-results.xml
+        continue-on-error: true
+
+      - name: Run Helm Security Scan
+        run: |
+          checkov --framework helm --directory deployment/helm/ --output junitxml --output-file-path helm-checkov-results.xml
+        continue-on-error: true
+
+      - name: Upload infrastructure scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: infrastructure-security-results
+          path: |
+            checkov-results.xml
+            tfsec-results.json
+            k8s-checkov-results.xml
+            helm-checkov-results.xml
+
+  # Dependency Security Scanning
+  dependency-security:
+    name: Dependency Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Run Go dependency security scan
+        run: |
+          go list -json -m all | nancy sleuth
+        continue-on-error: true
+
+      - name: Run npm audit
+        run: |
+          cd web/dashboard && npm audit --audit-level moderate
+        continue-on-error: true
+
+      - name: Run Snyk (Multi-language dependency scan)
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'quantumbeam'
+          path: '.'
+          format: 'HTML'
+          out: 'dependency-check-report'
+        continue-on-error: true
+
+  # Compliance and Policy Checking
+  compliance-check:
+    name: Security Compliance Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run OpenSCAP scanning
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenscap8
+          oscap xccdf eval --profile xccdf_org.ssgproject.content_profile_pci-dss --results compliance-results.xml security/policies/ssg-rhel8-ds.xml || true
+
+      - name: Run Custom Compliance Tests
+        run: |
+          go run security/compliance/compliance-checker.go -config security/compliance/config.yaml -output compliance-report.json
+
+      - name: Validate security configurations
+        run: |
+          find . -name "*.tf" -exec terraform fmt -check=true {} \;
+          find . -name "*.tf" -exec terraform validate {} \;
+          find . -name "*.yaml" -exec yamllint {} \;
+          find . -name "*.json" -exec jq empty {} \;
+
+      - name: Upload compliance results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: compliance-results
+          path: |
+            compliance-results.xml
+            compliance-report.json
+
+  # Security Gate and Reporting
+  security-gate:
+    name: Security Gate and Reporting
+    runs-on: ubuntu-latest
+    needs: [container-security, sast-scan, dast-scan, infrastructure-security, dependency-security, compliance-check]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Process security scan results
+        run: |
+          python security/scripts/process-security-results.py \
+            --input-dir . \
+            --output security-summary.json \
+            --threshold-critical 0 \
+            --threshold-high 5 \
+            --threshold-medium 20
+
+      - name: Generate security report
+        run: |
+          python security/scripts/generate-security-report.py \
+            --input security-summary.json \
+            --output security-report.html \
+            --template security/templates/report-template.html
+
+      - name: Check security gate
+        run: |
+          python security/scripts/security-gate-check.py \
+            --input security-summary.json \
+            --fail-on-critical true \
+            --fail-on-high-count 5
+
+      - name: Comment PR with security results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = JSON.parse(fs.readFileSync('security-summary.json', 'utf8'));
+
+            const comment = `
+            ## 🔒 Security Scan Results
+
+            **Summary:**
+            - Critical Issues: ${summary.critical}
+            - High Issues: ${summary.high}
+            - Medium Issues: ${summary.medium}
+            - Low Issues: ${summary.low}
+
+            **Status:** ${summary.status === 'PASS' ? '✅ PASSED' : '❌ FAILED'}
+
+            [View detailed security report](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Send security notifications
+        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+        run: |
+          curl -X POST "${{ secrets.SECURITY_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": "🚨 Security scan failed for QuantumBeam",
+              "attachments": [{
+                "color": "danger",
+                "fields": [{
+                  "title": "Repository",
+                  "value": "${{ github.repository }}",
+                  "short": true
+                }, {
+                  "title": "Branch",
+                  "value": "${{ github.ref_name }}",
+                  "short": true
+                }, {
+                  "title": "Commit",
+                  "value": "${{ github.sha }}",
+                  "short": true
+                }, {
+                  "title": "Workflow Run",
+                  "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                  "short": false
+                }]
+              }]
+            }'
+
+      - name: Upload final security report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: final-security-report
+          path: |
+            security-summary.json
+            security-report.html
+
+  # Security Metrics and Dashboard Update
+  security-metrics:
+    name: Update Security Metrics
+    runs-on: ubuntu-latest
+    needs: [security-gate]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download security summary
+        uses: actions/download-artifact@v3
+        with:
+          name: final-security-report
+          path: ./results
+
+      - name: Update security metrics dashboard
+        run: |
+          python security/scripts/update-metrics.py \
+            --input ./results/security-summary.json \
+            --dashboard-url "${{ secrets.METRICS_DASHBOARD_URL }}" \
+            --api-key "${{ secrets.METRICS_API_KEY }}"
+
+      - name: Create security badge
+        if: always()
+        run: |
+          python security/scripts/create-security-badge.py \
+            --input ./results/security-summary.json \
+            --output security-badge.svg
+
+      - name: Update README with security status
+        if: github.ref == 'refs/heads/main'
+        run: |
+          python security/scripts/update-readme-security.py \
+            --badge-path ./security-badge.svg \
+            --readme-path ./README.md

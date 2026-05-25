@@ -1,0 +1,499 @@
+# ArgoCD Configuration for QuantumBeam GitOps Workflow
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/infrastructure
+    targetRevision: HEAD
+    path: manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-namespace
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/infrastructure
+    targetRevision: HEAD
+    path: manifests/namespaces
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/infrastructure
+    targetRevision: HEAD
+    path: manifests/monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-apps
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/infrastructure
+    targetRevision: HEAD
+    path: manifests/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: quantumbeam
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 10m
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quantumbeam-configs
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/infrastructure
+    targetRevision: HEAD
+    path: manifests/configs
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: quantumbeam
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: quantumbeam-project
+  namespace: argocd
+spec:
+  description: QuantumBeam Production Applications
+  sourceRepos:
+  - https://github.com/quantumbeam/infrastructure
+  - https://github.com/quantumbeam/quantumbeam-apps
+  destinations:
+  - namespace: quantumbeam
+    server: https://kubernetes.default.svc
+  - namespace: monitoring
+    server: https://kubernetes.default.svc
+  - namespace: argocd
+    server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+  - group: ""
+    kind: Namespace
+  - group: networking.k8s.io
+    kind: Ingress
+  - group: cert-manager.io
+    kind: Certificate
+  - group: cert-manager.io
+    kind: Issuer
+  - group: external-secrets.io
+    kind: SecretStore
+  - group: external-secrets.io
+    kind: ExternalSecret
+  namespaceResourceBlacklist:
+  - group: ""
+    kind: ServiceAccount
+    - group: ""
+    kind: ConfigMap
+    - group: ""
+    kind: Secret
+  roles:
+  - name: admins
+    description: Admin access to project
+    policies:
+    - p, proj:quantumbeam-project:default, applications, *, quantumbeam-*/.*, allow
+    groups:
+    - github:quantumbeam:admins
+  - name: developers
+    description: Developer access to project
+    policies:
+    - p, proj:quantumbeam-project:default, applications, sync, quantumbeam-*/.*, allow
+    - p, proj:quantumbeam-project:default, applications, get, quantumbeam-*/.*, allow
+    groups:
+    - github:quantumbeam:developers
+  syncWindows:
+  - kind: allow
+    schedule: '0 2 * * *'  # 2 AM UTC
+    duration: 1h
+    namespaces:
+    - monitoring
+    applications:
+    - quantumbeam-monitoring
+  - kind: allow
+    schedule: '0 3 * * 1'  # 3 AM UTC on Mondays
+    duration: 2h
+    applications:
+    - quantumbeam-apps
+    manualSync: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+data:
+  application.instanceLabelKey: argocd.argoproj.io/instance
+  statusbadge.enabled: "true"
+  users.anonymous.enabled: "false"
+  accounts.admin: login
+  exec.enabled: "true"
+  configManagementPlugins: |
+    - name: helmfile
+      init:
+        command: ["helmfile"]
+        args: ["version"]
+      generate:
+        command: ["helmfile"]
+        args: ["template"]
+  url: "https://argocd.quantumbeam.io"
+  dex.config: |
+    connectors:
+    - type: oidc
+      id: github
+      name: GitHub
+      config:
+        clientID: $github-client-id
+        clientSecret: $github-client-secret
+        issuer: https://oauth2.sigstore.dev/auth
+        requestedScopes: ["openid", "profile", "email", "groups"]
+  resource.customizations: |
+    "*":
+      health.lua: |
+        hs = {}
+        hs.status = "Progressing"
+        hs.message = "Pending health check"
+        return hs
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-secret
+  namespace: argocd
+type: Opaque
+stringData:
+  # ArgoCD server admin password
+  admin.password: "$2a$10$K3oNQZJpGZ5K5mQZJpGZOz7oZJpGZ5K5mQZJpGZ5K5mQZJpGZ5K"
+  # GitHub OAuth configuration
+  github.client.id: "$github-client-id"
+  github.client.secret: "$github-client-secret"
+  # Additional secrets
+  webhook.github.secret: "$github-webhook-secret"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-notifications-secret
+  namespace: argocd
+type: Opaque
+stringData:
+  slack-token: "$slack-token"
+  slack.username: "argocd"
+  slack.channel: "#deployments"
+  email.username: "argocd@quantumbeam.io"
+  email.password: "$email-password"
+  email.from: "ArgoCD <argocd@quantumbeam.io>"
+  email.to: "devops@quantumbeam.io"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: quantumbeam-env-apps
+  namespace: argocd
+spec:
+  generators:
+  - git:
+      repoURL: https://github.com/quantumbeam/infrastructure
+      revision: HEAD
+      directories:
+      - path: environments/*
+  template:
+    metadata:
+      name: 'quantumbeam-{{path.basename}}'
+    spec:
+      project: quantumbeam-project
+      source:
+        repoURL: https://github.com/quantumbeam/infrastructure
+        targetRevision: HEAD
+        path: '{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: 'quantumbeam-{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+        - PrunePropagationPolicy=foreground
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: quantumbeam-microservices
+  namespace: argocd
+spec:
+  generators:
+  - git:
+      repoURL: https://github.com/quantumbeam/infrastructure
+      revision: HEAD
+      directories:
+      - path: apps/*
+  - list:
+      elements:
+      - service: api-server
+        image: ghcr.io/quantumbeam/quantumbeam-api
+        port: 8080
+        replicas: 3
+      - service: quantum-service
+        image: ghcr.io/quantumbeam/quantumbeam-quantum
+        port: 8001
+        replicas: 2
+      - service: ai-ml-service
+        image: ghcr.io/quantumbeam/quantumbeam-ai-ml
+        port: 8002
+        replicas: 2
+  template:
+    metadata:
+      name: '{{service}}-{{path[1]}}'
+      labels:
+        app.kubernetes.io/name: '{{service}}'
+        app.kubernetes.io/component: '{{path[1]}}'
+    spec:
+      project: quantumbeam-project
+      source:
+        repoURL: https://github.com/quantumbeam/infrastructure
+        targetRevision: HEAD
+        path: '{{path}}/{{service}}'
+        helm:
+          valueFiles:
+          - values-{{path[1]}}.yaml
+          parameters:
+          - name: image.repository
+            value: '{{image}}'
+          - name: service.port
+            value: '{{port}}'
+          - name: replicaCount
+            value: '{{replicas}}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: 'quantumbeam-{{path[1]}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-ingress
+  namespace: argocd
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - argocd.quantumbeam.io
+    secretName: argocd-server-tls
+  rules:
+  - host: argocd.quantumbeam.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 443
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: argocd-server-tls
+  namespace: argocd
+spec:
+  secretName: argocd-server-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: argocd.quantumbeam.io
+  dnsNames:
+  - argocd.quantumbeam.io
+---
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: aws-secretsmanager
+  namespace: argocd
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-east-1
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: argocd-repo-server
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: argocd-secrets
+  namespace: argocd
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secretsmanager
+    kind: SecretStore
+  target:
+    name: argocd-secrets
+    creationPolicy: Owner
+  data:
+  - secretKey: github-client-id
+    remoteRef:
+      key: argocd/github-client-id
+  - secretKey: github-client-secret
+    remoteRef:
+      key: argocd/github-client-secret
+  - secretKey: slack-token
+    remoteRef:
+      key: argocd/slack-token
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-notifications
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/argoproj/argo-cd
+    targetRevision: HEAD
+    path: manifests/notifications-cm
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-certs
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/quantumbeam/infrastructure
+    targetRevision: HEAD
+    path: manifests/certs
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+data:
+  policy.csv: |
+    p, role:admin, applications, *, quantumbeam-*/.*, allow
+    p, role:admin, clusters, *, *, allow
+    p, role:developer, applications, *, quantumbeam-*/.*, allow
+    p, role:developer, applications, sync, quantumbeam-*/.*, allow
+    p, role:readonly, applications, get, quantumbeam-*/.*, allow
+    p, role:readonly, clusters, get, *, allow
+    g, github:quantumbeam:admins, role:admin
+    g, github:quantumbeam:developers, role:developer
+    g, github:quantumbeam:readonly, role:readonly
+  policy.default: role:readonly

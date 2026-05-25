@@ -1,0 +1,440 @@
+name: Deployment Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      skip_validation:
+        description: 'Skip validation steps'
+        required: false
+        default: false
+        type: boolean
+      auto_promote:
+        description: 'Auto-promote after validation'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: quay.io/quantumbeam
+  NAMESPACE: quantumbeam
+
+jobs:
+  # Build and test
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+      commit-sha: ${{ steps.meta.outputs.commit }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.QUAY_USERNAME }}
+        password: ${{ secrets.QUAY_PASSWORD }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/quantumbeam-api
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./build/docker/Dockerfile.api
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+        build-args: |
+          VERSION=${{ steps.meta.outputs.version }}
+          COMMIT=${{ steps.meta.outputs.commit }}
+          BUILD_TIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+
+    - name: Run security scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/quantumbeam-api@${{ steps.build.outputs.digest }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Generate SBOM
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ env.REGISTRY }}/quantumbeam-api@${{ steps.build.outputs.digest }}
+        format: 'spdx-json'
+        output-file: 'sbom.spdx.json'
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom
+        path: sbom.spdx.json
+
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    environment:
+      name: staging
+      url: https://api-staging.quantumbeam.io
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v4
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+
+    - name: Update image tag in values
+      run: |
+        sed -i 's|tag: ".*"|tag: "${{ needs.build.outputs.image-tag }}"|' deploy/config/environments/staging/values.yaml
+
+    - name: Validate configuration
+      run: |
+        # Validate YAML syntax
+        find deploy -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'yq eval {} > /dev/null'
+
+        # Validate against schema
+        docker run --rm -v $(pwd):/app -w /app \
+          mikefarah/yq:latest \
+          eval '. | select(. != null)' \
+          deploy/config/environments/staging/values.yaml > /tmp/validated-values.yaml
+
+    - name: Deploy with ArgoCD
+      run: |
+        # Create/update ArgoCD application
+        cat << EOF | kubectl apply -f -
+        apiVersion: argoproj.io/v1alpha1
+        kind: Application
+        metadata:
+          name: quantumbeam-staging
+          namespace: argocd
+        spec:
+          project: quantumbeam
+          source:
+            repoURL: https://github.com/quantumbeam/quantumbeam-k8s
+            targetRevision: main
+            path: environments/staging
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: ${{ env.NAMESPACE }}
+          syncPolicy:
+            automated:
+              prune: true
+              selfHeal: true
+            syncOptions:
+            - CreateNamespace=true
+        EOF
+
+        # Wait for deployment to complete
+        echo "Waiting for deployment to complete..."
+        kubectl wait --for=condition=available deployment/quantumbeam-api -n ${{ env.NAMESPACE }} --timeout=600s
+
+    - name: Run smoke tests
+      run: |
+        # Get service URL
+        SERVICE_URL=$(kubectl get service quantumbeam-api-active -n ${{ env.NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+        if [[ -z "$SERVICE_URL" ]]; then
+          SERVICE_URL="quantumbeam-api-active.${{ env.NAMESPACE }}.svc.cluster.local"
+        fi
+
+        # Run smoke tests
+        kubectl run smoke-test --image=curlimages/curl:latest --rm -i --restart=Never \
+          -- curl -s "http://$SERVICE_URL/health" || {
+            echo "Health check failed"
+            exit 1
+          }
+
+        curl -s "http://$SERVICE_URL/ready" || {
+          echo "Readiness check failed"
+            exit 1
+        }
+
+        curl -s "http://$SERVICE_URL/metrics" | grep -q "http_requests_total" || {
+          echo "Metrics check failed"
+          exit 1
+        }
+
+    - name: Run comprehensive validation
+      run: |
+        # Apply validation ConfigMaps
+        kubectl apply -f test/deployment/smoke-tests.yaml -n ${{ env.NAMESPACE }}
+        kubectl apply -f test/deployment/deployment-validation.yaml -n ${{ env.NAMESPACE }}
+
+        # Run deployment validation
+        kubectl run deployment-validation --image=bitnami/kubectl:latest --rm -i --restart=Never \
+          -- /bin/bash -c "
+            /app/validate-deployment.sh \
+              --namespace ${{ env.NAMESPACE }} \
+              --service quantumbeam-api \
+              --deployment quantumbeam-api \
+              --timeout 600
+          "
+
+  # Production deployment (manual approval)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, deploy-staging]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    environment:
+      name: production
+      url: https://api.quantumbeam.io
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v4
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+
+    - name: Pre-deployment checks
+      run: |
+        echo "Running pre-deployment checks..."
+
+        # Check cluster health
+        kubectl cluster-info
+        kubectl get nodes
+
+        # Check namespace
+        kubectl get namespace ${{ env.NAMESPACE }}
+
+        # Check required secrets
+        kubectl get secret postgres-secret -n ${{ env.NAMESPACE }} || {
+          echo "PostgreSQL secret not found"
+          exit 1
+        }
+
+        kubectl get secret redis-secret -n ${{ env.NAMESPACE }} || {
+          echo "Redis secret not found"
+          exit 1
+        }
+
+    - name: Update image tag in production values
+      run: |
+        sed -i 's|tag: ".*"|tag: "${{ needs.build.outputs.image-tag }}"|' deploy/config/environments/production/values.yaml
+
+    - name: Validate production configuration
+      run: |
+        # Validate YAML syntax
+        find deploy -name "*.yaml" -o -name "*.yml" | xargs -I {} sh -c 'yq eval {} > /dev/null'
+
+        # Validate resource limits
+        yq eval '.api.resources' deploy/config/environments/production/values.yaml
+
+    - name: Blue-Green deployment
+      run: |
+        # Execute blue-green deployment script
+        chmod +x deploy/blue-green/scripts/deploy-blue-green.sh
+
+        ./deploy/blue-green/scripts/deploy-blue-green.sh \
+          --namespace ${{ env.NAMESPACE }} \
+          --image-tag ${{ needs.build.outputs.image-tag }} \
+          --context $(kubectl config current-context) \
+          --auto-promote=${{ github.event.inputs.auto_promote || 'false' }}
+
+    - name: Post-deployment validation
+      run: |
+        echo "Running post-deployment validation..."
+
+        # Apply validation ConfigMaps
+        kubectl apply -f test/deployment/deployment-validation.yaml -n ${{ env.NAMESPACE }}
+
+        # Run comprehensive validation
+        kubectl run prod-validation --image=bitnami/kubectl:latest --rm -i --restart=Never \
+          -- /bin/bash -c "
+            /app/validate-deployment.sh \
+              --namespace ${{ env.NAMESPACE }} \
+              --service quantumbeam-api \
+              --deployment quantumbeam-api \
+              --timeout 600
+          "
+
+    - name: Load testing
+      run: |
+        # Get service URL
+        SERVICE_URL=$(kubectl get service quantumbeam-api-active -n ${{ env.NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+        if [[ -z "$SERVICE_URL" ]]; then
+          SERVICE_URL="quantumbeam-api-active.${{ env.NAMESPACE }}.svc.cluster.local"
+        fi
+
+        # Run basic load test
+        docker run --rm -i --network host \
+          grafana/k6:latest \
+          run - --vus 10 --duration 30s - << EOF
+        import http from 'k6/http';
+        import { check } from 'k6';
+
+        export let options = {
+          vus: 10,
+          duration: '30s',
+        };
+
+        export default function () {
+          let response = http.get('http://${SERVICE_URL}/health');
+          check(response, {
+            'status is 200': (r) => r.status === 200,
+            'response time < 500ms': (r) => r.timings.duration < 500,
+          });
+        }
+EOF
+
+    - name: Generate deployment report
+      run: |
+        cat << EOF > deployment-report-${{ github.run_number }}.json
+        {
+          "deployment": {
+            "status": "success",
+            "environment": "production",
+            "image_tag": "${{ needs.build.outputs.image-tag }}",
+            "image_digest": "${{ needs.build.outputs.image-digest }}",
+            "commit_sha": "${{ needs.build.outputs.commit-sha }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "run_id": "${{ github.run_id }}",
+            "run_number": "${{ github.run_number }}",
+            "repository": "${{ github.repository }}",
+            "branch": "${{ github.ref_name }}",
+            "actor": "${{ github.actor }}"
+          },
+          "validation": {
+            "pre_deployment_checks": "passed",
+            "configuration_validation": "passed",
+            "deployment_validation": "passed",
+            "post_deployment_validation": "passed",
+            "load_testing": "passed"
+          }
+        }
+EOF
+
+    - name: Upload deployment report
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-report
+        path: deployment-report-${{ github.run_number }}.json
+
+    - name: Notify on success
+      if: success()
+      run: |
+        # Send Slack notification
+        curl -X POST -H 'Content-type: application/json' \
+          --data '{"text":"✅ QuantumBeam deployment to production completed successfully!\n\n📦 Image: ${{ needs.build.outputs.image-tag }}\n🔧 Commit: ${{ needs.build.outputs.commit-sha }}\n👤 Actor: ${{ github.actor }}\n📊 Run: #${{ github.run_number }}"}' \
+          ${{ secrets.SLACK_WEBHOOK_URL }} || true
+
+  # Rollback on failure
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: failure() && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+
+    steps:
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v4
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+
+    - name: Rollback deployment
+      run: |
+        echo "Rolling back deployment due to failure..."
+
+        # Rollback using ArgoCD
+        kubectl argo rollouts rollback quantumbeam-api -n ${{ env.NAMESPACE }}
+
+        # Wait for rollback to complete
+        kubectl wait --for=condition=available deployment/quantumbeam-api -n ${{ env.NAMESPACE }} --timeout=600s
+
+        echo "Rollback completed"
+
+    - name: Notify on rollback
+      run: |
+        # Send Slack notification
+        curl -X POST -H 'Content-type: application/json' \
+          --data '{"text":"🚨 QuantumBeam deployment failed and has been rolled back!\n\n🔧 Commit: ${{ github.commit.sha }}\n👤 Actor: ${{ github.actor }}\n📊 Run: #${{ github.run_number }}\n\n🔍 Please check the deployment and fix any issues before retrying."}' \
+          ${{ secrets.SLACK_WEBHOOK_URL }} || true
+
+  # Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy-production, rollback]
+    if: always()
+
+    steps:
+    - name: Cleanup temporary resources
+      run: |
+        echo "Cleaning up temporary resources..."
+        # Remove any temporary pods, jobs, or configmaps created during deployment
+        kubectl delete pod smoke-test --ignore-not-found=true -n ${{ env.NAMESPACE }} || true
+        kubectl delete pod deployment-validation --ignore-not-found=true -n ${{ env.NAMESPACE }} || true
+        kubectl delete pod prod-validation --ignore-not-found=true -n ${{ env.NAMESPACE }} || true
+
+    - name: Archive logs
+      if: always()
+      run: |
+        # Archive deployment logs
+        mkdir -p logs
+        kubectl logs deployment/quantumbeam-api -n ${{ env.NAMESPACE }} --tail=1000 > logs/deployment.log || true
+        kubectl get events -n ${{ env.NAMESPACE }} --sort-by='.lastTimestamp' > logs/events.log || true
+
+        # Upload logs as artifacts
+        tar -czf deployment-logs-${{ github.run_number }}.tar.gz logs/ || true
+
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-logs
+        path: deployment-logs-${{ github.run_number }}.tar.gz

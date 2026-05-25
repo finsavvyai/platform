@@ -1,0 +1,343 @@
+# Slack Integration Configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: slack-secrets
+  namespace: monitoring
+type: Opaque
+data:
+  # Base64 encoded Slack webhook URLs for different channels
+  critical_webhook: <SLACK_CRITICAL_WEBHOOK_BASE64>
+  high_webhook: <SLACK_HIGH_WEBHOOK_BASE64>
+  medium_webhook: <SLACK_MEDIUM_WEBHOOK_BASE64>
+  low_webhook: <SLACK_LOW_WEBHOOK_BASE64>
+  # Base64 encoded Slack bot token
+  bot_token: <SLACK_BOT_TOKEN_BASE64>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slack-config
+  namespace: monitoring
+data:
+  config.yaml: |
+    # Slack Integration Configuration
+    slack:
+      # Webhook URLs for different severity levels
+      webhooks:
+        critical: "${SLACK_CRITICAL_WEBHOOK}"
+        high: "${SLACK_HIGH_WEBHOOK}"
+        medium: "${SLACK_MEDIUM_WEBHOOK}"
+        low: "${SLACK_LOW_WEBHOOK}"
+
+      # Channel Configuration
+      channels:
+        critical:
+          name: "#alerts-critical"
+          mention: ["@here"]
+          icon_emoji: ":rotating_light:"
+          username: "QuantumBeam Critical Alerts"
+
+        high:
+          name: "#alerts-high"
+          mention: ["@channel"]
+          icon_emoji: ":warning:"
+          username: "QuantumBeam High Alerts"
+
+        medium:
+          name: "#alerts-medium"
+          mention: []
+          icon_emoji: ":information_source:"
+          username: "QuantumBeam Medium Alerts"
+
+        low:
+          name: "#alerts-low"
+          mention: []
+          icon_emoji: ":speech_balloon:"
+          username: "QuantumBeam Low Alerts"
+
+      # Message Formatting
+      message_formatting:
+        include_fields:
+          - "alertname"
+          - "severity"
+          - "summary"
+          - "description"
+          - "instance"
+          - "job"
+          - "namespace"
+          - "cluster"
+          - "timestamp"
+
+        formatting_rules:
+          severity_colors:
+            critical: "#FF0000"
+            high: "#FF8C00"
+            medium: "#FFD700"
+            low: "#008000"
+
+          link_formatting:
+            prometheus: "[Prometheus](http://prometheus.quantumbeam.io)"
+            grafana: "[Grafana](http://grafana.quantumbeam.io)"
+            alertmanager: "[AlertManager](http://alertmanager.quantumbeam.io)"
+            kubernetes: "[Kubernetes Dashboard](https://kubernetes.quantumbeam.io)"
+
+      # Notification Logic
+      notification_logic:
+        rate_limiting:
+          enabled: true
+          max_alerts_per_minute: 10
+          burst_size: 20
+
+        grouping:
+          enabled: true
+          group_by: ["alertname", "severity", "namespace"]
+          group_wait: "30s"
+          group_interval: "5m"
+          repeat_interval: "4h"
+
+        business_hours:
+          enabled: true
+          timezone: "UTC"
+          hours:
+            start: "09:00"
+            end: "17:00"
+          days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+
+          # Outside business hours
+          after_hours:
+            suppress_low: true
+            suppress_medium: false
+            escalate_high: true
+            escalate_critical: true
+
+        alert_suppression:
+          maintenance_windows:
+            enabled: true
+            default_duration: "2h"
+            automatic_suppression: true
+
+          known_issues:
+            enabled: true
+            suppression_duration: "1h"
+            auto_escalation: true
+
+      # Interactive Features
+      interactive_features:
+        buttons:
+          acknowledge:
+            enabled: true
+            text: "Acknowledge"
+            style: "primary"
+
+          escalate:
+            enabled: true
+            text: "Escalate"
+            style: "danger"
+
+          resolve:
+            enabled: true
+            text: "Resolve"
+            style: "good"
+
+          silence:
+            enabled: true
+            text: "Silence"
+            style: "default"
+
+          runbook:
+            enabled: true
+            text: "Runbook"
+            style: "default"
+
+        slash_commands:
+          enabled: true
+          commands:
+            - "/acknowledge"
+            - "/resolve"
+            - "/silence"
+            - "/escalate"
+            - "/status"
+
+      # Runbook Integration
+      runbook_integration:
+        enabled: true
+        runbook_base_url: "https://kb.quantumbeam.io/runbooks"
+        auto_suggestions: true
+        fallback_url: "https://docs.quantumbeam.io/troubleshooting"
+
+      # Escalation Workflows
+      escalation_workflows:
+        critical:
+          - step_1:
+              action: "slack_notification"
+              delay: "0m"
+              recipients: ["@on-call-engineer", "@engineering-manager"]
+
+          - step_2:
+              action: "pagerduty_incident"
+              delay: "5m"
+              urgency: "high"
+
+          - step_3:
+              action: "phone_call"
+              delay: "10m"
+              recipients: ["@on-call-engineer"]
+
+        high:
+          - step_1:
+              action: "slack_notification"
+              delay: "0m"
+              recipients: ["@on-call-engineer"]
+
+          - step_2:
+              action: "pagerduty_incident"
+              delay: "15m"
+              urgency: "high"
+
+        medium:
+          - step_1:
+              action: "slack_notification"
+              delay: "0m"
+              recipients: ["@engineering-team"]
+
+          - step_2:
+              action: "email_notification"
+              delay: "1h"
+              recipients: ["team@quantumbeam.io"]
+
+        low:
+          - step_1:
+              action: "slack_notification"
+              delay: "0m"
+              recipients: ["@devops-team"]
+
+          - step_2:
+              action: "jira_ticket"
+              delay: "4h"
+              project: "OPS"
+              priority: "Low"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slack-webhook
+  namespace: monitoring
+  labels:
+    app: slack-webhook
+    component: alerting
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: slack-webhook
+  template:
+    metadata:
+      labels:
+        app: slack-webhook
+        component: alerting
+    spec:
+      containers:
+      - name: slack-webhook
+        image: ghcr.io/prometheus-community/slack-webhook:2.6.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: SLACK_WEBHOOK_CRITICAL
+          valueFrom:
+            secretKeyRef:
+              name: slack-secrets
+              key: critical_webhook
+        - name: SLACK_WEBHOOK_HIGH
+          valueFrom:
+            secretKeyRef:
+              name: slack-secrets
+              key: high_webhook
+        - name: SLACK_WEBHOOK_MEDIUM
+          valueFrom:
+            secretKeyRef:
+              name: slack-secrets
+              key: medium_webhook
+        - name: SLACK_WEBHOOK_LOW
+          valueFrom:
+            secretKeyRef:
+              name: slack-secrets
+              key: low_webhook
+        - name: SLACK_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: slack-secrets
+              key: bot_token
+        args:
+        - "--config.file=/etc/slack/config.yml"
+        - "--alertmanager.url=http://alertmanager.monitoring.svc.cluster.local:9093"
+        - "--slack.url=$(SLACK_WEBHOOK_CRITICAL)"
+        - "--channel=alerts"
+        - "--template.file=/etc/slack/templates/default.tmpl"
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: config
+          mountPath: /etc/slack
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: slack-config
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: slack-webhook
+  namespace: monitoring
+  labels:
+    app: slack-webhook
+    component: alerting
+spec:
+  selector:
+    app: slack-webhook
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: slack-webhook
+  namespace: monitoring
+  labels:
+    app: slack-webhook
+    component: alerting
+spec:
+  selector:
+    matchLabels:
+      app: slack-webhook
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics

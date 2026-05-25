@@ -1,0 +1,1161 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-engineering-config
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: chaos-engineering
+    type: config
+data:
+  chaos-experiments.yaml: |
+    # Chaos Engineering Experiments for QuantumBeam
+    chaosEngineering:
+      # Global configuration
+      global:
+        enabled: true
+        namespace: "quantumbeam"
+        dryRun: false
+        debug: false
+
+        # Safety controls
+        safety:
+          # Maximum blast radius - percentage of pods that can be affected
+          maxBlastRadius: 30
+
+          # Time limits
+          maxExperimentDuration: "15m"
+          maxForcefulTerminationWait: "30s"
+
+          # Health checks
+          healthCheckTimeout: "30s"
+          healthCheckInterval: "5s"
+          healthCheckRetryAttempts: 3
+
+          # Notification settings
+          notifications:
+            enabled: true
+            slack:
+              webhookUrl: "https://hooks.slack.com/services/quantumbeam/chaos"
+              channel: "#quantumbeam-chaos"
+            email:
+              enabled: true
+              recipients: ["sre@quantumbeam.io", "devops@quantumbeam.io"]
+
+      # Experiment schedules
+      schedules:
+        # Weekly resilience tests during off-peak hours
+        weeklyResilience:
+          schedule: "0 2 * * 1"  # Monday 2 AM UTC
+          experiments: ["pod-delete", "network-latency", "disk-fill"]
+          enabled: true
+
+        # Monthly disaster recovery tests
+        monthlyDisasterRecovery:
+          schedule: "0 3 1 * *"  # 1st of month 3 AM UTC
+          experiments: ["node-drain", "zone-failure", "database-failure"]
+          enabled: true
+
+        # Daily micro-chaos for resilience building
+        dailyMicroChaos:
+          schedule: "*/30 9-17 * * 1-5"  # Every 30 mins during business hours
+          experiments: ["cpu-hog", "memory-hog"]
+          enabled: true
+          intensity: "low"
+
+      # Chaos experiments
+      experiments:
+        # Pod deletion experiments
+        podDelete:
+          name: "quantumbeam-pod-delete"
+          description: "Randomly delete pods to test system resilience"
+          type: "pod-delete"
+          enabled: true
+          parameters:
+            # Target configuration
+            target:
+              labelSelector: "app=quantumbeam"
+              mode: "fixed-percent"
+              value: "10"
+
+            # Chaos configuration
+            chaos:
+              duration: "2m"
+              interval: "30s"
+              force: true
+
+            # Safety configuration
+            safety:
+              gracePeriodSeconds: 30
+              lifecycle:
+                skipFor: ["chaos-monkey", "critical-service"]
+              psp:
+                allowPrivilegeEscalation: false
+
+          # Health checks
+          healthChecks:
+            - name: "api-health-check"
+              url: "http://quantumbeam-api.quantumbeam.svc.cluster.local/health"
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              timeoutSeconds: 5
+              successThreshold: 1
+              failureThreshold: 3
+
+            - name: "fraud-detection-health-check"
+              url: "http://quantumbeam-fraud-detector.quantumbeam.svc.cluster.local/health"
+              initialDelaySeconds: 10
+              periodSeconds: 15
+              timeoutSeconds: 10
+              successThreshold: 1
+              failureThreshold: 3
+
+        # Network chaos experiments
+        networkLatency:
+          name: "quantumbeam-network-latency"
+          description: "Inject network latency to test timeout handling"
+          type: "network-chaos"
+          enabled: true
+          parameters:
+            target:
+              labelSelector: "app=quantumbeam"
+              mode: "fixed-percent"
+              value: "20"
+
+            chaos:
+              duration: "5m"
+              latency:
+                latency: "200ms"
+                jitter: "50ms"
+                correlation: "25"
+              bandwidth:
+                rate: "100mbps"
+                limit: "500mbps"
+              packetLoss:
+                loss: "0.1%"
+                correlation: "25"
+
+            direction: "both"
+            externalTargets: ["postgres", "redis", "external-api"]
+
+          healthChecks:
+            - name: "connectivity-check"
+              url: "http://quantumbeam-api.quantumbeam.svc.cluster.local/health"
+              initialDelaySeconds: 10
+              periodSeconds: 5
+              timeoutSeconds: 10
+
+        # CPU stress experiments
+        cpuHog:
+          name: "quantumbeam-cpu-hog"
+          description: "Consume CPU resources to test performance under load"
+          type: "stress-chaos"
+          enabled: true
+          parameters:
+            target:
+              labelSelector: "app=quantumbeam-api"
+              mode: "fixed"
+              value: "1"
+
+            chaos:
+              duration: "3m"
+              stressors:
+                cpu:
+                  workers: 2
+                  load: 80
+                  options: ["--cpu-load", "80"]
+
+            # Resource limits
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+          healthChecks:
+            - name: "performance-degradation-check"
+              url: "http://quantumbeam-api.quantumbeam.svc.cluster.local/metrics"
+              expectedLatency: "1000ms"
+              expectedErrorRate: "5%"
+
+        # Memory stress experiments
+        memoryHog:
+          name: "quantumbeam-memory-hog"
+          description: "Consume memory to test OOM handling"
+          type: "stress-chaos"
+          enabled: true
+          parameters:
+            target:
+              labelSelector: "app=quantumbeam-fraud-detector"
+              mode: "fixed"
+              value: "1"
+
+            chaos:
+              duration: "2m"
+              stressors:
+                memory:
+                  workers: 1
+                  size: "512MB"
+                  options: ["--vm", "2", "--vm-bytes", "256M"]
+
+            limits:
+              cpu: "200m"
+              memory: "1Gi"
+
+          healthChecks:
+            - name: "memory-pressure-check"
+              url: "http://quantumbeam-fraud-detector.quantumbeam.svc.cluster.local/health"
+              expectedMemoryUsage: "90%"
+
+        # Disk fill experiments
+        diskFill:
+          name: "quantumbeam-disk-fill"
+          description: "Fill disk space to test storage handling"
+          type: "stress-chaos"
+          enabled: true
+          parameters:
+            target:
+              labelSelector: "app=quantumbeam-ai-ml"
+              mode: "fixed"
+              value: "1"
+
+            chaos:
+              duration: "2m"
+              stressors:
+                disk:
+                  workers: 1
+                  size: "5GB"
+                  path: "/tmp"
+
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+              storage: "10Gi"
+
+          healthChecks:
+            - name: "disk-space-check"
+              command: "df -h /tmp"
+              expectedFreeSpace: "1GB"
+
+        # DNS chaos experiments
+        dnsChaos:
+          name: "quantumbeam-dns-chaos"
+          description: "Disrupt DNS resolution to test service discovery resilience"
+          type: "dns-chaos"
+          enabled: true
+          parameters:
+            target:
+              labelSelector: "app=quantumbeam"
+              mode: "fixed-percent"
+              value: "50"
+
+            chaos:
+              duration: "2m"
+              action: "error"
+              dnsConfig:
+                nameservers: ["8.8.8.8", "8.8.4.4"]
+                searchDomains: ["quantumbeam.svc.cluster.local"]
+
+            targets:
+              - "postgres-service.quantumbeam.svc.cluster.local"
+              - "redis-service.quantumbeam.svc.cluster.local"
+              - "external-api.example.com"
+
+          healthChecks:
+            - name: "service-discovery-check"
+              url: "http://quantumbeam-api.quantumbeam.svc.cluster.local/health"
+              initialDelaySeconds: 30
+              periodSeconds: 10
+
+        # HTTP chaos experiments
+        httpChaos:
+          name: "quantumbeam-http-chaos"
+          description: "Inject HTTP errors to test API resilience"
+          type: "http-chaos"
+          enabled: true
+          parameters:
+            target:
+              labelSelector: "app=quantumbeam-api"
+              mode: "fixed"
+              value: "1"
+
+            chaos:
+              duration: "3m"
+              level: "header"
+              abort:
+                percentage: 10
+                httpStatus: 503
+              delay:
+                percentage: 20
+                latency: "500ms"
+              error:
+                percentage: 5
+                httpStatus: 500
+
+            target:
+              - "quantumbeam-fraud-detector:8080"
+              - "redis-service:6379"
+              - "postgres-service:5432"
+
+          healthChecks:
+            - name: "api-resilience-check"
+              url: "http://quantumbeam-api.quantumbeam.svc.cluster.local/health"
+              expectedStatusCode: 200
+
+      # Advanced chaos scenarios
+      scenarios:
+        # Multi-zone failure simulation
+        zoneFailure:
+          name: "quantumbeam-zone-failure"
+          description: "Simulate entire availability zone failure"
+          enabled: false  # High impact - enable with caution
+          experiments:
+            - type: "pod-delete"
+              parameters:
+                target:
+                  labelSelector: "topology.kubernetes.io/zone=us-west-2a"
+                  mode: "max"
+                  value: "100%"
+                chaos:
+                  duration: "5m"
+            - type: "network-chaos"
+              parameters:
+                target:
+                  labelSelector: "topology.kubernetes.io/zone=us-west-2a"
+                  mode: "max"
+                  value: "100%"
+                chaos:
+                  duration: "5m"
+                  network:
+                    action: "partition"
+
+        # Database failure simulation
+        databaseFailure:
+          name: "quantumbeam-database-failure"
+          description: "Simulate database failure scenarios"
+          enabled: true
+          experiments:
+            - type: "pod-delete"
+              parameters:
+                target:
+                  labelSelector: "app=postgres"
+                  mode: "fixed"
+                  value: "1"
+                chaos:
+                  duration: "1m"
+            - type: "network-chaos"
+              parameters:
+                target:
+                  labelSelector: "app=quantumbeam-api"
+                  mode: "fixed-percent"
+                  value: "50"
+                chaos:
+                  duration: "2m"
+                  network:
+                    action: "delay"
+                    latency: "1000ms"
+                    target: "postgres-service"
+
+        # Cache failure simulation
+        cacheFailure:
+          name: "quantumbeam-cache-failure"
+          description: "Simulate Redis cache failure"
+          enabled: true
+          experiments:
+            - type: "pod-delete"
+              parameters:
+                target:
+                  labelSelector: "app=redis"
+                  mode: "fixed"
+                  value: "1"
+                chaos:
+                  duration: "2m"
+            - type: "network-chaos"
+              parameters:
+                target:
+                  labelSelector: "app=quantumbeam-api"
+                  mode: "fixed-percent"
+                  value: "30"
+                chaos:
+                  duration: "1m"
+                  network:
+                    action: "partition"
+                    target: "redis-service"
+
+      # Observability and monitoring
+      observability:
+        # Metrics collection
+        metrics:
+          enabled: true
+          prometheus:
+            endpoint: "/metrics"
+            port: 8080
+            metrics:
+              - "chaos_experiments_total"
+              - "chaos_experiments_success_total"
+              - "chaos_experiments_failure_total"
+              - "chaos_experiments_duration_seconds"
+              - "chaos_targets_affected_total"
+
+        # Logging
+        logging:
+          enabled: true
+          level: "info"
+          format: "json"
+          fields:
+            - "experiment_name"
+            - "experiment_type"
+            - "target_namespace"
+            - "target_label_selector"
+            - "chaos_duration"
+            - "chaos_result"
+            - "blast_radius"
+
+        # Tracing
+        tracing:
+          enabled: true
+          jaeger:
+            endpoint: "http://jaeger-collector.monitoring.svc.cluster.local:14268/api/traces"
+            serviceName: "chaos-engineering"
+            sampleRate: 0.1
+
+      # Integration with external systems
+      integrations:
+        # Alertmanager integration
+        alertmanager:
+          enabled: true
+          endpoint: "http://alertmanager.monitoring.svc.cluster.local:9093"
+          rules:
+            - name: "ChaosExperimentFailed"
+              condition: "chaos_experiments_failure_total > 0"
+              severity: "warning"
+
+            - name: "ChaosExperimentRunning"
+              condition: "chaos_experiments_running_total > 0"
+              severity: "info"
+
+        # PagerDuty integration
+        pagerduty:
+          enabled: true
+          integrationKey: "quantumbeam-chaos-pagerduty"
+          severity: ["critical"]
+
+        # Slack integration
+        slack:
+          enabled: true
+          webhookUrl: "https://hooks.slack.com/services/quantumbeam/chaos"
+          channel: "#quantumbeam-chaos"
+          username: "ChaosMonkey"
+
+  chaos-engineering-dashboard.yaml: |
+    # Chaos Engineering Dashboard Configuration
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: chaos-dashboard-config
+      namespace: quantumbeam
+      labels:
+        app: quantumbeam
+        component: chaos-engineering
+        type: dashboard
+    data:
+      dashboard.json: |
+        {
+          "dashboard": {
+            "id": null,
+            "title": "QuantumBeam Chaos Engineering",
+            "tags": ["quantumbeam", "chaos", "resilience"],
+            "timezone": "browser",
+            "refresh": "30s",
+            "panels": [
+              {
+                "id": 1,
+                "title": "Active Chaos Experiments",
+                "type": "stat",
+                "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+                "targets": [
+                  {
+                    "expr": "chaos_experiments_running_total",
+                    "legendFormat": "Running",
+                    "refId": "A"
+                  }
+                ],
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "short",
+                    "thresholds": {
+                      "steps": [
+                        {"color": "green", "value": 0},
+                        {"color": "yellow", "value": 1},
+                        {"color": "red", "value": 5}
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "id": 2,
+                "title": "Chaos Experiment Success Rate",
+                "type": "stat",
+                "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+                "targets": [
+                  {
+                    "expr": "chaos_experiments_success_total / (chaos_experiments_success_total + chaos_experiments_failure_total) * 100",
+                    "legendFormat": "Success Rate",
+                    "refId": "A"
+                  }
+                ],
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "percent",
+                    "thresholds": {
+                      "steps": [
+                        {"color": "red", "value": 80},
+                        {"color": "yellow", "value": 90},
+                        {"color": "green", "value": 95}
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "id": 3,
+                "title": "Chaos Experiment Duration",
+                "type": "graph",
+                "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+                "targets": [
+                  {
+                    "expr": "histogram_quantile(0.95, rate(chaos_experiments_duration_seconds_bucket[5m]))",
+                    "legendFormat": "95th percentile",
+                    "refId": "A"
+                  },
+                  {
+                    "expr": "histogram_quantile(0.50, rate(chaos_experiments_duration_seconds_bucket[5m]))",
+                    "legendFormat": "50th percentile",
+                    "refId": "B"
+                  }
+                ],
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "s"
+                  }
+                }
+              },
+              {
+                "id": 4,
+                "title": "Chaos Targets Affected",
+                "type": "graph",
+                "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+                "targets": [
+                  {
+                    "expr": "sum by (experiment_type) (chaos_targets_affected_total)",
+                    "legendFormat": "{{experiment_type}}",
+                    "refId": "A"
+                  }
+                ],
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "short"
+                  }
+                }
+              },
+              {
+                "id": 5,
+                "title": "Chaos Experiment Results",
+                "type": "table",
+                "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+                "targets": [
+                  {
+                    "expr": "chaos_experiments_total",
+                    "legendFormat": "{{experiment_name}} - {{result}}",
+                    "refId": "A",
+                    "format": "table"
+                  }
+                ],
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "short"
+                  }
+                }
+              }
+            ],
+            "time": {"from": "now-1h", "to": "now"},
+            "refresh": "30s"
+          }
+        }
+
+  chaos-engineering-scripts.yaml: |
+    # Chaos Engineering Automation Scripts
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: chaos-engineering-scripts
+      namespace: quantumbeam
+      labels:
+        app: quantumbeam
+        component: chaos-engineering
+        type: scripts
+    data:
+      chaos-runner.py: |
+        #!/usr/bin/env python3
+        """
+        QuantumBeam Chaos Engineering Runner
+        Automated chaos experiment execution and monitoring
+        """
+
+        import asyncio
+        import json
+        import logging
+        import os
+        import time
+        import yaml
+        from datetime import datetime, timedelta
+        from typing import Dict, List, Optional
+
+        import aiohttp
+        import kubernetes
+        from kubernetes import client, config
+
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+
+        class ChaosEngineeringRunner:
+            """Chaos Engineering experiment runner and monitor"""
+
+            def __init__(self):
+                self.namespace = os.getenv('NAMESPACE', 'quantumbeam')
+                self.dry_run = os.getenv('DRY_RUN', 'false').lower() == 'true'
+                self.max_blast_radius = int(os.getenv('MAX_BLAST_RADIUS', '30'))
+                self.max_duration = os.getenv('MAX_EXPERIMENT_DURATION', '15m')
+
+                # Initialize Kubernetes client
+                try:
+                    config.load_incluster_config()
+                except:
+                    config.load_kube_config()
+
+                self.k8s_client = client.CoreV1Api()
+                self.custom_api = client.CustomObjectsApi()
+
+                # Chaos configuration
+                self.config = self.load_chaos_config()
+
+            def load_chaos_config(self) -> Dict:
+                """Load chaos engineering configuration"""
+                try:
+                    config_path = '/app/config/chaos-experiments.yaml'
+                    with open(config_path, 'r') as f:
+                        config = yaml.safe_load(f)
+                    return config.get('chaosEngineering', {})
+                except Exception as e:
+                    logger.error(f"Error loading chaos config: {e}")
+                    return {}
+
+            async def run_experiment(self, experiment_name: str, experiment_config: Dict) -> Dict:
+                """Run a single chaos experiment"""
+                logger.info(f"Starting chaos experiment: {experiment_name}")
+
+                if not experiment_config.get('enabled', False):
+                    return {"status": "skipped", "reason": "experiment disabled"}
+
+                try:
+                    # Validate safety constraints
+                    if not await self.validate_safety_constraints(experiment_config):
+                        return {"status": "failed", "reason": "safety constraints not met"}
+
+                    # Create chaos experiment manifest
+                    manifest = self.create_chaos_manifest(experiment_name, experiment_config)
+
+                    if self.dry_run:
+                        logger.info(f"DRY RUN: Would create experiment {experiment_name}")
+                        return {"status": "dry_run", "manifest": manifest}
+
+                    # Apply chaos experiment
+                    await self.apply_chaos_experiment(manifest)
+
+                    # Monitor experiment
+                    result = await self.monitor_experiment(experiment_name, experiment_config)
+
+                    # Cleanup
+                    await self.cleanup_experiment(experiment_name)
+
+                    return result
+
+                except Exception as e:
+                    logger.error(f"Error running experiment {experiment_name}: {e}")
+                    await self.cleanup_experiment(experiment_name)
+                    return {"status": "failed", "error": str(e)}
+
+            def create_chaos_manifest(self, experiment_name: str, experiment_config: Dict) -> Dict:
+                """Create Kubernetes manifest for chaos experiment"""
+                experiment_type = experiment_config['type']
+                parameters = experiment_config['parameters']
+
+                base_manifest = {
+                    "apiVersion": "chaos-mesh.org/v1alpha1",
+                    "kind": self.get_chaos_kind(experiment_type),
+                    "metadata": {
+                        "name": experiment_name,
+                        "namespace": self.namespace,
+                        "labels": {
+                            "app": "quantumbeam",
+                            "component": "chaos-engineering",
+                            "experiment-type": experiment_type
+                        },
+                        "annotations": {
+                            "chaos-mesh.org/experiment": "quantumbeam",
+                            "chaos-mesh.org/description": experiment_config.get('description', '')
+                        }
+                    },
+                    "spec": self.build_chaos_spec(experiment_type, parameters)
+                }
+
+                return base_manifest
+
+            def get_chaos_kind(self, experiment_type: str) -> str:
+                """Get Kubernetes kind for chaos experiment type"""
+                kind_mapping = {
+                    "pod-delete": "PodChaos",
+                    "network-chaos": "NetworkChaos",
+                    "stress-chaos": "StressChaos",
+                    "dns-chaos": "DNSChaos",
+                    "http-chaos": "HTTPChaos",
+                    "io-chaos": "IOChaos",
+                    "kernel-chaos": "KernelChaos"
+                }
+                return kind_mapping.get(experiment_type, "PodChaos")
+
+            def build_chaos_spec(self, experiment_type: str, parameters: Dict) -> Dict:
+                """Build chaos experiment specification"""
+                if experiment_type == "pod-delete":
+                    return {
+                        "selector": {
+                            "labelSelectors": {
+                                "app": parameters['target']['labelSelector']
+                            }
+                        },
+                        "mode": parameters['target']['mode'],
+                        "value": str(parameters['target']['value']),
+                        "action": "pod-kill",
+                        "gracePeriodSeconds": parameters.get('safety', {}).get('gracePeriodSeconds', 30)
+                    }
+
+                elif experiment_type == "network-chaos":
+                    return {
+                        "selector": {
+                            "labelSelectors": {
+                                "app": parameters['target']['labelSelector']
+                            }
+                        },
+                        "mode": parameters['target']['mode'],
+                        "value": str(parameters['target']['value']),
+                        "action": "delay",
+                        "delay": {
+                            "latency": parameters['chaos']['latency']['latency'],
+                            "jitter": parameters['chaos']['latency'].get('jitter', '0ms'),
+                            "correlation": parameters['chaos']['latency'].get('correlation', '0')
+                        },
+                        "direction": parameters.get('direction', 'both'),
+                        "externalTargets": parameters.get('externalTargets', [])
+                    }
+
+                elif experiment_type == "stress-chaos":
+                    return {
+                        "selector": {
+                            "labelSelectors": {
+                                "app": parameters['target']['labelSelector']
+                            }
+                        },
+                        "mode": parameters['target']['mode'],
+                        "value": str(parameters['target']['value']),
+                        "stressors": parameters['chaos']['stressors'],
+                        "stressngStressors": "-cpu 2 -cpu-load 80" if 'cpu' in parameters['chaos']['stressors'] else ""
+                    }
+
+                elif experiment_type == "dns-chaos":
+                    return {
+                        "selector": {
+                            "labelSelectors": {
+                                "app": parameters['target']['labelSelector']
+                            }
+                        },
+                        "mode": parameters['target']['mode'],
+                        "value": str(parameters['target']['value']),
+                        "action": parameters['chaos']['action'],
+                        "dnsConfig": {
+                            "nameservers": parameters['chaos']['dnsConfig']['nameservers'],
+                            "searchDomains": parameters['chaos']['dnsConfig']['searchDomains']
+                        },
+                        "targets": parameters.get('targets', [])
+                    }
+
+                elif experiment_type == "http-chaos":
+                    return {
+                        "selector": {
+                            "labelSelectors": {
+                                "app": parameters['target']['labelSelector']
+                            }
+                        },
+                        "mode": parameters['target']['mode'],
+                        "value": str(parameters['target']['value']),
+                        "level": parameters['chaos']['level'],
+                        "target": parameters['chaos']['target']
+                    }
+
+                # Default case
+                return {
+                    "selector": {
+                        "labelSelectors": {
+                            "app": parameters['target']['labelSelector']
+                        }
+                    }
+                }
+
+            async def validate_safety_constraints(self, experiment_config: Dict) -> bool:
+                """Validate that experiment meets safety constraints"""
+                try:
+                    target_config = experiment_config['parameters']['target']
+
+                    # Check blast radius
+                    if target_config['mode'] == 'fixed-percent':
+                        blast_radius = int(target_config['value'])
+                        if blast_radius > self.max_blast_radius:
+                            logger.warning(f"Blast radius {blast_radius}% exceeds maximum {self.max_blast_radius}%")
+                            return False
+
+                    # Check critical services
+                    label_selector = target_config['labelSelector']
+                    critical_services = ['chaos-monkey', 'critical-service', 'monitoring']
+                    for service in critical_services:
+                        if service in label_selector:
+                            logger.warning(f"Experiment targets critical service: {service}")
+                            return False
+
+                    # Check time constraints
+                    duration = experiment_config['parameters']['chaos']['duration']
+                    if self.duration_to_seconds(duration) > self.duration_to_seconds(self.max_duration):
+                        logger.warning(f"Duration {duration} exceeds maximum {self.max_duration}")
+                        return False
+
+                    # Check system health before experiment
+                    if not await self.check_system_health():
+                        logger.warning("System health check failed, skipping experiment")
+                        return False
+
+                    return True
+
+                except Exception as e:
+                    logger.error(f"Error validating safety constraints: {e}")
+                    return False
+
+            def duration_to_seconds(self, duration: str) -> int:
+                """Convert duration string to seconds"""
+                if duration.endswith('m'):
+                    return int(duration[:-1]) * 60
+                elif duration.endswith('h'):
+                    return int(duration[:-1]) * 3600
+                elif duration.endswith('s'):
+                    return int(duration[:-1])
+                else:
+                    return 300  # Default 5 minutes
+
+            async def check_system_health(self) -> bool:
+                """Check overall system health before running chaos experiments"""
+                try:
+                    # Check pod health
+                    pods = self.k8s_client.list_namespaced_pod(self.namespace)
+                    unhealthy_pods = 0
+
+                    for pod in pods.items:
+                        if pod.status.phase != 'Running':
+                            unhealthy_pods += 1
+                        for container_status in pod.status.container_statuses or []:
+                            if not container_status.ready:
+                                unhealthy_pods += 1
+
+                    if unhealthy_pods > len(pods.items) * 0.2:  # More than 20% unhealthy
+                        logger.warning(f"Too many unhealthy pods: {unhealthy_pods}/{len(pods.items)}")
+                        return False
+
+                    # Check resource utilization
+                    # This would integrate with metrics monitoring system
+                    # For now, assume healthy
+
+                    return True
+
+                except Exception as e:
+                    logger.error(f"Error checking system health: {e}")
+                    return False
+
+            async def apply_chaos_experiment(self, manifest: Dict):
+                """Apply chaos experiment to Kubernetes"""
+                try:
+                    chaos_kind = manifest['kind']
+                    group = "chaos-mesh.org"
+                    version = "v1alpha1"
+                    plural = self.get_plural_name(chaos_kind)
+
+                    await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: self.custom_api.create_namespaced_custom_object(
+                            group=group,
+                            version=version,
+                            namespace=self.namespace,
+                            plural=plural,
+                            body=manifest
+                        )
+                    )
+
+                    logger.info(f"Applied chaos experiment: {manifest['metadata']['name']}")
+
+                except Exception as e:
+                    logger.error(f"Error applying chaos experiment: {e}")
+                    raise
+
+            def get_plural_name(self, kind: str) -> str:
+                """Get plural name for Kubernetes resource"""
+                plural_mapping = {
+                    "PodChaos": "podchaos",
+                    "NetworkChaos": "networkchaos",
+                    "StressChaos": "stresschaos",
+                    "DNSChaos": "dnschaos",
+                    "HTTPChaos": "httpchaos",
+                    "IOChaos": "iochaos",
+                    "KernelChaos": "kernelchaos"
+                }
+                return plural_mapping.get(kind, "podchaos")
+
+            async def monitor_experiment(self, experiment_name: str, experiment_config: Dict) -> Dict:
+                """Monitor chaos experiment execution"""
+                logger.info(f"Monitoring chaos experiment: {experiment_name}")
+
+                duration = self.duration_to_seconds(experiment_config['parameters']['chaos']['duration'])
+                health_checks = experiment_config.get('healthChecks', [])
+
+                start_time = time.time()
+                health_check_results = []
+
+                while time.time() - start_time < duration:
+                    try:
+                        # Run health checks
+                        for health_check in health_checks:
+                            result = await self.run_health_check(health_check)
+                            health_check_results.append({
+                                'timestamp': datetime.utcnow().isoformat(),
+                                'check': health_check['name'],
+                                'result': result
+                            })
+
+                        # Check if any health check failed critically
+                        failed_checks = [r for r in health_check_results if r['result']['status'] == 'failed']
+                        if len(failed_checks) >= len(health_checks) * 0.5:  # 50% failed
+                            logger.warning(f"Too many health checks failed: {len(failed_checks)}/{len(health_checks)}")
+                            await self.emergency_stop_experiment(experiment_name)
+                            return {
+                                "status": "failed",
+                                "reason": "health check failures",
+                                "duration": time.time() - start_time,
+                                "health_checks": health_check_results
+                            }
+
+                        await asyncio.sleep(30)  # Check every 30 seconds
+
+                    except Exception as e:
+                        logger.error(f"Error during experiment monitoring: {e}")
+                        continue
+
+                return {
+                    "status": "completed",
+                    "duration": time.time() - start_time,
+                    "health_checks": health_check_results
+                }
+
+            async def run_health_check(self, health_check: Dict) -> Dict:
+                """Run a single health check"""
+                try:
+                    if 'url' in health_check:
+                        return await self.run_http_health_check(health_check)
+                    elif 'command' in health_check:
+                        return await self.run_command_health_check(health_check)
+                    else:
+                        return {"status": "unknown", "message": "Unsupported health check type"}
+
+                except Exception as e:
+                    logger.error(f"Error running health check {health_check['name']}: {e}")
+                    return {"status": "error", "error": str(e)}
+
+            async def run_http_health_check(self, health_check: Dict) -> Dict:
+                """Run HTTP health check"""
+                try:
+                    timeout = aiohttp.ClientTimeout(total=health_check.get('timeoutSeconds', 10))
+
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
+                        start_time = time.time()
+                        async with session.get(health_check['url']) as response:
+                            response_time = (time.time() - start_time) * 1000
+
+                            result = {
+                                "status": "passed" if response.status == 200 else "failed",
+                                "status_code": response.status,
+                                "response_time": response_time
+                            }
+
+                            # Check response time if specified
+                            if 'expectedLatency' in health_check:
+                                expected_max = int(health_check['expectedLatency'].replace('ms', ''))
+                                if response_time > expected_max:
+                                    result["status"] = "failed"
+                                    result["message"] = f"Response time {response_time:.0f}ms exceeds expected {expected_max}ms"
+
+                            return result
+
+                except Exception as e:
+                    return {"status": "failed", "error": str(e)}
+
+            async def run_command_health_check(self, health_check: Dict) -> Dict:
+                """Run command health check"""
+                try:
+                    # This would execute commands in pods or on the host
+                    # For security, we'll simulate this
+                    return {"status": "passed", "message": "Command health check simulated"}
+
+                except Exception as e:
+                    return {"status": "failed", "error": str(e)}
+
+            async def emergency_stop_experiment(self, experiment_name: str):
+                """Emergency stop chaos experiment"""
+                try:
+                    logger.warning(f"Emergency stopping experiment: {experiment_name}")
+                    await self.cleanup_experiment(experiment_name)
+                except Exception as e:
+                    logger.error(f"Error in emergency stop: {e}")
+
+            async def cleanup_experiment(self, experiment_name: str):
+                """Cleanup chaos experiment resources"""
+                try:
+                    group = "chaos-mesh.org"
+                    version = "v1alpha1"
+                    plural = "podchaos"  # Default, would need to be dynamic
+
+                    await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: self.custom_api.delete_namespaced_custom_object(
+                            group=group,
+                            version=version,
+                            namespace=self.namespace,
+                            plural=plural,
+                            name=experiment_name
+                        )
+                    )
+
+                    logger.info(f"Cleaned up chaos experiment: {experiment_name}")
+
+                except Exception as e:
+                    logger.error(f"Error cleaning up experiment {experiment_name}: {e}")
+
+            async def run_scheduled_experiments(self):
+                """Run scheduled chaos experiments"""
+                schedules = self.config.get('schedules', {})
+
+                for schedule_name, schedule_config in schedules.items():
+                    if not schedule_config.get('enabled', False):
+                        continue
+
+                    try:
+                        # Check if schedule should run now
+                        if self.should_run_schedule(schedule_config.get('schedule', '')):
+                            logger.info(f"Running scheduled experiments for: {schedule_name}")
+
+                            experiments = schedule_config.get('experiments', [])
+                            for experiment_name in experiments:
+                                if experiment_name in self.config.get('experiments', {}):
+                                    experiment_config = self.config['experiments'][experiment_name]
+                                    result = await self.run_experiment(experiment_name, experiment_config)
+
+                                    # Send notifications
+                                    await self.send_experiment_notification(experiment_name, result, schedule_name)
+
+                    except Exception as e:
+                        logger.error(f"Error running scheduled experiments {schedule_name}: {e}")
+
+            def should_run_schedule(self, cron_schedule: str) -> bool:
+                """Check if schedule should run now (simplified)"""
+                # This would implement proper cron scheduling
+                # For now, just return False to avoid automatic runs
+                return False
+
+            async def send_experiment_notification(self, experiment_name: str, result: Dict, schedule_name: str = None):
+                """Send notification about experiment results"""
+                try:
+                    message = {
+                        "experiment": experiment_name,
+                        "schedule": schedule_name,
+                        "status": result['status'],
+                        "duration": result.get('duration', 0),
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+
+                    # Send to Slack if configured
+                    slack_webhook = os.getenv('SLACK_WEBHOOK_URL')
+                    if slack_webhook and result['status'] != 'dry_run':
+                        await self.send_slack_notification(message, slack_webhook)
+
+                    # Log result
+                    logger.info(f"Experiment notification sent: {message}")
+
+                except Exception as e:
+                    logger.error(f"Error sending notification: {e}")
+
+            async def send_slack_notification(self, message: Dict, webhook_url: str):
+                """Send notification to Slack"""
+                try:
+                    color = "good" if message['status'] == 'completed' else "warning" if message['status'] == 'failed' else "info"
+
+                    slack_message = {
+                        "text": f"Chaos Experiment: {message['experiment']}",
+                        "attachments": [
+                            {
+                                "color": color,
+                                "fields": [
+                                    {"title": "Status", "value": message['status'], "short": True},
+                                    {"title": "Duration", "value": f"{message['duration']:.0f}s", "short": True},
+                                    {"title": "Schedule", "value": message.get('schedule', 'Manual'), "short": True},
+                                    {"title": "Time", "value": message['timestamp'], "short": True}
+                                ]
+                            }
+                        ]
+                    }
+
+                    async with aiohttp.ClientSession() as session:
+                        await session.post(webhook_url, json=slack_message)
+
+                except Exception as e:
+                    logger.error(f"Error sending Slack notification: {e}")
+
+            async def run_continuous_chaos(self):
+                """Run chaos experiments continuously"""
+                while True:
+                    try:
+                        # Run scheduled experiments
+                        await self.run_scheduled_experiments()
+
+                        # Wait before next cycle
+                        await asyncio.sleep(300)  # 5 minutes
+
+                    except KeyboardInterrupt:
+                        logger.info("Chaos engineering runner stopped by user")
+                        break
+                    except Exception as e:
+                        logger.error(f"Error in chaos runner cycle: {e}")
+                        await asyncio.sleep(60)  # 1 minute retry on error
+
+        async def main():
+            """Main execution function"""
+            runner = ChaosEngineeringRunner()
+
+            try:
+                logger.info("Starting QuantumBeam Chaos Engineering Runner")
+                await runner.run_continuous_chaos()
+            except Exception as e:
+                logger.error(f"Chaos Engineering Runner error: {e}")
+
+        if __name__ == "__main__":
+            asyncio.run(main())

@@ -1,0 +1,260 @@
+# Persistent Volume Claims for QuantumBeam Services
+
+# PVC for PostgreSQL data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-postgres
+    component: database
+    type: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd  # Adjust based on your cloud provider
+  resources:
+    requests:
+      storage: 100Gi
+  # Optional: Volume binding mode
+  volumeMode: Filesystem
+
+---
+
+# PVC for Redis data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-redis
+    component: cache
+    type: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 10Gi
+  volumeMode: Filesystem
+
+---
+
+# PVC for Quantum Service models and data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: quantum-models-pvc
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-quantum
+    component: models
+    type: storage
+spec:
+  accessModes:
+    - ReadWriteMany  # Allow multiple pods to access
+  storageClassName: shared-storage  # Use NFS or similar
+  resources:
+    requests:
+      storage: 50Gi
+  volumeMode: Filesystem
+
+---
+
+# PVC for AI/ML Service models
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ai-models-pvc
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-ai-ml
+    component: models
+    type: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: shared-storage
+  resources:
+    requests:
+      storage: 200Gi  # Large storage for ML models
+  volumeMode: Filesystem
+
+---
+
+# PVC for Prometheus metrics data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-prometheus
+    component: monitoring
+    type: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 50Gi
+  volumeMode: Filesystem
+
+---
+
+# PVC for Grafana data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-pvc
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-grafana
+    component: monitoring
+    type: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd
+  resources:
+    requests:
+      storage: 10Gi
+  volumeMode: Filesystem
+
+---
+
+# Storage Classes (example for different cloud providers)
+
+# AWS EBS gp3 storage class
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+  labels:
+    type: gp3
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  fsType: ext4
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+mountOptions:
+- debug
+
+# AWS EFS storage class for shared storage
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: shared-storage
+  labels:
+    type: efs
+provisioner: efs.csi.aws.com
+parameters:
+  provisioningMode: efs-ap
+  fileSystemId: fs-12345678  # Replace with actual EFS ID
+  directoryPerms: "700"
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+
+---
+
+# Example for Google Cloud Platform
+# GCP SSD storage class
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd-gcp
+  labels:
+    type: ssd
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+
+---
+
+# Example for Azure
+# Azure Premium SSD storage class
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd-azure
+  labels:
+    type: premium
+provisioner: kubernetes.io/azure-disk
+parameters:
+  skuname: Premium_LRS
+  kind: Managed
+  cachingMode: ReadOnly
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+
+---
+
+# Example for local development (minikube, kind)
+# Local storage class
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+  labels:
+    type: local
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Delete
+
+---
+# Example Persistent Volume for local development
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv-local
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-postgres
+    type: local
+spec:
+  capacity:
+    storage: 20Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /tmp/postgres-data  # Adjust path as needed
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - minikube  # Adjust node name as needed
+
+---
+
+# Volume Snapshot Classes for backup
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: quantumbeam-snapshots
+  labels:
+    app: quantumbeam
+    component: backup
+driver: ebs.csi.aws.com  # Adjust driver based on cloud provider
+deletionPolicy: Retain
+parameters:
+  description: "QuantumBeam volume snapshot"

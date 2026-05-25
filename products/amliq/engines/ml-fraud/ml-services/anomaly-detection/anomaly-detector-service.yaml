@@ -1,0 +1,500 @@
+# Anomaly Detection Service Configuration
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    purpose: anomaly-detection
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: anomaly-detector-config
+  namespace: monitoring
+data:
+  config.yaml: |
+    # Anomaly Detection Configuration
+    statistical_detector:
+      # Z-score parameters
+      z_score_threshold: 3.0
+      z_score_window: 100
+      z_score_min_samples: 30
+
+      # IQR parameters
+      iqr_multiplier: 1.5
+      iqr_window: 100
+
+      # EWMA parameters
+      ewma_alpha: 0.3
+      ewma_std_threshold: 2.5
+
+      # Moving Average parameters
+      ma_window: 20
+      ma_std_threshold: 2.5
+
+      # Seasonal Decomposition parameters
+      seasonal_period: 24
+      seasonal_threshold: 3.0
+
+    ml_detector:
+      # Training parameters
+      training_window_hours: 168  # 1 week
+      training_interval_hours: 24
+      min_training_samples: 1000
+
+      # Model parameters
+      isolation_forest_contamination: 0.1
+      lstm_sequence_length: 50
+      lstm_epochs: 100
+      lstm_batch_size: 32
+      autoencoder_epochs: 200
+      autoencoder_batch_size: 64
+
+      # Feature parameters
+      feature_lag_periods: [1, 5, 10, 20]
+      rolling_windows: [5, 10, 20, 50]
+
+    alerting:
+      # Alert thresholds
+      anomaly_score_threshold: 0.7
+      consecutive_anomalies_threshold: 2
+
+      # Alert parameters
+      alert_cooldown_minutes: 15
+      max_alerts_per_hour: 10
+
+    monitoring:
+      metrics_port: 8000
+      health_check_interval: 30
+
+    data_retention:
+      training_data_days: 30
+      model_retention_days: 90
+      anomaly_log_days: 7
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: statistical-anomaly-detector
+  namespace: monitoring
+  labels:
+    app: statistical-anomaly-detector
+    component: anomaly-detection
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: statistical-anomaly-detector
+  template:
+    metadata:
+      labels:
+        app: statistical-anomaly-detector
+        component: anomaly-detection
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: statistical-anomaly-detector
+        image: quantumbeam/statistical-anomaly-detector:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 8001
+          name: grpc
+          protocol: TCP
+        env:
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: anomaly-detector-secrets
+              key: redis_url
+        - name: PROMETHEUS_URL
+          value: "http://prometheus.observability.svc.cluster.local:9090"
+        - name: ALERTMANAGER_URL
+          value: "http://alertmanager.observability.svc.cluster.local:9093"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: CONFIG_PATH
+          value: "/app/config/config.yaml"
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: model-storage
+          mountPath: /app/models
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: config
+        configMap:
+          name: anomaly-detector-config
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: anomaly-detector-model-pvc
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-anomaly-detector
+  namespace: monitoring
+  labels:
+    app: ml-anomaly-detector
+    component: anomaly-detection
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ml-anomaly-detector
+  template:
+    metadata:
+      labels:
+        app: ml-anomaly-detector
+        component: anomaly-detection
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: ml-anomaly-detector
+        image: quantumbeam/ml-anomaly-detector:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 8001
+          name: grpc
+          protocol: TCP
+        env:
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: anomaly-detector-secrets
+              key: redis_url
+        - name: PROMETHEUS_URL
+          value: "http://prometheus.observability.svc.cluster.local:9090"
+        - name: ALERTMANAGER_URL
+          value: "http://alertmanager.observability.svc.cluster.local:9093"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: CONFIG_PATH
+          value: "/app/config/config.yaml"
+        - name: CUDA_VISIBLE_DEVICES
+          value: ""  # CPU inference for now
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: model-storage
+          mountPath: /app/models
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 45
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: config
+        configMap:
+          name: anomaly-detector-config
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: anomaly-detector-model-pvc
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: anomaly-detector-model-pvc
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: gp3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: statistical-anomaly-detector
+  namespace: monitoring
+  labels:
+    app: statistical-anomaly-detector
+    component: anomaly-detection
+spec:
+  selector:
+    app: statistical-anomaly-detector
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  - name: grpc
+    port: 8001
+    targetPort: 8001
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-anomaly-detector
+  namespace: monitoring
+  labels:
+    app: ml-anomaly-detector
+    component: anomaly-detection
+spec:
+  selector:
+    app: ml-anomaly-detector
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  - name: grpc
+    port: 8001
+    targetPort: 8001
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: anomaly-detector-secrets
+  namespace: monitoring
+type: Opaque
+data:
+  redis_url: REDIS_URL_BASE64
+  # Use: echo -n "redis://redis.observability.svc.cluster.local:6379/0" | base64
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ml-model-trainer
+  namespace: monitoring
+spec:
+  schedule: "0 2 * * *"  # Train daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: ml-model-trainer
+            image: quantumbeam/ml-anomaly-detector:latest
+            command:
+            - python
+            - -c
+            - |
+              import asyncio
+              import sys
+              sys.path.append('/app')
+              from ml_anomaly_detection import main
+              asyncio.run(main())
+            env:
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: anomaly-detector-secrets
+                  key: redis_url
+            - name: PROMETHEUS_URL
+              value: "http://prometheus.observability.svc.cluster.local:9090"
+            - name: CONFIG_PATH
+              value: "/app/config/config.yaml"
+            volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            - name: model-storage
+              mountPath: /app/models
+            resources:
+              requests:
+                cpu: 1000m
+                memory: 2Gi
+              limits:
+                cpu: 2000m
+                memory: 4Gi
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1000
+          volumes:
+          - name: config
+            configMap:
+              name: anomaly-detector-config
+          - name: model-storage
+            persistentVolumeClaim:
+              claimName: anomaly-detector-model-pvc
+          restartPolicy: OnFailure
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: anomaly-detector
+  namespace: monitoring
+  labels:
+    app: anomaly-detector
+    component: anomaly-detection
+spec:
+  selector:
+    matchLabels:
+      component: anomaly-detection
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: statistical-anomaly-detector-pdb
+  namespace: monitoring
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: statistical-anomaly-detector
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ml-anomaly-detector-pdb
+  namespace: monitoring
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: ml-anomaly-detector
+---
+# Horizontal Pod Autoscaler for anomaly detectors
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: statistical-anomaly-detector-hpa
+  namespace: monitoring
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: statistical-anomaly-detector
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ml-anomaly-detector-hpa
+  namespace: monitoring
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ml-anomaly-detector
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60

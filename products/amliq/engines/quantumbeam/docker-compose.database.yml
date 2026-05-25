@@ -1,0 +1,479 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database with Partitioning Support
+  postgres:
+    image: postgres:16-alpine
+    container_name: quantumbeam-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quantumbeam
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_MULTIPLE_DATABASES: quantumbeam_test,quantumbeam_staging,quantumbeam_analytics
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      # Performance tuning
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: "pg_stat_statements,pg_cron,pg_partman"
+      POSTGRES_MAX_CONNECTIONS: "200"
+      POSTGRES_SHARED_BUFFERS: "256MB"
+      POSTGRES_EFFECTIVE_CACHE_SIZE: "1GB"
+      POSTGRES_MAINTENANCE_WORK_MEM: "64MB"
+      POSTGRES_CHECKPOINT_COMPLETION_TARGET: "0.9"
+      POSTGRES_WALL_BUFFERS: "16MB"
+      POSTGRES_DEFAULT_STATISTICS_TARGET: "100"
+      POSTGRES_RANDOM_PAGE_COST: "1.1"
+      POSTGRES_EFFECTIVE_IO_CONCURRENCY: "200"
+      POSTGRES_WORK_MEM: "4MB"
+      POSTGRES_MIN_WAL_SIZE: "1GB"
+      POSTGRES_MAX_WAL_SIZE: "4GB"
+      # Logging
+      POSTGRES_LOG_STATEMENT: "all"
+      POSTGRES_LOG_MIN_DURATION_STATEMENT: "1000"
+      POSTGRES_LOG_DIRECTORY: "pg_log"
+      POSTGRES_LOG_FILENAME: "postgresql-%Y-%m-%d_%H%M%S.log"
+      # Partitioning
+      POSTGRES_CRON_DATABASE: "quantumbeam"
+      POSTGRES_TRACK_COMMIT_TIMESTAMP: "on"
+      POSTGRES_LOG_TEMP_FILES: "0"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh
+      - ./database/config/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./database/config/pg_hba.conf:/etc/postgresql/pg_hba.conf
+      - ./database/extensions:/docker-entrypoint-initdb.d/extensions
+      - ./database/schemas:/docker-entrypoint-initdb.d/schemas
+      - ./database/seeds:/docker-entrypoint-initdb.d/seeds
+      - postgres_logs:/var/log/postgresql
+    networks:
+      - quantumbeam-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d quantumbeam -h localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # PgBouncer Connection Pooler
+  pgbouncer:
+    image: pgbouncer/pgbouncer:latest
+    container_name: quantumbeam-pgbouncer
+    restart: unless-stopped
+    environment:
+      DATABASES_HOST: postgres
+      DATABASES_PORT: 5432
+      DATABASES_USER: postgres
+      DATABASES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DATABASES_DBNAME: quantumbeam
+      POOL_MODE: transaction
+      SERVER_RESET_QUERY: DISCARD ALL
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 50
+      MIN_POOL_SIZE: 10
+      RESERVE_POOL_SIZE: 5
+      RESERVE_POOL_TIMEOUT: 5
+      MAX_DB_CONNECTIONS: 100
+      MAX_USER_CONNECTIONS: 100
+      SERVER_LIFETIME: 3600
+      SERVER_IDLE_TIMEOUT: 600
+      AUTH_TYPE: md5
+      AUTH_FILE: /etc/pgbouncer/userlist.txt
+      ADMIN_USERS: postgres,admin
+      STATS_USERS: stats,postgres
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+      LOG_CONNECTIONS: "1"
+      LOG_DISCONNECTIONS: "1"
+      LOG_POOLER_ERRORS: "1"
+      LOG_STATS: "1"
+      ADMIN_USERS: postgres,admin
+      STATS_USERS: stats,postgres
+    ports:
+      - "${PGBOUNCER_PORT:-6432}:6432"
+    volumes:
+      - ./database/config/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./database/config/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    networks:
+      - quantumbeam-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pgbouncer -h localhost -p 6432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # Redis Cache and Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: quantumbeam-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD:-redis123}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --rdbcompression yes
+      --rdbchecksum yes
+      --tcp-keepalive 300
+      --timeout 0
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - redis_logs:/var/log/redis
+      - ./database/config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - quantumbeam-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # Redis Cluster (for production)
+  redis-cluster:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --cluster-announce-ip redis-cluster
+      --port 6370
+    ports:
+      - "6370-6375:6370-6375"
+    volumes:
+      - redis_cluster_data:/data
+    networks:
+      - quantumbeam-network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+  # InfluxDB for Time-Series Data
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: quantumbeam-influxdb
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD:-influxadmin123}
+      DOCKER_INFLUXDB_INIT_ORG: quantumbeam
+      DOCKER_INFLUXDB_INIT_BUCKET: metrics
+      DOCKER_INFLUXDB_INIT_BUCKET: transactions
+      DOCKER_INFLUXDB_INIT_BUCKET: fraud_events
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-quantumbeam-token-123456789}
+      DOCKER_INFLUXDB_INIT_RETENTION: 30d
+    ports:
+      - "${INFLUXDB_PORT:-8086}:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - quantumbeam-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8086/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # Elasticsearch for Search and Analytics
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    container_name: quantumbeam-elasticsearch
+    restart: unless-stopped
+    environment:
+      - node.name=quantumbeam-es-node
+      - cluster.name=quantumbeam-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - xpack.monitoring.collection.enabled=true
+      - xpack.ml.enabled=false
+      - xpack.watcher.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+      - ./database/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    networks:
+      - quantumbeam-network
+    healthcheck:
+      test:
+        ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  # ClickHouse for Analytics Data Warehouse
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: quantumbeam-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: analytics
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse123}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "${CLICKHOUSE_PORT:-8123}:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+      - ./database/config/clickhouse-config.xml:/etc/clickhouse-server/config.d/custom.xml:ro
+      - ./database/config/clickhouse-users.xml:/etc/clickhouse-server/users.d/custom.xml:ro
+    networks:
+      - quantumbeam-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  # Kafka for Event Streaming
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: quantumbeam-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 2
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - quantumbeam-network
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: quantumbeam-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      KAFKA_DELETE_TOPIC_ENABLE: true
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_LOG_CLEANUP_POLICY: delete
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+      - "9101:9101"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+      - kafka_logs:/var/log/kafka
+    networks:
+      - quantumbeam-network
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Schema Registry for Kafka
+  schema-registry:
+    image: confluentinc/cp-schema-registry:latest
+    container_name: quantumbeam-schema-registry
+    restart: unless-stopped
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports:
+      - "8081:8081"
+    networks:
+      - quantumbeam-network
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # MinIO S3-compatible Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: quantumbeam-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - quantumbeam-network
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Kafka UI
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: quantumbeam-kafka-ui
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: quantumbeam
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+    ports:
+      - "8080:8080"
+    networks:
+      - quantumbeam-network
+    depends_on:
+      - kafka
+      - schema-registry
+
+volumes:
+  # Data volumes
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/postgres
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/redis
+  redis_cluster_data:
+    driver: local
+  influxdb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/influxdb
+  influxdb_config:
+    driver: local
+  elasticsearch_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/elasticsearch
+  clickhouse_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/clickhouse
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/kafka
+  minio_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/data/minio
+
+  # Log volumes
+  postgres_logs:
+    driver: local
+  redis_logs:
+    driver: local
+  clickhouse_logs:
+    driver: local
+  kafka_logs:
+    driver: local
+  zookeeper_logs:
+    driver: local
+
+networks:
+  quantumbeam-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

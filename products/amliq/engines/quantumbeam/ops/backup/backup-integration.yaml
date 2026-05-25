@@ -1,0 +1,335 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backup-system
+  labels:
+    name: backup-system
+    purpose: backup-integration
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backup-integration-controller
+  namespace: backup-system
+  labels:
+    app: backup-integration-controller
+    component: backup-management
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backup-integration-controller
+  template:
+    metadata:
+      labels:
+        app: backup-integration-controller
+        component: backup-management
+    spec:
+      serviceAccountName: backup-controller
+      containers:
+      - name: backup-controller
+        image: quantumbeam/backup-integration:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: backup-secrets
+              key: database-url
+        - name: AWS_REGION
+          value: "us-west-2"
+        - name: S3_BACKUP_BUCKET
+          value: "quantumbeam-backups-prod"
+        - name: REDIS_URL
+          value: "redis://redis.backup-system.svc.cluster.local:6379"
+        - name: PROMETHEUS_URL
+          value: "http://prometheus.monitoring.svc.cluster.local:9090"
+        - name: ALERT_WEBHOOK
+          valueFrom:
+            secretKeyRef:
+              name: backup-secrets
+              key: alert-webhook
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: backup-config
+          mountPath: /etc/backup
+        - name: temp-storage
+          mountPath: /tmp/backups
+      volumes:
+      - name: backup-config
+        configMap:
+          name: backup-integration-config
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backup-integration-controller
+  namespace: backup-system
+  labels:
+    app: backup-integration-controller
+    component: backup-management
+spec:
+  selector:
+    app: backup-integration-controller
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ServiceAccount
+metadata:
+  name: backup-controller
+  namespace: backup-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backup-controller-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "persistentvolumes", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["secrets", "configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backup-controller-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backup-controller-role
+subjects:
+- kind: ServiceAccount
+  name: backup-controller
+  namespace: backup-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-integration-config
+  namespace: backup-system
+data:
+  backup-config.yaml: |
+    # Backup Integration Configuration
+    backup:
+      default_schedule: "0 2 * * *"  # Daily at 2 AM
+      retention:
+        daily: 30
+        weekly: 12
+        monthly: 12
+        yearly: 7
+      storage:
+        s3:
+          bucket: "quantumbeam-backups-prod"
+          region: "us-west-2"
+          encryption: "AES256"
+          lifecycle_policy:
+            - id: "DeleteOldBackups"
+              status: "Enabled"
+              expiration:
+                days: 365
+
+    applications:
+      api-service:
+        enabled: true
+        type: "database"
+        database:
+          host: "postgres-primary.production.svc.cluster.local"
+          port: 5432
+          name: "quantumbeam_production"
+          backup_method: "pg_dump"
+          compression: true
+          encryption: true
+        schedule: "0 3 * * *"  # Daily at 3 AM
+        timeout: "2h"
+        retention_days: 90
+
+      fraud-detector:
+        enabled: true
+        type: "model"
+        models:
+          - name: "fraud_detection_v1"
+            path: "/models/fraud_detection_v1.pkl"
+            type: "pickle"
+          - name: "anomaly_detection_v2"
+            path: "/models/anomaly_detection_v2.pkl"
+            type: "pickle"
+        schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+        timeout: "1h"
+        retention_days: 180
+
+      ai-engine:
+        enabled: true
+        type: "ml_model"
+        models:
+          - name: "nlp_model_v3"
+            path: "/models/nlp_model_v3.h5"
+            type: "tensorflow"
+          - name: "feature_extractor"
+            path: "/models/feature_extractor.pkl"
+            type: "pickle"
+        schedule: "0 5 * * 0"  # Weekly on Sunday at 5 AM
+        timeout: "2h"
+        retention_days: 365
+
+      config-maps:
+        enabled: true
+        type: "kubernetes"
+        resources:
+          - namespace: "production"
+            types: ["configmaps", "secrets"]
+            exclude_patterns: ["*-temp", "*-test"]
+        schedule: "0 1 * * *"  # Daily at 1 AM
+        timeout: "30m"
+        retention_days: 30
+
+      redis-cache:
+        enabled: true
+        type: "cache"
+        redis:
+          host: "redis-cache.production.svc.cluster.local"
+          port: 6379
+          password_secret: "redis-password"
+          backup_method: "rdb"
+        schedule: "0 6 * * *"  # Daily at 6 AM
+        timeout: "1h"
+        retention_days: 14
+
+    validation:
+      enabled: true
+      post_backup_validation: true
+      checksum_verification: true
+      test_restoration: true
+      sample_size: 5  # Percentage of backups to test restore
+
+    monitoring:
+      metrics_enabled: true
+      alerting:
+        backup_failure:
+          enabled: true
+          severity: "critical"
+          cooldown: "5m"
+        backup_delay:
+          enabled: true
+          threshold: "2h"
+          severity: "warning"
+        storage_usage:
+          enabled: true
+          threshold: "80%"
+          severity: "warning"
+
+    encryption:
+      enabled: true
+      algorithm: "AES-256-GCM"
+      key_rotation_days: 90
+      key_source: "aws-kms"
+      key_id: "alias/quantumbeam-backup-key"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: daily-backup-validator
+  namespace: backup-system
+spec:
+  schedule: "0 7 * * *"  # Daily at 7 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup-validator
+            image: quantumbeam/backup-integration:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Running backup validation..."
+              python3 /app/scripts/validate_backups.py \
+                --config /etc/backup/backup-config.yaml \
+                --validate-recent \
+                --test-restore \
+                --report-format json \
+                --output /tmp/validation-report.json
+
+              # Send report to monitoring system
+              curl -X POST \
+                -H "Content-Type: application/json" \
+                -d @/tmp/validation-report.json \
+                ${ALERT_WEBHOOK}/backup-validation
+            env:
+            - name: ALERT_WEBHOOK
+              valueFrom:
+                secretKeyRef:
+                  name: backup-secrets
+                  key: alert-webhook
+            volumeMounts:
+            - name: backup-config
+              mountPath: /etc/backup
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+          volumes:
+          - name: backup-config
+            configMap:
+              name: backup-integration-config
+          restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ServiceMonitor
+metadata:
+  name: backup-integration-metrics
+  namespace: backup-system
+  labels:
+    app: backup-integration-controller
+    component: backup-management
+spec:
+  selector:
+    matchLabels:
+      app: backup-integration-controller
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics

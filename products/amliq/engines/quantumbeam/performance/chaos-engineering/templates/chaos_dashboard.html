@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantumBeam Chaos Engineering Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        .header p {
+            opacity: 0.9;
+            margin-top: 0.5rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .metric-card h3 {
+            color: #666;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-change {
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .metric-change.positive {
+            color: #10b981;
+        }
+
+        .metric-change.negative {
+            color: #ef4444;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .chart-card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .chart-container {
+            height: 400px;
+        }
+
+        .experiments-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        .experiments-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .experiments-table th {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 2px solid #e5e7eb;
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.875rem;
+        }
+
+        .experiments-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.875rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-completed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-running {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-pending {
+            background: #fed7aa;
+            color: #9a3412;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .close {
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+
+        .form-group textarea {
+            height: 100px;
+            resize: vertical;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>🔥 QuantumBeam Chaos Engineering</h1>
+        <p>Test system resilience through controlled fault injection</p>
+    </header>
+
+    <div class="container">
+        <!-- Metrics Summary -->
+        <div class="metrics-grid" id="metricsGrid">
+            <div class="loading">Loading metrics...</div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>Experiment Timeline</h2>
+                <div id="timelineChart" class="chart-container"></div>
+            </div>
+            <div class="chart-card">
+                <h2>Fault Type Distribution</h2>
+                <div id="distributionChart" class="chart-container"></div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <h2>Success Rate Trend</h2>
+                <div id="trendChart" class="chart-container"></div>
+            </div>
+        </div>
+
+        <!-- Experiments Section -->
+        <div class="experiments-section">
+            <div class="section-header">
+                <h2>Recent Experiments</h2>
+                <div>
+                    <button class="btn btn-secondary" onclick="refreshExperiments()">
+                        🔄 Refresh
+                    </button>
+                    <button class="btn btn-primary" onclick="openCreateModal()">
+                        ➕ New Experiment
+                    </button>
+                </div>
+            </div>
+            <div id="experimentsContainer">
+                <div class="loading">Loading experiments...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Experiment Modal -->
+    <div id="createModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Experiment</h2>
+                <span class="close" onclick="closeCreateModal()">&times;</span>
+            </div>
+            <form id="createExperimentForm">
+                <div class="form-group">
+                    <label for="experimentName">Experiment Name</label>
+                    <input type="text" id="experimentName" name="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="faultType">Fault Type</label>
+                    <select id="faultType" name="faultType" required>
+                        <option value="">Select fault type</option>
+                        <option value="pod_delete">Pod Delete</option>
+                        <option value="cpu_stress">CPU Stress</option>
+                        <option value="memory_stress">Memory Stress</option>
+                        <option value="network_latency">Network Latency</option>
+                        <option value="network_packet_loss">Packet Loss</option>
+                        <option value="disk_pressure">Disk Pressure</option>
+                        <option value="dns_failure">DNS Failure</option>
+                        <option value="container_kill">Container Kill</option>
+                        <option value="node_drain">Node Drain</option>
+                        <option value="api_latency">API Latency</option>
+                        <option value="db_connection_failure">DB Connection Failure</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="targetPods">Target Pods (comma-separated)</label>
+                    <input type="text" id="targetPods" name="targetPods"
+                           placeholder="quantumbeam-api-xxxx, quantumbeam-worker-xxxx" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="namespace">Namespace</label>
+                    <input type="text" id="namespace" name="namespace" value="quantumbeam">
+                </div>
+
+                <div class="form-group">
+                    <label for="duration">Duration (seconds)</label>
+                    <input type="number" id="duration" name="duration" value="300" min="30" max="3600">
+                </div>
+
+                <div class="form-group">
+                    <label for="blastRadius">Blast Radius</label>
+                    <select id="blastRadius" name="blastRadius">
+                        <option value="minimal">Minimal (1 pod)</option>
+                        <option value="moderate" selected>Moderate (3 pods)</option>
+                        <option value="extensive">Extensive (5 pods)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="parameters">Parameters (JSON)</label>
+                    <textarea id="parameters" name="parameters" placeholder='{"count": 1, "load_percent": 80}'></textarea>
+                </div>
+
+                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Experiment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let experiments = [];
+        let metrics = {};
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadMetrics();
+            loadCharts();
+            loadExperiments();
+
+            // Auto-refresh every 30 seconds
+            setInterval(() => {
+                loadMetrics();
+                loadExperiments();
+            }, 30000);
+        });
+
+        // Load metrics summary
+        async function loadMetrics() {
+            try {
+                const response = await axios.get('/api/metrics/summary');
+                metrics = response.data;
+                renderMetrics();
+            } catch (error) {
+                console.error('Failed to load metrics:', error);
+                document.getElementById('metricsGrid').innerHTML =
+                    '<div class="error">Failed to load metrics</div>';
+            }
+        }
+
+        // Render metrics cards
+        function renderMetrics() {
+            const metricsGrid = document.getElementById('metricsGrid');
+
+            metricsGrid.innerHTML = `
+                <div class="metric-card">
+                    <h3>Total Experiments</h3>
+                    <div class="metric-value">${metrics.total_experiments || 0}</div>
+                    <div class="metric-change">All time</div>
+                </div>
+
+                <div class="metric-card">
+                    <h3>Success Rate</h3>
+                    <div class="metric-value">${metrics.success_rate?.toFixed(1) || 0}%</div>
+                    <div class="metric-change ${metrics.success_rate >= 80 ? 'positive' : 'negative'}">
+                        ${metrics.success_rate >= 80 ? '↑ Good' : '↓ Needs improvement'}
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <h3>Avg Duration</h3>
+                    <div class="metric-value">${Math.round(metrics.avg_duration || 0)}s</div>
+                    <div class="metric-change">Per experiment</div>
+                </div>
+
+                <div class="metric-card">
+                    <h3>Running</h3>
+                    <div class="metric-value">${metrics.status_breakdown?.running || 0}</div>
+                    <div class="metric-change">Active experiments</div>
+                </div>
+            `;
+        }
+
+        // Load charts
+        async function loadCharts() {
+            try {
+                // Timeline chart
+                const timelineResponse = await axios.get('/api/charts/experiment-timeline');
+                const timelineData = JSON.parse(timelineResponse.data);
+                Plotly.newPlot('timelineChart', timelineData.data, timelineData.layout);
+
+                // Distribution chart
+                const distributionResponse = await axios.get('/api/charts/fault-type-distribution');
+                const distributionData = JSON.parse(distributionResponse.data);
+                Plotly.newPlot('distributionChart', distributionData.data, distributionData.layout);
+
+                // Trend chart
+                const trendResponse = await axios.get('/api/charts/success-rate-trend');
+                const trendData = JSON.parse(trendResponse.data);
+                Plotly.newPlot('trendChart', trendData.data, trendData.layout);
+
+            } catch (error) {
+                console.error('Failed to load charts:', error);
+            }
+        }
+
+        // Load experiments
+        async function loadExperiments() {
+            try {
+                const response = await axios.get('/api/experiments');
+                experiments = response.data;
+                renderExperiments();
+            } catch (error) {
+                console.error('Failed to load experiments:', error);
+                document.getElementById('experimentsContainer').innerHTML =
+                    '<div class="error">Failed to load experiments</div>';
+            }
+        }
+
+        // Render experiments table
+        function renderExperiments() {
+            const container = document.getElementById('experimentsContainer');
+
+            if (experiments.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 2rem;">No experiments found</p>';
+                return;
+            }
+
+            const table = `
+                <table class="experiments-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Fault Type</th>
+                            <th>Target</th>
+                            <th>Duration</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${experiments.map(exp => `
+                            <tr>
+                                <td><strong>${exp.name}</strong></td>
+                                <td>
+                                    <span class="status-badge status-${exp.status}">${exp.status}</span>
+                                </td>
+                                <td>${exp.fault_type.replace('_', ' ')}</td>
+                                <td>${exp.target_pods.length} pods</td>
+                                <td>${exp.duration_seconds}s</td>
+                                <td>${new Date(exp.created_at).toLocaleString()}</td>
+                                <td>
+                                    <button class="btn btn-secondary" onclick="viewExperiment('${exp.id}')">
+                                        📊 View
+                                    </button>
+                                    ${exp.status === 'pending' ?
+                                        `<button class="btn btn-primary" onclick="runExperiment('${exp.id}')">
+                                            ▶️ Run
+                                        </button>` : ''
+                                    }
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = table;
+        }
+
+        // Refresh experiments
+        function refreshExperiments() {
+            loadExperiments();
+            loadMetrics();
+        }
+
+        // Modal functions
+        function openCreateModal() {
+            document.getElementById('createModal').style.display = 'block';
+        }
+
+        function closeCreateModal() {
+            document.getElementById('createModal').style.display = 'none';
+            document.getElementById('createExperimentForm').reset();
+        }
+
+        // Create experiment
+        document.getElementById('createExperimentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const targetPods = formData.get('targetPods').split(',').map(pod => pod.trim());
+
+            let parameters = {};
+            const parametersText = formData.get('parameters');
+            if (parametersText) {
+                try {
+                    parameters = JSON.parse(parametersText);
+                } catch (error) {
+                    alert('Invalid JSON in parameters field');
+                    return;
+                }
+            }
+
+            const experimentData = {
+                name: formData.get('name'),
+                fault_type: formData.get('faultType'),
+                target_pods: targetPods,
+                namespace: formData.get('namespace'),
+                duration_seconds: parseInt(formData.get('duration')),
+                blast_radius: formData.get('blastRadius'),
+                parameters: parameters
+            };
+
+            try {
+                const response = await axios.post('/api/experiment', experimentData);
+                closeCreateModal();
+                loadExperiments();
+                loadMetrics();
+
+                // Show success message
+                showSuccessMessage('Experiment created successfully!');
+
+            } catch (error) {
+                showErrorMessage('Failed to create experiment: ' + (error.response?.data?.error || error.message));
+            }
+        });
+
+        // Run experiment
+        async function runExperiment(experimentId) {
+            try {
+                await axios.post(`/api/experiment/${experimentId}/run`);
+                showSuccessMessage('Experiment started successfully!');
+                setTimeout(loadExperiments, 2000); // Refresh after a delay
+            } catch (error) {
+                showErrorMessage('Failed to run experiment: ' + (error.response?.data?.error || error.message));
+            }
+        }
+
+        // View experiment details
+        async function viewExperiment(experimentId) {
+            try {
+                const response = await axios.get(`/api/experiment/${experimentId}`);
+                const experiment = response.data;
+
+                // Create a simple modal to show experiment details
+                const modal = document.createElement('div');
+                modal.className = 'modal';
+                modal.style.display = 'block';
+                modal.innerHTML = `
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2>Experiment Details</h2>
+                            <span class="close" onclick="this.closest('.modal').remove()">&times;</span>
+                        </div>
+                        <pre style="background: #f5f5f5; padding: 1rem; border-radius: 6px; overflow-x: auto;">
+${JSON.stringify(experiment, null, 2)}
+                        </pre>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+
+            } catch (error) {
+                showErrorMessage('Failed to load experiment details');
+            }
+        }
+
+        // Show success message
+        function showSuccessMessage(message) {
+            const alert = document.createElement('div');
+            alert.className = 'success';
+            alert.textContent = message;
+            alert.style.position = 'fixed';
+            alert.style.top = '20px';
+            alert.style.right = '20px';
+            alert.style.zIndex = '2000';
+            alert.style.maxWidth = '400px';
+
+            document.body.appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        // Show error message
+        function showErrorMessage(message) {
+            const alert = document.createElement('div');
+            alert.className = 'error';
+            alert.textContent = message;
+            alert.style.position = 'fixed';
+            alert.style.top = '20px';
+            alert.style.right = '20px';
+            alert.style.zIndex = '2000';
+            alert.style.maxWidth = '400px';
+
+            document.body.appendChild(alert);
+            setTimeout(() => alert.remove(), 5000);
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('createModal');
+            if (event.target === modal) {
+                closeCreateModal();
+            }
+        }
+    </script>
+</body>
+</html>

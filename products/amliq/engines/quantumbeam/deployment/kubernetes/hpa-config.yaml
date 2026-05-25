@@ -1,0 +1,473 @@
+# Horizontal Pod Autoscaler Configuration for QuantumBeam
+# Enables automatic scaling based on CPU, memory, and custom metrics
+
+---
+# API Server HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: quantumbeam-api-hpa
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    component: api-server
+    version: v1
+  annotations:
+    autoscaling.alpha.kubernetes.io/conditions: '[{"type":"ScalingLimited","status":"True","lastTransitionTime":"2024-01-01T00:00:00Z","reason":"ScaleUpLimit","message":"Replica count has reached max allowed"}]'
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-api-deployment
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+  # Custom metrics for API requests
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+
+  # Custom metrics for response time
+  - type: Pods
+    pods:
+      metric:
+        name: http_request_duration_seconds
+      target:
+        type: AverageValue
+        averageValue: "0.5"
+
+  # Custom metrics for queue processing
+  - type: External
+    external:
+      metric:
+        name: redis_queue_length
+        selector:
+          matchLabels:
+            queue: api_requests
+      target:
+        type: AverageValue
+        averageValue: "50"
+
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+# Quantum Service HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: quantumbeam-quantum-hpa
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-quantum
+    component: quantum-service
+    version: v1
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-quantum-deployment
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+
+  # Custom metrics for quantum processing
+  - type: Pods
+    pods:
+      metric:
+        name: quantum_processing_queue_size
+      target:
+        type: AverageValue
+        averageValue: "20"
+
+  # Custom metrics for hardware utilization
+  - type: External
+    external:
+      metric:
+        name: quantum_hardware_utilization
+        selector:
+          matchLabels:
+            backend: "ibm_quantum"
+      target:
+        type: AverageValue
+        averageValue: "80"
+
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 180
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+# AI/ML Service HPA
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: quantumbeam-ai-ml-hpa
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-ai-ml
+    component: ai-ml-service
+    version: v1
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-ai-ml-deployment
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+  # Memory-based scaling (important for ML models)
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 90
+
+  # Custom metrics for model inference
+  - type: Pods
+    pods:
+      metric:
+        name: ml_inference_queue_size
+      target:
+        type: AverageValue
+        averageValue: "15"
+
+  # Custom metrics for GPU utilization (if applicable)
+  - type: External
+    external:
+      metric:
+        name: gpu_utilization_percent
+        selector:
+          matchLabels:
+            resource: "nvidia_gpu"
+      target:
+        type: AverageValue
+        averageValue: "85"
+
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 20
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+# VPA Configuration for API Server
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: quantumbeam-api-vpa
+  namespace: quantumbeam
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-api-deployment
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: api-server
+      maxAllowed:
+        cpu: "2"
+        memory: "2Gi"
+      minAllowed:
+        cpu: "100m"
+        memory: "256Mi"
+      controlledResources: ["cpu", "memory"]
+      controlledValues: "RequestsAndLimits"
+
+---
+# VPA Configuration for Quantum Service
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: quantumbeam-quantum-vpa
+  namespace: quantumbeam
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-quantum-deployment
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: quantum-service
+      maxAllowed:
+        cpu: "4"
+        memory: "8Gi"
+      minAllowed:
+        cpu: "500m"
+        memory: "1Gi"
+      controlledResources: ["cpu", "memory"]
+      controlledValues: "RequestsAndLimits"
+
+---
+# VPA Configuration for AI/ML Service
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: quantumbeam-ai-ml-vpa
+  namespace: quantumbeam
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: quantumbeam-ai-ml-deployment
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: ai-ml-service
+      maxAllowed:
+        cpu: "6"
+        memory: "16Gi"
+        nvidia.com/gpu: "2"
+      minAllowed:
+        cpu: "1"
+        memory: "2Gi"
+        nvidia.com/gpu: "0"
+      controlledResources: ["cpu", "memory", "nvidia.com/gpu"]
+      controlledValues: "RequestsAndLimits"
+
+---
+# Cluster Autoscaler Configuration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cluster-autoscaler
+  namespace: kube-system
+  labels:
+    app: cluster-autoscaler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cluster-autoscaler
+  template:
+    metadata:
+      labels:
+        app: cluster-autoscaler
+    spec:
+      serviceAccountName: cluster-autoscaler
+      containers:
+      - image: registry.k8s.io/autoscaling/cluster-autoscaler:v1.28.0
+        name: cluster-autoscaler
+        resources:
+          limits:
+            cpu: 100m
+            memory: 300Mi
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        command:
+        - ./cluster-autoscaler
+        - --v=4
+        - --stderrthreshold=info
+        - --cloud-provider=aws
+        - --skip-nodes-with-local-storage=false
+        - --expander=least-waste
+        - --node-group-auto-discovery=asg:tag=k8s.io/cluster-autoscaler/enabled,k8s.io/cluster-autoscaler/quantumbeam
+        - --balance-similar-node-groups
+        - --skip-nodes-with-system-pods=false
+        - --max-total-unready-percentage=10
+        - --scale-down-unneeded-time=10m
+        - --scale-down-unready-time=5m
+        - --scale-down-delay-after-add=10m
+        - --scale-down-delay-after-delete=0s
+        - --scale-down-delay-after-failure=3m
+        - --scan-interval=10s
+        - --max-nodes-total=100
+        - --max-node-provision-time=15m
+        - --skip-nodes-with-local-storage=true
+        - --skip-nodes-with-system-pods=true
+        - --write-status-configmap=true
+        - --leader-elect=true
+      env:
+      - name: AWS_REGION
+        value: "us-east-1"
+
+---
+# Service Account for Cluster Autoscaler
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-autoscaler
+  namespace: kube-system
+
+---
+# ClusterRole for Cluster Autoscaler
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-autoscaler
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods"]
+  verbs: ["list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["list", "watch"]
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["list", "watch", "create", "patch"]
+- apiGroups: ["policy"]
+  resources: ["poddisruptionbudgets"]
+  verbs: ["list", "watch"]
+
+---
+# ClusterRoleBinding for Cluster Autoscaler
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-autoscaler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-autoscaler
+subjects:
+- kind: ServiceAccount
+  name: cluster-autoscaler
+  namespace: kube-system
+
+---
+# Custom Metrics Service Monitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: quantumbeam-custom-metrics
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: quantumbeam-metrics-exporter
+  namespaceSelector:
+    matchNames:
+    - quantumbeam
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+
+---
+# PrometheusRule for scaling metrics
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: quantumbeam-scaling-rules
+  namespace: monitoring
+  labels:
+    app: quantumbeam
+    component: monitoring
+spec:
+  groups:
+  - name: quantumbeam.scaling.rules
+    rules:
+    - record: quantumbeam:api_requests_per_second
+      expr: sum(rate(http_requests_total{namespace="quantumbeam"}[5m])) by (pod)
+
+    - record: quantumbeam:api_response_time_avg
+      expr: avg(rate(http_request_duration_seconds_sum{namespace="quantumbeam"}[5m]) / rate(http_request_duration_seconds_count{namespace="quantumbeam"}[5m])) by (pod)
+
+    - record: quantumbeam:quantum_queue_size
+      expr: redis_queue_length{queue="quantum_processing"}
+
+    - record: quantumbeam:ml_inference_queue_size
+      expr: redis_queue_length{queue="ml_inference"}
+
+    - record: quantumbeam:cpu_utilization
+      expr: rate(container_cpu_usage_seconds_total{namespace="quantumbeam"}[5m]) * 100
+
+    - record: quantumbeam:memory_utilization
+      expr: container_memory_usage_bytes{namespace="quantumbeam"} / container_spec_memory_limit_bytes{namespace="quantumbeam"} * 100

@@ -1,0 +1,448 @@
+name: QuantumBeam Deployment Pipeline
+
+on:
+  repository_dispatch:
+    types: [deploy-production]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      version:
+        description: 'Version to deploy'
+        required: false
+        type: string
+      force_deploy:
+        description: 'Force deployment (skip health checks)'
+        required: false
+        default: false
+        type: boolean
+      rollback_enabled:
+        description: 'Enable automatic rollback on failure'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Pre-deployment checks
+  pre-deployment-checks:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+    outputs:
+      can-deploy: ${{ steps.checks.outputs.can-deploy }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate deployment request
+        id: checks
+        run: |
+          echo "can-deploy=true" >> $GITHUB_OUTPUT
+
+          # Check if this is a valid deployment request
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "Triggered by repository dispatch"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Triggered by workflow dispatch"
+          else
+            echo "Invalid trigger"
+            echo "can-deploy=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION="${{ github.event.client_payload.version || github.event.inputs.version || github.sha }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check image availability
+        run: |
+          if ! docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }} > /dev/null 2>&1; then
+            echo "❌ Image not found: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}"
+            exit 1
+          fi
+          echo "✅ Image found: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}"
+
+      - name: Validate deployment configuration
+        run: |
+          ENVIRONMENT="${{ github.event.client_payload.environment || github.event.inputs.environment }}"
+          if [ ! -f "helm/quantumbeam/values-${ENVIRONMENT}.yaml" ]; then
+            echo "❌ Configuration file not found for environment: $ENVIRONMENT"
+            exit 1
+          fi
+          echo "✅ Configuration found for environment: $ENVIRONMENT"
+
+  # Security validation
+  security-validation:
+    name: Security Validation
+    runs-on: ubuntu-latest
+    needs: pre-deployment-checks
+    if: needs.pre-deployment-checks.outputs.can-deploy == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run image security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.pre-deployment-checks.outputs.version }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Validate deployment manifests
+        run: |
+          ENVIRONMENT="${{ github.event.client_payload.environment || github.event.inputs.environment }}"
+          helm template quantumbeam ./helm/quantumbeam \
+            --namespace $ENVIRONMENT \
+            --set image.tag=${{ needs.pre-deployment-checks.outputs.version }} \
+            --values helm/quantumbeam/values-${ENVIRONMENT}.yaml | \
+            kubeval
+
+      - name: Check for secrets in deployment
+        run: |
+          ENVIRONMENT="${{ github.event.client_payload.environment || github.event.inputs.environment }}"
+          helm template quantumbeam ./helm/quantumbeam \
+            --namespace $ENVIRONMENT \
+            --set image.tag=${{ needs.pre-deployment-checks.outputs.version }} \
+            --values helm/quantumbeam/values-${ENVIRONMENT}.yaml | \
+            grep -i "secret\|password\|key\|token" && echo "❌ Potential secrets found in manifests" && exit 1 || echo "✅ No secrets found in manifests"
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks, security-validation]
+    if: (github.event.client_payload.environment == 'staging' || github.event.inputs.environment == 'staging') && needs.pre-deployment-checks.outputs.can-deploy == 'true'
+    environment: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > kubeconfig
+          chmod 600 kubeconfig
+
+      - name: Deploy to staging
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Create namespace if it doesn't exist
+          kubectl create namespace staging --dry-run=client -o yaml | kubectl apply -f -
+
+          # Deploy application
+          helm upgrade --install quantumbeam-staging ./helm/quantumbeam \
+            --namespace staging \
+            --set image.tag=${{ needs.pre-deployment-checks.outputs.version }} \
+            --set environment=staging \
+            --values helm/quantumbeam/values-staging.yaml \
+            --wait \
+            --timeout=15m
+
+      - name: Verify deployment
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Check deployment status
+          kubectl rollout status deployment/quantumbeam-staging -n staging --timeout=10m
+
+          # Check pod status
+          kubectl get pods -n staging -l app=quantumbeam-staging
+
+          # Check service endpoints
+          kubectl get endpoints -n staging
+
+      - name: Health check
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Wait for application to be ready
+          sleep 30
+
+          # Get service URL
+          SERVICE_URL=$(kubectl get svc quantumbeam-staging -n staging -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          if [ -z "$SERVICE_URL" ]; then
+            echo "⚠️  No external IP found, using port-forward for health check"
+            kubectl port-forward svc/quantumbeam-staging 8080:80 -n staging &
+            PF_PID=$!
+            sleep 10
+            SERVICE_URL="http://localhost:8080"
+          fi
+
+          # Run health checks
+          curl -f "$SERVICE_URL/health" || exit 1
+          curl -f "$SERVICE_URL/ready" || exit 1
+
+          # Clean up port-forward
+          kill $PF_PID 2>/dev/null || true
+
+      - name: Run smoke tests
+        run: |
+          chmod +x ci-cd/scripts/run-smoke-tests.sh
+          SERVICE_URL=$(kubectl get svc quantumbeam-staging -n staging -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          if [ -z "$SERVICE_URL" ]; then
+            kubectl port-forward svc/quantumbeam-staging 8080:80 -n staging &
+            PF_PID=$!
+            sleep 10
+            SERVICE_URL="http://localhost:8080"
+          fi
+
+          ci-cd/scripts/run-smoke-tests.sh staging "$SERVICE_URL"
+          kill $PF_PID 2>/dev/null || true
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks, security-validation, deploy-staging]
+    if: (github.event.client_payload.environment == 'production' || github.event.inputs.environment == 'production') && needs.pre-deployment-checks.outputs.can-deploy == 'true'
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+          chmod 600 kubeconfig
+
+      - name: Create backup
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Backup current deployment
+          kubectl get deployment quantumbeam-production -n production -o yaml > deployment-backup.yaml
+
+          # Backup database if applicable
+          # kubectl exec -n production deployment/database -- pg_dump ... > db-backup.sql
+
+      - name: Deploy to production (Blue-Green)
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Create production namespace if it doesn't exist
+          kubectl create namespace production --dry-run=client -o yaml | kubectl apply -f -
+
+          # Deploy to green environment first
+          helm upgrade --install quantumbeam-green ./helm/quantumbeam \
+            --namespace production \
+            --set image.tag=${{ needs.pre-deployment-checks.outputs.version }} \
+            --set environment=production \
+            --set deployment.color=green \
+            --values helm/quantumbeam/values-production.yaml \
+            --wait \
+            --timeout=20m
+
+      - name: Verify green deployment
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Check green deployment status
+          kubectl rollout status deployment/quantumbeam-green -n production --timeout=15m
+
+          # Get green service URL
+          GREEN_SERVICE_URL=$(kubectl get svc quantumbeam-green -n production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          if [ -z "$GREEN_SERVICE_URL" ]; then
+            echo "⚠️  No external IP for green service"
+            exit 1
+          fi
+
+          echo "✅ Green deployment ready at: $GREEN_SERVICE_URL"
+
+      - name: Health check green environment
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          GREEN_SERVICE_URL=$(kubectl get svc quantumbeam-green -n production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          # Run comprehensive health checks
+          curl -f "$GREEN_SERVICE_URL/health" || exit 1
+          curl -f "$GREEN_SERVICE_URL/ready" || exit 1
+          curl -f "$GREEN_SERVICE_URL/metrics" || exit 1
+
+      - name: Run production smoke tests
+        run: |
+          chmod +x ci-cd/scripts/run-smoke-tests.sh
+          GREEN_SERVICE_URL=$(kubectl get svc quantumbeam-green -n production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          ci-cd/scripts/run-smoke-tests.sh production "$GREEN_SERVICE_URL"
+
+      - name: Traffic switch
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Update service selector to point to green deployment
+          kubectl patch service quantumbeam-production -n production -p '{"spec":{"selector":{"color":"green","app":"quantumbeam"}}}'
+
+          echo "✅ Traffic switched to green deployment"
+
+      - name: Verify traffic switch
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          PRODUCTION_URL=$(kubectl get svc quantumbeam-production -n production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          # Verify traffic is going to green
+          for i in {1..10}; do
+            curl -f "$PRODUCTION_URL/health" || exit 1
+            sleep 2
+          done
+
+          echo "✅ Production traffic verified"
+
+      - name: Cleanup blue deployment
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Wait for a period to ensure stability
+          sleep 300
+
+          # Scale down blue deployment
+          kubectl scale deployment quantumbeam-blue -n production --replicas=0
+
+          # Optionally delete blue deployment after confirmation period
+          # helm uninstall quantumbeam-blue -n production
+
+      - name: Post-deployment monitoring
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          # Check pod health
+          kubectl get pods -n production -l app=quantumbeam,color=green
+
+          # Check service health
+          kubectl get endpoints -n production
+
+          # Check logs for errors
+          kubectl logs -n production -l app=quantumbeam,color=green --tail=50
+
+  # Rollback on failure
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: failure() && (github.event.inputs.rollback_enabled == 'true' || github.event.client_payload.rollback_enabled == 'true')
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+          chmod 600 kubeconfig
+
+      - name: Rollback deployment
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          echo "🔄 Rolling back deployment..."
+
+          # Restore from backup
+          if [ -f deployment-backup.yaml ]; then
+            kubectl apply -f deployment-backup.yaml
+          else
+            # Rollback using Helm
+            helm rollback quantumbeam-production -n production
+          fi
+
+          # Wait for rollback to complete
+          kubectl rollout status deployment/quantumbeam-production -n production --timeout=10m
+
+      - name: Verify rollback
+        run: |
+          export KUBECONFIG=kubeconfig
+
+          PRODUCTION_URL=$(kubectl get svc quantumbeam-production -n production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+          # Verify rollback
+          curl -f "$PRODUCTION_URL/health" || exit 1
+
+          echo "✅ Rollback completed successfully"
+
+  # Post-deployment notifications
+  notify:
+    name: Deployment Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production, rollback]
+    if: always()
+
+    steps:
+      - name: Notify Slack on success
+        if: needs.deploy-production.result == 'success'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          text: |
+            🚀 **QuantumBeam Deployment Successful**
+
+            **Environment**: Production
+            **Version**: ${{ needs.pre-deployment-checks.outputs.version }}
+            **Commit**: ${{ github.sha }}
+            **Deployed by**: ${{ github.actor }}
+
+            ✅ Deployment completed successfully!
+
+      - name: Notify Slack on failure
+        if: needs.deploy-production.result == 'failure' || needs.rollback.result == 'success'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#deployments'
+          text: |
+            ❌ **QuantumBeam Deployment Failed**
+
+            **Environment**: Production
+            **Version**: ${{ needs.pre-deployment-checks.outputs.version }}
+            **Commit**: ${{ github.sha }}
+            **Deployed by**: ${{ github.actor }}
+
+            🔍 Please investigate the deployment failure.
+
+      - name: Update deployment status
+        run: |
+          # Update deployment tracking system
+          curl -X POST "${{ secrets.DEPLOYMENT_TRACKING_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "repository": "${{ github.repository }}",
+              "environment": "${{ github.event.client_payload.environment || github.event.inputs.environment }}",
+              "version": "${{ needs.pre-deployment-checks.outputs.version }}",
+              "status": "${{ job.status }}",
+              "commit_sha": "${{ github.sha }}",
+              "deployed_by": "${{ github.actor }}",
+              "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+            }' || echo "Failed to update deployment status"

@@ -1,8 +1,21 @@
 # FinsavvyAI Platform
 
-Shared services for the FinsavvyAI ecosystem.
+Monorepo for the FinsavvyAI ecosystem.
 
 Mission: infrastructure for autonomous AI software systems.
+
+## Layout
+
+| Directory | Purpose |
+|---|---|
+| `packages/` | Shared platform services consumed by every product |
+| `products/` | Customer-facing CORE products (PushCI, Qestro, LunaOS, OpenSyber, SDLC.cc, AMLIQ, TenantIQ) |
+| `oss/` | Open-source components (PipeWarden, TokenForge, ClawPipe, MCP tooling, design system, etc.) |
+| `infrastructure/` | Deployment manifests, Terraform, Kubernetes, edge config |
+| `websites/` | Marketing sites and public web properties |
+| `_archive/` | Sprint snapshots, migration tracking, decommissioned components |
+
+Authority for migration scope and sequencing: `finsavvyai_consolidation_plan_addendum.md` (sections 1 + 3).
 
 ## Packages
 

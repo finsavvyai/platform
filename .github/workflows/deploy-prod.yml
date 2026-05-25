@@ -1,0 +1,119 @@
+name: deploy-prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version/tag to deploy (e.g. v0.1.0)."
+        required: true
+      service:
+        description: "Service directory containing wrangler.toml."
+        required: false
+        default: packages/ai-gateway
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+# Required secrets:
+#   CLOUDFLARE_API_TOKEN
+#   CLOUDFLARE_ACCOUNT_ID
+# GitHub environments used (configure in repo settings with required reviewers):
+#   production-canary-5   - manual approval before 5% rollout
+#   production-canary-50  - manual approval before 50% rollout
+#   production-canary-100 - manual approval before 100% rollout
+
+jobs:
+  build:
+    name: build (version=${{ inputs.version }})
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+  canary-5:
+    name: canary 5%
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: production-canary-5
+      url: https://finsavvyai.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - name: Deploy version + route 5% traffic
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          cd "${{ inputs.service }}"
+          npx --yes wrangler@3 versions upload --env production
+          npx --yes wrangler@3 versions deploy --env production --percentage 5 --yes
+      - name: Soak 10 minutes
+        run: sleep 600
+
+  canary-50:
+    name: canary 50%
+    needs: canary-5
+    runs-on: ubuntu-latest
+    environment:
+      name: production-canary-50
+      url: https://finsavvyai.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+      - name: Promote to 50%
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          cd "${{ inputs.service }}"
+          npx --yes wrangler@3 versions deploy --env production --percentage 50 --yes
+      - name: Soak 10 minutes
+        run: sleep 600
+
+  canary-100:
+    name: canary 100%
+    needs: canary-50
+    runs-on: ubuntu-latest
+    environment:
+      name: production-canary-100
+      url: https://finsavvyai.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version }}
+      - name: Promote to 100%
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          cd "${{ inputs.service }}"
+          npx --yes wrangler@3 versions deploy --env production --percentage 100 --yes

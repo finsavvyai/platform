@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: quantumbeam-api
+    env: docker
+    dockerfilePath: ./production-deploy/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: 8080
+      - key: LOG_LEVEL
+        value: info
+    autoDeploy: true
+    plan: free
+
+  - type: pserv
+    name: quantumbeam-postgres
+    env: docker
+    dockerfilePath: ./Dockerfile.postgres
+    envVars:
+      - key: POSTGRES_DB
+        value: quantumbeam
+      - key: POSTGRES_USER
+        value: quantumbeam_user
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+    plan: free
+    persistentDisk:
+      mountPath: /var/lib/postgresql/data
+      sizeGB: 10

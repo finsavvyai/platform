@@ -1,0 +1,567 @@
+# QuantumBeam Chaos Engineering Configuration
+# Comprehensive fault injection and resilience testing configuration
+
+# Global settings
+prometheus_url: "http://prometheus:9090"
+default_namespace: "quantumbeam"
+default_duration_seconds: 300
+experiment_retention_days: 30
+
+# Blast radius limits (maximum number of pods affected)
+blast_radius_limits:
+  minimal: 1    # Single pod only
+  moderate: 3   # Few pods
+  extensive: 5  # Multiple pods
+
+# Safety checks and guardrails
+safety_checks:
+  require_approval: true              # Require manual approval for experiments
+  business_hours_only: true          # Only run during business hours (9-5 weekdays)
+  exclude_critical_services: true    # Exclude services marked as critical
+  exclude_production_during_high_traffic: true  # Don't run during peak hours
+  auto_abort_on_alert: true          # Automatically abort if system alerts trigger
+  max_concurrent_experiments: 3      # Maximum simultaneous experiments
+
+# Business hours configuration
+business_hours:
+  timezone: "UTC"
+  weekdays: [1, 2, 3, 4, 5]  # Monday-Friday
+  start_hour: 9
+  end_hour: 17
+
+# High traffic periods to avoid
+high_traffic_periods:
+  - start: "09:00"
+    end: "11:00"
+  - start: "14:00"
+    end: "16:00"
+
+# Critical services to exclude
+critical_services:
+  - "quantumbeam-api"
+  - "quantumbeam-database"
+  - "quantumbeam-redis"
+  - "quantumbeam-monitoring"
+
+# Health check endpoints
+health_checks:
+  - name: "api_health"
+    endpoint: "http://quantumbeam-api.quantumbeam.svc.cluster.local:8080/health"
+    method: "GET"
+    expected_status: 200
+    timeout_seconds: 10
+    interval_seconds: 5
+    max_failures: 3
+
+  - name: "api_readiness"
+    endpoint: "http://quantumbeam-api.quantumbeam.svc.cluster.local:8080/ready"
+    method: "GET"
+    expected_status: 200
+    timeout_seconds: 10
+    interval_seconds: 10
+    max_failures: 3
+
+  - name: "web_interface"
+    endpoint: "http://quantumbeam-web.quantumbeam.svc.cluster.local:3000"
+    method: "GET"
+    expected_status: 200
+    timeout_seconds: 15
+    interval_seconds: 10
+    max_failures: 5
+
+  - name: "database_health"
+    endpoint: "http://quantumbeam-api.quantumbeam.svc.cluster.local:8080/db-health"
+    method: "GET"
+    expected_status: 200
+    timeout_seconds: 30
+    interval_seconds: 15
+    max_failures: 2
+
+  - name: "redis_health"
+    endpoint: "http://quantumbeam-api.quantumbeam.svc.cluster.local:8080/redis-health"
+    method: "GET"
+    expected_status: 200
+    timeout_seconds: 10
+    interval_seconds: 10
+    max_failures: 3
+
+# Fault injection configurations
+fault_types:
+  # Pod deletion fault
+  pod_delete:
+    description: "Delete pods to test self-healing capabilities"
+    blast_radius: ["minimal", "moderate"]
+    parameters:
+      count:
+        type: integer
+        min: 1
+        max: 5
+        default: 1
+        description: "Number of pods to delete"
+    cleanup: "automatic"  # Kubernetes will restart pods automatically
+
+  # CPU stress fault
+  cpu_stress:
+    description: "Inject CPU load to test performance under stress"
+    blast_radius: ["minimal", "moderate"]
+    parameters:
+      load_percent:
+        type: integer
+        min: 50
+        max: 100
+        default: 80
+        description: "CPU load percentage to inject"
+      duration_seconds:
+        type: integer
+        min: 30
+        max: 600
+        default: 60
+        description: "Duration of stress test"
+    cleanup: "automatic"  # Process will terminate automatically
+
+  # Memory stress fault
+  memory_stress:
+    description: "Inject memory pressure to test OOM handling"
+    blast_radius: ["minimal", "moderate"]
+    parameters:
+      memory_mb:
+        type: integer
+        min: 256
+        max: 2048
+        default: 512
+        description: "Memory to consume in MB"
+      duration_seconds:
+        type: integer
+        min: 30
+        max: 600
+        default: 60
+        description: "Duration of stress test"
+    cleanup: "automatic"
+
+  # Network latency fault
+  network_latency:
+    description: "Inject network latency to test timeout handling"
+    blast_radius: ["minimal", "moderate", "extensive"]
+    parameters:
+      latency_ms:
+        type: integer
+        min: 50
+        max: 2000
+        default: 200
+        description: "Network latency to inject in milliseconds"
+      jitter_ms:
+        type: integer
+        min: 0
+        max: 500
+        default: 50
+        description: "Random jitter in latency"
+    cleanup: "manual"  # Requires tc command to remove
+
+  # Network packet loss fault
+  network_packet_loss:
+    description: "Inject packet loss to test network resilience"
+    blast_radius: ["minimal", "moderate", "extensive"]
+    parameters:
+      loss_percent:
+        type: number
+        min: 1.0
+        max: 50.0
+        default: 5.0
+        description: "Percentage of packets to lose"
+      correlation:
+        type: number
+        min: 0.0
+        max: 100.0
+        default: 25.0
+        description: "Packet loss correlation percentage"
+    cleanup: "manual"
+
+  # Disk pressure fault
+  disk_pressure:
+    description: "Inject disk I/O pressure to test storage resilience"
+    blast_radius: ["minimal"]
+    parameters:
+      write_load_mb:
+        type: integer
+        min: 100
+        max: 1000
+        default: 500
+        description: "Write load in MB"
+      read_load_mb:
+        type: integer
+        min: 100
+        max: 1000
+        default: 500
+        description: "Read load in MB"
+      duration_seconds:
+        type: integer
+        min: 30
+        max: 300
+        default: 120
+        description: "Duration of I/O stress"
+    cleanup: "manual"
+
+  # DNS failure fault
+  dns_failure:
+    description: "Simulate DNS resolution failures"
+    blast_radius: ["moderate", "extensive"]
+    parameters:
+      failure_duration_seconds:
+        type: integer
+        min: 10
+        max: 300
+        default: 60
+        description: "Duration of DNS failure"
+      target_domains:
+        type: array
+        items:
+          type: string
+        default: ["external-api.example.com"]
+        description: "Domains to fail DNS resolution for"
+    cleanup: "automatic"
+
+  # Container kill fault
+  container_kill:
+    description: "Kill containers within pods to test container restart policies"
+    blast_radius: ["minimal"]
+    parameters:
+      container_names:
+        type: array
+        items:
+          type: string
+        default: ["app"]
+        description: "Names of containers to kill"
+      kill_signal:
+        type: integer
+        min: 1
+        max: 31
+        default: 15  # SIGTERM
+        description: "Signal to send to container"
+    cleanup: "automatic"
+
+  # Node drain fault
+  node_drain:
+    description: "Drain nodes to test cluster resilience"
+    blast_radius: ["extensive"]
+    parameters:
+      node_names:
+        type: array
+        items:
+          type: string
+        description: "Names of nodes to drain"
+      drain_timeout_seconds:
+        type: integer
+        min: 300
+        max: 3600
+        default: 600
+        description: "Timeout for node drain operation"
+      force_evict:
+        type: boolean
+        default: false
+        description: "Force eviction of pods that don't respect disruption budget"
+    cleanup: "manual"  # Requires manual node uncordon
+
+  # API latency fault
+  api_latency:
+    description: "Inject API endpoint latency to test client resilience"
+    blast_radius: ["minimal", "moderate"]
+    parameters:
+      endpoint_patterns:
+        type: array
+        items:
+          type: string
+        default: ["/api/*"]
+        description: "URL patterns to apply latency to"
+      latency_ms:
+        type: integer
+        min: 100
+        max: 5000
+        default: 1000
+        description: "API latency to inject in milliseconds"
+      error_rate:
+        type: number
+        min: 0.0
+        max: 100.0
+        default: 0.0
+        description: "Error rate to inject (0-100%)"
+    cleanup: "manual"
+
+  # Database connection failure fault
+  db_connection_failure:
+    description: "Simulate database connection failures"
+    blast_radius: ["minimal", "moderate"]
+    parameters:
+      failure_duration_seconds:
+        type: integer
+        min: 10
+        max: 300
+        default: 60
+        description: "Duration of connection failure"
+      connection_error_type:
+        type: string
+        enum: ["timeout", "connection_refused", "auth_error"]
+        default: "timeout"
+        description: "Type of connection error to simulate"
+      max_connections:
+        type: integer
+        min: 0
+        max: 100
+        default: 0
+        description: "Maximum allowed connections (0 = unlimited)"
+    cleanup: "manual"
+
+# Pre-defined experiment templates
+experiment_templates:
+  # Basic resilience test
+  basic_resilience:
+    name: "Basic System Resilience Test"
+    description: "Test basic self-healing capabilities"
+    experiments:
+      - fault_type: "pod_delete"
+        target_services: ["quantumbeam-api"]
+        parameters:
+          count: 1
+        blast_radius: "minimal"
+        duration_seconds: 300
+
+  # Load stress test
+  load_stress:
+    name: "Load Stress Test"
+    description: "Test system behavior under resource stress"
+    experiments:
+      - fault_type: "cpu_stress"
+        target_services: ["quantumbeam-api", "quantumbeam-worker"]
+        parameters:
+          load_percent: 70
+        blast_radius: "moderate"
+        duration_seconds: 180
+
+      - fault_type: "memory_stress"
+        target_services: ["quantumbeam-api"]
+        parameters:
+          memory_mb: 1024
+        blast_radius: "minimal"
+        duration_seconds: 180
+
+  # Network resilience test
+  network_resilience:
+    name: "Network Resilience Test"
+    description: "Test network fault tolerance"
+    experiments:
+      - fault_type: "network_latency"
+        target_services: ["quantumbeam-api"]
+        parameters:
+          latency_ms: 500
+        blast_radius: "moderate"
+        duration_seconds: 240
+
+      - fault_type: "network_packet_loss"
+        target_services: ["quantumbeam-api"]
+        parameters:
+          loss_percent: 3.0
+        blast_radius: "moderate"
+        duration_seconds: 240
+
+  # Database resilience test
+  database_resilience:
+    name: "Database Resilience Test"
+    description: "Test database failure handling"
+    experiments:
+      - fault_type: "db_connection_failure"
+        target_services: ["quantumbeam-api"]
+        parameters:
+          failure_duration_seconds: 30
+          connection_error_type: "timeout"
+        blast_radius: "minimal"
+        duration_seconds: 120
+
+  # Chaos day test (comprehensive)
+  chaos_day:
+    name: "Chaos Day Comprehensive Test"
+    description: "Run multiple chaos experiments to test overall system resilience"
+    experiments:
+      - fault_type: "pod_delete"
+        target_services: ["quantumbeam-api"]
+        parameters:
+          count: 2
+        blast_radius: "moderate"
+        duration_seconds: 300
+
+      - fault_type: "cpu_stress"
+        target_services: ["quantumbeam-worker"]
+        parameters:
+          load_percent: 80
+        blast_radius: "minimal"
+        duration_seconds: 180
+
+      - fault_type: "network_latency"
+        target_services: ["quantumbeam-api"]
+        parameters:
+          latency_ms: 300
+        blast_radius: "moderate"
+        duration_seconds: 200
+
+      - fault_type: "memory_stress"
+        target_services: ["quantumbeam-analytics"]
+        parameters:
+          memory_mb: 512
+        blast_radius: "minimal"
+        duration_seconds: 120
+
+# Monitoring and alerting
+monitoring:
+  # Metrics to collect during experiments
+  metrics:
+    - "cpu_usage"
+    - "memory_usage"
+    - "response_time_p95"
+    - "response_time_p99"
+    - "error_rate_4xx"
+    - "error_rate_5xx"
+    - "throughput_rps"
+    - "pod_restarts"
+    - "http_requests_total"
+    - "database_connections"
+    - "redis_connections"
+
+  # Alert thresholds
+  alert_thresholds:
+    error_rate:
+      warning: 5.0    # 5%
+      critical: 10.0  # 10%
+    response_time:
+      warning: 2000   # 2 seconds
+      critical: 5000  # 5 seconds
+    availability:
+      warning: 95.0   # 95%
+      critical: 90.0  # 90%
+    pod_restarts:
+      warning: 5
+      critical: 10
+
+  # Notifications
+  notifications:
+    slack:
+      enabled: true
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#chaos-engineering"
+      username: "ChaosBot"
+      notify_on:
+        - "experiment_start"
+        - "experiment_complete"
+        - "experiment_failed"
+        - "alert_triggered"
+
+    email:
+      enabled: true
+      smtp_server: "smtp.gmail.com"
+      smtp_port: 587
+      username: "${SMTP_USERNAME}"
+      password: "${SMTP_PASSWORD}"
+      recipients:
+        - "devops@quantumbeam.io"
+        - "engineering@quantumbeam.io"
+      notify_on:
+        - "experiment_failed"
+        - "alert_triggered"
+
+    pagerduty:
+      enabled: false
+      service_key: "${PAGERDUTY_SERVICE_KEY}"
+      notify_on:
+        - "critical_alert"
+
+# Reporting and analytics
+reporting:
+  # Report formats
+  formats:
+    - "json"
+    - "yaml"
+    - "html"
+    - "pdf"
+
+  # Report retention
+  retention_days: 90
+
+  # Automated report generation
+  automated_reports:
+    enabled: true
+    schedule: "0 6 * * 1"  # Every Monday at 6 AM
+    recipients:
+      - "engineering@quantumbeam.io"
+      - "devops@quantumbeam.io"
+
+  # Executive summary configuration
+  executive_summary:
+    include_metrics: true
+    include_impact_assessment: true
+    include_recommendations: true
+    include_trends: true
+    chart_types:
+      - "availability"
+      - "performance"
+      - "error_rate"
+      - "recovery_time"
+
+# Integration settings
+integrations:
+  # Kubernetes integration
+  kubernetes:
+    enabled: true
+    config_path: "~/.kube/config"
+    cluster_name: "quantumbeam-prod"
+    namespace: "quantumbeam"
+
+  # Prometheus integration
+  prometheus:
+    enabled: true
+    url: "http://prometheus:9090"
+    query_timeout: 30
+
+  # Grafana integration
+  grafana:
+    enabled: true
+    url: "http://grafana:3000"
+    api_key: "${GRAFANA_API_KEY}"
+    dashboard_template: "chaos-engineering-dashboard"
+
+  # Git integration for experiment tracking
+  git:
+    enabled: true
+    repository: "git@github.com:quantumbeam/chaos-experiments.git"
+    branch: "main"
+    auto_commit: true
+    commit_message: "Automated chaos experiment results"
+
+# Environment-specific settings
+environments:
+  development:
+    business_hours_only: false
+    require_approval: false
+    exclude_critical_services: false
+    max_concurrent_experiments: 5
+    blast_radius_limits:
+      minimal: 1
+      moderate: 3
+      extensive: 5
+
+  staging:
+    business_hours_only: true
+    require_approval: true
+    exclude_critical_services: true
+    max_concurrent_experiments: 3
+    blast_radius_limits:
+      minimal: 1
+      moderate: 2
+      extensive: 3
+
+  production:
+    business_hours_only: true
+    require_approval: true
+    exclude_critical_services: true
+    exclude_production_during_high_traffic: true
+    max_concurrent_experiments: 2
+    blast_radius_limits:
+      minimal: 1
+      moderate: 1
+      extensive: 2

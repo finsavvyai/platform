@@ -1,0 +1,420 @@
+# Custom Configuration Validation Policies for QuantumBeam
+
+# Security Policies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-security-policies
+  namespace: config-validation
+  labels:
+    app: config-validator
+    policy-type: security
+data:
+  quantumbeam-security-policy.yaml: |
+    name: quantumbeam-security-policy
+    category: security
+    severity: critical
+    description: "QuantumBeam-specific security policy enforcement"
+    rule: |
+      # No privileged containers
+      !contains(spec.containers[*].securityContext.privileged, true) AND
+      # No host namespaces
+      !spec.hostPID AND !spec.hostNetwork AND !spec.hostIPC AND
+      # Seccomp profile must be set
+      (spec.securityContext.seccompProfile != null OR spec.containers[*].securityContext.seccompProfile != null) AND
+      # AppArmor profile must be set
+      (spec.securityContext.appArmorProfile != null OR spec.containers[*].securityContext.appArmorProfile != null)
+    remediation: |
+      1. Remove privileged: true from securityContext
+      2. Disable hostPID, hostNetwork, and hostIPC
+      3. Set seccompProfile to RuntimeDefault or Localhost
+      4. Configure AppArmor profile for containers
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]
+
+  quantumbeam-secret-policy.yaml: |
+    name: quantumbeam-secret-policy
+    category: security
+    severity: error
+    description: "QuantumBeam secrets management policy"
+    rule: |
+      # Secrets should be mounted as files, not environment variables
+      (spec.containers[*].envFrom[*].secretRef == null OR
+       spec.containers[*].env[*].valueFrom.secretKeyRef == null) AND
+      # Encrypted annotations for sensitive data
+      !contains(metadata.annotations[*].keys[], "password") AND
+      !contains(metadata.annotations[*].keys[], "secret")
+    remediation: |
+      1. Mount secrets as files instead of environment variables
+      2. Use Kubernetes secrets for sensitive data
+      3. Encrypt sensitive configuration values
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]
+
+# Compliance Policies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-compliance-policies
+  namespace: config-validation
+  labels:
+    app: config-validator
+    policy-type: compliance
+data:
+  gdpr-compliance-policy.yaml: |
+    name: gdpr-compliance-policy
+    category: compliance
+    severity: error
+    description: "GDPR compliance validation"
+    rule: |
+      # Data residency annotations
+      (metadata.annotations["data-residency"] != null) AND
+      # Data retention labels
+      (metadata.labels["data-retention-days"] != null) AND
+      # Privacy by design annotations
+      (metadata.annotations["privacy-by-design"] == "true")
+    remediation: |
+      1. Add data residency annotation indicating data storage location
+      2. Configure data retention period labels
+      3. Implement privacy-by-design principles
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]
+
+  pci-dss-compliance-policy.yaml: |
+    name: pci-dss-compliance-policy
+    category: compliance
+    severity: critical
+    description: "PCI DSS compliance validation for payment processing"
+    rule: |
+      # Payment processing services must have PCI annotations
+      (metadata.labels["payment-processing"] != "true" OR
+       (metadata.annotations["pci-compliance-level"] != null AND
+        metadata.annotations["encryption-at-rest"] == "true" AND
+        metadata.annotations["encryption-in-transit"] == "true"))
+    remediation: |
+      1. Add PCI compliance level annotation
+      2. Implement encryption at rest and in transit
+      3. Follow PCI DSS requirements for payment processing
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]
+
+# Performance Policies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-performance-policies
+  namespace: config-validation
+  labels:
+    app: config-validator
+    policy-type: performance
+data:
+  performance-optimization-policy.yaml: |
+    name: performance-optimization-policy
+    category: performance
+    severity: warning
+    description: "Performance optimization validation"
+    rule: |
+      # Resource requests and limits should be balanced
+      (spec.containers[*].resources.requests.cpu <= spec.containers[*].resources.limits.cpu AND
+       spec.containers[*].resources.requests.memory <= spec.containers[*].resources.limits.memory) AND
+      # CPU limits should not be too high relative to requests
+      (spec.containers[*].resources.limits.cpu / spec.containers[*].resources.requests.cpu <= 4) AND
+      # Memory limits should provide reasonable headroom
+      (spec.containers[*].resources.limits.memory / spec.containers[*].resources.requests.memory <= 2)
+    remediation: |
+      1. Balance resource requests and limits
+      2. Avoid setting CPU limits more than 4x requests
+      3. Keep memory limits within 2x requests
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging", "development"]
+
+  quantumbeam-specific-performance-policy.yaml: |
+    name: quantumbeam-specific-performance-policy
+    category: performance
+    severity: warning
+    description: "QuantumBeam-specific performance requirements"
+    rule: |
+      # Fraud detection services must have performance annotations
+      (metadata.labels["app-type"] != "fraud-detection" OR
+       (metadata.annotations["performance-tier"] != null AND
+        metadata.annotations["sla-target"] != null AND
+        metadata.annotations["max-latency-ms"] != null))
+    remediation: |
+      1. Add performance tier annotation
+      2. Define SLA target requirements
+      3. Specify maximum acceptable latency
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]
+
+# Cost Optimization Policies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-cost-policies
+  namespace: config-validation
+  labels:
+    app: config-validator
+    policy-type: cost
+data:
+  cost-optimization-policy.yaml: |
+    name: cost-optimization-policy
+    category: cost
+    severity: info
+    description: "Cost optimization validation"
+    rule: |
+      # Development environments should use cost-optimized resources
+      (metadata.labels["environment"] != "development" OR
+       (spec.containers[*].resources.requests.cpu <= "500m" AND
+        spec.containers[*].resources.requests.memory <= "512Mi" AND
+        metadata.labels["cost-optimized"] == "true"))
+    remediation: |
+      1. Use smaller resource requests in development
+      2. Add cost-optimized label
+      3. Consider using spot instances for non-critical workloads
+    enabled: true
+    auto_remediate: false
+    environments: ["development"]
+
+  quantumbeam-cost-policy.yaml: |
+    name: quantumbeam-cost-policy
+    category: cost
+    severity: warning
+    description: "QuantumBeam-specific cost management"
+    rule: |
+      # All services must have cost center annotation
+      metadata.annotations["cost-center"] != null AND
+      # Services must have environment tier label
+      metadata.labels["tier"] != null AND
+      # Resource usage monitoring enabled
+      (metadata.annotations["monitoring-enabled"] == "true" OR
+       metadata.labels["monitoring"] == "enabled")
+    remediation: |
+      1. Add cost center annotation
+      2. Define tier classification (production, staging, development)
+      3. Enable monitoring for cost optimization
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging", "development"]
+
+# Reliability Policies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-reliability-policies
+  namespace: config-validation
+  labels:
+    app: config-validator
+    policy-type: reliability
+data:
+  high-availability-policy.yaml: |
+    name: high-availability-policy
+    category: reliability
+    severity: error
+    description: "High availability requirements for production services"
+    rule: |
+      # Production services must have multiple replicas
+      (metadata.labels["environment"] != "production" OR
+       (spec.replicas >= 2 AND
+        # Pod disruption budget must exist
+        (kind == "PodDisruptionBudget" OR
+         (metadata.labels["pdb-exists"] == "true")) AND
+        # Anti-affinity rules for multi-AZ deployment
+        (spec.affinity.podAntiAffinity != null OR
+         metadata.annotations["multi-az"] == "true")))
+    remediation: |
+      1. Set minimum 2 replicas for production services
+      2. Create PodDisruptionBudget
+      3. Configure pod anti-affinity for multi-AZ deployment
+    enabled: true
+    auto_remediate: false
+    environments: ["production"]
+
+  quantumbeam-reliability-policy.yaml: |
+    name: quantumbeam-reliability-policy
+    category: reliability
+    severity: error
+    description: "QuantumBeam reliability requirements"
+    rule: |
+      # Critical services must have reliability annotations
+      (metadata.labels["criticality"] != "high" OR
+       (metadata.annotations["recovery-time-objective"] != null AND
+        metadata.annotations["recovery-point-objective"] != null AND
+        metadata.annotations["disaster-recovery-plan"] == "true"))
+    remediation: |
+      1. Define recovery time objective (RTO)
+      2. Define recovery point objective (RPO)
+      3. Document disaster recovery plan
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]
+
+# Observability Policies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-observability-policies
+  namespace: config-validation
+  labels:
+    app: config-validator
+    policy-type: observability
+data:
+  observability-policy.yaml: |
+    name: observability-policy
+    category: observability
+    severity: warning
+    description: "Observability requirements validation"
+    rule: |
+      # Services must have observability annotations
+      (metadata.annotations["prometheus.io/scrape"] == "true" OR
+       metadata.labels["monitoring"] == "enabled") AND
+      # Tracing enabled for critical services
+      (metadata.labels["criticality"] != "high" OR
+       metadata.annotations["tracing-enabled"] == "true") AND
+      # Logging configuration
+      (metadata.annotations["log-level"] != null OR
+       metadata.labels["log-level"] != null)
+    remediation: |
+      1. Enable Prometheus metrics scraping
+      2. Configure distributed tracing for critical services
+      3. Set appropriate log levels
+    enabled: true
+      auto_remediate: false
+    environments: ["production", "staging"]
+
+  quantumbeam-observability-policy.yaml: |
+    name: quantumbeam-observability-policy
+    category: observability
+    severity: error
+    description: "QuantumBeam-specific observability requirements"
+    rule: |
+      # Fraud detection services must have comprehensive observability
+      (metadata.labels["app-type"] != "fraud-detection" OR
+       (metadata.annotations["performance-monitoring"] == "true" AND
+        metadata.annotations["error-tracking"] == "true" AND
+        metadata.annotations["business-metrics"] == "true"))
+    remediation: |
+      1. Enable comprehensive performance monitoring
+      2. Configure error tracking and alerting
+      3. Implement business metrics collection
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]
+
+# Data Management Policies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-data-policies
+  namespace: config-validation
+  labels:
+    app: config-validator
+    policy-type: data
+data:
+  data-governance-policy.yaml: |
+    name: data-governance-policy
+    category: data
+    severity: error
+    description: "Data governance and classification requirements"
+    rule: |
+      # Data classification labels must be present
+      (metadata.labels["data-classification"] != null AND
+       (metadata.labels["data-classification"] == "public" OR
+        metadata.labels["data-classification"] == "internal" OR
+        metadata.labels["data-classification"] == "confidential" OR
+        metadata.labels["data-classification"] == "restricted")) AND
+      # Data owner must be specified
+      metadata.annotations["data-owner"] != null AND
+      # Data retention policy must be defined
+      metadata.annotations["data-retention-policy"] != null
+    remediation: |
+      1. Classify data according to sensitivity
+      2. Specify data owner responsibility
+      3. Define data retention and deletion policies
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]
+
+  quantumbeam-data-policy.yaml: |
+    name: quantumbeam-data-policy
+    category: data
+    severity: critical
+    description: "QuantumBeam data management requirements"
+    rule: |
+      # Financial data processing must have specific annotations
+      (metadata.labels["processes-financial-data"] != "true" OR
+       (metadata.annotations["financial-data-encrypted"] == "true" AND
+        metadata.annotations["audit-logging-enabled"] == "true" AND
+        metadata.annotations["data-lineage-tracked"] == "true"))
+    remediation: |
+      1. Encrypt financial data at rest and in transit
+      2. Enable comprehensive audit logging
+      3. Implement data lineage tracking
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]
+
+# Network Security Policies
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-network-policies
+  namespace: config-validation
+  labels:
+    app: config-validator
+    policy-type: network
+data:
+  network-security-policy.yaml: |
+    name: network-security-policy
+    category: network
+    severity: error
+    description: "Network security and segmentation validation"
+    rule: |
+      # Namespaces must have network policies
+      (kind == "NetworkPolicy" OR
+       metadata.labels["network-policy-exempt"] == "true") AND
+      # Ingress resources must enforce TLS
+      (kind != "Ingress" OR
+       spec.tls != null) AND
+      # Services should not use NodePort in production
+      (metadata.labels["environment"] != "production" OR
+       spec.type != "NodePort")
+    remediation: |
+      1. Create NetworkPolicy for namespace segmentation
+      2. Enforce TLS on all Ingress resources
+      3. Avoid NodePort services in production
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]
+
+  quantumbeam-network-policy.yaml: |
+    name: quantumbeam-network-policy
+    category: network
+    severity: warning
+    description: "QuantumBeam network security requirements"
+    rule: |
+      # External-facing services must have security annotations
+      (metadata.labels["exposed"] != "true" OR
+       (metadata.annotations["security-scan-enabled"] == "true" AND
+        metadata.annotations["rate-limited"] == "true" AND
+        metadata.annotations["waf-protected"] == "true"))
+    remediation: |
+      1. Enable security scanning for external services
+      2. Implement rate limiting
+      3. Configure Web Application Firewall (WAF)
+    enabled: true
+    auto_remediate: false
+    environments: ["production", "staging"]

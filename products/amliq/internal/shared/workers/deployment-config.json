@@ -1,0 +1,163 @@
+{
+  "project": "fintech-go-cloudflare-suite",
+  "version": "1.0.0",
+  "deployment": {
+    "timestamp": "2025-11-04T00:00:00Z",
+    "environment": "production",
+    "status": "ready"
+  },
+  "infrastructure": {
+    "cloudflare": {
+      "workers": {
+        "main": "src/index.ts",
+        "routes": [
+          {
+            "pattern": "api.finsavvyai.com/*",
+            "worker": "secure-production-worker"
+          },
+          {
+            "pattern": "billing.finsavvyai.com/*",
+            "worker": "billing/billing-routes"
+          },
+          {
+            "pattern": "compliance.finsavvyai.com/*",
+            "worker": "compliance/compliance-routes"
+          },
+          {
+            "pattern": "intelligence.finsavvyai.com/*",
+            "worker": "intelligence/intelligence-routes"
+          },
+          {
+            "pattern": "risk.finsavvyai.com/*",
+            "worker": "risk/risk-routes"
+          }
+        ]
+      },
+      "databases": {
+        "billing_us": "billing-db-us",
+        "billing_eu": "billing-db-eu",
+        "compliance_us": "compliance-db-us",
+        "compliance_eu": "compliance-db-eu",
+        "intelligence_us": "intelligence-db-us",
+        "risk_us": "risk-db-us"
+      },
+      "storage": {
+        "r2": {
+          "documents": "fintech-documents",
+          "evidence": "compliance-evidence",
+          "templates": "billing-templates"
+        },
+        "kv": {
+          "cache": "api-cache",
+          "sessions": "user-sessions",
+          "agent_memory": "ai-agent-memory",
+          "rate_limits": "api-rate-limits"
+        },
+        "vectorize": {
+          "rag_embeddings": "fintech-rag-embeddings",
+          "document_embeddings": "fintech-doc-embeddings"
+        }
+      },
+      "queues": {
+        "ai_processing": "ai-queue",
+        "compliance": "compliance-queue",
+        "risk_analysis": "risk-queue",
+        "billing": "billing-queue"
+      }
+    }
+  },
+  "environment_variables": {
+    "production": {
+      "JWT_SECRET": "REQUIRED_32_CHAR_MINIMUM",
+      "ENVIRONMENT": "production",
+      "LOG_LEVEL": "info",
+      "AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
+      "EMBEDDING_MODEL": "@cf/baai/bge-base-en-v1.5"
+    },
+    "staging": {
+      "JWT_SECRET": "REQUIRED_32_CHAR_MINIMUM",
+      "ENVIRONMENT": "staging",
+      "LOG_LEVEL": "debug",
+      "AI_MODEL": "@cf/meta/llama-3.1-8b-instruct",
+      "EMBEDDING_MODEL": "@cf/baai/bge-base-en-v1.5"
+    }
+  },
+  "security": {
+    "features": {
+      "jwt_validation": true,
+      "sql_injection_protection": true,
+      "input_validation": true,
+      "rate_limiting": true,
+      "cors_protection": true,
+      "security_headers": true
+    },
+    "compliance": {
+      "pci_dss": "partial",
+      "gdpr": "compliant",
+      "audit_logging": true
+    }
+  },
+  "services": {
+    "subscription_management": {
+      "status": "ready",
+      "version": "1.0.0",
+      "features": [
+        "subscription_creation",
+        "subscription_updates",
+        "subscription_cancellation",
+        "plan_management",
+        "analytics",
+        "ai_insights"
+      ]
+    },
+    "billing": {
+      "status": "ready",
+      "version": "1.0.0",
+      "features": [
+        "invoice_management",
+        "payment_processing",
+        "customer_management"
+      ]
+    },
+    "compliance": {
+      "status": "ready",
+      "version": "1.0.0",
+      "features": [
+        "kyc_verification",
+        "sanctions_screening",
+        "case_management"
+      ]
+    },
+    "intelligence": {
+      "status": "ready",
+      "version": "1.0.0",
+      "features": [
+        "data_ingestion",
+        "analytics_dashboard",
+        "forecasting"
+      ]
+    },
+    "risk": {
+      "status": "ready",
+      "version": "1.0.0",
+      "features": [
+        "transaction_monitoring",
+        "fraud_detection",
+        "risk_scoring"
+      ]
+    }
+  },
+  "monitoring": {
+    "health_checks": [
+      "database_connectivity",
+      "ai_service_availability",
+      "storage_access",
+      "queue_health"
+    ],
+    "alerts": [
+      "error_rate_threshold",
+      "response_time_threshold",
+      "security_anomalies"
+    ]
+  }
+}

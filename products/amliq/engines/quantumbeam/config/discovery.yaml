@@ -1,0 +1,472 @@
+# Service Discovery and Load Balancing Configuration
+
+# Service Registry Configuration
+registry:
+  enabled: true
+  redis_key: "quantumbeam:services"
+  check_interval: "30s"
+  service_timeout: "60s"
+  health_check_path: "/health"
+  max_retries: 3
+  retry_delay: "2s"
+  enable_metrics: true
+
+# Load Balancer Configuration
+load_balancer:
+  algorithm: "weighted_round_robin"  # round_robin, weighted_round_robin, least_connections, random, consistent_hash, ip_hash
+  health_check_interval: "15s"
+  unhealthy_threshold: 3
+  healthy_threshold: 2
+  timeout: "5s"
+  retries: 2
+  enable_sticky_session: false
+  session_affinity: "cookie"  # cookie, ip_hash, header
+
+# Reverse Proxy Configuration
+proxy:
+  enabled: true
+  listen_address: "0.0.0.0"
+  port: 8080
+  timeout: "30s"
+  idle_timeout: "120s"
+  read_header_timeout: "10s"
+  write_timeout: "10s"
+  max_header_bytes: 1048576  # 1MB
+  enable_websockets: false
+  enable_compression: true
+  enable_cors: true
+  retry_attempts: 3
+  retry_delay: "1s"
+  circuit_breaker_threshold: 5
+  circuit_breaker_timeout: "30s"
+  health_check_interval: "15s"
+  metrics_enabled: true
+  access_log_enabled: true
+  error_log_enabled: true
+
+# Middleware Configuration
+middleware:
+  enabled: true
+  health_check_interval: "30s"
+  service_timeout: "30s"
+  max_retries: 3
+  retry_delay: "1s"
+  circuit_breaker_enabled: true
+  circuit_breaker_threshold: 5
+  rate_limit_enabled: true
+  default_rate_limit: 100
+  timeout_enabled: true
+  default_timeout: "30s"
+  load_balancing_enabled: true
+  default_strategy: "weighted_round_robin"
+  sticky_session_enabled: false
+  metrics_enabled: true
+  tracing_enabled: true
+
+# Service Routes Configuration
+routes:
+  # Fraud Detection Service
+  - path: "/api/v1/fraud/*"
+    service_name: "fraud-detection-service"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    timeout: "10s"
+    retries: 2
+    strategy: "weighted_round_robin"
+    rate_limit: 1000
+    auth_required: true
+    headers:
+      "X-Service-Version": "v1"
+    metadata:
+      "criticality": "high"
+      "team": "fraud"
+
+  # AI Analysis Service
+  - path: "/api/v1/ai/*"
+    service_name: "ai-analysis-service"
+    methods: ["GET", "POST"]
+    timeout: "30s"
+    retries: 1
+    strategy: "least_connections"
+    rate_limit: 500
+    auth_required: true
+    headers:
+      "X-Service-Version": "v1"
+    metadata:
+      "criticality": "medium"
+      "team": "ai"
+
+  # Quantum Computing Service
+  - path: "/api/v1/quantum/*"
+    service_name: "quantum-computing-service"
+    methods: ["GET", "POST"]
+    timeout: "600s"  # 10 minutes for quantum operations
+    retries: 1
+    strategy: "random"
+    rate_limit: 100
+    auth_required: true
+    headers:
+      "X-Service-Version": "v1"
+    metadata:
+      "criticality": "medium"
+      "team": "quantum"
+
+  # User Management Service
+  - path: "/api/v1/users/*"
+    service_name: "user-management-service"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    timeout: "5s"
+    retries: 3
+    strategy: "round_robin"
+    rate_limit: 2000
+    auth_required: true
+    headers:
+      "X-Service-Version": "v1"
+    metadata:
+      "criticality": "high"
+      "team": "platform"
+
+  # Authentication Service
+  - path: "/api/v1/auth/*"
+    service_name: "auth-service"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    timeout: "5s"
+    retries: 3
+    strategy: "round_robin"
+    rate_limit: 5000
+    auth_required: false
+    headers:
+      "X-Service-Version": "v1"
+    metadata:
+      "criticality": "high"
+      "team": "platform"
+
+  # API Gateway Service
+  - path: "/api/v1/gateway/*"
+    service_name: "api-gateway-service"
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+    timeout: "10s"
+    retries: 2
+    strategy: "weighted_round_robin"
+    rate_limit: 10000
+    auth_required: false
+    headers:
+      "X-Service-Version": "v1"
+    metadata:
+      "criticality": "high"
+      "team": "platform"
+
+  # Notification Service
+  - path: "/api/v1/notifications/*"
+    service_name: "notification-service"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    timeout: "15s"
+    retries: 3
+    strategy: "round_robin"
+    rate_limit: 1000
+    auth_required: true
+    headers:
+      "X-Service-Version": "v1"
+    metadata:
+      "criticality": "medium"
+      "team": "platform"
+
+  # Reporting Service
+  - path: "/api/v1/reports/*"
+    service_name: "reporting-service"
+    methods: ["GET", "POST"]
+    timeout: "60s"
+    retries: 2
+    strategy: "least_connections"
+    rate_limit: 500
+    auth_required: true
+    headers:
+      "X-Service-Version": "v1"
+    metadata:
+      "criticality": "medium"
+      "team": "analytics"
+
+  # Admin Service
+  - path: "/api/v1/admin/*"
+    service_name: "admin-service"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    timeout: "10s"
+    retries: 3
+    strategy: "round_robin"
+    rate_limit: 100
+    auth_required: true
+    headers:
+      "X-Service-Version": "v1"
+      "X-Admin-Required": "true"
+    metadata:
+      "criticality": "high"
+      "team": "platform"
+
+  # Webhook Service
+  - path: "/api/v1/webhooks/*"
+    service_name: "webhook-service"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    timeout: "30s"
+    retries: 3
+    strategy: "weighted_round_robin"
+    rate_limit: 2000
+    auth_required: true
+    headers:
+      "X-Service-Version": "v1"
+    metadata:
+      "criticality": "medium"
+      "team": "integrations"
+
+  # Monitoring Service
+  - path: "/api/v1/monitoring/*"
+    service_name: "monitoring-service"
+    methods: ["GET", "POST"]
+    timeout: "10s"
+    retries: 2
+    strategy: "round_robin"
+    rate_limit: 1000
+    auth_required: true
+    headers:
+      "X-Service-Version": "v1"
+    metadata:
+      "criticality": "medium"
+      "team": "platform"
+
+# Service Registration Templates
+service_templates:
+  microservice:
+    weight: 1
+    timeout: "30s"
+    retries: 3
+    health_check_path: "/health"
+    health_check_interval: "15s"
+    unhealthy_threshold: 3
+    healthy_threshold: 2
+    metadata:
+      "type": "microservice"
+      "framework": "go"
+
+  critical_service:
+    weight: 3
+    timeout: "10s"
+    retries: 5
+    health_check_path: "/health"
+    health_check_interval: "10s"
+    unhealthy_threshold: 2
+    healthy_threshold: 3
+    metadata:
+      "type": "critical"
+      "sla": "99.9%"
+
+  background_service:
+    weight: 1
+    timeout: "300s"
+    retries: 1
+    health_check_path: "/health"
+    health_check_interval: "60s"
+    unhealthy_threshold: 5
+    healthy_threshold: 2
+    metadata:
+      "type": "background"
+      "async": "true"
+
+  external_service:
+    weight: 2
+    timeout: "60s"
+    retries: 3
+    health_check_path: "/ping"
+    health_check_interval: "30s"
+    unhealthy_threshold: 3
+    healthy_threshold: 2
+    metadata:
+      "type": "external"
+      "managed": "false"
+
+# Load Balancing Strategies Configuration
+strategies:
+  round_robin:
+    description: "Distributes requests evenly across all healthy services"
+    use_case: "General purpose load balancing for similar services"
+
+  weighted_round_robin:
+    description: "Distributes requests based on service weights"
+    use_case: "Services with different capacities or performance characteristics"
+
+  least_connections:
+    description: "Sends requests to the service with the fewest active connections"
+    use_case: "Long-running requests or varying response times"
+
+  random:
+    description: "Selects services randomly"
+    use_case: "Simple load balancing when all services are similar"
+
+  consistent_hash:
+    description: "Routes requests based on hash of request key"
+    use_case: "Session affinity or cache routing"
+
+  ip_hash:
+    description: "Routes requests based on client IP hash"
+    use_case: "Geographic or client-based routing"
+
+  response_time:
+    description: "Routes to service with best response time"
+    use_case: "Performance-critical applications"
+
+  resource_based:
+    description: "Routes based on resource utilization and error rates"
+    use_case: "Complex environments with varying loads"
+
+  geographic:
+    description: "Routes to services in the same geographic region"
+    use_case: "Multi-region deployments"
+
+  zone_aware:
+    description: "Routes to services in the same availability zone"
+    use_case: "High availability deployments"
+
+  version_aware:
+    description: "Routes based on API version compatibility"
+    use_case: "Versioned APIs with backward compatibility"
+
+# Health Check Configuration
+health_checks:
+  default:
+    path: "/health"
+    method: "GET"
+    expected_status: 200
+    timeout: "5s"
+    interval: "15s"
+    unhealthy_threshold: 3
+    healthy_threshold: 2
+
+  detailed:
+    path: "/health/detailed"
+    method: "GET"
+    expected_status: 200
+    timeout: "10s"
+    interval: "30s"
+    unhealthy_threshold: 2
+    healthy_threshold: 3
+
+  external:
+    path: "/ping"
+    method: "GET"
+    expected_status: 200
+    timeout: "15s"
+    interval: "60s"
+    unhealthy_threshold: 3
+    healthy_threshold: 2
+
+# Circuit Breaker Configuration
+circuit_breakers:
+  default:
+    threshold: 5
+    timeout: "30s"
+    half_open_max_requests: 3
+    monitor_window: "5m"
+
+  strict:
+    threshold: 3
+    timeout: "60s"
+    half_open_max_requests: 2
+    monitor_window: "10m"
+
+  lenient:
+    threshold: 10
+    timeout: "15s"
+    half_open_max_requests: 5
+    monitor_window: "3m"
+
+# Rate Limiting Configuration
+rate_limiting:
+  global:
+    enabled: true
+    limit: 10000
+    window: "1m"
+    burst: 1000
+
+  per_service:
+    enabled: true
+    default_limit: 1000
+    default_window: "1m"
+
+  per_user:
+    enabled: true
+    default_limit: 100
+    default_window: "1m"
+
+  per_ip:
+    enabled: true
+    default_limit: 500
+    default_window: "1m"
+
+# Metrics Configuration
+metrics:
+  enabled: true
+  interval: "30s"
+  retention: "7d"
+  export_format: "prometheus"
+  export_port: 9090
+  export_path: "/metrics"
+
+  # Metrics to collect
+  collect:
+    - "request_count"
+    - "request_duration"
+    - "error_rate"
+    - "active_connections"
+    - "circuit_breaker_state"
+    - "service_health"
+    - "response_time_p95"
+    - "response_time_p99"
+
+# Tracing Configuration
+tracing:
+  enabled: true
+  provider: "jaeger"
+  sample_rate: 0.1
+  service_name: "quantumbeam-proxy"
+  endpoint: "http://jaeger:14268/api/traces"
+
+# Logging Configuration
+logging:
+  level: "info"
+  format: "json"
+  access_log_enabled: true
+  error_log_enabled: true
+  request_log_enabled: true
+
+  fields:
+    - "timestamp"
+    - "level"
+    - "request_id"
+    - "method"
+    - "path"
+    - "status"
+    - "duration"
+    - "client_ip"
+    - "user_agent"
+    - "service_name"
+    - "service_id"
+
+# Security Configuration
+security:
+  enable_cors: true
+  cors_origins: ["*"]
+  cors_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+  cors_headers: ["*"]
+  cors_credentials: true
+
+  rate_limiting:
+    enabled: true
+    default_limit: 1000
+    window: "1m"
+    burst: 100
+
+  authentication:
+    enabled: true
+    methods: ["jwt", "api_key", "session"]
+
+  authorization:
+    enabled: true
+    roles_enabled: true
+    permissions_enabled: true

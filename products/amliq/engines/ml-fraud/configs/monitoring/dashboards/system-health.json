@@ -1,0 +1,451 @@
+{
+  "dashboard": {
+    "id": "quantumbeam-system-health",
+    "title": "QuantumBeam System Health",
+    "tags": ["quantumbeam", "system", "health"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "environment",
+          "type": "datasource",
+          "datasource": "prometheus",
+          "query": "label_values(up, environment)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "refresh": 1,
+          "sort": 1,
+          "current": {
+            "selected": false,
+            "text": ["All"],
+            "value": ["$__all"]
+          }
+        },
+        {
+          "name": "service",
+          "type": "datasource",
+          "datasource": "prometheus",
+          "query": "label_values(up{environment=~\"$environment\"}, service)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "refresh": 1,
+          "sort": 1,
+          "current": {
+            "selected": false,
+            "text": ["All"],
+            "value": ["$__all"]
+          }
+        }
+      ]
+    },
+    "panels": [
+      {
+        "title": "System Overview",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "up{environment=~\"$environment\", service=~\"$service\"}",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "options": {
+                  "0": {
+                    "text": "DOWN",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "UP",
+                    "color": "green"
+                  }
+                },
+                "type": "value"
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 0
+                }
+              ]
+            }
+          }
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "center",
+          "orientation": "horizontal",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "title": "Service Status",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "up{environment=~\"$environment\", service=~\"$service\"}",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(http_requests_total{environment=~\"$environment\", service=~\"$service\"}[5m])",
+            "legendFormat": "{{service}}",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(http_request_duration_seconds_sum{environment=~\"$environment\", service=~\"$service\"}[5m]) / rate(http_request_duration_seconds_count{environment=~\"$environment\", service=~\"$service\"}[5m])",
+            "legendFormat": "{{service}}",
+            "refId": "C"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "merge",
+            "options": {}
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "indexByName": {},
+              "renameByName": {
+                "up": "Status",
+                "service": "Service",
+                "Value #B": "Request Rate",
+                "Value #C": "Avg Response Time"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            },
+            "mappings": [],
+            "thresholds": {
+              "steps": []
+            }
+          }
+        }
+      },
+      {
+        "title": "Request Rate",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{environment=~\"$environment\", service=~\"$service\"}[5m])) by (service)",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests per second"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        }
+      },
+      {
+        "title": "Response Time",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{environment=~\"$environment\", service=~\"$service\"}[5m])) by (service)",
+            "legendFormat": "{{service}} P50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{environment=~\"$environment\", service=~\"$service\"}[5m])) by (service)",
+            "legendFormat": "{{service}} P95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{environment=~\"$environment\", service=~\"$service\"}[5m])) by (service)",
+            "legendFormat": "{{service}} P99",
+            "refId": "C"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Response Time (seconds)"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        }
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{environment=~\"$environment\", service=~\"$service\", status=~\"5..\"}[5m])) by (service) / sum(rate(http_requests_total{environment=~\"$environment\", service=~\"$service\"}[5m])) by (service)",
+            "legendFormat": "{{service}} Error Rate",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Error Rate",
+            "max": 1,
+            "min": 0,
+            "unit": "percentunit"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        },
+        "alert": {
+          "alertRuleTags": {},
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  {
+                    "type": 0,
+                    "value": 0.05
+                  }
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": 1
+              },
+              "query": {
+                "params": [
+                  "A",
+                  "5m",
+                  "now"
+                ]
+              },
+              "reducer": {
+                "params": [],
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "High error rate detected",
+          "name": "High Error Rate Alert",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{environment=~\"$environment\", service=~\"$service\"} / 1024 / 1024",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Memory Usage (MB)"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        }
+      },
+      {
+        "title": "CPU Usage",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        },
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total{environment=~\"$environment\", service=~\"$service\"}[5m]) * 100",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "CPU Usage (%)",
+            "max": 100,
+            "min": 0
+          }
+        ],
+        "xAxis": {
+          "show": true
+        }
+      },
+      {
+        "title": "Database Connections",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        },
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends{environment=~\"$environment\"}",
+            "legendFormat": "{{datname}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Connections"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        }
+      },
+      {
+        "title": "Redis Memory Usage",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 32
+        },
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes{environment=~\"$environment\"} / 1024 / 1024",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Memory Usage (MB)"
+          }
+        ],
+        "xAxis": {
+          "show": true
+        }
+      },
+      {
+        "title": "Active Traces",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 32
+        },
+        "targets": [
+          {
+            "expr": "sum(traces_active_total{environment=~\"$environment\", service=~\"$service\"})",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "title": "Span Throughput",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 32
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(traces_span_dropped_total{environment=~\"$environment\", service=~\"$service\"}[5m]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "reqps"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="QuantumBeam: Quantum-enhanced fraud detection with 99.7% accuracy in under 50ms.">
+  <title>QuantumBeam - Quantum-Enhanced Fraud Detection</title>
+  <style>
+    /* Reset & Base */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #0a0e27 0%, #1a1a3e 50%, #16213e 100%);
+      color: #f5f5f7;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    @media (prefers-color-scheme: light) {
+      body {
+        background: linear-gradient(135deg, #f5f5f7 0%, #e8e8ed 50%, #f0eff8 100%);
+        color: #1d1d1f;
+      }
+    }
+
+    /* Typography */
+    h1, h2, h3 {
+      letter-spacing: -0.5px;
+    }
+
+    h1 { font-size: clamp(2.5rem, 8vw, 4.5rem); }
+    h2 { font-size: clamp(2rem, 5vw, 3rem); }
+    h3 { font-size: 1.25rem; }
+
+    a {
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+    }
+
+    /* Navigation */
+    .nav {
+      position: fixed;
+      top: 0;
+      width: 100%;
+      z-index: 1000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: rgba(10, 14, 39, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .nav-logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-logo span {
+      color: #c084fc;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: #f5f5f7;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .nav-links a:hover {
+      color: #c084fc;
+    }
+
+    @media (max-width: 768px) {
+      .nav {
+        padding: 1rem;
+      }
+      .nav-links {
+        gap: 1rem;
+        font-size: 0.85rem;
+      }
+    }
+
+    /* Hero Section */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 8rem 2rem 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: -40%;
+      right: -15%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.2), transparent);
+      border-radius: 50%;
+      animation: float 10s ease-in-out infinite;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      bottom: -30%;
+      left: -10%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(96, 165, 250, 0.15), transparent);
+      border-radius: 50%;
+      animation: float 8s ease-in-out infinite 1s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(30px); }
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 10;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .hero-title {
+      font-weight: 700;
+      background: linear-gradient(135deg, #c084fc 0%, #60a5fa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1.5rem;
+      line-height: 1.2;
+    }
+
+    .hero-subtitle {
+      font-size: 1.25rem;
+      color: #a0aec0;
+      margin-bottom: 2rem;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .cta-btn {
+      display: inline-block;
+      padding: 1rem 2.5rem;
+      background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+      color: #fff;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .cta-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(99, 102, 241, 0.4);
+    }
+
+    .cta-btn:active {
+      transform: translateY(0);
+    }
+
+    .cta-btn-secondary {
+      background: transparent;
+      border: 2px solid rgba(99, 102, 241, 0.5);
+      color: #c084fc;
+    }
+
+    .cta-btn-secondary:hover {
+      border-color: #c084fc;
+      background: rgba(192, 132, 252, 0.1);
+    }
+
+    /* Stats Bar */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 2rem;
+      margin-top: 4rem;
+      padding: 2rem;
+      background: rgba(99, 102, 241, 0.05);
+      border: 1px solid rgba(99, 102, 241, 0.1);
+      border-radius: 12px;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #c084fc;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: #a0aec0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+    }
+
+    @media (max-width: 768px) {
+      .hero {
+        padding: 6rem 1rem 1rem;
+      }
+      .hero-subtitle {
+        font-size: 1.1rem;
+      }
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        padding: 1.5rem;
+      }
+      .stat-value {
+        font-size: 1.5rem;
+      }
+    }
+
+    /* Section Base */
+    section {
+      padding: 5rem 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 3rem;
+      background: linear-gradient(135deg, #c084fc 0%, #7c3aed 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Features Section */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 2rem;
+    }
+
+    .feature-card {
+      padding: 2rem;
+      background: rgba(99, 102, 241, 0.05);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .feature-card:hover {
+      border-color: rgba(192, 132, 252, 0.4);
+      background: rgba(99, 102, 241, 0.08);
+      box-shadow: 0 12px 32px rgba(99, 102, 241, 0.15);
+      transform: translateY(-4px);
+    }
+
+    .feature-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      display: inline-block;
+    }
+
+    .feature-title {
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: #c084fc;
+    }
+
+    .feature-desc {
+      font-size: 0.95rem;
+      color: #a0aec0;
+      line-height: 1.6;
+    }
+
+    /* How It Works */
+    .how-it-works {
+      background: rgba(99, 102, 241, 0.05);
+      border: 1px solid rgba(99, 102, 241, 0.1);
+      border-radius: 12px;
+      padding: 3rem 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 3rem;
+      margin-top: 2rem;
+    }
+
+    .step {
+      text-align: center;
+      position: relative;
+    }
+
+    .step::after {
+      content: "→";
+      position: absolute;
+      right: -2rem;
+      top: 2rem;
+      font-size: 2rem;
+      color: rgba(192, 132, 252, 0.3);
+    }
+
+    .step:last-child::after {
+      content: "";
+    }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
+      border-radius: 50%;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: #fff;
+    }
+
+    .step-title {
+      font-weight: 600;
+      color: #c084fc;
+      margin-bottom: 0.5rem;
+    }
+
+    .step-desc {
+      font-size: 0.95rem;
+      color: #a0aec0;
+    }
+
+    @media (max-width: 768px) {
+      .steps-grid {
+        gap: 2rem;
+      }
+      .step::after {
+        content: "↓";
+        right: auto;
+        top: auto;
+        bottom: -2rem;
+      }
+      .step:last-child::after {
+        content: "";
+      }
+    }
+
+    /* API Example */
+    .api-section {
+      background: rgba(99, 102, 241, 0.05);
+      border: 1px solid rgba(99, 102, 241, 0.1);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-top: 2rem;
+    }
+
+    .api-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #c084fc;
+      margin-bottom: 1rem;
+    }
+
+    .code-block {
+      background: rgba(10, 14, 39, 0.8);
+      border: 1px solid rgba(99, 102, 241, 0.2);
+      border-radius: 8px;
+      padding: 1.5rem;
+      overflow-x: auto;
+      font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #60a5fa;
+    }
+
+    .code-block code {
+      color: inherit;
+    }
+
+    /* Pricing Section */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .pricing-card {
+      padding: 2rem;
+      background: rgba(99, 102, 241, 0.08);
+      border: 2px solid rgba(192, 132, 252, 0.3);
+      border-radius: 12px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .pricing-card:hover {
+      border-color: #c084fc;
+      background: rgba(99, 102, 241, 0.12);
+      box-shadow: 0 12px 32px rgba(99, 102, 241, 0.2);
+      transform: translateY(-4px);
+    }
+
+    .pricing-title {
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #c084fc;
+    }
+
+    .pricing-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #c084fc 0%, #60a5fa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .pricing-desc {
+      font-size: 0.9rem;
+      color: #a0aec0;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Trust Badges */
+    .trust-section {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 2rem;
+      margin-top: 3rem;
+      flex-wrap: wrap;
+    }
+
+    .trust-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      color: #a0aec0;
+    }
+
+    .trust-badge-icon {
+      width: 48px;
+      height: 48px;
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(192, 132, 252, 0.3);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    /* Footer */
+    .footer {
+      padding: 3rem 2rem;
+      text-align: center;
+      border-top: 1px solid rgba(99, 102, 241, 0.1);
+      color: #a0aec0;
+      margin-top: 5rem;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      list-style: none;
+    }
+
+    .footer-links a {
+      color: #c084fc;
+      font-weight: 500;
+    }
+
+    .footer-links a:hover {
+      color: #f5f5f7;
+    }
+
+    .footer-text {
+      font-size: 0.9rem;
+    }
+
+    .footer-divider {
+      width: 40px;
+      height: 1px;
+      background: rgba(99, 102, 241, 0.2);
+      margin: 1.5rem auto;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      section {
+        padding: 3rem 1rem;
+      }
+      .section-title {
+        margin-bottom: 2rem;
+      }
+      .features-grid,
+      .pricing-grid {
+        grid-template-columns: 1fr;
+      }
+      .footer-links {
+        gap: 1rem;
+        font-size: 0.9rem;
+      }
+      .trust-section {
+        gap: 1rem;
+      }
+    }
+
+    /* Accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* Focus states for keyboard navigation */
+    button:focus-visible,
+    a:focus-visible {
+      outline: 2px solid #c084fc;
+      outline-offset: 2px;
+    }
+
+    /* Dark mode enhancements */
+    @media (prefers-color-scheme: dark) {
+      .code-block {
+        background: rgba(10, 14, 39, 0.95);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-logo">
+      ⚛️ <span>QuantumBeam</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how-it-works">How It Works</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-content">
+      <h1 class="hero-title">Catch fraud before it happens</h1>
+      <p class="hero-subtitle">
+        99.7% accuracy in under 50ms. Quantum-enhanced ML for real-time fraud detection that scales with your business.
+      </p>
+      <button class="cta-btn">Get Started Free</button>
+      <button class="cta-btn cta-btn-secondary">Request Demo</button>
+
+      <!-- Performance Stats -->
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value">99.7%</div>
+          <div class="stat-label">Accuracy</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">&lt;50ms</div>
+          <div class="stat-label">Latency</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">1000+ TPS</div>
+          <div class="stat-label">Throughput</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">Zero</div>
+          <div class="stat-label">False Negatives</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features" id="features">
+    <h2 class="section-title">Powerful Features</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🧠</div>
+        <h3 class="feature-title">Quantum-Enhanced ML</h3>
+        <p class="feature-desc">
+          Advanced quantum-inspired algorithms deliver unmatched pattern recognition for complex fraud schemes.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3 class="feature-title">Real-Time Scoring</h3>
+        <p class="feature-desc">
+          Sub-50ms risk assessment at every transaction point. Block threats before they execute.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3 class="feature-title">Ring Detection</h3>
+        <p class="feature-desc">
+          Identify coordinated fraud rings through advanced graph analysis and behavioral correlation.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3 class="feature-title">Behavioral Analytics</h3>
+        <p class="feature-desc">
+          Learn unique customer patterns and detect anomalies in real-time with adaptive intelligence.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔐</div>
+        <h3 class="feature-title">Graph Analysis</h3>
+        <p class="feature-desc">
+          Map transaction networks to uncover hidden relationships and sophisticated fraud networks.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📈</div>
+        <h3 class="feature-title">Transaction Intelligence</h3>
+        <p class="feature-desc">
+          Comprehensive transaction intelligence dashboard with explainable AI for every decision.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section id="how-it-works">
+    <h2 class="section-title">How It Works</h2>
+    <div class="how-it-works">
+      <div class="steps-grid">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-title">Ingest</div>
+          <p class="step-desc">
+            Stream transactions in real-time through our low-latency API. Support for batch and live ingestion.
+          </p>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-title">Analyze</div>
+          <p class="step-desc">
+            Quantum ML engine processes transactions against 100+ behavioral signals and risk indicators.
+          </p>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-title">Block</div>
+          <p class="step-desc">
+            Receive risk scores and take immediate action. Rules-based or ML-driven decision orchestration.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Example -->
+    <div class="api-section">
+      <div class="api-title">API Example</div>
+      <div class="code-block">
+        <code>
+curl -X POST https://api.quantumbeam.io/v1/score \<br>
+  -H "Authorization: Bearer YOUR_API_KEY" \<br>
+  -H "Content-Type: application/json" \<br>
+  -d '{<br>
+    "transaction_id": "txn_abc123",<br>
+    "amount": 2500.00,<br>
+    "currency": "USD",<br>
+    "user_id": "user_456",<br>
+    "timestamp": "2026-03-20T14:30:00Z",<br>
+    "merchant_id": "mrch_789",<br>
+    "ip_address": "192.0.2.1",<br>
+    "device_fingerprint": "d4f3c8a1b2e9"<br>
+  }'<br>
+<br>
+# Response (10–30ms)<br>
+{<br>
+  "risk_score": 0.12,<br>
+  "risk_level": "LOW",<br>
+  "decision": "APPROVE",<br>
+  "signals": ["velocity_ok", "device_trusted"],<br>
+  "processing_time_ms": 18<br>
+}
+        </code>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Section -->
+  <section class="pricing" id="pricing">
+    <h2 class="section-title">Usage-Based Pricing</h2>
+    <p style="text-align: center; color: #a0aec0; margin-bottom: 2rem;">
+      Scale from startup to enterprise. No setup fees. Pay only for transactions evaluated.
+    </p>
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <h3 class="pricing-title">Standard</h3>
+        <div class="pricing-value">$0.01–$0.05</div>
+        <p class="pricing-desc">per transaction</p>
+        <p style="font-size: 0.9rem; color: #a0aec0; margin-bottom: 1.5rem;">
+          Risk-based pricing. Higher risk transactions cost more. Perfect for growing businesses.
+        </p>
+        <button class="cta-btn">Get Started Free</button>
+      </div>
+      <div class="pricing-card">
+        <h3 class="pricing-title">Enterprise</h3>
+        <div class="pricing-value">Custom</div>
+        <p class="pricing-desc">dedicated infrastructure</p>
+        <p style="font-size: 0.9rem; color: #a0aec0; margin-bottom: 1.5rem;">
+          Volume discounts, SLA guarantees, priority support, and custom model training.
+        </p>
+        <button class="cta-btn">Contact Sales</button>
+      </div>
+      <div class="pricing-card">
+        <h3 class="pricing-title">Self-Hosted</h3>
+        <div class="pricing-value">License</div>
+        <p class="pricing-desc">on-premises</p>
+        <p style="font-size: 0.9rem; color: #a0aec0; margin-bottom: 1.5rem;">
+          Deploy within your infrastructure. Full customization and integration control.
+        </p>
+        <button class="cta-btn">Request Demo</button>
+      </div>
+    </div>
+
+    <!-- Trust Badges -->
+    <div class="trust-section">
+      <div class="trust-badge">
+        <div class="trust-badge-icon">🔐</div>
+        <span>SOC 2 Type II</span>
+      </div>
+      <div class="trust-badge">
+        <div class="trust-badge-icon">💳</div>
+        <span>PCI DSS Level 1</span>
+      </div>
+      <div class="trust-badge">
+        <div class="trust-badge-icon">🌍</div>
+        <span>GDPR Compliant</span>
+      </div>
+      <div class="trust-badge">
+        <div class="trust-badge-icon">✅</div>
+        <span>ISO 27001</span>
+      </div>
+      <div class="trust-badge">
+        <div class="trust-badge-icon">🔍</div>
+        <span>99.99% Uptime SLA</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer" id="contact">
+    <ul class="footer-links">
+      <li><a href="#docs">Documentation</a></li>
+      <li><a href="#api">API Reference</a></li>
+      <li><a href="#status">Status</a></li>
+      <li><a href="#privacy">Privacy</a></li>
+      <li><a href="#security">Security</a></li>
+    </ul>
+    <div class="footer-divider"></div>
+    <p class="footer-text">
+      © 2026 QuantumBeam. Fraud detection at lightspeed. <br>
+      Built for the future of fintech.
+    </p>
+  </footer>
+</body>
+</html>

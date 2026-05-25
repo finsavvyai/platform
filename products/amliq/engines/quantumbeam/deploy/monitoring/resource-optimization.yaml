@@ -1,0 +1,564 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: resource-optimization
+  namespace: monitoring
+  labels:
+    app: quantumbeam
+    component: optimization
+    type: resource-monitoring
+data:
+  resource-optimizer.py: |
+    #!/usr/bin/env python3
+    """
+    QuantumBeam Resource Optimization and Right-sizing Tool
+    Monitors resource usage and provides optimization recommendations
+    """
+
+    import os
+    import sys
+    import json
+    import time
+    import logging
+    import argparse
+    from datetime import datetime, timedelta
+    from typing import Dict, List, Optional, Tuple
+    from dataclasses import dataclass, asdict
+    from enum import Enum
+
+    import requests
+    import prometheus_client
+    from prometheus_client import CollectorRegistry, Gauge, Counter
+    import numpy as np
+    import pandas as pd
+    from kubernetes import client, config
+    from kubernetes.client import V1Pod, V1Container, V1ResourceRequirements
+
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger(__name__)
+
+    class ResourceType(Enum):
+        CPU = "cpu"
+        MEMORY = "memory"
+        STORAGE = "storage"
+        NETWORK = "network"
+
+    class OptimizationAction(Enum):
+        INCREASE = "increase"
+        DECREASE = "decrease"
+        MAINTAIN = "maintain"
+
+    @dataclass
+    class ResourceMetrics:
+        """Resource usage metrics"""
+        resource_type: ResourceType
+        current_value: float
+        average_value: float
+        p95_value: float
+        p99_value: float
+        peak_value: float
+        min_value: float
+        utilization_percentage: float
+        recommendation: Optional[str] = None
+        suggested_action: Optional[OptimizationAction] = None
+        suggested_value: Optional[float] = None
+        confidence: float = 0.0
+
+    @dataclass
+    class PodResourceProfile:
+        """Pod resource usage profile"""
+        pod_name: str
+        namespace: str
+        container_name: str
+        current_requests: Dict[str, float]
+        current_limits: Dict[str, float]
+        metrics: Dict[ResourceType, ResourceMetrics]
+        optimization_score: float = 0.0
+        potential_savings: float = 0.0
+        last_optimized: Optional[datetime] = None
+
+    @dataclass
+    class OptimizationRecommendation:
+        """Resource optimization recommendation"""
+        pod_name: str
+        container_name: str
+        resource_type: ResourceType
+        current_value: float
+        recommended_value: float
+        action: OptimizationAction
+        reason: str
+        confidence: float
+        estimated_savings: float
+        implementation_priority: str
+
+    class ResourceOptimizer:
+        """Resource optimization and right-sizing engine"""
+
+        def __init__(self, prometheus_url: str = "http://prometheus.monitoring.svc.cluster.local:9090"):
+            self.prometheus_url = prometheus_url
+            self.k8s_client = self._init_k8s_client()
+            self.registry = CollectorRegistry()
+            self._setup_metrics()
+
+            # Configuration
+            self.config = {
+                "cpu_threshold": {
+                    "underutilized": 20.0,    # %
+                    "overutilized": 80.0,     # %
+                    "optimal_range": (40.0, 70.0),  # %
+                },
+                "memory_threshold": {
+                    "underutilized": 30.0,   # %
+                    "overutilized": 85.0,    # %
+                    "optimal_range": (50.0, 75.0),  # %
+                },
+                "data_retention_days": 30,
+                "analysis_window_hours": 24,
+                "min_confidence": 0.7,
+                "optimization_cooldown_hours": 24
+            }
+
+        def _init_k8s_client(self) -> client.CoreV1Api:
+            """Initialize Kubernetes client"""
+            try:
+                config.load_incluster_config()
+                return client.CoreV1Api()
+            except config.ConfigException:
+                config.load_kube_config()
+                return client.CoreV1Api()
+
+        def _setup_metrics(self):
+            """Setup Prometheus metrics for optimization monitoring"""
+            self.metrics = {
+                "optimization_recommendations": Counter(
+                    "resource_optimization_recommendations_total",
+                    "Total number of resource optimization recommendations",
+                    ["resource_type", "action", "namespace"],
+                    registry=self.registry
+                ),
+                "optimization_score": Gauge(
+                    "resource_optimization_score",
+                    "Resource optimization score (0-100)",
+                    ["pod", "container", "namespace"],
+                    registry=self.registry
+                ),
+                "potential_savings": Gauge(
+                    "resource_optimization_potential_savings_usd",
+                    "Potential monthly cost savings from optimization",
+                    ["namespace", "resource_type"],
+                    registry=self.registry
+                )
+            }
+
+        def query_prometheus(self, query: str) -> Dict:
+            """Execute Prometheus query"""
+            try:
+                response = requests.get(
+                    f"{self.prometheus_url}/api/v1/query",
+                    params={"query": query, "time": int(time.time())}
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("data", {}).get("result", [])
+            except Exception as e:
+                logger.error(f"Error querying Prometheus: {e}")
+                return {}
+
+        def get_container_metrics(self, pod_name: str, namespace: str, container_name: str,
+                                window_hours: int = 24) -> Dict[ResourceType, ResourceMetrics]:
+            """Get metrics for a specific container"""
+            metrics = {}
+
+            # CPU metrics
+            cpu_query = f"""
+            quantile_over_time(0.95, rate(container_cpu_usage_seconds_total{{pod="{pod_name}",namespace="{namespace}",container="{container_name}"}}[{window_hours}h]))
+            * 100
+            """
+            cpu_result = self.query_prometheus(cpu_query)
+            if cpu_result:
+                cpu_value = float(cpu_result[0]["value"][1])
+                metrics[ResourceType.CPU] = ResourceMetrics(
+                    resource_type=ResourceType.CPU,
+                    current_value=cpu_value,
+                    average_value=cpu_value,  # Simplified for this example
+                    p95_value=cpu_value,
+                    p99_value=cpu_value,
+                    peak_value=cpu_value,
+                    min_value=cpu_value,
+                    utilization_percentage=cpu_value
+                )
+
+            # Memory metrics
+            memory_query = f"""
+            quantile_over_time(0.95, container_memory_working_set_bytes{{pod="{pod_name}",namespace="{namespace}",container="{container_name}"}}[{window_hours}h]})
+            / container_spec_memory_limit_bytes{{pod="{pod_name}",namespace="{namespace}",container="{container_name}"}}
+            * 100
+            """
+            memory_result = self.query_prometheus(memory_query)
+            if memory_result:
+                memory_value = float(memory_result[0]["value"][1])
+                metrics[ResourceType.MEMORY] = ResourceMetrics(
+                    resource_type=ResourceType.MEMORY,
+                    current_value=memory_value,
+                    average_value=memory_value,
+                    p95_value=memory_value,
+                    p99_value=memory_value,
+                    peak_value=memory_value,
+                    min_value=memory_value,
+                    utilization_percentage=memory_value
+                )
+
+            return metrics
+
+        def get_pod_resource_requirements(self, pod_name: str, namespace: str) -> List[PodResourceProfile]:
+            """Get resource requirements for a pod"""
+            profiles = []
+
+            try:
+                pod = self.k8s_client.read_namespaced_pod(pod_name, namespace)
+
+                for container in pod.spec.containers:
+                    requests = {}
+                    limits = {}
+
+                    if container.resources:
+                        if container.resources.requests:
+                            if "cpu" in container.resources.requests:
+                                requests["cpu"] = self._parse_cpu(container.resources.requests["cpu"])
+                            if "memory" in container.resources.requests:
+                                requests["memory"] = self._parse_memory(container.resources.requests["memory"])
+
+                        if container.resources.limits:
+                            if "cpu" in container.resources.limits:
+                                limits["cpu"] = self._parse_cpu(container.resources.limits["cpu"])
+                            if "memory" in container.resources.limits:
+                                limits["memory"] = self._parse_memory(container.resources.limits["memory"])
+
+                    metrics = self.get_container_metrics(pod_name, namespace, container.name)
+
+                    profile = PodResourceProfile(
+                        pod_name=pod_name,
+                        namespace=namespace,
+                        container_name=container.name,
+                        current_requests=requests,
+                        current_limits=limits,
+                        metrics=metrics
+                    )
+
+                    profiles.append(profile)
+
+            except Exception as e:
+                logger.error(f"Error getting pod resource requirements for {pod_name}: {e}")
+
+            return profiles
+
+        def _parse_cpu(self, cpu_str: str) -> float:
+            """Parse CPU string to cores"""
+            if cpu_str.endswith("m"):
+                return float(cpu_str[:-1]) / 1000
+            return float(cpu_str)
+
+        def _parse_memory(self, memory_str: str) -> float:
+            """Parse memory string to MB"""
+            if memory_str.endswith("Ki"):
+                return float(memory_str[:-2]) / 1024
+            elif memory_str.endswith("Mi"):
+                return float(memory_str[:-2])
+            elif memory_str.endswith("Gi"):
+                return float(memory_str[:-2]) * 1024
+            return float(memory_str)
+
+        def analyze_resource_utilization(self, metrics: ResourceMetrics,
+                                         current_allocation: float) -> Tuple[OptimizationAction, float, str]:
+            """Analyze resource utilization and provide recommendation"""
+            thresholds = self.config[f"{metrics.resource_type.value}_threshold"]
+
+            if metrics.utilization_percentage < thresholds["underutilized"]:
+                action = OptimizationAction.DECREASE
+                suggested_value = current_allocation * 0.8  # Reduce by 20%
+                reason = f"Resource underutilized ({metrics.utilization_percentage:.1f}% < {thresholds['underutilized']}%)"
+                confidence = min(0.9, (thresholds["underutilized"] - metrics.utilization_percentage) / thresholds["underutilized"])
+
+            elif metrics.utilization_percentage > thresholds["overutilized"]:
+                action = OptimizationAction.INCREASE
+                suggested_value = current_allocation * 1.5  # Increase by 50%
+                reason = f"Resource overutilized ({metrics.utilization_percentage:.1f}% > {thresholds['overutilized']}%)"
+                confidence = min(0.9, (metrics.utilization_percentage - thresholds["overutilized"]) / (100 - thresholds["overutilized"]))
+
+            else:
+                action = OptimizationAction.MAINTAIN
+                suggested_value = current_allocation
+                reason = f"Resource utilization within optimal range ({thresholds['optimal_range'][0]}%-{thresholds['optimal_range'][1]}%)"
+                confidence = 0.8
+
+            return action, suggested_value, reason
+
+        def calculate_optimization_score(self, profile: PodResourceProfile) -> float:
+            """Calculate optimization score for a pod profile"""
+            total_score = 0
+            metrics_count = len(profile.metrics)
+
+            if metrics_count == 0:
+                return 0.0
+
+            for resource_type, metrics in profile.metrics.items():
+                # Score based on how close utilization is to optimal range
+                thresholds = self.config[f"{resource_type.value}_threshold"]
+                optimal_min, optimal_max = thresholds["optimal_range"]
+
+                if optimal_min <= metrics.utilization_percentage <= optimal_max:
+                    score = 100
+                elif metrics.utilization_percentage < optimal_min:
+                    score = 100 - (optimal_min - metrics.utilization_percentage)
+                else:
+                    score = 100 - (metrics.utilization_percentage - optimal_max)
+
+                total_score += max(0, score)
+
+            return total_score / metrics_count
+
+        def calculate_potential_savings(self, profile: PodResourceProfile) -> float:
+            """Calculate potential cost savings from optimization"""
+            # Simplified cost calculation - in production, integrate with your cloud provider's pricing
+            cpu_cost_per_core_month = 50  # Example: $50 per CPU core per month
+            memory_cost_per_gb_month = 10   # Example: $10 per GB per month
+
+            total_savings = 0.0
+
+            for resource_type, metrics in profile.metrics.items():
+                if metrics.suggested_action == OptimizationAction.DECREASE and metrics.suggested_value:
+                    current_allocation = profile.current_requests.get(resource_type.value, 0)
+                    if resource_type == ResourceType.CPU:
+                        savings = (current_allocation - metrics.suggested_value) * cpu_cost_per_core_month
+                    else:  # MEMORY
+                        savings = (current_allocation - metrics.suggested_value) * memory_cost_per_gb_month
+                    total_savings += savings
+
+            return total_savings
+
+        def generate_recommendations(self, profiles: List[PodResourceProfile]) -> List[OptimizationRecommendation]:
+            """Generate optimization recommendations"""
+            recommendations = []
+
+            for profile in profiles:
+                for resource_type, metrics in profile.metrics.items():
+                    if resource_type in profile.current_requests:
+                        current_allocation = profile.current_requests[resource_type]
+
+                        action, suggested_value, reason = self.analyze_resource_utilization(
+                            metrics, current_allocation
+                        )
+
+                        if action != OptimizationAction.MAINTAIN:
+                            estimated_savings = 0
+                            if action == OptimizationAction.DECREASE:
+                                if resource_type == ResourceType.CPU:
+                                    estimated_savings = (current_allocation - suggested_value) * 50  # $50 per core
+                                else:
+                                    estimated_savings = (current_allocation - suggested_value) * 10   # $10 per GB
+
+                            priority = "high" if metrics.confidence > 0.8 else "medium"
+
+                            recommendation = OptimizationRecommendation(
+                                pod_name=profile.pod_name,
+                                container_name=profile.container_name,
+                                resource_type=resource_type,
+                                current_value=current_allocation,
+                                recommended_value=suggested_value,
+                                action=action,
+                                reason=reason,
+                                confidence=metrics.confidence,
+                                estimated_savings=estimated_savings,
+                                implementation_priority=priority
+                            )
+                            recommendations.append(recommendation)
+
+            # Sort by priority and confidence
+            recommendations.sort(key=lambda x: (
+                0 if x.implementation_priority == "high" else 1,
+                -x.confidence
+            ))
+
+            return recommendations
+
+        def update_metrics(self, profiles: List[PodResourceProfile],
+                           recommendations: List[OptimizationRecommendation]):
+            """Update Prometheus metrics"""
+            for profile in profiles:
+                score = self.calculate_optimization_score(profile)
+                self.metrics["optimization_score"].labels(
+                    pod=profile.pod_name,
+                    container=profile.container_name,
+                    namespace=profile.namespace
+                ).set(score)
+
+            for rec in recommendations:
+                self.metrics["optimization_recommendations"].labels(
+                    resource_type=rec.resource_type.value,
+                    action=rec.action.value,
+                    namespace=profiles[0].namespace if profiles else "unknown"
+                ).inc()
+
+                self.metrics["potential_savings"].labels(
+                    namespace=profiles[0].namespace if profiles else "unknown",
+                    resource_type=rec.resource_type.value
+                ).inc(rec.estimated_savings)
+
+        def optimize_pods(self, namespace: str = None, dry_run: bool = True) -> Dict:
+            """Main optimization function"""
+            logger.info(f"Starting resource optimization (dry_run={dry_run})")
+
+            if namespace:
+                pods = self.k8s_client.list_namespaced_pod(namespace)
+            else:
+                pods = self.k8s_client.list_pod_for_all_namespaces()
+
+            profiles = []
+            for pod in pods.items:
+                if pod.status.phase == "Running":
+                    pod_profiles = self.get_pod_resource_requirements(pod.metadata.name, pod.metadata.namespace)
+                    profiles.extend(pod_profiles)
+
+            recommendations = self.generate_recommendations(profiles)
+
+            # Calculate total savings
+            total_savings = sum(rec.estimated_savings for rec in recommendations)
+
+            result = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "namespace": namespace,
+                "dry_run": dry_run,
+                "analyzed_pods": len(profiles),
+                "recommendations": [asdict(rec) for rec in recommendations],
+                "total_potential_savings": total_savings,
+                "optimization_scores": [
+                    {
+                        "pod": profile.pod_name,
+                        "container": profile.container_name,
+                        "score": self.calculate_optimization_score(profile)
+                    }
+                    for profile in profiles
+                ]
+            }
+
+            # Update metrics
+            self.update_metrics(profiles, recommendations)
+
+            # Apply recommendations if not dry run
+            if not dry_run and recommendations:
+                logger.info(f"Applying {len(recommendations)} optimization recommendations")
+                # Implementation would go here using Kubernetes API
+
+            return result
+
+        def generate_report(self, optimization_result: Dict) -> str:
+            """Generate optimization report"""
+            report = f"""
+    # QuantumBeam Resource Optimization Report
+    Generated: {optimization_result['timestamp']}
+    Namespace: {optimization_result.get('namespace', 'all')}
+    Dry Run: {optimization_result['dry_run']}
+
+    ## Summary
+    - Analyzed Pods: {optimization_result['analyzed_pods']}
+    - Recommendations: {len(optimization_result['recommendations'])}
+    - Potential Monthly Savings: ${optimization_result['total_potential_savings']:.2f}
+
+    ## Top Recommendations
+    """
+
+            for i, rec in enumerate(optimization_result['recommendations'][:10], 1):
+                report += f"""
+    {i}. **{rec['pod_name']}** ({rec['container_name']})
+       - Resource: {rec['resource_type'].value}
+       - Current: {rec['current_value']:.2f}
+       - Recommended: {rec['recommended_value']:.2f}
+       - Action: {rec['action'].value}
+       - Reason: {rec['reason']}
+       - Priority: {rec['implementation_priority']}
+       - Confidence: {rec['confidence']:.1%}
+       - Estimated Savings: ${rec['estimated_savings']:.2f}/month
+    """
+
+            return report
+
+    def run_optimization_cycle(self, namespace: str = None):
+        """Run a complete optimization cycle"""
+        logger.info("Starting resource optimization cycle")
+
+        # Optimize resources
+        result = self.optimize_pods(namespace, dry_run=True)
+
+        # Generate report
+        report = self.generate_report(result)
+
+        # Save report
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_file = f"/tmp/resource_optimization_report_{timestamp}.txt"
+
+        with open(report_file, "w") as f:
+            f.write(report)
+
+        logger.info(f"Optimization report saved to {report_file}")
+
+        return result
+
+    def start_monitoring_loop(self, interval_minutes: int = 60):
+        """Start continuous monitoring loop"""
+        logger.info(f"Starting resource optimization monitoring loop (interval: {interval_minutes} minutes)")
+
+        while True:
+            try:
+                self.run_optimization_cycle()
+                time.sleep(interval_minutes * 60)
+            except KeyboardInterrupt:
+                logger.info("Stopping optimization monitoring loop")
+                break
+            except Exception as e:
+                logger.error(f"Error in optimization loop: {e}")
+                time.sleep(60)  # Wait before retrying
+
+    def export_metrics(self) -> str:
+        """Export current metrics in Prometheus format"""
+        output = []
+        for metric_name, metric in self.metrics.items():
+            samples = metric._samples()
+            for sample in samples:
+                output.append(str(sample))
+        return "\n".join(output)
+
+    def main():
+        parser = argparse.ArgumentParser(description="QuantumBeam Resource Optimizer")
+        parser.add_argument("--namespace", help="Kubernetes namespace to analyze")
+        parser.add_argument("--dry-run", action="store_true", default=True,
+                           help="Only analyze, don't apply changes")
+        parser.add_argument("--prometheus-url", default="http://prometheus.monitoring.svc.cluster.local:9090",
+                           help="Prometheus server URL")
+        parser.add_argument("--output", help="Output file for results")
+        parser.add_argument("--monitor", action="store_true",
+                           help="Start continuous monitoring")
+        parser.add_argument("--interval", type=int, default=60,
+                           help="Monitoring interval in minutes")
+
+        args = parser.parse_args()
+
+        optimizer = ResourceOptimizer(args.prometheus_url)
+
+        if args.monitor:
+            optimizer.start_monitoring_loop(args.interval)
+        else:
+            result = optimizer.optimize_pods(args.namespace, args.dry_run)
+
+            if args.output:
+                with open(args.output, "w") as f:
+                    json.dump(result, f, indent=2, default=str)
+                logger.info(f"Results saved to {args.output}")
+            else:
+                print(json.dumps(result, indent=2, default=str))
+
+    if __name__ == "__main__":
+        main()

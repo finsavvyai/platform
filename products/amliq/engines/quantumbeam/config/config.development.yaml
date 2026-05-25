@@ -1,0 +1,278 @@
+# QuantumBeam Configuration - Development Environment
+# This file overrides base configuration for development
+
+# Environment Configuration
+environment:
+  name: "development"
+  debug: true
+  region: "us-east-1"
+  zone: "us-east-1a"
+  version: "1.0.0-dev"
+  build_time: ""
+  git_commit: ""
+  instance_id: "dev-001"
+  cluster_name: "development"
+
+# Server Configuration
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: "60s" # Longer timeouts for debugging
+  write_timeout: "60s"
+  idle_timeout: "120s"
+  shutdown_timeout: "10s"
+
+  tls:
+    enabled: false
+
+  cors:
+    allowed_origins: ["http://localhost:3000", "http://localhost:3001", "http://localhost:8080", "http://127.0.0.1:3000"]
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"]
+    allowed_headers: ["*"] # Allow all headers in development
+    exposed_headers: ["*"]
+    allow_credentials: true
+    max_age: 86400
+
+  limits:
+    max_header_bytes: 2097152 # 2MB
+    max_body_bytes: 20971520 # 20MB
+    max_conns_per_ip: 1000 # More permissive
+    max_conns_per_host: 5000
+    max_request_size: 20971520 # 20MB
+    max_file_upload_size: 104857600 # 100MB
+    request_timeout: "300s" # 5 minutes for debugging
+    read_header_timeout: "60s"
+
+# Database Configuration
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "password"
+  dbname: "quantumbeam_dev"
+  sslmode: "disable" # No SSL in development
+  max_connections: 10 # Fewer connections in development
+  min_connections: 2
+  max_idle_connections: 5
+  max_lifetime: "30m" # Shorter lifetime for development
+  max_idle_time: "10m"
+  connect_timeout: "5s"
+  query_timeout: "60s" # Longer timeouts for debugging
+  slow_query_threshold: "500ms" # Higher threshold for development
+  enable_query_logger: true # Enable query logging in development
+  migration_path: "./migrations"
+  seed_data_path: "./seeds"
+  connection_attempts: 5
+  connection_retry_wait: "2s"
+
+# Redis Configuration
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 1 # Use different DB for development
+  pool_size: 5
+  min_idle_conns: 1
+  max_retries: 5
+  dial_timeout: "10s"
+  read_timeout: "10s"
+  write_timeout: "10s"
+  pool_timeout: "10s"
+  idle_timeout: "10m"
+  idle_check_frequency: "30s"
+
+# Security Configuration
+security:
+  jwt:
+    secret: "development-secret-key-change-in-production-32-chars"
+    access_expiration: "1h" # Longer expiration for development
+    refresh_expiration: "24h"
+    issuer: "quantumbeam-dev"
+    algorithm: "HS256"
+    refresh_enabled: true
+    blacklist_enabled: false # Disable blacklist for easier debugging
+
+  password:
+    min_length: 6 # More lenient for development
+    require_uppercase: false
+    require_lowercase: false
+    require_numbers: false
+    require_special: false
+
+  rate_limit:
+    enabled: false # Disable rate limiting in development
+    global_limit: 10000
+    window: "1m"
+    burst_size: 1000
+    storage: "memory" # Use memory storage in development
+
+  session:
+    store: "memory" # Use memory store in development
+    secure: false
+    same_site: "Lax"
+
+  api_key:
+    default_rate_limit_per_minute: 10000 # High limits in development
+    default_rate_limit_per_hour: 1000000
+    require_approval: false
+    auto_cleanup_expired: false
+
+  web_security:
+    csp_enabled: false # Disable CSP in development
+    hsts_max_age: 0 # Disable HSTS in development
+    hsts_include_subdomains: false
+    trusted_proxies: ["127.0.0.1", "::1"]
+
+# AI/ML Configuration
+ai:
+  enabled: true
+  provider: "mock" # Use mock provider in development
+  model: "mock-gpt-4"
+  api_key: "mock-key"
+  timeout: "60s"
+  max_tokens: 1024 # Lower tokens for development
+  confidence_threshold: 0.5 # Lower threshold for testing
+  cache_enabled: false # Disable cache in development
+
+# Quantum Computing Configuration
+quantum:
+  enabled: false # Disabled in development
+  provider: "mock"
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+
+  metrics:
+    enabled: true
+    port: 9090
+    sample_rate: 1.0 # Sample everything in development
+
+  tracing:
+    enabled: true
+    sample_rate: 1.0 # Sample everything in development
+    provider: "jaeger"
+    endpoint: "http://localhost:14268/api/traces"
+
+  health_check:
+    enabled: true
+    port: 8081
+
+  profiling:
+    enabled: true # Enable profiling in development
+    port: 6060
+    sample_rate: 1.0
+
+# Logging Configuration
+logging:
+  level: "debug" # Debug level in development
+  format: "console" # Console format for development
+  output: ["stdout"]
+
+  console:
+    enabled: true
+    no_color: false
+    time_format: "15:04:05" # Shorter time format
+    min_width: 120
+
+  structured: false # Simpler logging in development
+  fields: ["time", "level", "msg"]
+
+# Feature Flags Configuration
+features:
+  fraud_detection:
+    enabled: true
+    percentage: 100
+
+  ai_analysis:
+    enabled: true
+    percentage: 100
+
+  quantum_analysis:
+    enabled: false
+    percentage: 0
+
+  advanced_analytics:
+    enabled: true
+    percentage: 100
+
+  real_time_monitoring:
+    enabled: true
+    percentage: 100
+
+  multi_currency:
+    enabled: true
+    percentage: 100
+
+  batch_processing:
+    enabled: true
+    percentage: 100
+
+  webhooks:
+    enabled: false # Disable webhooks in development
+    percentage: 0
+
+  audit_logging:
+    enabled: true
+    percentage: 100
+
+  data_export:
+    enabled: true
+    percentage: 100
+
+# External Services Configuration
+external_services:
+  notifications:
+    enabled: false # Disable external notifications in development
+
+  payment:
+    enabled: false # Disable payment in development
+
+  email_service:
+    enabled: false # Disable email service in development
+
+  sms_service:
+    enabled: false # Disable SMS service in development
+
+  storage:
+    enabled: false # Disable external storage in development
+
+  cdn:
+    enabled: false # Disable CDN in development
+
+# Rate Limiting Configuration
+rate_limiting:
+  global:
+    enabled: false # Disable rate limiting in development
+
+  users:
+    enabled: false
+
+  api_keys:
+    enabled: false
+
+  ips:
+    enabled: false
+
+# Cache Configuration
+cache:
+  enabled: true
+  provider: "memory" # Use memory cache in development
+  default_ttl: "10m" # Shorter TTL in development
+  max_entries: 1000
+
+# Webhook Configuration
+webhook:
+  enabled: false # Disable webhooks in development
+
+# Development-specific settings
+development:
+  auto_migrate: true
+  seed_data: true
+  mock_external_services: true
+  enable_debug_endpoints: true
+  show_sql_queries: true
+  enable_cors_all_origins: true
+  disable_authentication: false # Keep authentication enabled
+  test_data_generation: true
+  hot_reload: true

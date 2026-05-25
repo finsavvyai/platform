@@ -1,0 +1,199 @@
+# QuantumBeam Performance Testing Configuration
+# This file contains configuration for performance testing
+
+# General settings
+concurrent_users: 10
+test_duration: 5m
+ramp_up_period: 30s
+cool_down_period: 30s
+
+# Request settings
+requests_per_second: 100
+timeout: 30s
+retry_attempts: 3
+
+# Load patterns
+enable_spike_load: false
+spike_multiplier: 2.0
+spike_duration: 2m
+
+# Resource monitoring
+enable_profiling: true
+memory_profile_interval: 30s
+cpu_profile_interval: 30s
+
+# Output settings
+enable_verbose_logging: false
+output_format: "json"
+report_directory: "./reports"
+
+# Database settings
+enable_db_monitoring: true
+db_metrics_interval: 10s
+
+# Cache settings
+enable_cache_monitoring: true
+cache_metrics_interval: 10s
+
+# Target configuration
+target_url: "http://localhost:8080"
+environment: "development"
+
+# Database connection (for monitoring)
+database:
+  host: "localhost"
+  port: 5432
+  database: "quantumbeam_test"
+  username: "test_user"
+  password: "test_password"
+  ssl_mode: "disable"
+  max_connections: 20
+  max_idle_connections: 5
+  max_open_connections: 10
+  connection_max_lifetime: 1h
+
+# Redis connection (for monitoring)
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  database: 0
+  pool_size: 10
+  min_idle_connections: 3
+  max_retries: 3
+  read_timeout: 30s
+  write_timeout: 30s
+  pool_timeout: 30s
+
+# Scenarios configuration
+scenarios:
+  smoke_test:
+    weight: 100
+    timeout: 30s
+    retry_policy:
+      max_attempts: 2
+      backoff_type: "fixed"
+      base_delay: 500ms
+      max_delay: 2s
+
+  load_test:
+    weight: 100
+    timeout: 45s
+    retry_policy:
+      max_attempts: 3
+      backoff_type: "exponential"
+      base_delay: 1s
+      max_delay: 10s
+
+  stress_test:
+    weight: 100
+    timeout: 120s
+    retry_policy:
+      max_attempts: 1
+      backoff_type: "fixed"
+      base_delay: 5s
+      max_delay: 5s
+
+# Alerting thresholds
+thresholds:
+  response_time:
+    warning: 1000ms
+    critical: 5000ms
+  error_rate:
+    warning: 5%
+    critical: 20%
+  cpu_usage:
+    warning: 70%
+    critical: 90%
+  memory_usage:
+    warning: 1GB
+    critical: 4GB
+  disk_usage:
+    warning: 80%
+    critical: 95%
+
+# Custom headers for requests
+default_headers:
+  User-Agent: "QuantumBeam-Performance-Test/1.0"
+  Accept: "application/json"
+  Content-Type: "application/json"
+
+# Authentication settings (for protected endpoints)
+authentication:
+  type: "bearer"  # bearer, api_key, basic
+  token: "test-token-12345"
+  api_key: "test-api-key-67890"
+  username: "test_user"
+  password: "test_password"
+
+# Test data settings
+test_data:
+  users:
+    count: 100
+    prefix: "testuser"
+    domain: "example.com"
+  transactions:
+    count: 1000
+    amount_range:
+      min: 1.00
+      max: 10000.00
+    currencies: ["USD", "EUR", "GBP", "JPY"]
+  merchants:
+    count: 50
+    prefix: "merchant"
+
+# Performance profiling settings
+profiling:
+  cpu_profile: true
+  memory_profile: true
+  block_profile: true
+  goroutine_profile: true
+  trace_profile: true
+  profile_duration: 30s
+  profile_interval: 10s
+
+# Report generation settings
+reporting:
+  include_charts: true
+  include_detailed_metrics: true
+  include_error_analysis: true
+  include_resource_usage: true
+  chart_types: ["response_time", "throughput", "error_rate", "resource_usage"]
+  export_formats: ["json", "html"]
+
+# Notification settings
+notifications:
+  enabled: false
+  webhook_url: ""
+  slack_channel: ""
+  email_recipients: []
+  notify_on_completion: true
+  notify_on_failure: true
+
+# Integration settings
+integrations:
+  prometheus:
+    enabled: false
+    push_gateway: "http://localhost:9091"
+    job_name: "quantumbeam-performance-test"
+  grafana:
+    enabled: false
+    dashboard_url: ""
+    api_key: ""
+  datadog:
+    enabled: false
+    api_key: ""
+    app_key: ""
+    host: "quantumbeam-performance-test"
+
+# Advanced settings
+advanced:
+  connection_pooling: true
+  keep_alive: true
+  compression: true
+  follow_redirects: true
+  max_redirects: 5
+  skip_ssl_verification: true
+  dns_timeout: 30s
+  tls_timeout: 30s
+  connect_timeout: 30s

@@ -1,7 +1,7 @@
 {
   "name": "@finsavvyai/ai-gateway",
-  "version": "0.1.0",
-  "description": "AI gateway: provider routing, retries, semantic cache, model selection.",
+  "version": "0.2.0",
+  "description": "AI gateway: provider routing, retries, semantic cache, accounting, plus a Cloudflare-Workers-compatible edge transport (JWT, rate limiting, security headers, audit).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -9,14 +9,40 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./edge": {
+      "types": "./dist/edge/index.d.ts",
+      "import": "./dist/edge/index.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "dev": "wrangler dev --local",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:prod": "wrangler versions deploy --percentage 5 --env production"
   },
-  "files": ["dist", "README.md"],
-  "publishConfig": { "access": "restricted" }
+  "files": [
+    "dist",
+    "migrations",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "peerDependencies": {
+    "hono": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "hono": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "1.6.1",
+    "wrangler": "^3.90.0"
+  }
 }

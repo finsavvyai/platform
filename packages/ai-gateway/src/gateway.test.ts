@@ -1,64 +1,74 @@
-import { describe, expect, it, vi } from "vitest";
-import { InMemorySemanticCache } from "./cache.js";
+import { describe, expect, it } from "vitest";
+import { NoRouteError } from "./errors.js";
 import { AiGateway } from "./gateway.js";
-import type {
-  GatewayRequest,
-  ModelRef,
-  ProviderAdapter,
-} from "./types.js";
+import { baseReq, fastRef, frontierRef, mockAdapter } from "./test-fixtures.js";
 
-const ref: ModelRef = { provider: "anthropic", model: "claude-opus-4-7", tier: "frontier" };
-
-const req: GatewayRequest = {
-  tenantId: "t1",
-  prompt: "hi",
-  tier: "frontier",
-  maxTokens: 100,
-  cacheKey: "k1",
-};
-
-const okAdapter = (text = "ok"): ProviderAdapter => ({
-  ref,
-  complete: vi.fn(async () => ({
-    text,
-    promptTokens: 1,
-    completionTokens: 1,
-  })),
-});
-
-describe("AiGateway", () => {
+describe("AiGateway construction", () => {
   it("rejects empty adapter set", () => {
     expect(() => new AiGateway({ adapters: [] })).toThrow();
   });
+});
 
-  it("completes via adapter", async () => {
-    const g = new AiGateway({ adapters: [okAdapter("hello")] });
-    const res = await g.complete(req);
-    expect(res.text).toBe("hello");
+describe("AiGateway happy path", () => {
+  it("routes to tier match and returns tokens", async () => {
+    const g = new AiGateway({
+      adapters: [mockAdapter(fastRef), mockAdapter(frontierRef, "hi")],
+    });
+    const res = await g.complete(baseReq);
+    expect(res.text).toBe("hi");
     expect(res.cached).toBe(false);
     expect(res.attempts).toBe(1);
+    expect(res.inputTokens).toBe(10);
+    expect(res.outputTokens).toBe(20);
+    expect(res.model.provider).toBe("anthropic");
   });
 
-  it("retries on failure", async () => {
-    let calls = 0;
-    const adapter: ProviderAdapter = {
-      ref,
-      complete: vi.fn(async () => {
-        calls += 1;
-        if (calls < 2) throw new Error("flaky");
-        return { text: "ok", promptTokens: 1, completionTokens: 1 };
-      }),
-    };
-    const g = new AiGateway({ adapters: [adapter], maxAttempts: 3 });
-    const res = await g.complete(req);
-    expect(res.attempts).toBe(2);
+  it("routes by explicit model name", async () => {
+    const a = mockAdapter(fastRef, "fast");
+    const b = mockAdapter(
+      { ...fastRef, model: "gpt-4o", costPer1kInput: 2.5 },
+      "big",
+    );
+    const g = new AiGateway({ adapters: [a, b] });
+    const res = await g.complete({ ...baseReq, tier: "fast", model: "gpt-4o" });
+    expect(res.text).toBe("big");
+  });
+});
+
+describe("AiGateway routing errors", () => {
+  it("NoRouteError when no tier matches", async () => {
+    const g = new AiGateway({ adapters: [mockAdapter(fastRef)] });
+    await expect(g.complete(baseReq)).rejects.toBeInstanceOf(NoRouteError);
   });
 
-  it("returns cached response", async () => {
-    const cache = new InMemorySemanticCache();
-    const g = new AiGateway({ adapters: [okAdapter("first")], cache });
-    await g.complete(req);
-    const res = await g.complete(req);
-    expect(res.cached).toBe(true);
+  it("NoRouteError when explicit model not found", async () => {
+    const g = new AiGateway({ adapters: [mockAdapter(fastRef)] });
+    await expect(
+      g.complete({ ...baseReq, tier: "fast", model: "ghost" }),
+    ).rejects.toBeInstanceOf(NoRouteError);
+  });
+
+  it("NoRouteError when policy cost cap excludes all", async () => {
+    const g = new AiGateway({
+      adapters: [mockAdapter(frontierRef)],
+      policy: { maxCostPer1kInput: 1 },
+    });
+    await expect(g.complete(baseReq)).rejects.toBeInstanceOf(NoRouteError);
+  });
+
+  it("NoRouteError when policy latency cap excludes all", async () => {
+    const g = new AiGateway({
+      adapters: [mockAdapter(frontierRef)],
+      policy: { maxLatencyMs: 100 },
+    });
+    await expect(g.complete(baseReq)).rejects.toBeInstanceOf(NoRouteError);
+  });
+
+  it("NoRouteError when preferProvider not in pool", async () => {
+    const g = new AiGateway({
+      adapters: [mockAdapter(frontierRef)],
+      policy: { preferProvider: "openai" },
+    });
+    await expect(g.complete(baseReq)).rejects.toBeInstanceOf(NoRouteError);
   });
 });

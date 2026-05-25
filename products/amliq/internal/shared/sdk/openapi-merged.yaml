@@ -1,0 +1,1709 @@
+openapi: 3.0.3
+info:
+  title: FinSavvy AI Platform API
+  version: 1.0.0
+  description: |
+    Unified API for the FinSavvy AI enterprise fintech platform.
+    Combines fraud detection, analytics, billing, ML retraining,
+    onboarding, compliance, webhook, and audit services.
+  contact:
+    name: FinSavvy AI Engineering
+    email: engineering@finsavvy.ai
+    url: https://docs.finsavvy.ai
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.finsavvy.ai/api/v1
+    description: Production
+  - url: https://sandbox.finsavvy.ai/api/v1
+    description: Sandbox
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Fraud Detection
+    description: Real-time transaction fraud analysis and scoring
+  - name: Analytics
+    description: Transaction, revenue, and customer analytics
+  - name: Billing
+    description: Subscription and payment management
+  - name: ML Retraining
+    description: ML model drift monitoring and retraining
+  - name: Onboarding
+    description: Tenant onboarding and sandbox provisioning
+  - name: Compliance
+    description: Regulatory compliance frameworks and reporting
+  - name: Webhooks
+    description: Webhook registration and delivery management
+  - name: Audit
+    description: Audit log querying and statistics
+
+paths:
+  # --- Fraud Detection ---
+  /fraud/analyze:
+    post:
+      operationId: analyzeFraudTransaction
+      summary: Analyze a single transaction for fraud
+      tags: [Fraud Detection]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionRequest"
+      responses:
+        "200":
+          description: Fraud analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FraudAnalysisResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /fraud/analyze/batch:
+    post:
+      operationId: analyzeFraudBatch
+      summary: Analyze a batch of transactions for fraud
+      tags: [Fraud Detection]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transactions]
+              properties:
+                transactions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TransactionRequest"
+                  maxItems: 100
+      responses:
+        "200":
+          description: Batch analysis results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FraudAnalysisResult"
+                  request_id:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /fraud/fraud-rings/detect:
+    post:
+      operationId: detectFraudRings
+      summary: Detect fraud ring patterns across transactions
+      tags: [Fraud Detection]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transaction_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                time_window_hours:
+                  type: integer
+                  default: 24
+      responses:
+        "200":
+          description: Detected fraud rings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FraudRing"
+                  request_id:
+                    type: string
+
+  /fraud/performance:
+    get:
+      operationId: getFraudPerformanceMetrics
+      summary: Get fraud engine performance metrics
+      tags: [Fraud Detection]
+      responses:
+        "200":
+          description: Performance metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metrics:
+                    $ref: "#/components/schemas/PerformanceMetrics"
+                  request_id:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /fraud/backends/status:
+    get:
+      operationId: getFraudBackendStatus
+      summary: Get processing backend availability status
+      tags: [Fraud Detection]
+      responses:
+        "200":
+          description: Backend status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    $ref: "#/components/schemas/BackendStatus"
+                  request_id:
+                    type: string
+
+  /fraud/routing/decision:
+    get:
+      operationId: getFraudRoutingDecision
+      summary: Get routing decision for given feature vector
+      tags: [Fraud Detection]
+      parameters:
+        - name: amount
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: risk_score
+          in: query
+          schema:
+            type: number
+            format: double
+      responses:
+        "200":
+          description: Routing decision
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  decision:
+                    $ref: "#/components/schemas/RoutingDecision"
+                  features:
+                    type: object
+                    additionalProperties:
+                      type: number
+
+  # --- Rules ---
+  /fraud/rules:
+    post:
+      operationId: createFraudRule
+      summary: Create a new fraud detection rule
+      tags: [Fraud Detection]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FraudRuleInput"
+      responses:
+        "201":
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FraudRule"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    get:
+      operationId: listFraudRules
+      summary: List fraud detection rules
+      tags: [Fraud Detection]
+      parameters:
+        - name: enabled
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: List of rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FraudRule"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+
+  /fraud/rules/{id}:
+    get:
+      operationId: getFraudRule
+      summary: Get a fraud rule by ID
+      tags: [Fraud Detection]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Rule details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FraudRule"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: updateFraudRule
+      summary: Update an existing fraud rule
+      tags: [Fraud Detection]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FraudRuleInput"
+      responses:
+        "200":
+          description: Rule updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FraudRule"
+    delete:
+      operationId: deleteFraudRule
+      summary: Delete a fraud rule
+      tags: [Fraud Detection]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "204":
+          description: Rule deleted
+
+  /fraud/rules/{id}/toggle:
+    patch:
+      operationId: toggleFraudRule
+      summary: Toggle a fraud rule enabled/disabled
+      tags: [Fraud Detection]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Rule toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FraudRule"
+
+  /fraud/rules/test:
+    post:
+      operationId: testFraudRule
+      summary: Dry-run a rule against sample data
+      tags: [Fraud Detection]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rule:
+                  $ref: "#/components/schemas/FraudRuleInput"
+                transaction:
+                  $ref: "#/components/schemas/TransactionRequest"
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matched:
+                    type: boolean
+                  score_adjustment:
+                    type: number
+
+  # --- ML Retraining ---
+  /ml/drift/report:
+    get:
+      operationId: getDriftReport
+      summary: Get current model drift report
+      tags: [ML Retraining]
+      responses:
+        "200":
+          description: Drift report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriftReport"
+
+  /ml/retrain/trigger:
+    post:
+      operationId: triggerModelRetrain
+      summary: Trigger an ML model retraining job
+      tags: [ML Retraining]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                model_id:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        "202":
+          description: Retraining job started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetrainJob"
+
+  /ml/retrain/jobs:
+    get:
+      operationId: listRetrainJobs
+      summary: List retraining jobs
+      tags: [ML Retraining]
+      responses:
+        "200":
+          description: List of retraining jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RetrainJob"
+
+  /ml/retrain/jobs/{job_id}:
+    get:
+      operationId: getRetrainJobStatus
+      summary: Get status of a retraining job
+      tags: [ML Retraining]
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetrainJob"
+
+  /ml/retrain/schedule:
+    get:
+      operationId: getRetrainSchedule
+      summary: Get automatic retraining schedule
+      tags: [ML Retraining]
+      responses:
+        "200":
+          description: Current schedule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetrainSchedule"
+    put:
+      operationId: updateRetrainSchedule
+      summary: Update automatic retraining schedule
+      tags: [ML Retraining]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetrainSchedule"
+      responses:
+        "200":
+          description: Schedule updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetrainSchedule"
+
+  # --- Onboarding ---
+  /onboarding/start:
+    post:
+      operationId: startOnboarding
+      summary: Start a new tenant onboarding session
+      tags: [Onboarding]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [company_name, email]
+              properties:
+                company_name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                plan:
+                  type: string
+                  enum: [starter, professional, enterprise]
+      responses:
+        "201":
+          description: Onboarding session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingSession"
+
+  /onboarding/{id}:
+    get:
+      operationId: getOnboardingSession
+      summary: Get onboarding session details
+      tags: [Onboarding]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingSession"
+
+  /onboarding/{id}/sandbox:
+    post:
+      operationId: provisionSandbox
+      summary: Provision a sandbox environment for the tenant
+      tags: [Onboarding]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "202":
+          description: Sandbox provisioning started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sandbox_url:
+                    type: string
+                    format: uri
+                  api_key:
+                    type: string
+                  status:
+                    type: string
+
+  /onboarding/analytics:
+    get:
+      operationId: getOnboardingAnalytics
+      summary: Get onboarding funnel analytics
+      tags: [Onboarding]
+      responses:
+        "200":
+          description: Onboarding analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_sessions:
+                    type: integer
+                  completion_rate:
+                    type: number
+                  avg_duration_minutes:
+                    type: number
+
+  # --- Compliance ---
+  /compliance/frameworks:
+    get:
+      operationId: listComplianceFrameworks
+      summary: List supported compliance frameworks
+      tags: [Compliance]
+      responses:
+        "200":
+          description: List of frameworks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  frameworks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ComplianceFramework"
+
+  /compliance/report:
+    get:
+      operationId: generateComplianceReport
+      summary: Generate a compliance status report
+      tags: [Compliance]
+      parameters:
+        - name: framework
+          in: query
+          schema:
+            type: string
+            enum: [pci_dss, soc2, gdpr, finra]
+      responses:
+        "200":
+          description: Compliance report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceReport"
+
+  /compliance/dashboard:
+    get:
+      operationId: getComplianceDashboard
+      summary: Get compliance dashboard summary
+      tags: [Compliance]
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  overall_score:
+                    type: number
+                  frameworks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ComplianceFramework"
+
+  # --- Analytics ---
+  /analytics/transactions:
+    get:
+      operationId: getTransactionAnalytics
+      summary: Get transaction analytics for a time range
+      tags: [Analytics]
+      parameters:
+        - name: start
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Transaction analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionAnalytics"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /analytics/transactions/summary:
+    get:
+      operationId: getTransactionSummary
+      summary: Get transaction summary statistics
+      tags: [Analytics]
+      responses:
+        "200":
+          description: Transaction summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_count:
+                    type: integer
+                  total_volume:
+                    type: number
+                  avg_amount:
+                    type: number
+                  fraud_rate:
+                    type: number
+
+  /analytics/transactions/trends:
+    get:
+      operationId: getTransactionTrends
+      summary: Get transaction trend data
+      tags: [Analytics]
+      parameters:
+        - name: interval
+          in: query
+          schema:
+            type: string
+            enum: [hour, day, week, month]
+            default: day
+        - name: periods
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+      responses:
+        "200":
+          description: Trend data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  interval:
+                    type: string
+                  data_points:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                        count:
+                          type: integer
+                        volume:
+                          type: number
+
+  /analytics/fraud:
+    get:
+      operationId: getFraudAnalytics
+      summary: Get fraud analytics for a time range
+      tags: [Analytics]
+      parameters:
+        - name: start
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Fraud analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_flagged:
+                    type: integer
+                  false_positive_rate:
+                    type: number
+                  top_patterns:
+                    type: array
+                    items:
+                      type: string
+
+  /analytics/revenue:
+    get:
+      operationId: getRevenueAnalytics
+      summary: Get revenue analytics for a time range
+      tags: [Analytics]
+      parameters:
+        - name: start
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Revenue analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_revenue:
+                    type: number
+                  mrr:
+                    type: number
+                  growth_rate:
+                    type: number
+
+  /analytics/revenue/forecast:
+    get:
+      operationId: getRevenueForecast
+      summary: Get revenue forecast
+      tags: [Analytics]
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 90
+      responses:
+        "200":
+          description: Revenue forecast
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  forecast_days:
+                    type: integer
+                  predicted_revenue:
+                    type: number
+                  confidence_interval:
+                    type: object
+                    properties:
+                      lower:
+                        type: number
+                      upper:
+                        type: number
+
+  /analytics/dashboard:
+    get:
+      operationId: getDashboardData
+      summary: Get unified dashboard data
+      tags: [Analytics]
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kpis:
+                    type: object
+                  charts:
+                    type: object
+                  alerts:
+                    type: array
+                    items:
+                      type: object
+
+  /analytics/reports/generate:
+    post:
+      operationId: generateAnalyticsReport
+      summary: Generate a custom analytics report
+      tags: [Analytics]
+      parameters:
+        - name: X-User-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+      responses:
+        "202":
+          description: Report generation started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  /analytics/reports/{id}:
+    get:
+      operationId: getAnalyticsReport
+      summary: Get a generated report by ID
+      tags: [Analytics]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Report details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /analytics/cohorts:
+    get:
+      operationId: listCohorts
+      summary: List customer cohorts
+      tags: [Analytics]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Cohort list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cohorts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        size:
+                          type: integer
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+
+  /analytics/forecast:
+    post:
+      operationId: generateForecast
+      summary: Generate a custom forecast
+      tags: [Analytics]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [metric, horizon_days]
+              properties:
+                metric:
+                  type: string
+                  enum: [revenue, transactions, fraud_rate]
+                horizon_days:
+                  type: integer
+                  minimum: 1
+                  maximum: 365
+                method:
+                  type: string
+                  enum: [arima, prophet, linear]
+      responses:
+        "200":
+          description: Forecast result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  metric:
+                    type: string
+                  data_points:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        value:
+                          type: number
+                        lower:
+                          type: number
+                        upper:
+                          type: number
+
+  # --- Billing ---
+  /billing/subscriptions:
+    get:
+      operationId: listSubscriptions
+      summary: List tenant subscriptions
+      tags: [Billing]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Subscription list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscriptions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Subscription"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+
+  /billing/invoices:
+    get:
+      operationId: listInvoices
+      summary: List invoices for the current tenant
+      tags: [Billing]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Invoice list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  invoices:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Invoice"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+
+  /billing/usage:
+    get:
+      operationId: getBillingUsage
+      summary: Get API usage metrics for billing
+      tags: [Billing]
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Usage data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  api_calls:
+                    type: integer
+                  transactions_analyzed:
+                    type: integer
+                  period_start:
+                    type: string
+                    format: date-time
+                  period_end:
+                    type: string
+                    format: date-time
+
+  # --- Webhooks ---
+  /webhooks:
+    post:
+      operationId: createWebhook
+      summary: Register a new webhook endpoint
+      tags: [Webhooks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookInput"
+      responses:
+        "201":
+          description: Webhook created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+    get:
+      operationId: listWebhooks
+      summary: List registered webhooks
+      tags: [Webhooks]
+      responses:
+        "200":
+          description: Webhook list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhooks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Webhook"
+
+  /webhooks/{id}:
+    delete:
+      operationId: deleteWebhook
+      summary: Remove a webhook registration
+      tags: [Webhooks]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "204":
+          description: Webhook deleted
+
+  # --- Audit ---
+  /audit/logs:
+    get:
+      operationId: listAuditLogs
+      summary: Query audit log entries
+      tags: [Audit]
+      parameters:
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: actor
+          in: query
+          schema:
+            type: string
+        - name: start
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEntry"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+
+  /audit/logs/stats:
+    get:
+      operationId: getAuditStats
+      summary: Get audit log summary statistics
+      tags: [Audit]
+      responses:
+        "200":
+          description: Audit statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_entries:
+                    type: integer
+                  entries_today:
+                    type: integer
+                  top_actions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        action:
+                          type: string
+                        count:
+                          type: integer
+
+  /audit/logs/{id}:
+    get:
+      operationId: getAuditEntry
+      summary: Get a single audit log entry
+      tags: [Audit]
+      parameters:
+        - $ref: "#/components/parameters/ResourceId"
+      responses:
+        "200":
+          description: Audit entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEntry"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # --- Health ---
+  /health:
+    get:
+      operationId: getHealthCheck
+      summary: Service health check
+      tags: [Fraud Detection]
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthCheck"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token (15 min expiry)
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Tenant-scoped API key
+
+  parameters:
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        has_more:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+        request_id:
+          type: string
+
+    HealthCheck:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        version:
+          type: string
+        uptime_seconds:
+          type: integer
+        services:
+          type: object
+          additionalProperties:
+            type: string
+
+    TransactionRequest:
+      type: object
+      required: [amount, currency]
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: double
+          minimum: 0
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        merchant_id:
+          type: string
+        customer_id:
+          type: string
+        card_hash:
+          type: string
+        ip_address:
+          type: string
+          format: ipv4
+        device_fingerprint:
+          type: string
+        location:
+          type: object
+          properties:
+            latitude:
+              type: number
+            longitude:
+              type: number
+            country:
+              type: string
+        features:
+          type: object
+          additionalProperties:
+            type: number
+        metadata:
+          type: object
+
+    FraudAnalysisResult:
+      type: object
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        risk_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        risk_level:
+          type: string
+          enum: [low, medium, high, critical]
+        recommendation:
+          type: string
+          enum: [approve, review, block]
+        processing_time_ms:
+          type: number
+        rules_triggered:
+          type: array
+          items:
+            type: string
+        request_id:
+          type: string
+
+    FraudRing:
+      type: object
+      properties:
+        ring_id:
+          type: string
+        confidence:
+          type: number
+        members:
+          type: array
+          items:
+            type: string
+        total_amount:
+          type: number
+        pattern:
+          type: string
+
+    PerformanceMetrics:
+      type: object
+      properties:
+        avg_latency_ms:
+          type: number
+        p99_latency_ms:
+          type: number
+        throughput_rps:
+          type: number
+        success_rate:
+          type: number
+        quantum_advantage:
+          type: number
+
+    BackendStatus:
+      type: object
+      properties:
+        available_backends:
+          type: integer
+        total_backends:
+          type: integer
+        system_health:
+          type: string
+          enum: [excellent, good, fair, poor]
+        average_queue_time:
+          type: number
+
+    RoutingDecision:
+      type: object
+      properties:
+        method:
+          type: string
+          enum: [quantum, classical, hybrid]
+        confidence:
+          type: number
+        reasoning:
+          type: string
+        expected_advantage:
+          type: number
+
+    FraudRuleInput:
+      type: object
+      required: [name, condition]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        condition:
+          type: string
+          description: Rule condition expression
+        score_adjustment:
+          type: number
+        enabled:
+          type: boolean
+          default: true
+
+    FraudRule:
+      allOf:
+        - $ref: "#/components/schemas/FraudRuleInput"
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    DriftReport:
+      type: object
+      properties:
+        model_id:
+          type: string
+        drift_detected:
+          type: boolean
+        drift_score:
+          type: number
+        features_drifted:
+          type: array
+          items:
+            type: string
+        recommendation:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+
+    RetrainJob:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        model_id:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        metrics:
+          type: object
+          properties:
+            accuracy:
+              type: number
+            precision:
+              type: number
+            recall:
+              type: number
+            f1_score:
+              type: number
+
+    RetrainSchedule:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        cron_expression:
+          type: string
+        drift_threshold:
+          type: number
+        last_run:
+          type: string
+          format: date-time
+        next_run:
+          type: string
+          format: date-time
+
+    OnboardingSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        company_name:
+          type: string
+        email:
+          type: string
+        plan:
+          type: string
+        current_step:
+          type: integer
+        total_steps:
+          type: integer
+        status:
+          type: string
+          enum: [in_progress, completed, abandoned]
+        created_at:
+          type: string
+          format: date-time
+
+    ComplianceFramework:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        score:
+          type: number
+        total_controls:
+          type: integer
+        passing_controls:
+          type: integer
+        status:
+          type: string
+          enum: [compliant, partial, non_compliant]
+
+    ComplianceReport:
+      type: object
+      properties:
+        framework:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        overall_score:
+          type: number
+        controls:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              status:
+                type: string
+              evidence_count:
+                type: integer
+
+    TransactionAnalytics:
+      type: object
+      properties:
+        total_transactions:
+          type: integer
+        total_volume:
+          type: number
+        avg_amount:
+          type: number
+        fraud_rate:
+          type: number
+        approval_rate:
+          type: number
+        period_start:
+          type: string
+          format: date-time
+        period_end:
+          type: string
+          format: date-time
+
+    ReportRequest:
+      type: object
+      required: [name, type, time_range]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        type:
+          type: string
+          enum: [transactions, fraud, revenue, compliance]
+        time_range:
+          type: object
+          required: [start, end]
+          properties:
+            start:
+              type: string
+              format: date-time
+            end:
+              type: string
+              format: date-time
+        filters:
+          type: object
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          enum: [pending, generating, completed, failed]
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        download_url:
+          type: string
+          format: uri
+
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+        plan:
+          type: string
+          enum: [starter, professional, enterprise]
+        status:
+          type: string
+          enum: [active, past_due, canceled, trialing]
+        current_period_start:
+          type: string
+          format: date-time
+        current_period_end:
+          type: string
+          format: date-time
+        amount:
+          type: number
+        currency:
+          type: string
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [draft, open, paid, void]
+        due_date:
+          type: string
+          format: date
+        pdf_url:
+          type: string
+          format: uri
+
+    WebhookInput:
+      type: object
+      required: [url, events]
+      properties:
+        url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              - fraud.detected
+              - fraud.cleared
+              - transaction.analyzed
+              - model.retrained
+              - compliance.alert
+        secret:
+          type: string
+
+    Webhook:
+      allOf:
+        - $ref: "#/components/schemas/WebhookInput"
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [active, disabled]
+            created_at:
+              type: string
+              format: date-time
+
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        actor:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        details:
+          type: object
+        ip_address:
+          type: string
+        timestamp:
+          type: string
+          format: date-time

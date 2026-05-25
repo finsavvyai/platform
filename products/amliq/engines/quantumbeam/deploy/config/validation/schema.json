@@ -1,0 +1,727 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QuantumBeam Configuration Schema",
+  "description": "Schema for validating QuantumBeam Kubernetes configuration values",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "environment": {
+          "type": "string",
+          "enum": ["development", "staging", "production"],
+          "description": "Deployment environment"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Kubernetes namespace"
+        },
+        "region": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "AWS region"
+        },
+        "imageRegistry": {
+          "type": "string",
+          "format": "hostname",
+          "description": "Container registry URL"
+        }
+      },
+      "required": ["environment", "namespace", "region"]
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "registry": {
+          "type": "string",
+          "format": "hostname",
+          "description": "Container registry"
+        },
+        "repository": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Image repository name"
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9._-]+$",
+          "description": "Image tag"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"],
+          "description": "Image pull policy"
+        }
+      },
+      "required": ["registry", "repository", "tag", "pullPolicy"]
+    },
+    "api": {
+      "type": "object",
+      "properties": {
+        "replicas": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Number of replicas"
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "pattern": "^[0-9]+m?$",
+                  "description": "CPU request"
+                },
+                "memory": {
+                  "type": "string",
+                  "pattern": "^[0-9]+[KMGT]i?$",
+                  "description": "Memory request"
+                }
+              },
+              "required": ["cpu", "memory"]
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "pattern": "^[0-9]+m?$",
+                  "description": "CPU limit"
+                },
+                "memory": {
+                  "type": "string",
+                  "pattern": "^[0-9]+[KMGT]i?$",
+                  "description": "Memory limit"
+                }
+              },
+              "required": ["cpu", "memory"]
+            }
+          },
+          "required": ["requests", "limits"]
+        },
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable autoscaling"
+            },
+            "minReplicas": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Minimum replicas"
+            },
+            "maxReplicas": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum replicas"
+            },
+            "targetCPUUtilizationPercentage": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Target CPU utilization percentage"
+            }
+          },
+          "required": ["enabled", "minReplicas", "maxReplicas"]
+        },
+        "healthChecks": {
+          "type": "object",
+          "properties": {
+            "livenessProbe": {
+              "type": "object",
+              "properties": {
+                "httpGet": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^/.*",
+                      "description": "Health check path"
+                    },
+                    "port": {
+                      "type": "string",
+                      "description": "Port name or number"
+                    }
+                  },
+                  "required": ["path", "port"]
+                },
+                "initialDelaySeconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Initial delay in seconds"
+                },
+                "periodSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Period in seconds"
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Timeout in seconds"
+                },
+                "failureThreshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Failure threshold"
+                }
+              },
+              "required": ["httpGet", "initialDelaySeconds", "periodSeconds", "timeoutSeconds", "failureThreshold"]
+            },
+            "readinessProbe": {
+              "type": "object",
+              "properties": {
+                "httpGet": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "pattern": "^/.*",
+                      "description": "Readiness check path"
+                    },
+                    "port": {
+                      "type": "string",
+                      "description": "Port name or number"
+                    }
+                  },
+                  "required": ["path", "port"]
+                },
+                "initialDelaySeconds": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Initial delay in seconds"
+                },
+                "periodSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Period in seconds"
+                },
+                "timeoutSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Timeout in seconds"
+                },
+                "failureThreshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Failure threshold"
+                }
+              },
+              "required": ["httpGet", "initialDelaySeconds", "periodSeconds", "timeoutSeconds", "failureThreshold"]
+            }
+          },
+          "required": ["livenessProbe", "readinessProbe"]
+        }
+      },
+      "required": ["replicas", "resources", "healthChecks"]
+    },
+    "database": {
+      "type": "object",
+      "properties": {
+        "postgres": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "type": "string",
+              "format": "hostname",
+              "description": "PostgreSQL host"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "PostgreSQL port"
+            },
+            "database": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_]+$",
+              "description": "Database name"
+            },
+            "username": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_]+$",
+              "description": "Database username"
+            },
+            "sslMode": {
+              "type": "string",
+              "enum": ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"],
+              "description": "SSL mode"
+            },
+            "maxConnections": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "description": "Maximum connections"
+            }
+          },
+          "required": ["host", "port", "database", "username", "sslMode", "maxConnections"]
+        },
+        "redis": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "type": "string",
+              "format": "hostname",
+              "description": "Redis host"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "Redis port"
+            },
+            "database": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 15,
+              "description": "Redis database number"
+            },
+            "maxConnections": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "description": "Maximum connections"
+            }
+          },
+          "required": ["host", "port", "database", "maxConnections"]
+        }
+      },
+      "required": ["postgres", "redis"]
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "prometheus": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Prometheus metrics"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "Metrics port"
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^/.*",
+              "description": "Metrics path"
+            },
+            "interval": {
+              "type": "string",
+              "pattern": "^[0-9]+[smh]$",
+              "description": "Scrape interval"
+            }
+          },
+          "required": ["enabled", "port", "path", "interval"]
+        },
+        "jaeger": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Jaeger tracing"
+            },
+            "endpoint": {
+              "type": "string",
+              "format": "uri",
+              "description": "Jaeger endpoint"
+            },
+            "serviceName": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$",
+              "description": "Service name"
+            },
+            "sampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Sampling rate"
+            }
+          },
+          "required": ["enabled", "endpoint", "serviceName", "sampleRate"]
+        }
+      },
+      "required": ["prometheus", "jaeger"]
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "rbac": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable RBAC"
+            },
+            "serviceAccount": {
+              "type": "object",
+              "properties": {
+                "create": {
+                  "type": "boolean",
+                  "description": "Create service account"
+                },
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]+$",
+                  "description": "Service account name"
+                }
+              },
+              "required": ["create", "name"]
+            }
+          },
+          "required": ["enabled", "serviceAccount"]
+        },
+        "podSecurityPolicy": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Pod Security Policy"
+            },
+            "allowPrivilegeEscalation": {
+              "type": "boolean",
+              "description": "Allow privilege escalation"
+            },
+            "readOnlyRootFilesystem": {
+              "type": "boolean",
+              "description": "Read-only root filesystem"
+            },
+            "runAsUser": {
+              "type": "object",
+              "properties": {
+                "rule": {
+                  "type": "string",
+                  "enum": ["RunAsAny", "MustRunAs", "MustRunAsNonRoot"],
+                  "description": "Run as user rule"
+                }
+              },
+              "required": ["rule"]
+            }
+          },
+          "required": ["enabled", "allowPrivilegeEscalation", "readOnlyRootFilesystem", "runAsUser"]
+        },
+        "networkPolicy": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Network Policy"
+            },
+            "ingress": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "ports": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "protocol": {
+                          "type": "string",
+                          "enum": ["TCP", "UDP", "SCTP"]
+                        },
+                        "port": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 65535
+                        }
+                      },
+                      "required": ["protocol", "port"]
+                    }
+                  }
+                }
+              }
+            },
+            "egress": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "to": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "ports": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "protocol": {
+                          "type": "string",
+                          "enum": ["TCP", "UDP", "SCTP"]
+                        },
+                        "port": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 65535
+                        }
+                      },
+                      "required": ["protocol", "port"]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": ["enabled"]
+        }
+      },
+      "required": ["rbac", "podSecurityPolicy", "networkPolicy"]
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "appConfig": {
+          "type": "object",
+          "properties": {
+            "environment": {
+              "type": "string",
+              "enum": ["development", "staging", "production"],
+              "description": "Application environment"
+            },
+            "logLevel": {
+              "type": "string",
+              "enum": ["debug", "info", "warn", "error", "fatal"],
+              "description": "Log level"
+            },
+            "debug": {
+              "type": "boolean",
+              "description": "Enable debug mode"
+            },
+            "featureFlags": {
+              "type": "object",
+              "properties": {
+                "quantumEnhancement": {
+                  "type": "boolean",
+                  "description": "Enable quantum enhancement features"
+                },
+                "mlModelV2": {
+                  "type": "boolean",
+                  "description": "Enable ML model v2"
+                },
+                "realTimeScoring": {
+                  "type": "boolean",
+                  "description": "Enable real-time scoring"
+                }
+              },
+              "required": ["quantumEnhancement", "mlModelV2", "realTimeScoring"]
+            },
+            "performance": {
+              "type": "object",
+              "properties": {
+                "maxRequestSize": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 104857600,
+                  "description": "Maximum request size in bytes"
+                },
+                "readBufferSize": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65536,
+                  "description": "Read buffer size"
+                },
+                "writeBufferSize": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65536,
+                  "description": "Write buffer size"
+                },
+                "timeout": {
+                  "type": "string",
+                  "pattern": "^[0-9]+[smh]$",
+                  "description": "Request timeout"
+                }
+              },
+              "required": ["maxRequestSize", "readBufferSize", "writeBufferSize", "timeout"]
+            }
+          },
+          "required": ["environment", "logLevel", "debug", "featureFlags", "performance"]
+        },
+        "secrets": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable external secrets"
+            },
+            "externalSecrets": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable external secrets operator"
+                },
+                "backend": {
+                  "type": "string",
+                  "enum": ["awsSecretsManager", "azureKeyVault", "gcpSecretManager", "vault"],
+                  "description": "Secrets backend"
+                },
+                "region": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9-]+$",
+                  "description": "Region for cloud secrets"
+                }
+              },
+              "required": ["enabled", "backend", "region"]
+            }
+          },
+          "required": ["enabled", "externalSecrets"]
+        }
+      },
+      "required": ["appConfig", "secrets"]
+    },
+    "backup": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable backups"
+        },
+        "schedule": {
+          "type": "string",
+          "pattern": "^[0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+$",
+          "description": "Cron schedule for backups"
+        },
+        "retention": {
+          "type": "string",
+          "pattern": "^[0-9]+[smhdwMy]$",
+          "description": "Backup retention period"
+        },
+        "s3": {
+          "type": "object",
+          "properties": {
+            "bucket": {
+              "type": "string",
+              "pattern": "^[a-z0-9.-]+$",
+              "description": "S3 bucket name"
+            },
+            "region": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]+$",
+              "description": "S3 bucket region"
+            },
+            "prefix": {
+              "type": "string",
+              "description": "S3 key prefix"
+            }
+          },
+          "required": ["bucket", "region", "prefix"]
+        },
+        "database": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable database backups"
+            },
+            "schedule": {
+              "type": "string",
+              "pattern": "^[0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+$",
+              "description": "Database backup schedule"
+            },
+            "compression": {
+              "type": "boolean",
+              "description": "Enable backup compression"
+            },
+            "encryption": {
+              "type": "boolean",
+              "description": "Enable backup encryption"
+            }
+          },
+          "required": ["enabled", "schedule", "compression", "encryption"]
+        }
+      },
+      "required": ["enabled", "schedule", "retention", "s3", "database"]
+    },
+    "compliance": {
+      "type": "object",
+      "properties": {
+        "auditLogging": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable audit logging"
+            },
+            "retention": {
+              "type": "string",
+              "pattern": "^[0-9]+[smhdwMy]$",
+              "description": "Audit log retention"
+            },
+            "includeRequestBody": {
+              "type": "boolean",
+              "description": "Include request body in logs"
+            },
+            "includeResponseBody": {
+              "type": "boolean",
+              "description": "Include response body in logs"
+            }
+          },
+          "required": ["enabled", "retention", "includeRequestBody", "includeResponseBody"]
+        },
+        "securityScanning": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable security scanning"
+            },
+            "schedule": {
+              "type": "string",
+              "pattern": "^[0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+$",
+              "description": "Security scan schedule"
+            },
+            "vulnerabilityThreshold": {
+              "type": "string",
+              "description": "Vulnerability threshold"
+            }
+          },
+          "required": ["enabled", "schedule", "vulnerabilityThreshold"]
+        },
+        "complianceReporting": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable compliance reporting"
+            },
+            "schedule": {
+              "type": "string",
+              "pattern": "^[0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+ [0-9*,-/]+$",
+              "description": "Compliance report schedule"
+            },
+            "frameworks": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["SOC2", "GDPR", "PCI-DSS", "HIPAA", "ISO27001"]
+              },
+              "description": "Compliance frameworks"
+            }
+          },
+          "required": ["enabled", "schedule", "frameworks"]
+        }
+      },
+      "required": ["auditLogging", "securityScanning", "complianceReporting"]
+    }
+  },
+  "required": ["global", "image", "api", "database", "monitoring", "security", "config", "backup", "compliance"]
+}

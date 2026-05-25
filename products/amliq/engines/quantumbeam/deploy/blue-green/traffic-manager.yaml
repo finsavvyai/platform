@@ -1,0 +1,405 @@
+apiVersion: argoproj.io/v1alpha1
+kind: RolloutManager
+metadata:
+  name: rollout-manager
+  namespace: argo-rollouts
+spec:
+  # No spec needed for default configuration
+---
+# Service Mesh Integration (Istio)
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: quantumbeam-api-virtualservice
+  namespace: quantumbeam
+spec:
+  hosts:
+  - api.quantumbeam.io
+  gateways:
+  - quantumbeam-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /api
+    fault:
+      delay:
+        percentage:
+          value: 0
+        fixedDelay: 0s
+    rewrite:
+      uri: /
+    route:
+    - destination:
+        host: quantumbeam-api-active
+        port:
+          number: 80
+      weight: 100
+    - destination:
+        host: quantumbeam-api-preview
+        port:
+          number: 80
+      weight: 0
+    retries:
+      attempts: 3
+      perTryTimeout: 5s
+      retryOn: "5xx,gateway-error,connect-failure,refused-stream"
+    timeout: 30s
+---
+# Istio Destination Rules
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: quantumbeam-api-destinationrule
+  namespace: quantumbeam
+spec:
+  host: quantumbeam-api-active
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        maxRequestsPerConnection: 10
+    circuitBreaker:
+      consecutiveErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+      minHealthPercent: 50
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: quantumbeam-api-preview-destinationrule
+  namespace: quantumbeam
+spec:
+  host: quantumbeam-api-preview
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_CONN
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http1MaxPendingRequests: 25
+        maxRequestsPerConnection: 5
+    circuitBreaker:
+      consecutiveErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+---
+# Traffic Splitting Configuration
+apiVersion: argoproj.io/v1alpha1
+kind: Experiment
+metadata:
+  name: quantumbeam-api-traffic-split
+  namespace: quantumbeam
+spec:
+  # Analysis templates to run during the experiment
+  analyses:
+  - name: success-rate
+    templateName: success-rate
+    args:
+    - name: service-name
+      value: quantumbeam-api-preview
+  - name: latency
+    templateName: latency
+    args:
+    - name: service-name
+      value: quantumbeam-api-preview
+  - name: error-rate
+    templateName: error-rate
+    args:
+    - name: service-name
+      value: quantumbeam-api-preview
+
+  # Duration of the experiment
+  duration: 10m
+
+  # Templates for analysis
+  templates:
+  - name: success-rate
+    templateRef:
+      name: success-rate
+    args:
+    - name: service-name
+      value: quantumbeam-api-preview
+
+  # Traffic routing
+  steps:
+  - setWeight: 10
+  - pause: {duration: 5m}
+  - setWeight: 25
+  - pause: {duration: 5m}
+  - setWeight: 50
+  - pause: {duration: 5m}
+  - setWeight: 75
+  - pause: {duration: 5m}
+  - setWeight: 100
+
+  # Service mesh traffic routing
+  apiVersion: argoproj.io/v1alpha1
+  kind: TrafficRouting
+  metadata:
+    name: istio
+  spec:
+    istio:
+      virtualService:
+        name: quantumbeam-api-virtualservice
+        routes:
+        - primary
+      destinationRule:
+        name: quantumbeam-api-destinationrule
+        stableSubsetName: stable
+        canarySubsetName: canary
+---
+# Monitoring ConfigMap for Blue-Green Deployments
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blue-green-monitoring
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    component: monitoring
+data:
+  prometheus-rules.yaml: |
+    groups:
+    - name: quantumbeam-blue-green
+      rules:
+      # Success rate monitoring
+      - alert: LowSuccessRate
+        expr: |
+          (
+            sum(rate(http_requests_total{service=~"quantumbeam-api-(active|preview)",status!~"5.."}[5m])) /
+            sum(rate(http_requests_total{service=~"quantumbeam-api-(active|preview)"}[5m]))
+          ) < 0.99
+        for: 2m
+        labels:
+          severity: warning
+          service: quantumbeam-api
+        annotations:
+          summary: "Low success rate detected"
+          description: "Success rate is {{ $value | humanizePercentage }} for {{ $labels.service }}"
+
+      # High error rate monitoring
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{service=~"quantumbeam-api-(active|preview)",status=~"5.."}[5m])) /
+            sum(rate(http_requests_total{service=~"quantumbeam-api-(active|preview)"}[5m]))
+          ) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          service: quantumbeam-api
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for {{ $labels.service }}"
+
+      # High latency monitoring
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{service=~"quantumbeam-api-(active|preview)"}[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: quantumbeam-api
+        annotations:
+          summary: "High latency detected"
+          description: "99th percentile latency is {{ $value }}s for {{ $labels.service }}"
+
+      # Deployment health monitoring
+      - alert: DeploymentUnhealthy
+        expr: |
+          up{job="kubernetes-pods",service=~"quantumbeam-api-(active|preview)"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: quantumbeam-api
+        annotations:
+          summary: "Deployment unhealthy"
+          description: "{{ $labels.service }} deployment is unhealthy"
+
+      # Replica count monitoring
+      - alert: LowReplicaCount
+        expr: |
+          kube_deployment_spec_replicas{deployment=~"quantumbeam-api"} != kube_deployment_status_replicas_ready{deployment=~"quantumbeam-api"}
+        for: 5m
+        labels:
+          severity: warning
+          service: quantumbeam-api
+        annotations:
+          summary: "Low replica count"
+          description: "Deployment {{ $labels.deployment }} has {{ $value }} replicas ready out of {{ $value }} desired"
+
+  grafana-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "QuantumBeam Blue-Green Deployment",
+        "tags": ["quantumbeam", "blue-green", "deployment"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "title": "Deployment Status",
+            "type": "stat",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "up{job=\"kubernetes-pods\",service=~\"quantumbeam-api-(active|preview)\"}",
+                "legendFormat": "{{service}}"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "mappings": [
+                  {
+                    "options": {
+                      "0": {"text": "DOWN", "color": "red"},
+                      "1": {"text": "UP", "color": "green"}
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "title": "Request Rate",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{service=~\"quantumbeam-api-(active|preview)\"}[5m])) by (service)",
+                "legendFormat": "{{service}}"
+              }
+            ]
+          },
+          {
+            "title": "Success Rate",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{service=~\"quantumbeam-api-(active|preview)\",status!~\"5..\"}[5m])) by (service) / sum(rate(http_requests_total{service=~\"quantumbeam-api-(active|preview)\"}[5m])) by (service)",
+                "legendFormat": "{{service}}"
+              }
+            ],
+            "yAxes": [
+              {"max": 1, "min": 0, "unit": "percentunit"}
+            ]
+          },
+          {
+            "title": "Response Time",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{service=~\"quantumbeam-api-(active|preview)\"}[5m])) by (le, service))",
+                "legendFormat": "{{service}} P99"
+              },
+              {
+                "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=~\"quantumbeam-api-(active|preview)\"}[5m])) by (le, service))",
+                "legendFormat": "{{service}} P95"
+              },
+              {
+                "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{service=~\"quantumbeam-api-(active|preview)\"}[5m])) by (le, service))",
+                "legendFormat": "{{service}} P50"
+              }
+            ]
+          },
+          {
+            "title": "Error Rate",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{service=~\"quantumbeam-api-(active|preview)\",status=~\"5..\"}[5m])) by (service) / sum(rate(http_requests_total{service=~\"quantumbeam-api-(active|preview)\"}[5m])) by (service)",
+                "legendFormat": "{{service}}"
+              }
+            ],
+            "yAxes": [
+              {"max": 1, "min": 0, "unit": "percentunit"}
+            ]
+          },
+          {
+            "title": "Replica Count",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+            "targets": [
+              {
+                "expr": "kube_deployment_status_replicas_ready{deployment=~\"quantumbeam-api.*\"}",
+                "legendFormat": "{{deployment}} ready"
+              },
+              {
+                "expr": "kube_deployment_spec_replicas{deployment=~\"quantumbeam-api.*\"}",
+                "legendFormat": "{{deployment}} desired"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: quantumbeam-api-metrics
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: quantumbeam-api
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    honorLabels: true
+---
+# Pod Monitor for detailed metrics
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: quantumbeam-api-pods
+  namespace: quantumbeam
+  labels:
+    app: quantumbeam-api
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: quantumbeam-api
+  namespaceSelector:
+    matchNamespaces:
+    - quantumbeam
+  podMetricsEndpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    honorLabels: true

@@ -1,0 +1,366 @@
+version: "3.8"
+
+# QuantumBeam.io - MinIO Cluster Configuration
+# This file sets up a production-ready MinIO cluster with erasure coding
+
+services:
+  # MinIO Node 1
+  minio-1:
+    image: minio/minio:latest
+    container_name: quantumbeam-minio-1
+    restart: unless-stopped
+    command: server --console-address ":9001" http://minio-1{9000...9003}/data{1...4} http://minio-2{9010...9013}/data{1...4} http://minio-3{9020...9023}/data{1...4} http://minio-4{9030...9033}/data{1...4}
+    environment:
+      MINIO_ROOT_USER: quantumbeamadmin
+      MINIO_ROOT_PASSWORD: quantumbeam_minio_secure_2024
+      MINIO_REGION: us-east-1
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
+      MINIO_SERVER_URL: http://localhost:9000
+      MINIO_STORAGE_CLASS_STANDARD: EC:4
+      MINIO_ERASURE_SET_DRIVE_COUNT: 4
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+      - "9002:9002"
+      - "9003:9003"
+    volumes:
+      - minio_1_data_1:/data1
+      - minio_1_data_2:/data2
+      - minio_1_data_3:/data3
+      - minio_1_data_4:/data4
+      - ./config/minio-config.json:/config.json:ro
+    networks:
+      - quantumbeam-minio-cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+
+  # MinIO Node 2
+  minio-2:
+    image: minio/minio:latest
+    container_name: quantumbeam-minio-2
+    restart: unless-stopped
+    command: server --console-address ":9011" http://minio-1{9000...9003}/data{1...4} http://minio-2{9010...9013}/data{1...4} http://minio-3{9020...9023}/data{1...4} http://minio-4{9030...9033}/data{1...4}
+    environment:
+      MINIO_ROOT_USER: quantumbeamadmin
+      MINIO_ROOT_PASSWORD: quantumbeam_minio_secure_2024
+      MINIO_REGION: us-east-1
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9011
+      MINIO_SERVER_URL: http://localhost:9010
+      MINIO_STORAGE_CLASS_STANDARD: EC:4
+      MINIO_ERASURE_SET_DRIVE_COUNT: 4
+    ports:
+      - "9010:9010"
+      - "9011:9011"
+      - "9012:9012"
+      - "9013:9013"
+    volumes:
+      - minio_2_data_1:/data1
+      - minio_2_data_2:/data2
+      - minio_2_data_3:/data3
+      - minio_2_data_4:/data4
+      - ./config/minio-config.json:/config.json:ro
+    networks:
+      - quantumbeam-minio-cluster
+    depends_on:
+      - minio-1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9010/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+
+  # MinIO Node 3
+  minio-3:
+    image: minio/minio:latest
+    container_name: quantumbeam-minio-3
+    restart: unless-stopped
+    command: server --console-address ":9021" http://minio-1{9000...9003}/data{1...4} http://minio-2{9010...9013}/data{1...4} http://minio-3{9020...9023}/data{1...4} http://minio-4{9030...9033}/data{1...4}
+    environment:
+      MINIO_ROOT_USER: quantumbeamadmin
+      MINIO_ROOT_PASSWORD: quantumbeam_minio_secure_2024
+      MINIO_REGION: us-east-1
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9021
+      MINIO_SERVER_URL: http://localhost:9020
+      MINIO_STORAGE_CLASS_STANDARD: EC:4
+      MINIO_ERASURE_SET_DRIVE_COUNT: 4
+    ports:
+      - "9020:9020"
+      - "9021:9021"
+      - "9022:9022"
+      - "9023:9023"
+    volumes:
+      - minio_3_data_1:/data1
+      - minio_3_data_2:/data2
+      - minio_3_data_3:/data3
+      - minio_3_data_4:/data4
+      - ./config/minio-config.json:/config.json:ro
+    networks:
+      - quantumbeam-minio-cluster
+    depends_on:
+      - minio-1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9020/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+
+  # MinIO Node 4
+  minio-4:
+    image: minio/minio:latest
+    container_name: quantumbeam-minio-4
+    restart: unless-stopped
+    command: server --console-address ":9031" http://minio-1{9000...9003}/data{1...4} http://minio-2{9010...9013}/data{1...4} http://minio-3{9020...9023}/data{1...4} http://minio-4{9030...9033}/data{1...4}
+    environment:
+      MINIO_ROOT_USER: quantumbeamadmin
+      MINIO_ROOT_PASSWORD: quantumbeam_minio_secure_2024
+      MINIO_REGION: us-east-1
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9031
+      MINIO_SERVER_URL: http://localhost:9030
+      MINIO_STORAGE_CLASS_STANDARD: EC:4
+      MINIO_ERASURE_SET_DRIVE_COUNT: 4
+    ports:
+      - "9030:9030"
+      - "9031:9031"
+      - "9032:9032"
+      - "9033:9033"
+    volumes:
+      - minio_4_data_1:/data1
+      - minio_4_data_2:/data2
+      - minio_4_data_3:/data3
+      - minio_4_data_4:/data4
+      - ./config/minio-config.json:/config.json:ro
+    networks:
+      - quantumbeam-minio-cluster
+    depends_on:
+      - minio-1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9030/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+
+  # MinIO Load Balancer (Nginx)
+  minio-lb:
+    image: nginx:alpine
+    container_name: quantumbeam-minio-lb
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./config/nginx-minio.conf:/etc/nginx/nginx.conf:ro
+      - minio_lb_logs:/var/log/nginx
+    networks:
+      - quantumbeam-minio-cluster
+    depends_on:
+      - minio-1
+      - minio-2
+      - minio-3
+      - minio-4
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost/minio/health/live || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # MinIO Client for Setup
+  minio-setup:
+    image: minio/mc:latest
+    container_name: quantumbeam-minio-setup
+    restart: "no"
+    environment:
+      MC_HOST_cluster1: http://quantumbeamadmin:quantumbeam_minio_secure_2024@minio-1:9000
+    depends_on:
+      minio-1:
+        condition: service_healthy
+      minio-2:
+        condition: service_healthy
+      minio-3:
+        condition: service_healthy
+      minio-4:
+        condition: service_healthy
+    networks:
+      - quantumbeam-minio-cluster
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO cluster to be ready...';
+      sleep 30;
+
+      echo 'Creating initial buckets...';
+      mc mb cluster1/quantumbeam-documents 2>/dev/null || true;
+      mc mb cluster1/quantumbeam-models 2>/dev/null || true;
+      mc mb cluster1/quantumbeam-backups 2>/dev/null || true;
+      mc mb cluster1/quantumbeam-logs 2>/dev/null || true;
+      mc mb cluster1/quantumbeam-temp 2>/dev/null || true;
+      mc mb cluster1/fraud-reports 2>/dev/null || true;
+      mc mb cluster1/ml-models 2>/dev/null || true;
+      mc mb cluster1/quantum-models 2>/dev/null || true;
+      mc mb cluster1/audit-logs 2>/dev/null || true;
+      mc mb cluster1/user-data 2>/dev/null || true;
+
+      echo 'Setting bucket policies...';
+      mc anonymous set download cluster1/quantumbeam-documents 2>/dev/null || true;
+
+      echo 'Setting up lifecycle policies...';
+      mc ilm rule add cluster1/quantumbeam-temp --expire-days 7 2>/dev/null || true;
+      mc ilm rule add cluster1/quantumbeam-logs --expire-days 90 2>/dev/null || true;
+      mc ilm rule add cluster1/quantumbeam-backups --expire-days 365 2>/dev/null || true;
+
+      echo 'MinIO cluster setup completed successfully!';
+      "
+
+  # MinIO Exporter (Prometheus metrics)
+  minio-exporter:
+    image: minio/exporter:latest
+    container_name: quantumbeam-minio-exporter
+    restart: unless-stopped
+    environment:
+      MINIO_ENDPOINT: minio-1:9000
+      MINIO_ACCESS_KEY: quantumbeamadmin
+      MINIO_SECRET_KEY: quantumbeam_minio_secure_2024
+      MINIO_EXPORTER_WEB_LISTEN_ADDRESS: :9000
+      MINIO_EXPORTER_WEB_TELEMETRY_PATH: /metrics
+      MINIO_EXPORTER_WEB_HEALTH_PATH: /health
+      MINIO_EXPORTER_LOG_LEVEL: info
+    ports:
+      - "9123:9000"
+    networks:
+      - quantumbeam-minio-cluster
+    depends_on:
+      minio-1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Prometheus for MinIO monitoring
+  prometheus-minio:
+    image: prom/prometheus:latest
+    container_name: quantumbeam-prometheus-minio
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus-minio.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/minio-rules.yml:/etc/prometheus/minio_rules.yml:ro
+      - prometheus_minio_data:/prometheus
+    networks:
+      - quantumbeam-minio-cluster
+    depends_on:
+      - minio-exporter
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Grafana for MinIO dashboards
+  grafana-minio:
+    image: grafana/grafana:latest
+    container_name: quantumbeam-grafana-minio
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: quantumbeam2024
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource,minio-datasource
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "http://localhost:3001"
+      GF_SMTP_ENABLED: "false"
+      GF_LOG_LEVEL: "info"
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_minio_data:/var/lib/grafana
+      - ./config/grafana-minio-provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana-minio-dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - quantumbeam-minio-cluster
+    depends_on:
+      - prometheus-minio
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# Network configuration
+networks:
+  quantumbeam-minio-cluster:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
+          gateway: 172.23.0.1
+
+# Volume configuration
+volumes:
+  # MinIO Node 1 data volumes
+  minio_1_data_1:
+    driver: local
+  minio_1_data_2:
+    driver: local
+  minio_1_data_3:
+    driver: local
+  minio_1_data_4:
+    driver: local
+
+  # MinIO Node 2 data volumes
+  minio_2_data_1:
+    driver: local
+  minio_2_data_2:
+    driver: local
+  minio_2_data_3:
+    driver: local
+  minio_2_data_4:
+    driver: local
+
+  # MinIO Node 3 data volumes
+  minio_3_data_1:
+    driver: local
+  minio_3_data_2:
+    driver: local
+  minio_3_data_3:
+    driver: local
+  minio_3_data_4:
+    driver: local
+
+  # MinIO Node 4 data volumes
+  minio_4_data_1:
+    driver: local
+  minio_4_data_2:
+    driver: local
+  minio_4_data_3:
+    driver: local
+  minio_4_data_4:
+    driver: local
+
+  # Monitoring volumes
+  minio_lb_logs:
+    driver: local
+  prometheus_minio_data:
+    driver: local
+  grafana_minio_data:
+    driver: local
+
+# Health check script (external)
+# Use with: docker-compose -f docker-compose.minio-cluster.yml up --healthcheck-interval 30s

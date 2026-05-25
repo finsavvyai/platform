@@ -1,0 +1,379 @@
+# Default values for QuantumBeam Fraud Detection Platform
+# This is a YAML-formatted file
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: "fast-ssd"
+  sharedStorageClass: "shared-storage"
+
+  # Common environment settings
+  environment: "production"
+  domain: "quantumbeam.io"
+
+  # Resource limits and requests
+  defaultResources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Image configuration
+image:
+  registry: docker.io
+  repository: quantumbeam
+  pullPolicy: Always
+  tag: "latest"
+
+# Service account configuration
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "quantumbeam"
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Container security context
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - ALL
+
+# API Server Configuration
+apiServer:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: quantumbeam/api
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/rate-limit: "100"
+    hosts:
+      - host: api.quantumbeam.io
+        paths:
+          - path: /v1
+            pathType: Prefix
+    tls:
+      - secretName: quantumbeam-api-tls
+        hosts:
+          - api.quantumbeam.io
+
+  config:
+    logLevel: "info"
+    ginMode: "release"
+    databaseUrl: "postgres://quantumbeam:password123@postgres-service:5432/quantumbeam?sslmode=require"
+    redisUrl: "redis://redis-service:6379"
+    quantumServiceUrl: "http://quantum-service:8001"
+    aiServiceUrl: "http://ai-ml-service:8001"
+    prometheusUrl: "http://prometheus-service:9090"
+
+  secrets:
+    jwtSecret: "super_secure_jwt_secret_change_in_production"
+    openaiApiKey: ""
+    anthropicApiKey: ""
+    lemonsqueezyApiKey: ""
+
+# Quantum Service Configuration
+quantumService:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: quantumbeam/quantum
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+
+  config:
+    logLevel: "info"
+    backendTimeout: "30s"
+    maxRetries: 3
+    circuitBreakerThreshold: 5
+
+  secrets:
+    ibmQuantumToken: ""
+    awsBraketAccessKey: ""
+    awsBraketSecretKey: ""
+
+  persistence:
+    enabled: true
+    storageClass: "shared-storage"
+    size: "50Gi"
+    accessMode: "ReadWriteMany"
+
+# AI/ML Service Configuration
+aiMlService:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: quantumbeam/ai-ml
+    tag: "latest"
+
+  service:
+    type: ClusterIP
+    port: 8001
+    targetPort: 8001
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+
+  config:
+    logLevel: "info"
+    modelTimeout: "60s"
+    maxConcurrentRequests: 10
+    cacheTtl: "3600s"
+
+  secrets:
+    openaiApiKey: ""
+    anthropicApiKey: ""
+    huggingfaceToken: ""
+
+  persistence:
+    enabled: true
+    storageClass: "shared-storage"
+    size: "200Gi"
+    accessMode: "ReadWriteMany"
+
+# Database Configuration (PostgreSQL)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "password123"
+    username: "quantumbeam"
+    password: "password123"
+    database: "quantumbeam"
+  primary:
+    persistence:
+      enabled: true
+      storageClass: "fast-ssd"
+      size: "100Gi"
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    service:
+      type: ClusterIP
+      ports:
+        postgresql: 5432
+
+# Redis Configuration
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      storageClass: "fast-ssd"
+      size: "10Gi"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  replica:
+    replicaCount: 0  # Disable replication for simplicity
+
+# Monitoring Configuration
+prometheus:
+  enabled: true
+  server:
+    enabled: true
+    replicaCount: 1
+    service:
+      type: ClusterIP
+      ports:
+        http: 9090
+    persistence:
+      enabled: true
+      storageClass: "fast-ssd"
+      size: "50Gi"
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    retention: "15d"
+
+  alertmanager:
+    enabled: true
+    replicaCount: 1
+    service:
+      type: ClusterIP
+      ports:
+        http: 9093
+    persistence:
+      enabled: true
+      size: "10Gi"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+grafana:
+  enabled: true
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 3000
+  persistence:
+    enabled: true
+    storageClass: "fast-ssd"
+    size: "10Gi"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  adminUser: admin
+  adminPassword: "admin123"
+  sidecar:
+    datasources:
+      enabled: true
+      label: grafana_datasource
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+
+# Ingress Configuration
+ingress-nginx:
+  enabled: false  # Set to true if you need to install ingress-nginx
+
+# Additional Configurations
+monitoring:
+  enabled: true
+  namespace: "monitoring"
+
+  prometheusRules:
+    enabled: true
+
+  grafanaDashboards:
+    enabled: true
+    defaultDashboards:
+      - quantumbeam-overview
+      - fraud-detection-metrics
+      - quantum-performance
+      - system-health
+
+security:
+  networkPolicy:
+    enabled: true
+  podSecurityPolicy:
+    enabled: false
+
+  tls:
+    enabled: true
+    issuer: "letsencrypt-prod"
+    secretName: "quantumbeam-tls"
+
+backup:
+  enabled: false
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+  storageClass: "fast-ssd"
+  storageSize: "100Gi"
+
+logging:
+  level: "info"
+  format: "json"
+  auditLog: true
+  correlationIds: true
+
+# Resource quotas for the namespace
+resourceQuota:
+  enabled: true
+  requests:
+    cpu: "10"
+    memory: "20Gi"
+  limits:
+    cpu: "20"
+    memory: "40Gi"
+
+# Pod disruption budgets
+podDisruptionBudget:
+  apiServer:
+    enabled: true
+    minAvailable: 2
+  quantumService:
+    enabled: true
+    minAvailable: 1
+  aiMlService:
+    enabled: true
+    minAvailable: 1

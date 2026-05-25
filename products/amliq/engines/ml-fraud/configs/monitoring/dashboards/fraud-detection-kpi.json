@@ -1,0 +1,708 @@
+{
+  "dashboard": {
+    "id": "quantumbeam-fraud-detection-kpi",
+    "title": "QuantumBeam Fraud Detection KPI",
+    "tags": ["quantumbeam", "fraud", "detection", "kpi"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "60s",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "timeRange",
+          "type": "custom",
+          "query": "1h,6h,24h,7d,30d",
+          "current": {
+            "selected": false,
+            "text": "24h",
+            "value": "24h"
+          },
+          "options": [
+            {
+              "selected": false,
+              "text": "1h",
+              "value": "1h"
+            },
+            {
+              "selected": true,
+              "text": "24h",
+              "value": "24h"
+            },
+            {
+              "selected": false,
+              "text": "7d",
+              "value": "7d"
+            },
+            {
+              "selected": false,
+              "text": "30d",
+              "value": "30d"
+            }
+          ]
+        }
+      ]
+    },
+    "panels": [
+      {
+        "title": "Fraud Detection Overview",
+        "type": "row",
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "collapsed": false
+      },
+      {
+        "title": "Total Transactions Processed",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 1
+        },
+        "targets": [
+          {
+            "expr": "sum(increase(fraud_detection_transactions_processed_total[$timeRange]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "center",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        }
+      },
+      {
+        "title": "Fraud Cases Detected",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 1
+        },
+        "targets": [
+          {
+            "expr": "sum(increase(fraud_detection_cases_detected_total[$timeRange]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 100
+                },
+                {
+                  "color": "red",
+                  "value": 1000
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "title": "Detection Accuracy",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 1
+        },
+        "targets": [
+          {
+            "expr": "avg(fraud_detection_accuracy_ratio[$timeRange])",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.8
+                },
+                {
+                  "color": "green",
+                  "value": 0.95
+                }
+              ]
+            },
+            "unit": "percentunit",
+            "max": 1,
+            "min": 0
+          }
+        }
+      },
+      {
+        "title": "Average Processing Time",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 1
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(fraud_detection_processing_duration_seconds_bucket[$timeRange]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.5
+                },
+                {
+                  "color": "red",
+                  "value": 2.0
+                }
+              ]
+            },
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "title": "Transaction Processing Volume",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 5
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(fraud_detection_transactions_processed_total[5m])) by (transaction_type)",
+            "legendFormat": "{{transaction_type}}",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(fraud_detection_cases_detected_total[5m])) by (fraud_type)",
+            "legendFormat": "Fraud: {{fraud_type}}",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Transactions per second"
+          }
+        ]
+      },
+      {
+        "title": "Detection Rate by Type",
+        "type": "piechart",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 5
+        },
+        "targets": [
+          {
+            "expr": "sum by (fraud_type) (increase(fraud_detection_cases_detected_total[$timeRange]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "title": "Performance Metrics",
+        "type": "row",
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 13
+        }
+      },
+      {
+        "title": "Processing Time Distribution",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 14
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(fraud_detection_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "P50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(fraud_detection_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(fraud_detection_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "P99",
+            "refId": "C"
+          },
+          {
+            "expr": "histogram_quantile(0.999, rate(fraud_detection_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "P99.9",
+            "refId": "D"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Processing Time (seconds)"
+          }
+        ]
+      },
+      {
+        "title": "Algorithm Performance",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 14
+        },
+        "targets": [
+          {
+            "expr": "avg(fraud_detection_algorithm_duration_seconds{algorithm!=\"\"}[$timeRange]) by (algorithm)",
+            "legendFormat": "{{algorithm}}",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(fraud_detection_algorithm_accuracy_ratio{algorithm!=\"\"}[$timeRange]) by (algorithm)",
+            "legendFormat": "{{algorithm}}",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(fraud_detection_algorithm_executions_total{algorithm!=\"\"}[$timeRange])) by (algorithm)",
+            "legendFormat": "{{algorithm}}",
+            "refId": "C"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "merge",
+            "options": {}
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "indexByName": {},
+              "renameByName": {
+                "algorithm": "Algorithm",
+                "Value #A": "Avg Duration (s)",
+                "Value #B": "Accuracy",
+                "Value #C": "Executions/sec"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            },
+            "mappings": []
+          }
+        }
+      },
+      {
+        "title": "ML Model Performance",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 22
+        },
+        "targets": [
+          {
+            "expr": "avg(fraud_detection_model_accuracy_ratio[$timeRange]) by (model_name, model_version)",
+            "legendFormat": "{{model_name}} v{{model_version}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Accuracy",
+            "max": 1,
+            "min": 0,
+            "unit": "percentunit"
+          }
+        ]
+      },
+      {
+        "title": "Quantum Algorithm Performance",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 22
+        },
+        "targets": [
+          {
+            "expr": "avg(quantum_algorithm_execution_time_seconds[$timeRange]) by (algorithm_name)",
+            "legendFormat": "{{algorithm_name}}",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(quantum_algorithm_success_probability[$timeRange]) by (algorithm_name)",
+            "legendFormat": "{{algorithm_name}} Success Rate",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Time (s) / Probability"
+          }
+        ]
+      },
+      {
+        "title": "Resource Utilization",
+        "type": "row",
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 30
+        }
+      },
+      {
+        "title": "GPU Utilization (AI/ML Service)",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 31
+        },
+        "targets": [
+          {
+            "expr": "avg(rate(nvidia_gpu_utilization_gpu{service=\"ai-ml-service\"}[5m])) by (gpu)",
+            "legendFormat": "GPU {{gpu}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "GPU Utilization (%)",
+            "max": 100,
+            "min": 0
+          }
+        ]
+      },
+      {
+        "title": "Memory Usage by Service",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 31
+        },
+        "targets": [
+          {
+            "expr": "avg(process_resident_memory_bytes{service=~\".*\"} / 1024 / 1024) by (service)",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Memory Usage (MB)"
+          }
+        ]
+      },
+      {
+        "title": "Database Performance",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 39
+        },
+        "targets": [
+          {
+            "expr": "rate(pg_stat_database_transactions_total{datname=\"quantumbeam\"}[5m])",
+            "legendFormat": "Transactions/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "avg(rate(pg_stat_activity_xact_commit{datname=\"quantumbeam\"}[5m]))",
+            "legendFormat": "Commits/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "avg(rate(pg_stat_activity_xact_rollback{datname=\"quantumbeam\"}[5m]))",
+            "legendFormat": "Rollbacks/sec",
+            "refId": "C"
+          }
+        ]
+      },
+      {
+        "title": "Cache Hit Rates",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 39
+        },
+        "targets": [
+          {
+            "expr": "rate(redis_keyspace_hits_total{service=\"fraud-detection\"}[5m]) / (rate(redis_keyspace_hits_total{service=\"fraud-detection\"}[5m]) + rate(redis_keyspace_misses_total{service=\"fraud-detection\"}[5m]))",
+            "legendFormat": "Redis Cache Hit Rate",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Hit Rate",
+            "max": 1,
+            "min": 0,
+            "unit": "percentunit"
+          }
+        ]
+      },
+      {
+        "title": "Business Impact",
+        "type": "row",
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 47
+        }
+      },
+      {
+        "title": "Fraud Prevention Value",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 0,
+          "y": 48
+        },
+        "targets": [
+          {
+            "expr": "sum(increase(fraud_detection_value_protected_usd[$timeRange]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 10000
+                },
+                {
+                  "color": "red",
+                  "value": 1000
+                }
+              ]
+            },
+            "unit": "currencyUSD"
+          }
+        }
+      },
+      {
+        "title": "False Positive Rate",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 8,
+          "y": 48
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(fraud_detection_false_positives_total[$timeRange])) / sum(rate(fraud_detection_predictions_total[$timeRange]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.05
+                },
+                {
+                  "color": "red",
+                  "value": 0.1
+                }
+              ]
+            },
+            "unit": "percentunit",
+            "max": 1,
+            "min": 0
+          }
+        }
+      },
+      {
+        "title": "Detection Coverage",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 16,
+          "y": 48
+        },
+        "targets": [
+          {
+            "expr": "sum(fraud_detection_coverage_ratio[$timeRange]) / count(fraud_detection_coverage_ratio[$timeRange])",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.8
+                },
+                {
+                  "color": "green",
+                  "value": 0.95
+                }
+              ]
+            },
+            "unit": "percentunit",
+            "max": 1,
+            "min": 0
+          }
+        }
+      },
+      {
+        "title": "Fraud Types Distribution (24h)",
+        "type": "bargauge",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 52
+        },
+        "targets": [
+          {
+            "expr": "topk(10, sum by (fraud_type) (increase(fraud_detection_cases_detected_total[24h])))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "unit": "short"
+          }
+        }
+      }
+    ]
+  }
+}
