@@ -77,6 +77,24 @@ export interface SearchAdapter {
   query(q: SearchAdapterQuery): Promise<SearchAdapterResult>;
 }
 
+export type SearchAdapterErrorCode =
+  | "bad_response"
+  | "network_error"
+  | "timeout"
+  | "upstream_error";
+
+export class SearchAdapterError extends Error {
+  readonly code: SearchAdapterErrorCode;
+  readonly status?: number;
+
+  constructor(code: SearchAdapterErrorCode, message: string, status?: number) {
+    super(message);
+    this.name = "SearchAdapterError";
+    this.code = code;
+    if (status !== undefined) this.status = status;
+  }
+}
+
 /** Stable error codes for the search endpoint. */
 export type SearchErrorCode =
   | "missing_query"

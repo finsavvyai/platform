@@ -100,6 +100,18 @@ describe("HMAC signer/verifier", () => {
     const s2 = createHmacSigner(Buffer.from(KEY, "utf8"));
     expect(s1.sign("h")).toBe(s2.sign("h"));
   });
+
+  it("createHmacVerifier accepts Buffer keys equivalently to string keys", () => {
+    // Covers sign.ts line 59 — typeof key === "string" ? ... : key
+    // else-branch in createHmacVerifier (Buffer-typed key path).
+    const signer = createHmacSigner(KEY);
+    const verifierString = createHmacVerifier(KEY);
+    const verifierBuffer = createHmacVerifier(Buffer.from(KEY, "utf8"));
+    const c = chainAppend(null, rec());
+    const signed = signRecord(c, signer);
+    expect(verifierString.verify(c.hash, signed.sig)).toBe(true);
+    expect(verifierBuffer.verify(c.hash, signed.sig)).toBe(true);
+  });
 });
 
 describe("hmacSignerFromEnv", () => {

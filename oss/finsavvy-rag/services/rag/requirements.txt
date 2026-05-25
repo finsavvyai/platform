@@ -1,3 +1,4 @@
+# Direct runtime deps
 fastapi>=0.111.0
 uvicorn>=0.30.0
 pydantic>=2.8.0
@@ -5,3 +6,26 @@ psycopg2-binary>=2.9.9
 SQLAlchemy>=2.0.30
 sentence-transformers>=2.7.0
 numpy>=1.26.0
+
+# --- Security pins (DEPS_AUDIT.md P1-P5; DEPS_REMEDIATION.md) ---
+# Transitive via sentence-transformers; pinned to address HIGH CVEs.
+
+# P4: filelock — CVE-2025-68146, CVE-2026-22701 (TOCTOU symlink → file truncation)
+# Patched in 3.20.3+; bump beyond audited 3.19.1.
+filelock>=3.20.3
+
+# P5: pillow — CVE-2026-25990, -40192, -42308..42311 (OOB write, decomp bomb, heap overflow)
+# Patched in 12.2.0+; bump beyond audited 11.3.0.
+pillow>=12.2.0
+
+# P1: transformers — CVE-2026-1839 (torch.load w/o weights_only → RCE on malicious checkpoint)
+# Patched in >=5.0.0rc3 (no stable yet). Floor at 4.57.6 (audited) and apply mitigation below.
+# P2: transformers — CVE-2025-14929 / PYSEC-2025-217 (X-CLIP checkpoint deserialization RCE)
+# NO UPSTREAM FIX. Constraint: only load checkpoints from an internal allow-list;
+# scan uploads before load; never load user-supplied checkpoints in v0.1.
+# See oss/finsavvy-rag/SECURITY.md (founder action item).
+transformers>=4.57.6,<5.0.0
+
+# P3: torch — PYSEC-2026-139 / CVE-2026-4538 (pt2 loader deserialization, UNFIXED)
+# Constraint: in-house loaders MUST pass weights_only=True; track upstream fix.
+torch>=2.8.0

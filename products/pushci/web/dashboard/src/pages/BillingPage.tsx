@@ -6,6 +6,7 @@ import BillingPromo from '../components/BillingPromo';
 import BillingUsage from '../components/BillingUsage';
 import CheckoutModal from '../components/CheckoutModal';
 import { useAuth } from '../hooks/useAuth';
+import { usePlan } from '../hooks/usePlan';
 import { useToast } from '../components/Toast';
 import { btnGesture } from '../styles/gestures';
 import { PLANS } from '../components/BillingCards';
@@ -37,6 +38,7 @@ function openExternal(url: string) {
 
 export default function BillingPage() {
   const { token } = useAuth();
+  const { refetch: refetchGlobalPlan } = usePlan();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [currentPlan, setCurrentPlan] = useState('free');
@@ -49,30 +51,56 @@ export default function BillingPage() {
 
   useEffect(() => {
     loadLemonSqueezy();
-    if (searchParams.get('success') === '1') {
-      toast({ type: 'success', title: 'Payment successful', message: 'Your plan has been upgraded.' });
+    const isPostCheckout = searchParams.get('success') === '1';
+    if (isPostCheckout) {
+      toast({
+        type: 'success',
+        title: 'Payment successful',
+        message: 'Activating your plan…',
+      });
       searchParams.delete('success');
       setSearchParams(searchParams, { replace: true });
     }
     if (!token) return;
     let cancelled = false;
-    usersApi
-      .me()
-      .then((data) => {
-        if (cancelled) return;
-        if (data.plan) setCurrentPlan(data.plan);
-        if (data.ai_usage !== undefined) {
-          setUsage({ ai_usage: data.ai_usage, ai_limit: data.ai_limit ?? 0 });
+    let attempts = 0;
+    const maxAttempts = isPostCheckout ? 10 : 1;
+
+    async function poll() {
+      while (!cancelled && attempts < maxAttempts) {
+        attempts++;
+        try {
+          const data = await usersApi.me();
+          if (cancelled) return;
+          if (data.plan) setCurrentPlan(data.plan);
+          if (data.ai_usage !== undefined) {
+            setUsage({ ai_usage: data.ai_usage, ai_limit: data.ai_limit ?? 0 });
+          }
+          if (isPostCheckout && data.plan && data.plan !== 'free') {
+            // Refresh global PlanContext so sidebar PlanBadge + other
+            // plan-gated UI surfaces flip without a page reload.
+            refetchGlobalPlan();
+            return;
+          }
+          if (!isPostCheckout) return;
+        } catch (err: unknown) {
+          if (cancelled) return;
+          const errName = (err as { name?: string })?.name;
+          if (errName === 'AuthExpiredError') return;
+          if (attempts >= maxAttempts) {
+            toast({
+              type: 'warning',
+              title: 'Could not load billing info',
+              message: err instanceof Error ? err.message : 'Refresh to try again.',
+            });
+            return;
+          }
         }
-      })
-      .catch((err) => {
-        if (cancelled || err?.name === 'AuthExpiredError') return;
-        toast({
-          type: 'warning',
-          title: 'Could not load billing info',
-          message: err instanceof Error ? err.message : 'Refresh to try again.',
-        });
-      });
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+
+    poll();
     return () => { cancelled = true; };
   }, [token]);
 

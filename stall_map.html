@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FinsavvyAI — Stall Map</title>
+<style>
+  :root {
+    --ink-900: #14171a; --ink-700: #2c3138; --ink-500: #4a525c;
+    --ink-300: #8a93a0; --ink-200: #c7ccd3; --ink-100: #e6e9ee;
+    --ink-50: #f3f5f8; --bg: #fbfcfd;
+    --accent: #1a73e8; --ok: #2e7d32; --warn: #c0392b;
+    --gold: #b8860b; --purple: #6a1b9a; --teal: #00838f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink-900: #e8ebf0; --ink-700: #c7ccd3; --ink-500: #95a0ad;
+      --ink-300: #6a727d; --ink-200: #3a414b; --ink-100: #262b32;
+      --ink-50: #1c2026; --bg: #14171a; --accent: #6ea8fe;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    font-size: 15.5px; line-height: 1.6;
+    color: var(--ink-900); background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 1100px; margin: 0 auto; padding: 48px 28px 96px; }
+  header.doc {
+    border-bottom: 1px solid var(--ink-100);
+    padding-bottom: 28px; margin-bottom: 32px;
+  }
+  .eyebrow {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--accent); font-weight: 700; margin-bottom: 8px;
+  }
+  h1 {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+    font-size: 38px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1.1; margin: 0 0 10px;
+  }
+  .subtitle { color: var(--ink-500); font-size: 16px; margin: 0 0 16px; max-width: 760px; }
+  h2 {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+    font-size: 24px; font-weight: 700; letter-spacing: -0.015em;
+    margin: 52px 0 10px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  h3 { font-size: 17px; font-weight: 600; margin: 24px 0 8px; }
+  p { margin: 0 0 12px; }
+  ul, ol { margin: 0 0 12px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  strong { font-weight: 600; color: var(--ink-900); }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.86em; background: var(--ink-50);
+    padding: 1px 6px; border-radius: 4px; color: var(--ink-700);
+  }
+  hr { border: 0; border-top: 1px solid var(--ink-100); margin: 40px 0; }
+  /* TOC + bucket legend */
+  nav.toc {
+    background: var(--ink-50); border-radius: 12px;
+    padding: 16px 22px; margin-bottom: 28px; font-size: 14px;
+  }
+  nav.toc strong {
+    display: block; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--ink-500); margin-bottom: 8px;
+  }
+  nav.toc ol { padding-left: 18px; margin: 0; }
+  .legend {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px; margin: 14px 0 24px;
+  }
+  .legend-item {
+    background: var(--bg); border: 1px solid var(--ink-100); border-radius: 8px;
+    padding: 10px 12px; font-size: 13.5px;
+  }
+  .legend-item .dot {
+    display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+    vertical-align: middle; margin-right: 8px;
+  }
+  .dot-active { background: var(--ok); }
+  .dot-background { background: var(--gold); }
+  .dot-stall { background: #e67e22; }
+  .dot-externalize { background: var(--teal); }
+  .dot-shutdown { background: var(--warn); }
+  /* Section header pills */
+  .pill {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .pill-active { background: rgba(46,125,50,0.14); color: var(--ok); }
+  .pill-background { background: rgba(184,134,11,0.16); color: var(--gold); }
+  .pill-stall { background: rgba(230,126,34,0.16); color: #c0660a; }
+  .pill-externalize { background: rgba(0,131,143,0.16); color: var(--teal); }
+  .pill-shutdown { background: rgba(192,57,43,0.14); color: var(--warn); }
+  .pill-notouch { background: rgba(106,27,154,0.14); color: var(--purple); }
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto; border: 1px solid var(--ink-100); border-radius: 10px;
+    margin: 14px 0 22px; background: var(--bg);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td {
+    text-align: left; padding: 10px 12px; vertical-align: top;
+    border-bottom: 1px solid var(--ink-100);
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  th {
+    background: var(--ink-50); font-weight: 600; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-500);
+    white-space: nowrap;
+  }
+  td code { font-size: 0.84em; }
+  /* Callouts */
+  .callout {
+    background: var(--ink-50); border-left: 3px solid var(--accent);
+    padding: 14px 18px; border-radius: 6px; margin: 14px 0 22px;
+  }
+  .callout.warn { border-left-color: var(--warn); background: rgba(192,57,43,0.04); }
+  .callout.gold { border-left-color: var(--gold); background: rgba(184,134,11,0.04); }
+  .callout.ok { border-left-color: var(--ok); background: rgba(46,125,50,0.04); }
+  .callout.purple { border-left-color: var(--purple); background: rgba(106,27,154,0.05); }
+  .callout h3 { margin-top: 0; }
+  /* Summary grid */
+  .summary-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; margin: 16px 0 20px;
+  }
+  .summary-card {
+    background: var(--ink-50); border-radius: 10px; padding: 14px 16px;
+    text-align: center;
+  }
+  .summary-card .count {
+    font-size: 28px; font-weight: 700; line-height: 1;
+    margin-bottom: 4px;
+  }
+  .summary-card .label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--ink-500);
+  }
+  .summary-card.active .count { color: var(--ok); }
+  .summary-card.background .count { color: var(--gold); }
+  .summary-card.stall .count { color: #e67e22; }
+  .summary-card.externalize .count { color: var(--teal); }
+  .summary-card.shutdown .count { color: var(--warn); }
+  /* Script block */
+  .script-block {
+    background: var(--bg); border: 1px dashed var(--ink-200);
+    border-radius: 8px; padding: 16px 20px;
+    font-style: italic; color: var(--ink-700);
+    margin: 12px 0;
+  }
+  /* Print */
+  @media print {
+    body { background: white; color: black; font-size: 10.5pt; }
+    main { max-width: 100%; padding: 0; }
+    .table-wrap, .callout { border: 1px solid #ddd; background: white; }
+    h2, h3 { break-after: avoid; }
+    table { break-inside: avoid; }
+    nav.toc { background: white; border: 1px solid #ddd; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="doc">
+  <div class="eyebrow">Companion to Decisive 6-Month Plan · 26 May 2026</div>
+  <h1>Stall Map</h1>
+  <p class="subtitle">Every project across the portfolio gets an explicit status. The 6-month plan focuses 4 streams on AMLIQ Brain + Series A — everything else needs to be active, background, stalled, externalized, shut down, or off-limits. Otherwise these projects will quietly consume attention, cycles, and cognitive load.</p>
+  <div class="legend">
+    <div class="legend-item"><span class="dot dot-active"></span><strong>ACTIVE</strong> — in the 4-stream plan</div>
+    <div class="legend-item"><span class="dot dot-background"></span><strong>BACKGROUND</strong> — alive, monthly only</div>
+    <div class="legend-item"><span class="dot dot-stall"></span><strong>STALL</strong> — pause feature work</div>
+    <div class="legend-item"><span class="dot dot-externalize"></span><strong>EXTERNALIZE</strong> — out of FinsavvyAI</div>
+    <div class="legend-item"><span class="dot dot-shutdown"></span><strong>SHUT DOWN</strong> — execute in week 1</div>
+  </div>
+</header>
+
+<nav class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#active">ACTIVE — the 4 streams</a></li>
+    <li><a href="#background">BACKGROUND — alive but not accelerated</a></li>
+    <li><a href="#stall">STALL — pause active dev</a></li>
+    <li><a href="#externalize">EXTERNALIZE — move out</a></li>
+    <li><a href="#shutdown">SHUT DOWN — execute in week 1</a></li>
+    <li><a href="#donottouch">DO NOT TOUCH</a></li>
+    <li><a href="#summary">Summary counts</a></li>
+    <li><a href="#tradeoffs">What you give up</a></li>
+    <li><a href="#script">Stall communication script</a></li>
+  </ol>
+</nav>
+
+<section id="active">
+<h2><span class="pill pill-active">Active</span> The 4 streams of the plan</h2>
+<p>Already covered in the decisive plan, listed here for completeness. These get the team's focus for 6 months.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Project</th><th>Stream</th><th>Why active</th></tr></thead>
+<tbody>
+<tr><td>AMLIQ Brain</td><td>A · Brain Build</td><td>Primary product launch</td></tr>
+<tr><td>AMLIQ Investigate</td><td>B · Investigate Migration</td><td>Addendum Weeks 4-6; ships alongside Brain</td></tr>
+<tr><td><code>oss/finsavvy-rag/</code></td><td>A · OSS support</td><td>OSS wedge for Brain</td></tr>
+<tr><td><code>oss/a2a-framework/</code></td><td>A · OSS support</td><td>Licensed + minimal maintenance</td></tr>
+<tr><td><code>oss/mcp-tooling/</code></td><td>A · Brain connectors</td><td>Connector library for Brain</td></tr>
+<tr><td><code>platform/{auth,billing,telemetry,ai-gateway,policy-engine}</code></td><td>A + B · Platform</td><td>Brain + Investigate both depend on these</td></tr>
+<tr><td><code>websites/finsavvyai.com/</code></td><td>A · Marketing</td><td>Refresh in M5; receives Brain product pages</td></tr>
+<tr><td>Sprint harness</td><td>Cross-cutting</td><td>Continuous infra; do not touch</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout ok">
+<strong>Eng resource estimate:</strong> ~3 engineers + founder time, fully loaded on the above for 6 months.
+</div>
+</section>
+
+<section id="background">
+<h2><span class="pill pill-background">Background</span> Alive but not accelerated</h2>
+<p>Already in the plan's "Background workstreams" section. Listed here with explicit rules.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Project</th><th>Owner</th><th>Cadence</th><th>Hard rule</th></tr></thead>
+<tbody>
+<tr><td><strong>TenantIQ</strong></td><td>TenantIQ owner</td><td>Monthly status to founder</td><td><strong>No new features.</strong> Only customer support + sales from existing inbound. Production stays up. Pick this back up at M7 with Series A money — market validation is real (51% MSP barrier).</td></tr>
+<tr><td><strong>PushCI</strong></td><td>PushCI owner</td><td>Monthly status to founder</td><td>OSS PipeWarden landing page stays; <strong>no GA launch push</strong> until M7. Single eng owner, no team allocation.</td></tr>
+<tr><td><strong>PipeWarden OSS</strong></td><td>PipeWarden owner</td><td>Monthly contributor cadence</td><td>Accept community PRs, do not feature-build. The Brain OSS wedge (<code>finsavvy-rag</code>) takes the M1-6 OSS spotlight.</td></tr>
+<tr><td><strong>Qestro</strong></td><td>Qestro owner</td><td>Monthly status</td><td>Was Tier 2; no investment until Brain ships.</td></tr>
+<tr><td><strong>SDLC.cc</strong></td><td>SDLC owner</td><td>Monthly status</td><td>Was Tier 2; regulatory tailwind still real. Keep marketing site warm, no product investment.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout warn">
+<strong>Trap to avoid:</strong> "background" is not "freedom to keep shipping quietly." Each background project must accept that <strong>zero engineering acceleration happens for 6 months.</strong> If an owner can't accept that, the project moves to STALL.
+</div>
+</section>
+
+<section id="stall">
+<h2><span class="pill pill-stall">Stall</span> Pause active development</h2>
+<p>These have shipped code or active development that needs to stop. Production stays up; features freeze; engineering reallocates to Brain.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Project</th><th>Current state</th><th>Stall scope</th><th>Why stall (not background)</th></tr></thead>
+<tbody>
+<tr>
+  <td><strong>OpenSyber</strong></td>
+  <td><code>products/opensyber/</code> · 3.3K files · Tier 2</td>
+  <td>Pause all dev. Keep marketing live. Strategic decision deferred to M7.</td>
+  <td>Window closing (Check Point bought Lakera). Half-built OpenSyber is worse than paused. Decide direction once Brain has Series A funds.</td>
+</tr>
+<tr>
+  <td><strong>LunaOS</strong></td>
+  <td><code>products/lunaos/</code> · 22K files · lunaforge harvested</td>
+  <td>Pause all dev. Maintain CI green. Repositioning deferred to M7.</td>
+  <td>Crowded market (LangGraph, CrewAI, MS Agent Framework). Positioning fix is bigger than 90 days.</td>
+</tr>
+<tr>
+  <td><strong>QueryFlux</strong> <small>(if promoted)</small></td>
+  <td><code>products/queryflux/</code> planned</td>
+  <td>Keep code in monorepo so it doesn't bitrot. <strong>No new features, no GTM push.</strong> Pick up M7+.</td>
+  <td>Active team work would compete with Brain for the same eng. Founder-led one-off conversations OK.</td>
+</tr>
+<tr>
+  <td><strong>02_AI_AGENTS/llm</strong></td>
+  <td>Top-ranked Feb '26 (89/88); defaulted to fold into Brain</td>
+  <td>Stop separate dev. Migrate distributed-cluster code into Brain's self-hosted inference path.</td>
+  <td>Folding makes Brain stronger. Standalone competes with Ollama (169K stars) / vLLM — brutal.</td>
+</tr>
+<tr><td><strong>automationhub</strong></td><td><code>oss/automationhub/</code> · 11K files</td><td>Maintain OSS, no feature push</td><td>Useful primitives for LunaOS — but LunaOS itself is paused.</td></tr>
+<tr><td><strong>clawpipe</strong> + server + benchmark</td><td><code>oss/clawpipe/</code> · 10.9K files</td><td>Maintain OSS, no feature push</td><td>LunaOS runtime support — same logic.</td></tr>
+<tr><td><strong>tokenforge</strong></td><td><code>oss/tokenforge/</code></td><td>Maintain OSS, no feature push</td><td>Telemetry SDK; absorb into <code>platform/telemetry</code> in M7 if time.</td></tr>
+<tr><td><strong>design-system (F8 UI)</strong></td><td><code>oss/design-system/</code> · 240 files</td><td>Available for Brain to use, no feature push</td><td>Brain uses it but doesn't extend it.</td></tr>
+<tr><td><strong>homebrew-pipewarden</strong></td><td><code>oss/homebrew-pipewarden/</code></td><td>Maintain tap, no new releases</td><td>Distribution for PipeWarden which is background.</td></tr>
+<tr><td><strong>javascript-package-manager (jpm)</strong></td><td><code>02_AI_AGENTS/mcp-servers/javascript-package-manager/</code></td><td>Maintain, no feature push</td><td>Useful MCP server but not a Brain dependency.</td></tr>
+<tr><td><strong>npmplus-core</strong></td><td><code>02_AI_AGENTS/mcp-servers/npmplus-core/</code></td><td>Stale (Aug '25). No further work.</td><td>Already not in active development.</td></tr>
+<tr><td><strong>coderailflow / coderail-dev</strong></td><td><code>coderailflow/</code>, <code>coderail-dev/</code></td><td>Park pending decision (LunaOS module vs archive)</td><td>Blocked on LunaOS which is stalled.</td></tr>
+<tr><td><strong>sprint-city</strong></td><td><code>infrastructure/sprint-tooling/sprint-city/</code></td><td>Maintain as infra</td><td>Internal tool; existing maintenance.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout warn">
+<strong>Counter-rule:</strong> if a stalled product's customer/user pings with a critical bug, fix it. Do not turn maintenance into stealth feature work.
+</div>
+</section>
+
+<section id="externalize">
+<h2><span class="pill pill-externalize">Externalize</span> Move out of FinsavvyAI</h2>
+<p>Real value, off-thesis. Should not consume FinsavvyAI engineering, marketing, or fundraise narrative. Spin out cleanly.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Project</th><th>Why externalize</th><th>Move to</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td><strong>looma-sh</strong></td><td>Live production (looma.sh, relay.looma.sh), investor brief, paid pricing tiers — V2V automotive (wrong vertical)</td><td><code>/Users/shaharsolomon/dev/projects/looma/</code> (sibling)</td><td>Founder-personal entity. Halt FinsavvyAI archive sweep. Inventory: EXTERNALIZED.</td></tr>
+<tr><td><strong>pixel-pets</strong></td><td>Last commit 2 days ago (active), full brief, AI creature franchise — off-thesis AI product</td><td><code>/Users/shaharsolomon/dev/projects/pixel-pets/</code> (sibling)</td><td>Founder-personal or partner with co-founder. Halt archive.</td></tr>
+<tr><td><strong>looma_sh_full_fun</strong></td><td>Looma sibling/export</td><td>Merge with externalized looma</td><td>Decide if duplicate or canonical</td></tr>
+<tr><td><strong>yallabye standalone</strong></td><td>Travel app — off-thesis</td><td>Founder-personal or sell</td><td>Confirm out-of-scope for FinsavvyAI</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout ok">
+<strong>Rule:</strong> externalized projects do not appear in FinsavvyAI investor materials, do not consume FinsavvyAI eng cycles, do not show up in the consolidation monorepo.
+</div>
+</section>
+
+<section id="shutdown">
+<h2><span class="pill pill-shutdown">Shut Down</span> Execute in week 1</h2>
+<p>These cost something (domain, hosting, cognitive load) and have no recovery value. Pull the plug.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Project / Asset</th><th>Cost source</th><th>Shutdown action</th></tr></thead>
+<tbody>
+<tr><td><strong>autoboot / FastPM</strong></td><td><code>fastpm.dev</code> + Netlify + Supabase + LemonSqueezy</td><td>Take site down OR redirect to finsavvyai.com. Cancel LemonSqueezy. Snapshot code.</td></tr>
+<tr><td><strong>subsforge / subsforge.dev</strong></td><td>Parked domain, residual hosting</td><td>Confirm parked, no active billing</td></tr>
+<tr><td><strong>viralsplit / viralsplit.io</strong></td><td>Parked domain, App Store presence</td><td>Pull from App Store/Play Store. Domain stays parked.</td></tr>
+<tr><td><strong>smartreply-ai / smartrepli.ai</strong></td><td>Parked domain</td><td>Confirm parked</td></tr>
+<tr><td><strong>devwrapped</strong></td><td>GitHub Year-in-Review site</td><td>Take site down, snapshot code</td></tr>
+<tr><td><strong>scangenie / scan-genie variants</strong></td><td>Multiple repos, no live deploy</td><td>Snapshot + delete duplicates (keep 1 archive)</td></tr>
+<tr><td><strong>moneh-hacham</strong></td><td>Smart meter project</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>hashmal</strong></td><td>No signal</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>immortal-fc</strong></td><td>"first commit" — never developed</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>codebridge</strong></td><td>Unclear scope</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>flujo</strong></td><td>Last commit 14 months stale</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>windsu-credit-manager</strong></td><td>Architecture incompatible with PushCI</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>focusvault-server</strong></td><td>Last commit July 2025</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>02_AI_AGENTS/a2a/{server,cli,agent-record}</strong></td><td>All April 2025; superseded by <code>oss/a2a-framework/</code></td><td>Snapshot + delete</td></tr>
+<tr><td><strong>02_AI_AGENTS/mcp-servers/mcp-servers</strong></td><td>Stale feature branch</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>02_AI_AGENTS/lunaos-repos/lunaos-mobile</strong></td><td>Never started</td><td>Delete</td></tr>
+<tr><td><strong>04_chrome_extensions/extensions/vibepulse</strong></td><td>4178 uncommitted, off-thesis games</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>05_mobile_apps/nippy</strong></td><td>No signal</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>06_websites/Immortal-FC</strong></td><td>Football club site</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>06_websites/finsavvyai-website × 2</strong></td><td>Old static sites, superseded by Astro</td><td>Snapshot + delete both</td></tr>
+<tr><td><strong>06_websites/npmplus-website</strong></td><td>NPM Plus marketing</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>06_websites/websites/code-safety-suite/shield-ai</strong></td><td>Retired</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>bsl/monitor</strong></td><td>Last commit Dec 2021 — 4.5 years dead</td><td>Snapshot + delete</td></tr>
+<tr><td><strong>09_global_remit/*</strong> (7 repos)</td><td>Remittance fintech — off-thesis (AMLIQ scope is investigations)</td><td>Snapshot + delete each</td></tr>
+<tr><td><strong>All <code>*.agent1</code>, <code>*.agent2</code> worktree variants</strong></td><td>Sprint-loop artifacts</td><td>Snapshot + delete (per inventory)</td></tr>
+<tr><td><strong>Parallel queryflux/querylens dirs</strong></td><td>After promotion to <code>products/queryflux/</code>, originals are duplicates</td><td>Snapshot + delete originals</td></tr>
+<tr><td><strong>notebooklm-py</strong></td><td>Third-party (teng-lin)</td><td>Remove from portfolio</td></tr>
+<tr><td><strong>All of <code>08_open_source/*</code></strong></td><td>Third-party vendored code per founder note</td><td>Move to <code>infrastructure/vendored/opensource/</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="callout gold">
+<strong>Cost recovery estimate:</strong> ~30 GitHub repos retired, 6-8 domain registrations let lapse, 4-6 SaaS subscriptions cancelled (Netlify, Vercel, Supabase, LemonSqueezy products), ~50GB local disk recovered.
+</div>
+</section>
+
+<section id="donottouch">
+<h2><span class="pill pill-notouch">Do Not Touch</span></h2>
+<div class="callout purple">
+<h3>06_websites/hava-solomon</h3>
+<p><strong>Memorial site for your mother.</strong> Keep online. No FinsavvyAI category, no migration, no archive. Personal.</p>
+</div>
+</section>
+
+<section id="summary">
+<h2>Summary counts</h2>
+
+<div class="summary-grid">
+  <div class="summary-card active"><div class="count">~8</div><div class="label">Active</div></div>
+  <div class="summary-card background"><div class="count">5</div><div class="label">Background</div></div>
+  <div class="summary-card stall"><div class="count">~13</div><div class="label">Stall</div></div>
+  <div class="summary-card externalize"><div class="count">3-4</div><div class="label">Externalize</div></div>
+  <div class="summary-card shutdown"><div class="count">~25-30</div><div class="label">Shut Down</div></div>
+</div>
+
+<div class="callout ok">
+<strong>Net effect 6 months from now:</strong> one launched product (AMLIQ Brain), one migrated product (AMLIQ Investigate), Series A closed, the platform stack consolidated, ~25 retired side projects no longer pulling on attention. Everything else is alive in maintenance, ready to be picked back up after the raise with money + clarity.
+</div>
+</section>
+
+<section id="tradeoffs">
+<h2>What you give up by stalling</h2>
+<p>Honest accounting of the trade-offs.</p>
+
+<h3>TenantIQ stalling — most expensive trade</h3>
+<p>The market validation was the strongest in the portfolio (51% of MSPs flagged governance as #1 AI barrier). <strong>Risk:</strong> a competitor (AvePoint Elements expanding downmarket, CoreView pricing more aggressively) takes the segment in 6 months. <strong>Mitigation:</strong> Brain ships, Series A closes, TenantIQ gets dedicated eng + GTM in M7-12 with fresh capital and proven execution credibility.</p>
+
+<h3>PushCI/PipeWarden OSS as background</h3>
+<p>The developer wedge isn't your headline for the next 6 months. <strong>Risk:</strong> CodeRabbit, Greptile, Snyk continue their lead. <strong>Mitigation:</strong> Brain is a <em>compounding</em> wedge — once Series A funds GTM, PushCI re-emerges with the integrated-platform story (Brain + PushCI + everything = "the AI ops stack for regulated dev orgs").</p>
+
+<h3>02_AI_AGENTS/llm folding into Brain</h3>
+<p>Losing the optionality of "FinSavvy Distributed Cluster" as standalone brand. <strong>Risk:</strong> someone else builds the home-cluster category. <strong>Mitigation:</strong> that category is brutal (Ollama 169K stars). Folding inward is the right call.</p>
+
+<h3>LunaOS pause</h3>
+<p>Leaving the agent-orchestration category to LangGraph / CrewAI / Microsoft Agent Framework uncontested for 6 more months. <strong>Risk:</strong> by M7 the category is locked. <strong>Mitigation:</strong> LunaOS's positioning was unclear anyway — better to come back with a sharper angle.</p>
+
+<h3>OpenSyber pause</h3>
+<p>Runtime-AI-security category gets fully consolidated (Check Point + Lakera, Lasso growing). <strong>Risk:</strong> the window closes. <strong>Mitigation:</strong> pause forces the strategic decision (compete/partner/sell) instead of half-building forever.</p>
+
+<div class="callout ok">
+<strong>The trade is real, and it's the right one.</strong> A single shipped product with revenue and SOC 2 unlocks more strategic options at M7 than 8 half-built ones do today.
+</div>
+</section>
+
+<section id="script">
+<h2>Stall communication script</h2>
+<p>For design partners + team. If anyone asks "why aren't we shipping X anymore," say this:</p>
+<div class="script-block">
+"We're consolidating around AMLIQ Brain through end of Q4 — shipping a single category-defining product, closing Series A, and proving the compounding-platform thesis with one named customer cohort. Every other product is in maintenance or background, owned but not accelerated. Once Brain GA's and the round closes, we have funded paths back into TenantIQ, PushCI, LunaOS, OpenSyber, SDLC.cc on a roadmap that's defensible because Brain proved the model."
+</div>
+<p>That's the line to use, internally and externally.</p>
+</section>
+
+</main>
+</body>
+</html>

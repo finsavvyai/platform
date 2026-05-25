@@ -13,6 +13,7 @@
  */
 
 import { aggregate } from "./aggregator.js";
+import { emitDecisionAudit } from "./audit.js";
 import { route } from "./router.js";
 import type {
   AmlDecision,
@@ -23,12 +24,10 @@ import type {
   EngineResult,
 } from "./types.js";
 
-export class AuditEmitFailure extends Error {
-  constructor(public readonly cause: unknown) {
-    super("audit emit failed");
-    this.name = "AuditEmitFailure";
-  }
-}
+// Re-export for backwards compatibility — server.ts and consumers import
+// AuditEmitFailure from decision-service.js. Single source of truth is
+// `./audit.js`.
+export { AuditEmitFailure } from "./audit.js";
 
 export interface DecisionServiceDeps {
   readonly engineClients: Readonly<Record<EngineName, EngineClient>>;
@@ -42,16 +41,6 @@ export interface DecisionServiceDeps {
 }
 
 const DEFAULT_OVERALL_TIMEOUT_MS = 250;
-
-const resourceFor = (request: DecisionRequest): string =>
-  `${request.subject.subject_hash}:${request.transaction.transaction_id}`;
-
-const auditDecisionFor = (
-  action: "allow" | "flag" | "block",
-): "allow" | "deny" | "error" => {
-  if (action === "block") return "deny";
-  return "allow"; // flag and allow both pass the gate, just with review hint
-};
 
 export const createDecisionService = (deps: DecisionServiceDeps) => {
   const now = deps.now ?? (() => new Date());
@@ -109,27 +98,14 @@ export const createDecisionService = (deps: DecisionServiceDeps) => {
       partial: agg.partial,
     };
 
-    try {
-      await deps.audit.emit({
-        actorId: deps.actorIdFor(request),
-        tenantId: request.tenant_id,
-        event: "amliq.decision",
-        resource: resourceFor(request),
-        decision: auditDecisionFor(agg.recommended_action),
-        reason: `max_score=${agg.max_risk_score}`,
-        meta: {
-          decision_id: decisionId,
-          request_id: requestId,
-          recommended_action: agg.recommended_action,
-          partial: agg.partial,
-          confidence: agg.confidence,
-          engine_results: engineResults,
-        },
-      });
-    } catch (err) {
-      // Release-blocking: caller must convert this to 503.
-      throw new AuditEmitFailure(err);
-    }
+    // Release-blocking: audit-emit failure throws AuditEmitFailure; caller
+    // (server.ts) MUST translate that to 503.
+    await emitDecisionAudit({
+      decision,
+      request,
+      actorId: deps.actorIdFor(request),
+      emitter: deps.audit,
+    });
 
     return decision;
   };
@@ -138,3 +114,6 @@ export const createDecisionService = (deps: DecisionServiceDeps) => {
 };
 
 export type DecisionService = ReturnType<typeof createDecisionService>;
+// Type re-export used by `Promise<void>` declarations consuming the original
+// surface — keep the public API stable.
+export type { AuditEmitter };

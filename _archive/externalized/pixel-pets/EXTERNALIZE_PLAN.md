@@ -4,6 +4,8 @@ Founder decision (2026-05-25, after May 2026 ranking memo): **EXTERNALIZE, not a
 
 Original code: `/Users/shaharsolomon/dev/projects/portfolio/pixel-pets/` (untouched).
 
+**Execution status (2026-05-26): ON HOLD from archive sweep.** Source remains intact while the spin-out actions below are worked. Do not delete, compress, or continue archival cleanup for pixel-pets from the FinsavvyAI repo.
+
 ## Why this was wrongly archived
 
 Round 4 archive sweep (2026-05-25) snapshotted pixel-pets as off-thesis. The ranking memo flagged this as wrong because:

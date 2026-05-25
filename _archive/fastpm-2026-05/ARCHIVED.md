@@ -4,6 +4,8 @@
 **Snapshot type:** manifest-only (source >100MB)
 **Disposition:** parked-domain
 
+**Execution status (2026-05-26): ARCHIVE classification confirmed.** This retires the FastPM product framing. Domain redirect/takedown is an operational action outside this repo; the active sprint/automation harness remains explicitly out of scope for deletion.
+
 ## Source
 - **Path:** `/Users/shaharsolomon/dev/projects/portfolio/autoboot/`
 - **Commit SHA:** `4bff57dd20e381f57cc16ff8c3c3de333ac0fe79`

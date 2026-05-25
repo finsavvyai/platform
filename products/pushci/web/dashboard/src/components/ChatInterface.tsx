@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import type { ActionResult } from '../lib/chatActionDispatcher';
+import ActionResultCard from './ActionResultCard';
 
 interface Message {
   id: string;
@@ -6,6 +8,7 @@ interface Message {
   text: string;
   action?: string;
   params?: Record<string, unknown>;
+  result?: ActionResult;
 }
 
 interface Props {
@@ -101,6 +104,7 @@ export default function ChatInterface({ messages, onSend, loading }: Props) {
             }`}>
               <p className="whitespace-pre-wrap">{msg.text}</p>
               {msg.action && <ActionCard action={msg.action} params={msg.params} />}
+              {msg.result && <ActionResultCard result={msg.result} />}
             </div>
           </div>
         ))}

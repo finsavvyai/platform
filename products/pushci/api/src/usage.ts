@@ -2,7 +2,7 @@ import type { Context, Next } from "hono";
 import type { Env, JwtPayload } from "./types";
 import { verifyJwt } from "./auth";
 
-export type PlanId = "free" | "pro" | "team";
+export type PlanId = "free" | "pro" | "team" | "enterprise";
 
 interface UserRecord {
   sub: string;
@@ -15,6 +15,7 @@ const AI_LIMITS: Record<PlanId, number> = {
   free: 0,
   pro: 100,
   team: 500,
+  enterprise: 10000,
 };
 
 export async function upsertUser(

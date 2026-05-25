@@ -10,6 +10,8 @@ const {
   description = 'AMLIQ Brain — analyst search with regulator-defensible citations.',
   showAuthBanner = false,
 } = Astro.props;
+
+const year = new Date().getFullYear();
 ---
 
 <!doctype html>
@@ -21,6 +23,20 @@ const {
     <meta name="description" content={description} />
     <meta name="robots" content="noindex" />
     <title>{title}</title>
+    <style>
+      /* A11Y: respect prefers-reduced-motion globally — disables non-
+         essential transitions/animations only when the OS opts in. */
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
   </head>
   <body
     class="min-h-screen bg-ink-50 text-ink-900 antialiased
@@ -31,13 +47,17 @@ const {
       href="#main"
       class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2
              focus:rounded focus:bg-ink-900 focus:px-3 focus:py-1.5
-             focus:text-ink-50"
+             focus:text-ink-50 focus:outline focus:outline-2
+             focus:outline-offset-2 focus:outline-ink-900
+             dark:focus:bg-ink-50 dark:focus:text-ink-900
+             dark:focus:outline-ink-50"
     >
       Skip to content
     </a>
     {showAuthBanner && (
       <div
         role="status"
+        aria-live="polite"
         class="border-b border-ink-100 bg-ink-50/95 px-6 py-2
                text-xs text-ink-500
                dark:border-ink-700 dark:bg-ink-900/95 dark:text-ink-400"
@@ -75,5 +95,17 @@ const {
     <main id="main" class="mx-auto max-w-5xl px-gutter py-12 sm:py-16">
       <slot />
     </main>
+    <footer
+      class="border-t border-ink-100 mt-12 dark:border-ink-700"
+    >
+      <div
+        class="mx-auto flex max-w-5xl flex-col gap-2 px-gutter py-6
+               text-xs text-ink-500 sm:flex-row sm:items-center
+               sm:justify-between dark:text-ink-400"
+      >
+        <p>&copy; {year} FinsavvyAI — AMLIQ Brain (internal preview).</p>
+        <p>Regulator-defensible citations · audit-chain enforced.</p>
+      </div>
+    </footer>
   </body>
 </html>

@@ -21,6 +21,10 @@ export class StaticEntitlements implements EntitlementChecker {
   ): number | "unlimited" {
     if (!this.has(subscription, plan, key)) return 0;
     const ent = plan.entitlements.find((e) => e.key === key);
+    // Defensive type-narrowing: has() returned true, which guarantees
+    // some((e) => e.key === key) matched; find() with the same predicate
+    // cannot return undefined here. Kept for noUncheckedIndexedAccess.
+    /* v8 ignore next 1 */
     if (!ent) return 0;
     if (ent.limit === "unlimited") return "unlimited";
     return Math.max(0, ent.limit - used);

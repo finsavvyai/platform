@@ -5,6 +5,8 @@ Founder decision (2026-05-25): **externalize, do not archive.**
 Original code: `/Users/shaharsolomon/dev/projects/portfolio/looma-sh/` (untouched).
 Original production: `looma.sh` (marketing), `relay.looma.sh` (API).
 
+**Execution status (2026-05-26): ON HOLD from archive sweep.** Source remains intact while the spin-out actions below are worked. Do not delete, compress, or continue archival cleanup for Looma from the FinsavvyAI repo.
+
 ## Why not archive
 
 - Live production endpoints with auth + persistence (Phase 1 shipped 2026-05-08).

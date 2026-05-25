@@ -3,6 +3,8 @@ import ChatInterface, { type Message } from '../components/ChatInterface';
 import ChatEmptyState from '../components/ChatEmptyState';
 import { useProjects } from '../hooks/useProjects';
 import { API_BASE_URL } from '../config';
+import { dispatchAction } from '../lib/chatActionDispatcher';
+import { pollRunStatus } from '../lib/runPolling';
 
 const categories = [
   { label: 'Pipeline', items: ['generate pipeline', 'fix my pipeline', 'optimize my pipeline'] },
@@ -29,12 +31,13 @@ export default function ChatPage() {
     const userMsg: Message = { id: `m-${++msgId}`, role: 'user', text };
     setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
+
+    const token = localStorage.getItem('pushci_token');
+    const assistantId = `m-${++msgId}`;
+
     try {
-      const token = localStorage.getItem('pushci_token');
       const body: Record<string, unknown> = { message: text };
-      if (selectedRepo) {
-        body.repoContext = { root: selectedRepo };
-      }
+      if (selectedRepo) body.repoContext = { root: selectedRepo };
       const res = await fetch(`${API_BASE_URL}/api/nlp/ask`, {
         method: 'POST',
         headers: {
@@ -43,14 +46,61 @@ export default function ChatPage() {
         },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
-      setMessages((prev) => [...prev, {
-        id: `m-${++msgId}`, role: 'assistant',
+      const data = await res.json() as {
+        action?: string;
+        params?: Record<string, unknown>;
+        message?: string;
+        error?: string;
+      };
+
+      const assistantMsg: Message = {
+        id: assistantId,
+        role: 'assistant',
         text: data.message ?? data.error ?? 'Done.',
-        action: data.action, params: data.params,
-      }]);
+        action: data.action,
+        params: data.params,
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      // If Claude picked a tool, dispatch it. The dispatcher knows how
+      // to call the right endpoint, stub the deferred actions, and
+      // surface a structured result for ActionResultCard to render.
+      if (data.action && token) {
+        const result = await dispatchAction({
+          action: data.action,
+          params: data.params ?? {},
+          token,
+          repoContext: selectedRepo ? { root: selectedRepo } : undefined,
+        });
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, result } : m)),
+        );
+
+        // Async actions return a runId — long-poll until terminal.
+        if (result.state === 'polling' && result.runId) {
+          const poll = await pollRunStatus(result.runId, token);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    result: {
+                      state: poll.status === 'succeeded' ? 'success' : 'error',
+                      action: result.action,
+                      data: poll.run,
+                      error: poll.status === 'succeeded'
+                        ? undefined
+                        : `Run ended with status: ${poll.status}`,
+                    },
+                  }
+                : m,
+            ),
+          );
+        }
+      }
     } catch {
-      setMessages((prev) => [...prev,
+      setMessages((prev) => [
+        ...prev,
         { id: `m-${++msgId}`, role: 'assistant', text: 'Failed to reach API.' },
       ]);
     } finally {

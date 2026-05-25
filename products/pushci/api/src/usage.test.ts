@@ -1,13 +1,19 @@
 import { describe, it, expect } from "vitest";
 import type { PlanId } from "./usage";
 import { PLANS } from "./billing-types";
-const AI_LIMITS: Record<PlanId, number> = { free: 0, pro: 100, team: 500 };
+const AI_LIMITS: Record<PlanId, number> = {
+  free: 0,
+  pro: 100,
+  team: 500,
+  enterprise: 10000,
+};
 
 describe("AI_LIMITS", () => {
-  it("free=0, pro=100, team=500", () => {
+  it("free=0, pro=100, team=500, enterprise=10000", () => {
     expect(AI_LIMITS.free).toBe(0);
     expect(AI_LIMITS.pro).toBe(100);
     expect(AI_LIMITS.team).toBe(500);
+    expect(AI_LIMITS.enterprise).toBe(10000);
   });
 });
 

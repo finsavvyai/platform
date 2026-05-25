@@ -45,6 +45,9 @@ const dedupePreserveOrder = (xs: readonly string[]): readonly string[] => {
 };
 
 const computeConfidence = (scores: readonly number[]): number => {
+  // Defensive: aggregate() short-circuits on successful.length === 0 before
+  // ever reaching this function — kept as a safe-input contract.
+  /* v8 ignore next */
   if (scores.length === 0) return 0;
   if (scores.length === 1) return 1;
   const mean = scores.reduce((s, n) => s + n, 0) / scores.length;

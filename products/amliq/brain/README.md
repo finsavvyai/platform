@@ -35,9 +35,15 @@ the sibling subtrees are excluded from this tsconfig/vitest scope.
 The **TS API skeleton** for AMLIQ Brain. Specifically:
 
 - `services/api/src/server.ts` — Hono app factory wiring health + auth + audit
+- `services/api/src/runtime.ts` — host composition helper for deployment wiring
+- `services/api/src/worker.ts` — Worker-style `fetch` adapter using explicit env bindings
+- `services/api/src/worker-auth.ts` — Worker-local HS256 JWT verifier plus shared-token dev fallback
+- `services/api/src/sar-draft/` — audited `POST /v1/brain/sar-draft` bridge to the SAR Draft Agent
+- `services/api/src/search/http-adapter.ts` — optional HTTP adapter for `oss/finsavvy-rag` search
 - `services/api/src/auth.ts` — JWT middleware (DI-based; 100% covered)
 - `services/api/src/audit.ts` — audit emitter with tamper-chain hook + sink fallback (100% covered)
 - `services/api/src/health.ts` — round-3 mesh health snapshot builder
+- `services/api/src/sar-draft/http-generator.ts` — optional HTTP adapter for a separately hosted SAR Draft runtime
 - `services/api/src/types.ts` — all DI contracts (AuthVerifier, AuditSink, AuditChain, etc.)
 - `services/retrieval/src/types.ts` — `ComplianceDoc` cross-agent contract (RAG corpus shape)
 - `services/sanctions/src/types.ts` — 3-tier sanctions screening contract (locked decision #8)
@@ -49,8 +55,15 @@ The **TS API skeleton** for AMLIQ Brain. Specifically:
 
 - Not a runnable service binary. The host-process boot (`node services/api/dist/index.js`) and concrete wiring of `AuthVerifier` / `AuditSink` / `AuditChain` live in a future deploy ticket.
 - Not in `pnpm-workspace.yaml`. Per round-4 rule, `products/*` packages with no `@finsavvyai/*` imports stay out of the workspace glob to avoid vitest version conflicts.
-- Not yet calling `oss/finsavvy-rag/`. That package is cut in W4; until then `RetrievalAdapter` is type-only.
-- Not yet running Python agents. M2 W6.
+- Not yet embedding `oss/finsavvy-rag/` in-process. The API now exposes an
+  optional HTTP search adapter for a separately hosted RAG runtime.
+- Not yet launching Python agents in-process. The API now exposes a
+  DI-backed SAR Draft bridge, host composition helper, and optional HTTP
+  adapter so production wiring can call the Python runtime without
+  importing it directly.
+- Not tied to shared workspace auth packages from `products/*`. The Worker
+  shell verifies HS256 JWTs locally when JWT env is configured, while
+  `createBrainHostApp()` can still receive a platform verifier through DI.
 
 ## Cross-agent contracts honoured (Brain Week 2 mesh)
 
@@ -89,3 +102,7 @@ audit sink hard-fails (primary + fallback both throw), the request returns
 `503 audit_emit_failed` — Brain does **not** serve a successful response
 without a written audit record. This mirrors the AMLIQ Investigate rule in
 `../api/decision.md` §7.
+
+The SAR Draft endpoint also enforces `human_review_required === true` on
+every generated draft. If a generator returns a draft that disables human
+review, the API returns `503 human_review_required_violation`.

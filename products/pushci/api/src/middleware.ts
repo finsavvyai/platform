@@ -30,7 +30,7 @@ export async function corsMiddleware(c: Context<{ Bindings: MwEnv }>, next: Next
       headers: {
         "Access-Control-Allow-Origin": allowed,
         "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization,Content-Type",
+        "Access-Control-Allow-Headers": "Authorization,Content-Type,Idempotency-Key,X-Requested-With",
         "Access-Control-Max-Age": "86400",
       },
     });

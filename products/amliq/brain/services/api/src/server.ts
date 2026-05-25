@@ -16,6 +16,7 @@ import { buildAuthMiddleware, getBrainAuth } from "./auth.js";
 import { BrainAuditEmitter } from "./audit.js";
 import { HealthBuilder } from "./health.js";
 import { createRateLimitMiddleware } from "./rate-limit/index.js";
+import { buildSarDraftHandler } from "./sar-draft/sar-draft-handler.js";
 import { buildSearchHandler } from "./search/search-handler.js";
 import type { BrainApiConfig } from "./types.js";
 
@@ -125,6 +126,14 @@ export const createBrainApp = (config: BrainApiConfig): BrainApp => {
         : {}),
     });
     guarded.post("/search", searchHandler);
+  }
+
+  if (config.sarDraft !== undefined) {
+    const sarDraftHandler = buildSarDraftHandler({
+      generator: config.sarDraft.generator,
+      audit,
+    });
+    guarded.post("/brain/sar-draft", sarDraftHandler);
   }
 
   app.route("/v1", guarded);

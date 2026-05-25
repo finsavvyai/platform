@@ -2,7 +2,7 @@
 
 **Snapshot date:** 2026-05-25
 **Snapshot type:** manifest-only (source >100MB)
-**Disposition:** off-thesis
+**Disposition:** superseded — ON HOLD / externalize
 
 ## Source
 - **Path:** `/Users/shaharsolomon/dev/projects/portfolio/pixel-pets/`
@@ -31,8 +31,6 @@ AI creature franchise — off-thesis vs developer/infrastructure plays.
 None.
 
 ## Suggested final disposition
-**Preserve 90 days.** Note: commit activity within the last few days
-(2026-05-23). Although off-thesis for FinsavvyAI, the project is fresh
-and being actively spec'd as a separate venture. Confirm with founder
-before deletion — this may need to move to a personal-projects org
-rather than be deleted.
+**Superseded by `EXTERNALIZE_PLAN.md`.** Preserve the original source
+until spin-out is complete. Do not delete after 90 days; the archive
+sweep is on hold for this project.

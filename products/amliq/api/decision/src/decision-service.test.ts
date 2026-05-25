@@ -166,6 +166,22 @@ describe("decision-service.createDecisionService", () => {
     expect(audit.calls[0]?.decision).toBe("allow");
   });
 
+  it("uses deps.newRequestId when supplied (line 51 truthy branch)", async () => {
+    const qb = mockClient("quantumbeam", { risk_score: 5 });
+    const audit = recordingAudit();
+    const svc = createDecisionService({
+      engineClients: { quantumbeam: qb, "ml-fraud": qb },
+      audit,
+      actorIdFor: (r) => `actor:${r.tenant_id}`,
+      newDecisionId: () => "dec_n",
+      newRequestId: (r) => `req_custom_${r.transaction.transaction_id}`,
+    });
+    const out = await svc.handle(req());
+    expect(out.request_id).toBe("req_custom_t1");
+    expect(audit.calls[0]?.meta?.request_id).toBe("req_custom_t1");
+    expect(audit.calls[0]?.actorId).toBe("actor:tenantA");
+  });
+
   it("unconfigured engine client → stable error result, no throw", async () => {
     const qb = mockClient("quantumbeam", { risk_score: 20 });
     const audit = recordingAudit();

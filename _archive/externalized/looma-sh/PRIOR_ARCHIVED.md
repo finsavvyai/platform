@@ -2,7 +2,7 @@
 
 **Snapshot date:** 2026-05-25
 **Snapshot type:** manifest-only (source >100MB)
-**Disposition:** off-thesis
+**Disposition:** superseded — ON HOLD / externalize
 
 ## Source
 - **Path:** `/Users/shaharsolomon/dev/projects/portfolio/looma-sh/`
@@ -40,5 +40,6 @@ production-grade Workers auth with KV-backed API keys, take a look at
 this repo's `app/.planning/ROADMAP.md` and signup handler before delete.
 
 ## Suggested final disposition
-**Preserve 60 days, then delete.** Live in production at last check —
-verify the relay.looma.sh service is actually shut down before deletion.
+**Superseded by `SPIN_OUT_PLAN.md`.** Preserve the original source until
+spin-out is complete. Do not delete after 60 days; the archive sweep is
+on hold for this project.

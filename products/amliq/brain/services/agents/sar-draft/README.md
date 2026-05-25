@@ -50,6 +50,7 @@ sar-draft/
 ├── src/sar_draft/
 │   ├── __init__.py
 │   ├── types.py
+│   ├── http_runtime.py
 │   ├── template_registry.py
 │   ├── context_fill.py
 │   ├── draft_agent.py
@@ -92,6 +93,7 @@ Coverage gates (enforced in CI once wired):
 ## Status (M2 W6)
 
 Skeleton only. Placeholder template content. End-to-end happy path with
-mocked `RetrievalAdapter` + `AuditEmitter` passes. Real FinCEN narratives,
-PII redaction integration with the TS audit sink, and the human-review UI
-land in subsequent weeks.
+mocked `RetrievalAdapter` + `AuditEmitter` passes. `http_runtime.py`
+defines the `{ok, draft}` transport envelope consumed by the TS Brain API
+HTTP generator. Real FinCEN narratives, PII redaction integration with the
+TS audit sink, and the human-review UI land in subsequent weeks.

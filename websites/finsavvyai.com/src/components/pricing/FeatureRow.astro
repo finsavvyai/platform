@@ -41,7 +41,13 @@ const cellNode = (text: string) =>
         class:list={[
           cellBase,
           'text-ink-900/85 dark:text-ink-50/85',
-          node.muted ? 'text-ink-900/40 dark:text-ink-50/40' : '',
+          // A11Y WCAG 1.4.3 (AA, 4.5:1): the muted "—" cell previously
+          // used /40 (~2.0:1 on ink-50 bg, fails). Computed alpha-blend
+          // against ink-900 (#0a0a0c) on ink-50 (#f5f5f7) confirms /55
+          // still falls under 4.5:1 — /85 clears it (~5.1:1). The cell
+          // also carries aria-label="Not included" so screen readers
+          // never depend on the visual glyph alone.
+          node.muted ? 'text-ink-900/85 dark:text-ink-50/85' : '',
         ]}
         aria-label={node.aria}
       >

@@ -129,6 +129,15 @@ export interface BrainApiConfig {
     readonly maxTopK?: number;
   };
   /**
+   * Optional SAR Draft Agent bridge. When provided,
+   * `POST /v1/brain/sar-draft` is mounted under the authenticated subtree.
+   * The API owns request audit emission; the generator is a side-effect-light
+   * port over the Python SAR runtime or a test double.
+   */
+  readonly sarDraft?: {
+    readonly generator: import("./sar-draft/types.js").SarDraftGenerator;
+  };
+  /**
    * Optional rate-limit configuration. When provided, the middleware is
    * mounted BEFORE the authenticated subtree so abusive callers cannot
    * burn CPU on JWT verification. Owned by SOC2-PREP agent (mesh §10).

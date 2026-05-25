@@ -95,6 +95,33 @@ jobs:
       - name: pnpm audit (block on high/critical)
         run: pnpm audit --prod --audit-level=high
 
+  pip-audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit
+        run: pip install --upgrade pip pip-audit
+      - name: Audit oss/finsavvy-rag/services/* requirements (block on HIGH/CRITICAL)
+        run: |
+          set -e
+          shopt -s nullglob
+          fail=0
+          for req in oss/finsavvy-rag/services/*/requirements.txt; do
+            echo "::group::pip-audit $req"
+            # --strict: any vuln fails; --vulnerability-service osv (default PyPI + OSV).
+            # Re-runs with explicit ignore list possible; for now any HIGH or CRITICAL fails.
+            pip-audit -r "$req" --strict --disable-pip || fail=1
+            echo "::endgroup::"
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::pip-audit detected vulnerabilities in one or more requirements files"
+            exit 1
+          fi
+
   secret-scan:
     name: secret-scan
     runs-on: ubuntu-latest

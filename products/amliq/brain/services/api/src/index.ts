@@ -8,6 +8,22 @@
 export { createBrainApp } from "./server.js";
 export type { BrainApp } from "./server.js";
 
+export { createBrainHostApp } from "./runtime.js";
+export type { BrainHostConfig } from "./runtime.js";
+
+export {
+  createBrainWorkerApp,
+  createBrainWorkerFetch,
+  default as brainWorker,
+} from "./worker.js";
+export type { BrainWorkerDeps, BrainWorkerEnv } from "./worker.js";
+
+export {
+  createWorkerAuthVerifier,
+  workerRequiredRole,
+} from "./worker-auth.js";
+export type { BrainWorkerAuthEnv } from "./worker-auth.js";
+
 export {
   buildAuthMiddleware,
   getBrainAuth,
@@ -25,12 +41,16 @@ export { HealthBuilder } from "./health.js";
 export type { HealthBuilderOptions } from "./health.js";
 
 export {
+  createHttpSearchAdapter,
   buildSearchHandler,
+  HttpSearchAdapter,
   linkCitations,
 } from "./search/index.js";
 export type {
   Citation,
+  HttpSearchAdapterOptions,
   SearchAdapter,
+  SearchAdapterErrorCode,
   SearchAdapterHit,
   SearchAdapterQuery,
   SearchAdapterResult,
@@ -40,6 +60,24 @@ export type {
   SearchResponse,
   SearchResult,
 } from "./search/index.js";
+export { SearchAdapterError } from "./search/index.js";
+
+export {
+  buildSarDraftHandler,
+  createHttpSarDraftGenerator,
+  HttpSarDraftGenerator,
+  SarDraftGeneratorError,
+} from "./sar-draft/index.js";
+export type {
+  HttpSarDraftGeneratorOptions,
+  SarAlertInput,
+  SarDraft,
+  SarDraftErrorCode,
+  SarDraftGenerator,
+  SarDraftGeneratorErrorCode,
+  SarDraftHandlerOptions,
+  SarDraftResponse,
+} from "./sar-draft/index.js";
 
 export * from "./rate-limit/index.js";
 

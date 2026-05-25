@@ -34,6 +34,9 @@ export const verifyChain = (
   if (records.length === 0) return { ok: true };
 
   const first = records[0];
+  // Defensive TS-strict guard: records.length > 0 here guarantees records[0]
+  // is defined. Kept for the `noUncheckedIndexedAccess` compiler flag.
+  /* v8 ignore next */
   if (first === undefined) return { ok: true };
 
   let prevHash: string | null = null;
@@ -41,6 +44,9 @@ export const verifyChain = (
 
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
+    // Defensive: i < records.length guarantees indexed access is defined;
+    // this branch only exists to satisfy `noUncheckedIndexedAccess`.
+    /* v8 ignore next */
     if (r === undefined) return fail(i, "sequence_gap");
     const c = r.chained;
 

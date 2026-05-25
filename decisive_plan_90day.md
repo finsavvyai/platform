@@ -1,10 +1,23 @@
-# FinsavvyAI — Decisive 90-Day Plan
+# FinsavvyAI — Decisive 6-Month Execution Plan
 
-**Status:** May 25, 2026. Locked decisions integrated. One plan, six months, ship-or-pivot gates.
+**Status:** May 26, 2026. Locked decisions integrated. Execution started. First 90 days prove the product; the following 90 days convert revenue, compliance, and the Series A.
 
 **The bet:** Run the consolidation finish line in parallel with launching AMLIQ Brain, then close Series A on a "developer wedge + compliance wedge + integrated platform" thesis backed by 5 paying Brain customers and SOC 2 Type 1.
 
-**The deadline:** GA + Series A close by **end of Q4 2026** (November 30).
+**The deadline:** AMLIQ Brain GA + Series A close by **November 30, 2026**.
+
+## Scope frame
+
+This is no longer framed as a pure 90-day plan. It is a 6-month execution plan with two explicit phases:
+
+| Phase | Window | Purpose | Exit signal |
+|---|---|---|---|
+| Phase 1 | First 90 days, W1-W12 | Prove AMLIQ Brain, keep AMLIQ Investigate migration moving, lock design partners, start SOC 2. | 3 agents in weekly partner use, SOC 2 audit in progress, first Brain Pro contract drafted. |
+| Phase 2 | Second 90 days, W13-W24 plus Nov close buffer | Convert design partners to paid, finish SOC 2 Type 1, launch Brain GA, close Series A. | 5+ paying customers, $500K+ ARR run-rate, SOC 2 Type 1, Series A closed. |
+
+Calendar note: the week-by-week execution schedule runs through W24 (ending November 8). November 9-30 is the close buffer for legal, funding wires, customer procurement, and GA follow-through.
+
+**Execution tracker:** `docs/execution/decisive_6month_implementation_status.md`
 
 ---
 
@@ -23,7 +36,7 @@
 | 9 | Fundraise | **Roll Brain into existing Series A pitch (no separate seed)** | Founder lock |
 | 10 | M&A relationships | **Start now with LSEG, Moody's, NICE Actimize. Avoid Salesforce/Microsoft/Google pitches.** | Brief Pt 10 |
 
-## Additional decisions DECIDED in this plan (confirm or override)
+## Decided by default (override before irreversible action)
 
 | # | Decision | Default | Override path |
 |---|---|---|---|
@@ -35,11 +48,11 @@
 | 16 | autoboot (FastPM) | **Reclassify ARCHIVE, redirect fastpm.dev → finsavvyai.com.** | Reply to keep running |
 | 17 | opensource/ folder | **Move to `infrastructure/vendored/opensource/`. Mark third-party (not yours).** | n/a |
 
-**If no override by Wednesday May 27, defaults stand. Plan starts executing Thursday May 28.**
+**Execution has started.** Any owner override before end of day Wednesday May 27 replaces a default before irreversible work on that item.
 
 ---
 
-## Week-by-week — first 90 days
+## Six-month schedule — prove first, close second
 
 ### Week 1 — Cleanup + relationship starts (May 25-31)
 
@@ -187,7 +200,7 @@
 
 ---
 
-## Out of scope for 90 days (deliberately deferred)
+## Out of scope through Month 6 (deliberately deferred)
 
 - Banking core integrations (Mambu/Temenos/Finastra) — M7-9
 - EU + UK jurisdictional expansion — M7-12

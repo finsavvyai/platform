@@ -1,5 +1,19 @@
 # @finsavvyai/ai-gateway
 
+## SPEC PACKAGE
+
+This package is the canonical SPECIFICATION + reference implementation for
+the AI gateway (provider routing, retries, cache, accounting) and its edge
+transport (JWT, rate-limit, audit, security headers).
+Products do NOT import from this package at runtime (round-2 isolation rule:
+`products/*` must not import `@finsavvyai/*`).
+Products MAY copy types or mirror logic from here; any drift is reviewed
+against this source of truth.
+
+See [SPEC.md](./SPEC.md) for the contract reference.
+
+---
+
 AI gateway with two layers, both ESM, both runtime-agnostic, both fully typed.
 
 ## Layer 1 — orchestrator (round 1)

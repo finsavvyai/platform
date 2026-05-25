@@ -1,5 +1,18 @@
 # @finsavvyai/shared-types
 
+## SPEC PACKAGE
+
+This package is the canonical SPECIFICATION + reference implementation for
+cross-product wire types (AML scoring, audit events, branded identifiers).
+Products do NOT import from this package at runtime (round-2 isolation rule:
+`products/*` must not import `@finsavvyai/*`).
+Products MAY copy types or mirror logic from here; any drift is reviewed
+against this source of truth.
+
+See [SPEC.md](./SPEC.md) for the contract reference.
+
+---
+
 Cross-product TypeScript type contracts for the FinsavvyAI platform.
 
 ## Scope

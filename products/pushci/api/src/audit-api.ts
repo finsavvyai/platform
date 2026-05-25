@@ -2,13 +2,16 @@
 
 import { Hono } from "hono";
 import { getAuthUser } from "./team-auth";
+import { requirePlan } from "./usage";
 import type { Env } from "./types";
 
 type Bindings = Env;
 export const auditApiRoutes = new Hono<{ Bindings: Bindings }>();
 
-// GET /api/audit/logs — paginated, filterable audit log
-auditApiRoutes.get("/logs", async (c) => {
+// GET /api/audit/logs — paginated, filterable audit log.
+// Team-only feature: requirePlan("team") returns 403 upgrade_required for
+// free/pro users. Tenant-scoped via actor_sub = user.sub below.
+auditApiRoutes.get("/logs", requirePlan("team"), async (c) => {
   const user = await getAuthUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
 
