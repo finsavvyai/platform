@@ -1,0 +1,330 @@
+# Cloud-ready Docker Compose for Universal Dependency Platform
+# Optimized for cloud deployment with service mesh and observability
+
+version: '3.8'
+
+x-common-environment: &common-env
+  ENVIRONMENT: ${ENVIRONMENT:-production}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  DATABASE_URL: ${DATABASE_URL:-postgresql://udp_user:udp_password@postgres:5432/udp_prod}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  SECRET_KEY: ${SECRET_KEY}
+  CORS_ORIGINS: ${CORS_ORIGINS:-["https://app.universaldependency.com"]}
+  MONITORING_ENABLED: "true"
+  TRACING_ENABLED: "true"
+  JAEGER_ENDPOINT: ${JAEGER_ENDPOINT:-http://jaeger:14268/api/traces}
+
+x-common-config: &common-config
+  restart: unless-stopped
+  networks:
+    - udp-cloud
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  # Main UDP API Service
+  udp-api:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: Dockerfile.cloud
+      target: production
+      args:
+        PYTHON_VERSION: "3.11"
+        POETRY_VERSION: "1.7.1"
+    image: udp/api:${VERSION:-latest}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      <<: *common-env
+      SERVICE_NAME: udp-api
+      SERVICE_VERSION: ${VERSION:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: ${API_REPLICAS:-2}
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.udp-api.rule=Host(`api.universaldependency.com`)"
+      - "traefik.http.services.udp-api.loadbalancer.server.port=8000"
+
+  # Celery Worker Pool
+  udp-worker:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: Dockerfile.cloud
+      target: celery-worker
+    image: udp/worker:${VERSION:-latest}
+    environment:
+      <<: *common-env
+      SERVICE_NAME: udp-worker
+      C_FORCE_ROOT: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: ${WORKER_REPLICAS:-3}
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  # Celery Beat Scheduler
+  udp-beat:
+    <<: *common-config
+    build:
+      context: .
+      dockerfile: Dockerfile.cloud
+      target: celery-beat
+    image: udp/beat:${VERSION:-latest}
+    environment:
+      <<: *common-env
+      SERVICE_NAME: udp-beat
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - celery_beat_data:/tmp
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # PostgreSQL Database with Cloud Configuration
+  postgres:
+    <<: *common-config
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-udp_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-udp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deployment/postgres/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./deployment/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-udp_user} -d ${POSTGRES_DB:-udp_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
+
+  # Redis with Clustering Support
+  redis:
+    <<: *common-config
+    image: redis:7-alpine
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./deployment/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # Traefik Load Balancer
+  traefik:
+    <<: *common-config
+    image: traefik:v3.0
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--metrics.prometheus=true"
+      - "--tracing.jaeger.samplingServerURL=http://jaeger:5778/sampling"
+      - "--tracing.jaeger.localAgentHostPort=jaeger:6831"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_data:/acme.json
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.universaldependency.com`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+
+  # Prometheus Monitoring
+  prometheus:
+    <<: *common-config
+    image: prom/prometheus:latest
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.wal-compression'
+    volumes:
+      - ./monitoring/prometheus.cloud.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  # Grafana Dashboards
+  grafana:
+    <<: *common-config
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: "grafana-piechart-panel,grafana-worldmap-panel"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+  # Jaeger Tracing
+  jaeger:
+    <<: *common-config
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: ":9411"
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # Elasticsearch for Logs
+  elasticsearch:
+    <<: *common-config
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # Kibana for Log Visualization
+  kibana:
+    <<: *common-config
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  # Logstash for Log Processing
+  logstash:
+    <<: *common-config
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    volumes:
+      - ./deployment/logstash/pipeline:/usr/share/logstash/pipeline
+    ports:
+      - "5044:5044"
+    depends_on:
+      - elasticsearch
+
+  # Backup Service
+  backup:
+    <<: *common-config
+    image: postgres:15-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - backup_data:/backups
+      - ./scripts/backup.sh:/backup.sh
+    command: ["sh", "-c", "while true; do sleep 86400; /backup.sh; done"]
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  traefik_data:
+    driver: local
+  celery_beat_data:
+    driver: local
+  backup_data:
+    driver: local
+
+networks:
+  udp-cloud:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

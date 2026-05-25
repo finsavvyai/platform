@@ -1,0 +1,425 @@
+# Azure DevOps Pipeline for Universal Dependency Platform
+# Multi-stage YAML pipeline with security, testing, and deployment
+
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+    - staging
+  paths:
+    exclude:
+    - docs/*
+    - README.md
+
+pr:
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    exclude:
+    - docs/*
+    - README.md
+
+variables:
+  # Build Configuration
+  pythonVersion: '3.11'
+  poetryVersion: '1.7.1'
+
+  # Container Registry
+  containerRegistry: 'udpcontainerregistry'
+  imageRepository: 'universal-dependency-platform'
+  dockerfilePath: '$(Build.SourcesDirectory)/Dockerfile.cloud'
+
+  # Kubernetes Configuration
+  kubernetesServiceConnection: 'udp-k8s-connection'
+
+  # Environment URLs
+  ${{ if eq(variables['Build.SourceBranchName'], 'develop') }}:
+    deploymentEnvironment: 'development'
+    kubernetesNamespace: 'udp-dev'
+    appUrl: 'https://dev-api.universaldependency.com'
+  ${{ elseif eq(variables['Build.SourceBranchName'], 'staging') }}:
+    deploymentEnvironment: 'staging'
+    kubernetesNamespace: 'udp-staging'
+    appUrl: 'https://staging-api.universaldependency.com'
+  ${{ elseif eq(variables['Build.SourceBranchName'], 'main') }}:
+    deploymentEnvironment: 'production'
+    kubernetesNamespace: 'udp-prod'
+    appUrl: 'https://api.universaldependency.com'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+# Security and Quality Stage
+- stage: SecurityAndQuality
+  displayName: 'Security & Code Quality'
+  jobs:
+  - job: SecurityScan
+    displayName: 'Security Scanning'
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(pythonVersion)'
+      displayName: 'Use Python $(pythonVersion)'
+
+    - script: |
+        python -m pip install --upgrade pip
+        pip install bandit safety
+      displayName: 'Install security tools'
+
+    - script: |
+        bandit -r src/udp -f json -o $(Build.ArtifactStagingDirectory)/bandit-report.json || true
+        safety check --json --output $(Build.ArtifactStagingDirectory)/safety-report.json || true
+      displayName: 'Run security scans'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'security-reports'
+      displayName: 'Publish security reports'
+
+  - job: CodeQuality
+    displayName: 'Code Quality'
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(pythonVersion)'
+
+    - script: |
+        pip install poetry==$(poetryVersion)
+        poetry config virtualenvs.in-project true
+        poetry install --with dev
+      displayName: 'Install dependencies'
+
+    - script: |
+        poetry run ruff check src/ tests/ --output-format=json > $(Build.ArtifactStagingDirectory)/ruff-report.json || true
+        poetry run ruff format --check src/ tests/
+      displayName: 'Run linting'
+
+    - script: |
+        poetry run mypy src/udp --junit-xml=$(Build.ArtifactStagingDirectory)/mypy-results.xml || true
+      displayName: 'Run type checking'
+
+    - task: PublishTestResults@2
+      condition: always()
+      inputs:
+        testResultsFiles: '$(Build.ArtifactStagingDirectory)/mypy-results.xml'
+        testRunTitle: 'MyPy Type Checking'
+
+# Test Stage
+- stage: Test
+  displayName: 'Testing'
+  dependsOn: SecurityAndQuality
+  jobs:
+  - job: UnitTests
+    displayName: 'Unit Tests'
+    services:
+      postgres: postgres:15-alpine
+      redis: redis:7-alpine
+    variables:
+      POSTGRES_DB: udp_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/udp_test
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: test-secret-key-for-azure-devops-pipeline
+      ENVIRONMENT: testing
+
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(pythonVersion)'
+
+    - script: |
+        pip install poetry==$(poetryVersion)
+        poetry config virtualenvs.in-project true
+        poetry install --with dev
+      displayName: 'Install dependencies'
+
+    - script: |
+        poetry run pytest tests/ -v \
+          --cov=src/udp \
+          --cov-report=xml \
+          --cov-report=html \
+          --junit-xml=$(Build.ArtifactStagingDirectory)/test-results.xml
+      displayName: 'Run unit tests'
+
+    - task: PublishTestResults@2
+      condition: always()
+      inputs:
+        testResultsFiles: '$(Build.ArtifactStagingDirectory)/test-results.xml'
+        testRunTitle: 'Unit Tests'
+
+    - task: PublishCodeCoverageResults@1
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage.xml'
+        reportDirectory: '$(System.DefaultWorkingDirectory)/htmlcov'
+
+  - job: IntegrationTests
+    displayName: 'Integration Tests'
+    condition: and(succeeded(), in(variables['Build.SourceBranchName'], 'main', 'develop', 'staging'))
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(pythonVersion)'
+
+    - script: |
+        pip install poetry==$(poetryVersion)
+        poetry install --with dev
+      displayName: 'Install dependencies'
+
+    - script: |
+        docker-compose -f docker-compose.cloud.yml up -d postgres redis
+        sleep 30
+      displayName: 'Start services'
+
+    - script: |
+        export DATABASE_URL=postgresql://udp_user:udp_password@localhost:5432/udp_prod
+        export REDIS_URL=redis://localhost:6379/0
+        poetry run pytest tests/integration/ -v \
+          --junit-xml=$(Build.ArtifactStagingDirectory)/integration-results.xml
+      displayName: 'Run integration tests'
+
+    - script: |
+        docker-compose -f docker-compose.cloud.yml down
+      displayName: 'Stop services'
+      condition: always()
+
+    - task: PublishTestResults@2
+      condition: always()
+      inputs:
+        testResultsFiles: '$(Build.ArtifactStagingDirectory)/integration-results.xml'
+        testRunTitle: 'Integration Tests'
+
+# Build Stage
+- stage: Build
+  displayName: 'Build Images'
+  dependsOn: Test
+  condition: and(succeeded(), in(variables['Build.SourceBranchName'], 'main', 'develop', 'staging'))
+  jobs:
+  - job: BuildImages
+    displayName: 'Build Docker Images'
+    steps:
+    - task: Docker@2
+      displayName: 'Build API Image'
+      inputs:
+        containerRegistry: '$(containerRegistry)'
+        repository: '$(imageRepository)/api'
+        command: 'buildAndPush'
+        Dockerfile: '$(dockerfilePath)'
+        buildContext: '$(Build.SourcesDirectory)'
+        arguments: '--target production'
+        tags: |
+          $(Build.BuildId)
+          latest
+
+    - task: Docker@2
+      displayName: 'Build Worker Image'
+      inputs:
+        containerRegistry: '$(containerRegistry)'
+        repository: '$(imageRepository)/worker'
+        command: 'buildAndPush'
+        Dockerfile: '$(dockerfilePath)'
+        buildContext: '$(Build.SourcesDirectory)'
+        arguments: '--target celery-worker'
+        tags: |
+          $(Build.BuildId)
+          latest
+
+    - task: Docker@2
+      displayName: 'Build Beat Image'
+      inputs:
+        containerRegistry: '$(containerRegistry)'
+        repository: '$(imageRepository)/beat'
+        command: 'buildAndPush'
+        Dockerfile: '$(dockerfilePath)'
+        buildContext: '$(Build.SourcesDirectory)'
+        arguments: '--target celery-beat'
+        tags: |
+          $(Build.BuildId)
+          latest
+
+# Container Security Scanning
+- stage: ContainerSecurity
+  displayName: 'Container Security'
+  dependsOn: Build
+  jobs:
+  - job: ContainerScan
+    displayName: 'Container Security Scan'
+    steps:
+    - task: AquaSecurityTrivy@0
+      inputs:
+        image: '$(containerRegistry).azurecr.io/$(imageRepository)/api:$(Build.BuildId)'
+        outputFormat: 'json'
+        outputFile: '$(Build.ArtifactStagingDirectory)/trivy-api-report.json'
+      displayName: 'Scan API container'
+
+    - task: AquaSecurityTrivy@0
+      inputs:
+        image: '$(containerRegistry).azurecr.io/$(imageRepository)/worker:$(Build.BuildId)'
+        outputFormat: 'json'
+        outputFile: '$(Build.ArtifactStagingDirectory)/trivy-worker-report.json'
+      displayName: 'Scan Worker container'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'container-security-reports'
+
+# Deployment Stages
+- stage: DeployDevelopment
+  displayName: 'Deploy to Development'
+  dependsOn: [Build, ContainerSecurity]
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'develop'))
+  jobs:
+  - deployment: DeployDev
+    displayName: 'Deploy to Development'
+    environment: 'development'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: KubernetesManifest@0
+            displayName: 'Deploy to Kubernetes'
+            inputs:
+              action: 'deploy'
+              kubernetesServiceConnection: '$(kubernetesServiceConnection)'
+              namespace: '$(kubernetesNamespace)'
+              manifests: |
+                k8s/overlays/development/*.yaml
+
+          - task: Kubernetes@1
+            displayName: 'Update image tags'
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: '$(kubernetesServiceConnection)'
+              namespace: '$(kubernetesNamespace)'
+              command: 'set'
+              arguments: 'image deployment/udp-api udp-api=$(containerRegistry).azurecr.io/$(imageRepository)/api:$(Build.BuildId)'
+
+          - task: Kubernetes@1
+            displayName: 'Wait for deployment'
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: '$(kubernetesServiceConnection)'
+              namespace: '$(kubernetesNamespace)'
+              command: 'rollout'
+              arguments: 'status deployment/udp-api --timeout=600s'
+
+          - task: PowerShell@2
+            displayName: 'Health check'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Start-Sleep -Seconds 30
+                $response = Invoke-WebRequest -Uri "$(appUrl)/health" -UseBasicParsing
+                if ($response.StatusCode -ne 200) {
+                    throw "Health check failed"
+                }
+
+- stage: DeployStaging
+  displayName: 'Deploy to Staging'
+  dependsOn: [Build, ContainerSecurity]
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'staging'))
+  jobs:
+  - deployment: DeployStaging
+    displayName: 'Deploy to Staging'
+    environment: 'staging'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: KubernetesManifest@0
+            displayName: 'Deploy to Kubernetes'
+            inputs:
+              action: 'deploy'
+              kubernetesServiceConnection: '$(kubernetesServiceConnection)'
+              namespace: '$(kubernetesNamespace)'
+              manifests: |
+                k8s/overlays/staging/*.yaml
+
+          - task: Kubernetes@1
+            displayName: 'Update image tags'
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: '$(kubernetesServiceConnection)'
+              namespace: '$(kubernetesNamespace)'
+              command: 'set'
+              arguments: 'image deployment/udp-api udp-api=$(containerRegistry).azurecr.io/$(imageRepository)/api:$(Build.BuildId)'
+
+- stage: PerformanceTest
+  displayName: 'Performance Testing'
+  dependsOn: DeployStaging
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'staging'))
+  jobs:
+  - job: LoadTest
+    displayName: 'Load Testing'
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '$(pythonVersion)'
+
+    - script: |
+        pip install locust
+      displayName: 'Install Locust'
+
+    - script: |
+        cd tests/performance
+        locust --headless \
+          --users 100 \
+          --spawn-rate 10 \
+          --run-time 300s \
+          --host $(appUrl) \
+          --html $(Build.ArtifactStagingDirectory)/performance-report.html \
+          --csv $(Build.ArtifactStagingDirectory)/performance
+      displayName: 'Run performance tests'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)'
+        artifactName: 'performance-reports'
+
+- stage: DeployProduction
+  displayName: 'Deploy to Production'
+  dependsOn: [Build, ContainerSecurity]
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+  jobs:
+  - deployment: DeployProd
+    displayName: 'Deploy to Production'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: KubernetesManifest@0
+            displayName: 'Deploy to Kubernetes'
+            inputs:
+              action: 'deploy'
+              kubernetesServiceConnection: '$(kubernetesServiceConnection)'
+              namespace: '$(kubernetesNamespace)'
+              manifests: |
+                k8s/overlays/production/*.yaml
+
+          - task: Kubernetes@1
+            displayName: 'Update image tags'
+            inputs:
+              connectionType: 'Kubernetes Service Connection'
+              kubernetesServiceEndpoint: '$(kubernetesServiceConnection)'
+              namespace: '$(kubernetesNamespace)'
+              command: 'set'
+              arguments: 'image deployment/udp-api udp-api=$(containerRegistry).azurecr.io/$(imageRepository)/api:$(Build.BuildId)'
+
+          - task: PowerShell@2
+            displayName: 'Post-deployment verification'
+            inputs:
+              targetType: 'inline'
+              script: |
+                Start-Sleep -Seconds 60
+                $response = Invoke-WebRequest -Uri "$(appUrl)/health" -UseBasicParsing
+                if ($response.StatusCode -ne 200) {
+                    throw "Production health check failed"
+                }

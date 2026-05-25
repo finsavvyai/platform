@@ -1,0 +1,73 @@
+name = "upm-api-gateway"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Environment variables
+[env.production]
+name = "upm-api-gateway"
+routes = [
+  { pattern = "api.upm.plus/*", zone_name = "upm.plus" }
+]
+
+[env.staging]
+name = "upm-api-gateway-staging"
+routes = [
+  { pattern = "api-staging.upm.plus/*", zone_name = "upm.plus" }
+]
+
+# KV Namespaces for caching
+[[kv_namespaces]]
+binding = "UPM_CACHE"
+id = "upm-cache-production"
+preview_id = "upm-cache-preview"
+
+[[kv_namespaces]]
+binding = "DEPENDENCY_CACHE"
+id = "dependency-cache-production"
+preview_id = "dependency-cache-preview"
+
+# D1 Database (SQLite)
+[[d1_databases]]
+binding = "UPM_DB"
+database_name = "upm-database-production"
+database_id = "upm-db-production-id"
+
+[[d1_databases]]
+binding = "UPM_DB_STAGING"
+database_name = "upm-database-staging"
+database_id = "upm-db-staging-id"
+
+# R2 Storage for file uploads
+[[r2_buckets]]
+binding = "UPM_STORAGE"
+bucket_name = "upm-storage-production"
+
+[[r2_buckets]]
+binding = "UPM_STORAGE_STAGING"
+bucket_name = "upm-storage-staging"
+
+# Queue for background processing
+[[queues.producers]]
+binding = "ANALYSIS_QUEUE"
+queue = "upm-analysis-queue"
+
+[[queues.consumers]]
+queue = "upm-analysis-queue"
+max_batch_size = 10
+max_batch_timeout = 30
+
+# Environment secrets (set via wrangler secret put)
+# - UPM_BACKEND_URL: URL to main backend API
+# - JWT_SECRET: Secret for JWT token signing
+# - VULNERABILITY_DB_API_KEY: API key for vulnerability databases
+# - GITHUB_TOKEN: GitHub token for repository analysis
+# - NPM_TOKEN: npm token for package analysis
+
+# Variable bindings
+[vars]
+ENVIRONMENT = "production"
+API_VERSION = "v1"
+MAX_REQUEST_SIZE = "104857600"  # 100MB
+CACHE_TTL = "3600"  # 1 hour
+RATE_LIMIT = "1000"  # requests per minute

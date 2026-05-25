@@ -1,0 +1,226 @@
+# UDP Ingress for external access via Google Cloud Load Balancer
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: udp-ingress
+  namespace: udp
+  labels:
+    app: udp
+    component: ingress
+  annotations:
+    # Google Cloud Load Balancer configuration
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "udp-ip"
+    cloud.google.com/backend-config: '{"default": "udp-api-backend-config"}'
+    cloud.google.com/health-checks: '{"8000": "udp-health-check"}'
+
+    # SSL configuration (for future use)
+    kubernetes.io/ingress.allow-http: "true"
+    # kubernetes.io/managed-certificates: "udp-ssl-cert"
+
+    # Rate limiting and security
+    cloud.google.com/armor-config: '{"udp-security-policy": "udp-armor-policy"}'
+
+    # Connection settings
+    cloud.google.com/connection-draining-timeout: "60"
+    cloud.google.com/session-affinity: "CLIENT_IP"
+
+    # Monitoring
+    prometheus.io/probe: "true"
+    prometheus.io/probe-path: "/health"
+spec:
+  rules:
+  - host: udp.example.com  # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: udp-api-service
+            port:
+              number: 8000
+  - http:  # Default backend for IP access
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: udp-api-service
+            port:
+              number: 8000
+  # TLS configuration (uncomment when SSL is configured)
+  # tls:
+  # - hosts:
+  #   - udp.example.com
+  #   secretName: udp-tls-secret
+
+---
+# Health check for Google Cloud Load Balancer
+apiVersion: cloud.google.com/v1
+kind: HealthCheck
+metadata:
+  name: udp-health-check
+  namespace: udp
+  labels:
+    app: udp
+    component: health-check
+spec:
+  type: HTTP
+  httpHealthCheck:
+    port: 8000
+    requestPath: /health/ready
+  checkIntervalSec: 30
+  timeoutSec: 10
+  healthyThreshold: 1
+  unhealthyThreshold: 3
+
+---
+# Cloud Armor security policy
+apiVersion: cloud.google.com/v1
+kind: SecurityPolicy
+metadata:
+  name: udp-armor-policy
+  namespace: udp
+  labels:
+    app: udp
+    component: security-policy
+spec:
+  description: "Security policy for UDP API"
+
+  # Default rule - allow all by default
+  defaultRuleAction: "allow"
+
+  rules:
+  # Rate limiting rule
+  - priority: 1000
+    description: "Rate limiting rule"
+    match:
+      config:
+        srcIpRanges:
+        - "*"
+    rateLimitOptions:
+      rateLimitThreshold:
+        count: 100
+        intervalSec: 60
+      banThreshold:
+        count: 200
+        intervalSec: 60
+      banDurationSec: 300
+      enforceOnKey: IP
+    action: "rate_based_ban"
+
+  # Block common attack patterns
+  - priority: 2000
+    description: "Block SQL injection attempts"
+    match:
+      expr:
+        expression: "has(request.headers['user-agent']) &&
+                    (request.headers['user-agent'].contains('sqlmap') ||
+                     request.headers['user-agent'].contains('union') ||
+                     request.headers['user-agent'].contains('select'))"
+    action: "deny(403)"
+
+  # Geographic restrictions (optional - uncomment to enable)
+  # - priority: 3000
+  #   description: "Block traffic from certain countries"
+  #   match:
+  #     config:
+  #       srcRegionCodes:
+  #       - "CN"  # China
+  #       - "RU"  # Russia
+  #   action: "deny(403)"
+
+  # Allow health checks
+  - priority: 100
+    description: "Allow Google health checks"
+    match:
+      config:
+        srcIpRanges:
+        - "130.211.0.0/22"
+        - "35.191.0.0/16"
+        - "209.85.152.0/22"
+        - "209.85.204.0/22"
+    action: "allow"
+
+---
+# Static IP address reservation
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-ip-service
+  namespace: udp
+  annotations:
+    # This will be created manually or via script
+    cloud.google.com/load-balancer-type: "External"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: ""  # Will be populated by script
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 8000
+    protocol: TCP
+    name: https
+  selector:
+    app: udp
+    component: api
+
+---
+# Managed SSL certificate (for production use)
+# Uncomment when you have a domain configured
+# apiVersion: networking.gke.io/v1
+# kind: ManagedCertificate
+# metadata:
+#   name: udp-ssl-cert
+#   namespace: udp
+# spec:
+#   domains:
+#     - udp.example.com
+#     - api.udp.example.com
+
+---
+# FrontendConfig for additional load balancer settings
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: udp-frontend-config
+  namespace: udp
+  labels:
+    app: udp
+    component: frontend-config
+spec:
+  # SSL settings
+  sslPolicy: "udp-ssl-policy"
+
+  # Redirect HTTP to HTTPS (enable when SSL is configured)
+  redirectToHttps:
+    enabled: false  # Set to true when SSL is ready
+
+  # Custom headers
+  responseHeaders:
+    X-Frame-Options: "DENY"
+    X-Content-Type-Options: "nosniff"
+    X-XSS-Protection: "1; mode=block"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+    Referrer-Policy: "strict-origin-when-cross-origin"
+
+---
+# Network Endpoint Group for more advanced traffic management
+apiVersion: cloud.google.com/v1
+kind: NetworkEndpointGroup
+metadata:
+  name: udp-neg
+  namespace: udp
+  labels:
+    app: udp
+    component: network-endpoint-group
+spec:
+  type: "container-native"
+  networkEndpointType: "gce-vm-ip-port"
+  defaultPort: 8000
+  network: "udp-vpc"
+  subnetwork: "udp-subnet"

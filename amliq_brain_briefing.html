@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AMLIQ Brain — Founder Briefing</title>
+<style>
+  :root {
+    --ink-900: #14171a;
+    --ink-700: #2c3138;
+    --ink-500: #4a525c;
+    --ink-300: #8a93a0;
+    --ink-200: #c7ccd3;
+    --ink-100: #e6e9ee;
+    --ink-50:  #f3f5f8;
+    --bg:      #fbfcfd;
+    --accent:  #1a73e8;
+    --ok:      #2e7d32;
+    --warn:    #c0392b;
+    --gold:    #b8860b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink-900: #e8ebf0;
+      --ink-700: #c7ccd3;
+      --ink-500: #95a0ad;
+      --ink-300: #6a727d;
+      --ink-200: #3a414b;
+      --ink-100: #262b32;
+      --ink-50:  #1c2026;
+      --bg:      #14171a;
+      --accent:  #6ea8fe;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px; line-height: 1.6;
+    color: var(--ink-900); background: var(--bg);
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 56px 32px 96px; }
+  header.doc { border-bottom: 1px solid var(--ink-100); padding-bottom: 28px; margin-bottom: 36px; }
+  .eyebrow {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--accent); font-weight: 600; margin-bottom: 8px;
+  }
+  h1 {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+    font-size: 40px; font-weight: 700; letter-spacing: -0.02em;
+    line-height: 1.1; margin: 0 0 12px;
+  }
+  .subtitle { color: var(--ink-500); font-size: 17px; margin: 0; max-width: 720px; }
+  h2 {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+    font-size: 26px; font-weight: 700; letter-spacing: -0.015em;
+    margin: 56px 0 14px; padding-top: 8px;
+  }
+  h3 { font-size: 19px; font-weight: 600; margin: 32px 0 10px; }
+  h4 { font-size: 14px; font-weight: 600; margin: 20px 0 6px; color: var(--ink-700); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin: 5px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  strong { font-weight: 600; color: var(--ink-900); }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.86em; background: var(--ink-50);
+    padding: 1px 6px; border-radius: 4px; color: var(--ink-700);
+  }
+  hr { border: 0; border-top: 1px solid var(--ink-100); margin: 48px 0; }
+  /* TOC */
+  nav.toc {
+    background: var(--ink-50); border-radius: 12px;
+    padding: 18px 24px; margin-bottom: 36px; font-size: 14px;
+  }
+  nav.toc strong {
+    display: block; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--ink-500); margin-bottom: 8px;
+  }
+  nav.toc ol { columns: 2; column-gap: 36px; padding-left: 18px; margin: 0; }
+  nav.toc li { break-inside: avoid; margin: 3px 0; }
+  /* Section: locked decisions */
+  .lock-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px; margin: 16px 0 24px;
+  }
+  .lock-card {
+    background: var(--ink-50); border-radius: 12px; padding: 18px 20px;
+    border-left: 4px solid var(--ok);
+  }
+  .lock-card .tag {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--ok);
+    background: rgba(46, 125, 50, 0.12); padding: 3px 8px; border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .lock-card h4 { margin: 0 0 8px; text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--ink-900); }
+  .lock-card p { font-size: 14px; color: var(--ink-700); margin: 0; }
+  .lock-card .verdict { font-weight: 700; color: var(--ok); margin-top: 8px; display: block; font-size: 14px; }
+  /* Recommendation cards (open decisions) */
+  .rec {
+    background: var(--bg); border: 1px solid var(--ink-100); border-radius: 12px;
+    padding: 20px 24px; margin: 16px 0 24px;
+  }
+  .rec h3 { margin-top: 0; }
+  .rec .recline {
+    background: var(--ink-50); border-radius: 8px; padding: 12px 16px;
+    margin: 12px 0; font-size: 15px;
+  }
+  .rec .recline strong { display: inline-block; color: var(--accent); margin-right: 6px; }
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto; border: 1px solid var(--ink-100); border-radius: 10px;
+    margin: 16px 0 24px; background: var(--bg);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td {
+    text-align: left; padding: 12px 14px; vertical-align: top;
+    border-bottom: 1px solid var(--ink-100);
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  th {
+    background: var(--ink-50); font-weight: 600; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-500);
+    white-space: nowrap;
+  }
+  td .path {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px; color: var(--ink-500);
+    display: block; margin-top: 2px;
+  }
+  td.check { text-align: center; font-size: 16px; }
+  /* Narrative box */
+  .narrative {
+    background: linear-gradient(135deg, rgba(26,115,232,0.04), rgba(26,115,232,0.01));
+    border: 1px solid rgba(26,115,232,0.16); border-radius: 12px;
+    padding: 24px 28px; margin: 16px 0 24px;
+  }
+  .narrative p { font-size: 15.5px; line-height: 1.65; }
+  .narrative blockquote {
+    margin: 0; padding: 16px 20px; background: var(--bg);
+    border-left: 3px solid var(--accent); border-radius: 6px;
+    font-size: 15.5px; line-height: 1.65;
+  }
+  /* Callout */
+  .callout {
+    background: var(--ink-50); border-left: 3px solid var(--accent);
+    padding: 16px 20px; border-radius: 6px; margin: 16px 0 24px;
+  }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.gold { border-left-color: var(--gold); }
+  .callout h3 { margin-top: 0; }
+  /* Next actions */
+  .actions { counter-reset: act; list-style: none; padding: 0; }
+  .actions li {
+    background: var(--ink-50); border-radius: 10px;
+    padding: 14px 18px 14px 56px; counter-increment: act;
+    position: relative; margin-bottom: 8px;
+  }
+  .actions li::before {
+    content: counter(act);
+    position: absolute; left: 16px; top: 14px;
+    width: 28px; height: 28px; background: var(--accent); color: white;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .actions li strong { display: block; margin-bottom: 2px; }
+  .actions li span { font-size: 13.5px; color: var(--ink-500); }
+  /* Sources */
+  .sources {
+    background: var(--ink-50); border-radius: 12px;
+    padding: 20px 24px; margin-top: 8px;
+  }
+  .sources h2 { margin-top: 0; padding-top: 0; }
+  .sources ul { padding-left: 18px; }
+  .sources li { margin: 6px 0; font-size: 14px; }
+  /* Print */
+  @media print {
+    body { background: white; color: black; font-size: 11pt; }
+    main { max-width: 100%; padding: 0; }
+    .table-wrap, .narrative, .callout, .rec, .lock-card { border: 1px solid #ddd; background: white; }
+    h2, h3 { break-after: avoid; }
+    table { break-inside: avoid; }
+    nav.toc { background: white; border: 1px solid #ddd; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header class="doc">
+  <div class="eyebrow">Product Brief · May 2026</div>
+  <h1>AMLIQ Brain</h1>
+  <p class="subtitle">Vertical RAG + compliance-ops platform for regulated financial services — the organizational AI layer that horizontal players (Doti, Glean) cannot economically serve. Decisions locked, recommendations and integrated investor narrative below.</p>
+</header>
+
+<nav class="toc">
+  <strong>Contents</strong>
+  <ol>
+    <li><a href="#position">One-line position</a></li>
+    <li><a href="#thesis">The thesis</a></li>
+    <li><a href="#icp">ICP</a></li>
+    <li><a href="#surface">Product surface</a></li>
+    <li><a href="#diff">Differentiation matrix</a></li>
+    <li><a href="#tech">Technical architecture</a></li>
+    <li><a href="#plan">6-month MVP plan</a></li>
+    <li><a href="#locked">Locked decisions</a></li>
+    <li><a href="#recs">Remaining recommendations</a></li>
+    <li><a href="#narrative">Updated investor narrative</a></li>
+    <li><a href="#next">Next actions this week</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<section id="position">
+<h2>One-line position</h2>
+<div class="narrative">
+<p><strong>The organizational brain for compliance teams in regulated financial services</strong> — unified AI search + agent workflows across regulatory filings, internal policies, sanctions data, transaction context, and case history, with audit-grade traceability that horizontal enterprise-AI products (Doti, Glean, Microsoft Copilot) cannot match for this buyer.</p>
+<p>Launches as <strong>AMLIQ Brain</strong>, a second SKU under the existing AMLIQ brand (alongside <code>AMLIQ Investigate</code>).</p>
+</div>
+</section>
+
+<section id="thesis">
+<h2>The thesis — three forces in May 2026</h2>
+
+<h4>Buyer pain</h4>
+<p>SAR filing is the most-penalized BSA violation. Tier-2 banks deploying behavioral monitoring see 40–60% alert reduction. Fintechs in Series B+ have a Compliance Officer but a 2-5 person team drowning in alerts, regulatory updates, and case backlogs. They cannot afford LSEG World-Check (six figures/year) and they cannot use Glean (horizontal — doesn't know AML).</p>
+
+<h4>Doti-shaped exit window</h4>
+<p>Salesforce just bought Doti for ~$100M after 1 year on $7M raised. The horizontal-RAG category is consolidating into platform giants. The next acquisition wave will hit <strong>vertical RAG</strong> — LSEG, Moody's, NICE Actimize, ComplyAdvantage, FIS all need a defensive AI-native acquisition in the next 18 months.</p>
+
+<h4>Horizontals can't follow</h4>
+<p>Glean has SOC 2 + ISO 27001 + HIPAA + GDPR — they technically can serve regulated FSI. But their economics demand horizontal scale. They won't build AML-specific agents, sanctions data integrations, SAR draft templates, or banking-core connectors (Mambu, Temenos, Finastra). <strong>The vertical depth is the moat.</strong></p>
+</section>
+
+<section id="icp">
+<h2>ICP — initial customer profile</h2>
+
+<div class="callout">
+<h3>Primary v1 buyer</h3>
+<p><strong>Head of Compliance / MLRO at a Series B–D fintech or tier-2 regional bank.</strong></p>
+<ul>
+  <li><strong>Team size:</strong> 2–15 compliance professionals</li>
+  <li><strong>Pain:</strong> Drowning in regulatory updates, alert backlog, SAR queue. Spreadsheets + Slack + basic TM tool. Can't justify World-Check ($150-500K/yr). Auditor will flag the gap within 12 months.</li>
+  <li><strong>Budget:</strong> $20-80K/yr (vs World-Check $150K+ and Glean $50K+ horizontal that doesn't solve their problem)</li>
+  <li><strong>Decision cycle:</strong> 60-90 days; champion is the MLRO, blocker is procurement/security review</li>
+  <li><strong>Trigger:</strong> Failed audit finding, regulator visit, new product launch (esp. crypto, lending, payments), Series-B+ funding round</li>
+</ul>
+</div>
+
+<h4>Adjacent buyers (v2-v3)</h4>
+<p>Crypto exchanges (huge compliance burden, no established vendor) · Insurance carriers (Solvency II + audit trails) · Money services businesses (state-by-state licensing complexity) · Healthcare GRC teams (HIPAA + state regs + payor compliance — natural expansion off AML)</p>
+</section>
+
+<section id="surface">
+<h2>Product surface</h2>
+
+<h3>Search (table stakes)</h3>
+<p>Unified RAG across regulatory filings (FinCEN, FFIEC, BSA, AML5, EU AI Act, MiCA, FATF), internal policies, sanctions/PEP data (OFAC SDN, EU consolidated, UN), transaction context, case history, and adverse media. <strong>Citations on every answer. Audit log of every retrieval (regulator-grade).</strong></p>
+
+<h3>Agents (the wedge)</h3>
+<p>Three high-value agents that compress hours into minutes:</p>
+<ol>
+  <li><strong>SAR Draft Agent</strong> — given a flagged transaction + customer history, drafts the SAR narrative pulling from transaction context, prior cases, and regulatory templates. Analyst reviews and approves; never autonomous filing.</li>
+  <li><strong>Regulatory Change Agent</strong> — subscribes to FinCEN/FFIEC/EBA/MAS feeds; when a rule changes, drafts the policy delta + impact analysis + suggested team actions, opens a Jira ticket.</li>
+  <li><strong>Alert Triage Agent</strong> — for each alert from the bank's TM system, retrieves context (customer KYC, prior behavior, similar dispositioned alerts) and pre-classifies with reasoning chain.</li>
+</ol>
+<p>Each agent: action log, source citations, reversibility, 1:1 attribution to a human analyst at approval time.</p>
+
+<h3>Connectors (phased)</h3>
+<p><strong>Phase 1:</strong> Slack, Confluence, Jira, Microsoft Teams, Google Drive, SharePoint. <strong>Phase 2:</strong> Mambu, Temenos, Finastra (core banking), Actimize, SAS, NICE (legacy TM). <strong>Phase 3:</strong> Dow Jones Risk, Refinitiv adverse media, ComplyAdvantage screening API. <strong>MCP-native</strong> — all connectors are MCP servers, consumed internally and exposable to customer's own agents (Claude, Cursor, custom).</p>
+
+<h3>Audit-grade infrastructure (non-negotiable)</h3>
+<p>Tamper-evident log of every agent action (hash-chained) · Citation back to source-of-truth doc with version + timestamp on every retrieved chunk · Per-user, per-action permission model · Data residency (EU customer = EU vector DB) · SAML/SCIM · Customer-managed encryption keys at higher tiers · <strong>SOC 2 Type 1 at GA, Type 2 within 12 months, ISO 27001 within 18.</strong></p>
+</section>
+
+<section id="diff">
+<h2>Differentiation matrix</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr>
+    <th>Capability</th><th>AMLIQ Brain</th><th>Glean</th><th>Doti/Salesforce</th><th>Hummingbird</th><th>Unit21</th><th>Sardine</th>
+  </tr></thead>
+  <tbody>
+    <tr><td>Horizontal org search</td><td>✅ vertical-scoped</td><td>✅✅</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+    <tr><td>AML-specific agents</td><td>✅ core</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
+    <tr><td>Banking core integrations</td><td>✅ phase 2</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>✅</td></tr>
+    <tr><td>Sanctions/PEP feeds</td><td>✅ phase 1</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td><td>⚠️ partial</td></tr>
+    <tr><td>Audit-grade traceability</td><td>✅ core</td><td>✅ Protect tier</td><td>⚠️ inherited</td><td>✅</td><td>✅</td><td>✅</td></tr>
+    <tr><td>Regulatory change monitoring</td><td>✅ core</td><td>⚠️ generic</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td></tr>
+    <tr><td>MCP-native (BYO-agent)</td><td>✅ core</td><td>⚠️ early</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+    <tr><td>Mid-market price point</td><td>✅ $20-80K</td><td>❌ $50K+</td><td>n/a</td><td>❌ $80K+</td><td>❌ $100K+</td><td>❌ $80K+</td></tr>
+    <tr><td>Open-source primitives</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>The winning lane:</strong> Hummingbird/Unit21/Sardine own the alert-to-SAR workflow (case management). They don't own the broader knowledge layer (policies, regulatory feeds, ad-hoc research). AMLIQ Brain owns the knowledge layer + adds case-management-adjacent agents. Complementary at first, competitive at scale.</p>
+</section>
+
+<section id="tech">
+<h2>Technical architecture</h2>
+
+<h3>What you already have</h3>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Component</th><th>Source path</th><th>Role in Brain</th></tr></thead>
+  <tbody>
+    <tr><td>RAG primitives</td><td><code>/Users/shaharsolomon/dev/projects/FinSavvyAI_Distributed_RAG/</code></td><td>Vector index + retrieval; needs hardening for production scale</td></tr>
+    <tr><td>MCP connectors</td><td><code>oss/mcp-tooling/</code> (810 files)</td><td>Slack, Jira, Confluence, Drive → banking cores</td></tr>
+    <tr><td>Agent-to-agent</td><td><code>oss/a2a-framework/</code> (152 files)</td><td>Multi-agent workflows (alert triage → SAR draft → review)</td></tr>
+    <tr><td>Auth (SAML/SCIM/RBAC)</td><td><code>packages/auth/</code></td><td>Enterprise identity</td></tr>
+    <tr><td>Telemetry + audit logs</td><td><code>packages/telemetry/</code></td><td>Audit-grade event logging</td></tr>
+    <tr><td>AI gateway</td><td><code>packages/ai-gateway/</code> (from fintech-suite)</td><td>Provider routing, semantic cache, BYO-model</td></tr>
+    <tr><td>Billing</td><td><code>packages/billing/</code></td><td>Subscription tiers</td></tr>
+    <tr><td>Policy engine</td><td><code>packages/policy-engine/</code></td><td>PII redaction, data-residency policies</td></tr>
+    <tr><td>AMLIQ engines (Q3 fold)</td><td><code>products/amliq/engines/quantumbeam/</code> + <code>ml-fraud/</code></td><td>Fraud scoring in case-context-pull</td></tr>
+    <tr><td>Distributed LLM</td><td><code>02_AI_AGENTS/llm/</code></td><td><strong>Self-hosted inference for on-prem customers (now confirmed scope)</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>What you build new</h3>
+<ol>
+  <li><strong>Compliance corpus ingest pipeline</strong> — scheduled crawlers for FinCEN/FFIEC/EBA/MAS feeds with diff detection</li>
+  <li><strong>SAR template library + draft renderer</strong> — versioned per jurisdiction (FinCEN SAR, UK SAR, etc.)</li>
+  <li><strong>Sanctions/PEP normalizer</strong> — OFAC SDN + EU consolidated + UN into common entity model</li>
+  <li><strong>Per-customer vector DB provisioning</strong> — multi-tenant pgvector or per-tenant Qdrant; data residency-aware</li>
+  <li><strong>Tamper-evident audit log</strong> — hash-chained events; optional anchoring to public ledger for high-assurance</li>
+  <li><strong>Compliance certification track</strong> — SOC 2 prep, security questionnaire automation, vendor due-diligence pack</li>
+</ol>
+
+<h3>What you don't build (deliberately)</h3>
+<p>Transaction monitoring engine (Brain consumes alerts, doesn't generate them) · Customer-facing KYC onboarding (Sardine/Persona/Alloy own it) · Sanctions screening API (Brain pulls customer's existing screening results)</p>
+</section>
+
+<section id="plan">
+<h2>6-month MVP plan</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Month</th><th>Focus</th><th>Deliverables</th></tr></thead>
+  <tbody>
+    <tr><td><strong>M1</strong></td><td>Foundations</td><td>Promote <code>FinSavvyAI_Distributed_RAG</code> to <code>products/amliq/brain/rag/</code> · harden vector DB · FinCEN + FFIEC corpus ingest · wire <code>packages/auth</code> + <code>telemetry</code></td></tr>
+    <tr><td><strong>M2</strong></td><td>Connectors + search</td><td>Slack + Confluence + Google Drive (reuse <code>oss/mcp-tooling</code>) · search UI with citations · tamper-evident audit log spike</td></tr>
+    <tr><td><strong>M3</strong></td><td>First agent</td><td>SAR template library (US FinCEN first) · SAR Draft Agent end-to-end · multi-tenant data isolation</td></tr>
+    <tr><td><strong>M4</strong></td><td>Design partner enablement</td><td>Onboard 3 design partners (1 IL fintech, 1 US tier-2 bank, 1 crypto exchange) · Jira + Teams connectors · Regulatory Change Agent v1</td></tr>
+    <tr><td><strong>M5</strong></td><td>Hardening + compliance prep</td><td>Alert Triage Agent v1 · security review + pen test · SOC 2 Type 1 audit kickoff · pricing & packaging finalized</td></tr>
+    <tr><td><strong>M6</strong></td><td>GA launch</td><td>SOC 2 Type 1 complete · marketing site (atop existing <code>websites/finsavvyai.com/</code>) · Series A pitch updated with Brain · <strong>first 5 paying customers</strong> ($20-50K ACV each)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>Stretch (M7-9):</strong> Banking-core integrations (Mambu first), Dow Jones Risk feed, EU expansion with data residency.</p>
+</section>
+
+<section id="locked">
+<h2>Locked founder decisions</h2>
+<div class="lock-grid">
+  <div class="lock-card">
+    <span class="tag">Locked · 25 May 2026</span>
+    <h4>Brain vs existing AMLIQ migration</h4>
+    <p>Run both with shared engineering. AMLIQ Investigate continues per addendum Week 4-6; Brain shares the same <code>products/amliq/</code> tree and platform packages. No duplication of auth/billing/telemetry effort.</p>
+    <span class="verdict">→ Parallel</span>
+  </div>
+  <div class="lock-card">
+    <span class="tag">Locked · 25 May 2026</span>
+    <h4>Fundraise structure</h4>
+    <p>Roll Brain into the existing Series A pitch. Series A story expands from "infrastructure for AI-generated software" to "infrastructure + one vertical product with two SKUs." Raises round ceiling without splintering cap table.</p>
+    <span class="verdict">→ Existing Series A</span>
+  </div>
+  <div class="lock-card">
+    <span class="tag">Locked · 25 May 2026</span>
+    <h4>Deployment model</h4>
+    <p>Cloud-first GA, self-hosted available at higher tier from day 1. Same codebase, deployment-mode by config. <code>02_AI_AGENTS/llm</code> distributed cluster becomes the self-hosted inference backbone. Cloud serves mid-market cheaply; self-hosted unlocks tier-1 banks and EU data-residency.</p>
+    <span class="verdict">→ Both from day 1</span>
+  </div>
+</div>
+</section>
+
+<section id="recs">
+<h2>Remaining recommendations (7 decisions)</h2>
+
+<div class="rec">
+<h3>1. Naming</h3>
+<div class="recline"><strong>Recommend:</strong> AMLIQ umbrella with two SKUs — <code>AMLIQ Investigate</code> (analyst tool) + <code>AMLIQ Brain</code> (org-level platform).</div>
+<p>Single brand, two product surfaces. Marketing shows them as complementary; enterprise sells together, mid-market sells separately. Avoids splintering the narrative further; Doti exit was for a focused product; "AMLIQ" already has thesis equity. Alternative (new brand like "Sentinel") adds 6+ months of brand-building.</p>
+</div>
+
+<div class="rec">
+<h3>2. Scope of v1 — jurisdiction</h3>
+<div class="recline"><strong>Recommend:</strong> US only (FinCEN-first) for first 6 months. UK + EU added M7-12.</div>
+<p>US has highest enforcement intensity, largest mid-market ICP, clearest feed structure, easiest design-partner acquisition in your network. UK + EU later unlocks London challengers, Israeli fintechs serving EU, MiCA-compliant crypto. Going broader on day 1 only justifies if design partners already committed in all three regions.</p>
+</div>
+
+<div class="rec">
+<h3>4. Open-source primitives</h3>
+<div class="recline"><strong>Recommend:</strong> Open-source <code>FinSavvyAI_Distributed_RAG</code> upgrade as <code>oss/finsavvy-rag/</code> (Apache 2.0).</div>
+<p>Matches the OSS-gravity moat layer. Adds a second OSS asset alongside PipeWarden. Creates inbound for Brain (devs searching "self-hosted enterprise RAG with audit logs" find OSS → become aware of Brain — same playbook as PipeWarden → PushCI). Apache 2.0 over MIT for enterprise patent grant. Keep proprietary: compliance corpus ingest, SAR templates, audit-log scheme, multi-tenant orchestration, CMK integration — that's the commercial moat.</p>
+</div>
+
+<div class="rec">
+<h3>6. Design partner targets</h3>
+<div class="recline"><strong>Recommend:</strong> 3 partners, 3 segments, all closeable within 30 days via warm intros.</div>
+<ul>
+  <li><strong>Israeli fintech (Series B-C)</strong> — densest network pool; payments / lending / neobank with MLRO pain. Fast iteration partner + IL reference logo.</li>
+  <li><strong>US tier-2 regional bank</strong> — credibility logo for NA; warm-intro via Israeli VC bank relationships (Bessemer, Glilot, Insight). Procurement + enterprise-feature learning.</li>
+  <li><strong>Crypto exchange (US or EU regulated)</strong> — highest pain density, lowest entrenched competition. Target tier-2 (Bitstamp, Bitpanda, eToro, Crypto.com regional).</li>
+</ul>
+<p><strong>Avoid:</strong> tier-1 banks (12+ month procurement breaks 6-month MVP), insurance carriers (different reg framework — wrong v1 ICP).</p>
+</div>
+
+<div class="rec">
+<h3>7. Pricing model</h3>
+<div class="recline"><strong>Recommend:</strong> Hybrid — platform fee + per-seat + usage cap on agent actions.</div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Tier</th><th>Platform/yr</th><th>Per-seat/mo</th><th>Included agent actions</th><th>Overage</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Brain Starter</strong> (≤5 users, cloud)</td><td>$0</td><td>$400</td><td>200 SAR drafts + 1,000 alert triages</td><td>$2/SAR, $0.50/alert</td></tr>
+    <tr><td><strong>Brain Pro</strong> (≤25 users, cloud)</td><td>$20K</td><td>$300</td><td>1,500 SAR + 10,000 alert</td><td>discounted</td></tr>
+    <tr><td><strong>Brain Enterprise</strong> (unlimited, self-host option)</td><td>$80K</td><td>$250</td><td>Unlimited</td><td>n/a</td></tr>
+  </tbody>
+</table>
+</div>
+<p>ACV bands: Starter $20-30K, Pro $40-70K, Enterprise $100-200K. Hybrid avoids underpricing high-usage accounts (pure per-seat) and unpredictability (pure usage). Matches what Hummingbird/Unit21 do — proven for this buyer.</p>
+</div>
+
+<div class="rec">
+<h3>8. Sanctions/PEP feeds — build vs partner</h3>
+<div class="recline"><strong>Recommend:</strong> Three-tier matching the SKU tiers.</div>
+<ul>
+  <li><strong>Starter:</strong> OFAC SDN + EU consolidated + UN public lists only (free, we ingest)</li>
+  <li><strong>Pro:</strong> Add ComplyAdvantage embedded screening (partnership — revenue share or pass-through pricing)</li>
+  <li><strong>Enterprise:</strong> Dow Jones Risk feed (customer-licensed, we integrate)</li>
+</ul>
+<p>Building proprietary sanctions data is a 5-10 year, $50M+ investment — not your fight. Own the <em>workflow</em>. ComplyAdvantage partnership is highest-leverage: they have data, lack agent-product surface. <strong>1-hour intro call this month.</strong></p>
+</div>
+
+<div class="rec">
+<h3>10. Acquirer-target shortlist</h3>
+<div class="recline"><strong>Recommend:</strong> Three primary relationships started in next 12 months.</div>
+<ol>
+  <li><strong>LSEG</strong> (owner of World-Check) — <em>defensive acquisition</em>. If Brain takes mid-market share, LSEG will want to acquire to defend, not lose share. Build via Refinitiv data-licensing org first (natural conversation about adverse-media feeds).</li>
+  <li><strong>Moody's</strong> (acquired RDC, BvD, kompany, Passfort — actively rolling up AML/KYC) — <em>strategic stack</em>. Their playbook is bolting AI-native onto their risk-data spine.</li>
+  <li><strong>NICE Actimize</strong> — <em>modernization</em>. Their AML platform is on-prem and dated. Acquiring Brain gives them an AI-native cloud story.</li>
+</ol>
+<p><strong>Watch list:</strong> ComplyAdvantage (if partnership goes well, acquisition is natural exit), FIS, Snowflake Compliance Cloud.</p>
+<p><strong>Avoid pitching:</strong> Salesforce (just bought Doti — won't double-buy in 18mo), Microsoft (Copilot for Compliance internal effort), Google (Vertex — uninterested in vertical SaaS).</p>
+<div class="callout gold">
+<h3>Why this matters now</h3>
+<p>The founders of Doti spent ~6 months in conversations with Salesforce before the deal. M&A relationships compound. Start now even if exit is 18-24 months out.</p>
+</div>
+</div>
+</section>
+
+<section id="narrative">
+<h2>Updated investor narrative (drop-in for Series A pitch)</h2>
+
+<div class="narrative">
+<h3>Updated elevator pitch — one paragraph</h3>
+<blockquote>FinsavvyAI is the operational stack for AI-generated software. As AI writes more code and runs more workflows, that work needs to be validated before merge, tested at runtime, orchestrated across environments, secured against autonomous misuse, and governed for compliance — and today those concerns are handled by separate point tools built for human developers and human compliance officers. We ship a unified platform (PushCI, Qestro, LunaOS, OpenSyber, SDLC.cc, TenantIQ, AMLIQ) with an open-source wedge (PipeWarden) that detects risky AI-generated PRs the moment they're proposed, and a vertical wedge (AMLIQ Brain) that becomes the organizational AI layer for compliance teams in regulated financial services — where horizontal enterprise-AI products (Salesforce/Doti, Glean) cannot legally or economically follow. Developers adopt PushCI for free, expand into Qestro and OpenSyber as AI usage hits production. Compliance teams adopt AMLIQ Brain for organizational AI search, expand into AMLIQ Investigate for deep case workflows, then into SDLC.cc + TenantIQ for board-level AI governance. Our category is <strong>AI-native infrastructure for regulated AI work</strong> — two GTM motions, one platform.</blockquote>
+</div>
+
+<h3>Updated longer narrative</h3>
+
+<p><strong>The two wedges.</strong> PushCI + PipeWarden OSS is the developer wedge. AI code-generation is now a daily workflow for ~30% of working developers, but the merge gate has not adapted: linters and SAST tools were built for human authorship patterns and miss the failure modes specific to LLM output. PipeWarden is the open-source detection engine; PushCI is the hosted product. <strong>AMLIQ Brain is the compliance wedge.</strong> Compliance officers at tier-2 banks and Series B+ fintechs face a budget squeeze: World-Check (LSEG) costs $150-500K/year and Glean ($50K+ horizontal AI search) doesn't know AML. AMLIQ Brain is a vertical AI layer priced for the mid-market ($20-80K) that does what horizontals won't — knows sanctions data, integrates with banking cores, drafts SARs, and tracks regulatory change. Salesforce just paid $100M for Doti (horizontal Israeli enterprise-AI search startup) after one year — validating that the AI-organizational-layer category is real. We're building the vertical version of that, where the buyer cannot use horizontal solutions.</p>
+
+<p><strong>The expansion.</strong> From either wedge, customers expand across the integrated platform. From the developer side: PushCI → Qestro (runtime QA) → OpenSyber (agent security) → SDLC.cc (governance). From the compliance side: AMLIQ Brain (organizational AI for compliance team) → AMLIQ Investigate (deep case management) → SDLC.cc (board-level AI policy) → TenantIQ (M365 governance for the same regulated org). Both motions converge at SDLC.cc and the platform layer, which is where revenue compounds.</p>
+
+<p><strong>The moat</strong> has four layers. First, <strong>OSS gravity</strong> — PipeWarden and (new) the FinsavvyAI RAG primitives both seed inbound and credibility. Second, <strong>shared infrastructure</strong> — auth, billing, telemetry, AI gateway, and policy engine built once, leveraged by 7+ products. Third, <strong>the integrated trace</strong> — every product writes to the same telemetry layer, so a single regulated organization can track a SAR from AMLIQ Brain draft → SDLC.cc approval → audit-grade log. Fourth, <strong>vertical depth</strong> — AMLIQ Brain knows AML/sanctions/regulatory feeds in a way horizontal enterprise-AI deliberately doesn't.</p>
+
+<p><strong>The category</strong> is AI-native infrastructure for regulated AI work — both the AI software that engineering teams build, and the AI workflows that compliance and risk teams run. Two adjacent categories, one platform. The right comparison is what Datadog was to cloud monitoring (developer wedge that became infrastructure) crossed with what Bloomberg Terminal was to financial workflow (vertical-depth product that incumbents couldn't horizontally serve).</p>
+
+<p><strong>Why now (updated).</strong> Four forcing functions: (1) AI code-gen is past early-majority threshold inside engineering; (2) regulators (EU AI Act, US executive orders, Israeli AI directives, BSA modernization) are moving from guidance to enforceable compliance — creating a buyer for both SDLC.cc and AMLIQ Brain; (3) runtime AI agents are entering production — creating a buyer for OpenSyber and AMLIQ Brain (same agents now write code AND draft SARs); (4) <strong>horizontal enterprise-AI consolidation</strong> — Salesforce/Doti, Microsoft/Copilot, Google/Vertex have absorbed the horizontal AI-search category, leaving regulated verticals deliberately underserved. Window for vertical AI infrastructure is wide open and closing fast (~18-24 months before the same acquirers move down-vertical).</p>
+
+<p><strong>Use of funds (updated).</strong> A Series A funds (a) finishing the platform consolidation so new product launches cost weeks not quarters; (b) PushCI + PipeWarden GTM (developer growth, GitHub Marketplace, OSS content); (c) AMLIQ Brain GTM (design partners, SOC 2, compliance buyer outreach) — the highest-ACV motion, where one enterprise contract = 50 PushCI Pro accounts; (d) AMLIQ Investigate productization (QuantumBeam fold-in and AML scoring consolidation per addendum's Weeks 4-6).</p>
+</section>
+
+<section id="next">
+<h2>Next concrete actions (this week)</h2>
+<ol class="actions">
+  <li><strong>Approve the brief + decisions doc</strong><span>Sign-off unlocks engineering work.</span></li>
+  <li><strong>Identify 3 design-partner targets</strong><span>Names + warm-intro paths (15 min).</span></li>
+  <li><strong>First ComplyAdvantage intro call</strong><span>Partnership / data integration scoping (30 min).</span></li>
+  <li><strong>First LSEG conversation</strong><span>Start at Refinitiv data-licensing for adverse-media feed access. Long-game acquirer relationship.</span></li>
+  <li><strong>Series A pitch deck update</strong><span>Add AMLIQ Brain slide using the narrative above (1-2 hrs).</span></li>
+  <li><strong>Engineering kickoff</strong><span>Brain skeleton in <code>products/amliq/brain/</code>, RAG primitives promotion from <code>FinSavvyAI_Distributed_RAG</code>, first connector spike (Slack).</span></li>
+</ol>
+</section>
+
+<section id="sources" class="sources">
+<h2>Sources</h2>
+<ul>
+  <li><a href="https://www.calcalistech.com/ctechnews/article/bksy0dqewe">Salesforce acquires Doti AI for ~$100M — Ctech</a></li>
+  <li><a href="https://techcrunch.com/2025/01/22/doti-gives-enterprises-a-flexible-ai-powered-search-experience-to-unlock-their-data-silos/">Doti AI — TechCrunch (Jan 2025)</a></li>
+  <li><a href="https://www.tipranks.com/news/salesforce-nysecrm-acquires-doti-to-boost-agentic-ai-push-heres-what-it-means-2">Salesforce Acquires Doti for Agentic AI Push — TipRanks</a></li>
+  <li><a href="https://www.glean.com/perspectives/top-7-industries-with-stringent-ai-compliance-needs-in-2026">Top 7 industries with stringent AI compliance needs 2026 — Glean</a></li>
+  <li><a href="https://www.glean.com/perspectives/using-ai-for-effective-regulatory-change-monitoring">Using AI for effective regulatory change monitoring — Glean</a></li>
+  <li><a href="https://www.fluxforce.ai/blog/guide-to-aml-compliance-for-fintechs">The Complete Guide to AML Compliance for Fintechs in 2026 — FluxForce</a></li>
+  <li><a href="https://www.wolterskluwer.com/en/expert-insights/bsa-aml-in-2025-2026">BSA/AML in 2025–2026 — Wolters Kluwer</a></li>
+  <li><a href="https://youverify.co/blog/aml-compliance-software-banks-complete-buyers-guide">AML Compliance Software for Banks Buyer's Guide 2026 — Youverify</a></li>
+  <li><a href="https://www.unit21.ai/products/aml-transaction-monitoring">Unit21 Agentic AI AML Platform</a></li>
+  <li><a href="https://www.sardine.ai/">Sardine Agentic Financial Crime Platform</a></li>
+</ul>
+</section>
+
+</main>
+</body>
+</html>

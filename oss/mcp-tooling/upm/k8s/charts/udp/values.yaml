@@ -1,0 +1,283 @@
+# Default values for UDP Helm chart
+# This is a YAML-formatted file.
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# Application configuration
+app:
+  name: universal-dependency-platform
+  version: "0.1.0"
+
+# Image configuration
+image:
+  registry: ghcr.io
+  repository: universaldependency/udp
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# API service configuration
+api:
+  replicaCount: 3
+  image:
+    repository: api
+    tag: ""
+
+  service:
+    type: ClusterIP
+    port: 8000
+    targetPort: 8000
+    annotations: {}
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+# Worker service configuration
+worker:
+  replicaCount: 5
+  image:
+    repository: worker
+    tag: ""
+
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 50
+    targetCPUUtilizationPercentage: 75
+
+# Beat scheduler configuration
+beat:
+  replicaCount: 1
+  image:
+    repository: beat
+    tag: ""
+
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+# Configuration
+config:
+  environment: production
+  logLevel: INFO
+  debug: false
+
+  # Security settings
+  security:
+    secretKey: ""
+    jwtAlgorithm: RS256
+    corsOrigins: []
+
+  # External services
+  externalServices:
+    openaiApiKey: ""
+    githubToken: ""
+
+# Database configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: ""
+    username: udp_user
+    password: ""
+    database: udp_prod
+  architecture: standalone
+  persistence:
+    enabled: true
+    size: 100Gi
+    storageClass: ""
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+
+# External PostgreSQL configuration
+externalPostgresql:
+  enabled: false
+  host: ""
+  port: 5432
+  username: ""
+  password: ""
+  database: ""
+
+# Redis configuration
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+# External Redis configuration
+externalRedis:
+  enabled: false
+  host: ""
+  port: 6379
+  password: ""
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+  hosts:
+    - host: api.universaldependency.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: udp-tls
+      hosts:
+        - api.universaldependency.com
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+  grafana:
+    enabled: true
+    adminPassword: ""
+
+  alerts:
+    enabled: true
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod Security Context
+podSecurityContext:
+  fsGroup: 1001
+  runAsNonRoot: true
+  runAsUser: 1001
+
+# Security Context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1001
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - udp
+          topologyKey: kubernetes.io/hostname
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  ingress:
+    enabled: true
+  egress:
+    enabled: true
+
+# Backup configuration
+backup:
+  enabled: false
+  schedule: "0 2 * * *"
+  retention: "30d"
+  storage:
+    size: 500Gi
+    storageClass: ""
+
+# Plugin configuration
+plugins:
+  enabled: true
+  registry: ghcr.io/universaldependency/plugins
+  mountPath: /app/plugins
+
+# Testing configuration
+testing:
+  enabled: false
+  image:
+    repository: test
+    tag: "latest"

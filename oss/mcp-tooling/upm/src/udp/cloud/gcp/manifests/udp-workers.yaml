@@ -1,0 +1,412 @@
+# UDP Worker Deployment for background tasks
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udp-worker
+  namespace: udp
+  labels:
+    app: udp
+    component: worker
+    tier: worker
+    version: v1
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: udp
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: udp
+        component: worker
+        tier: worker
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: udp-worker
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      - name: wait-for-dependencies
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for PostgreSQL..."
+          until nc -z udp-postgres 5432; do
+            echo "PostgreSQL not ready, waiting..."
+            sleep 2
+          done
+          echo "Waiting for Redis..."
+          until nc -z udp-redis 6379; do
+            echo "Redis not ready, waiting..."
+            sleep 2
+          done
+          echo "Dependencies ready!"
+        resources:
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
+          limits:
+            memory: "32Mi"
+            cpu: "50m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_CONNECT
+      containers:
+      - name: udp-worker
+        image: gcr.io/PROJECT_ID/udp:latest  # Will be replaced by deployment script
+        imagePullPolicy: Always
+        command:
+        - python
+        - -m
+        - celery
+        - worker
+        - -A
+        - udp.infrastructure.celery_app
+        - --loglevel=info
+        - --concurrency=2
+        - --max-tasks-per-child=1000
+        - --time-limit=300
+        - --soft-time-limit=240
+        ports:
+        - containerPort: 8001
+          name: metrics
+          protocol: TCP
+        env:
+        # Database connection
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: udp-database-secret
+              key: DATABASE_URL
+        # Redis connection
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: udp-redis-secret
+              key: REDIS_URL
+        # Celery configuration
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: udp-redis-secret
+              key: REDIS_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: udp-redis-secret
+              key: REDIS_URL
+        # Security secrets
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: udp-secrets
+              key: SECRET_KEY
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: udp-secrets
+              key: ENCRYPTION_KEY
+        # Worker identification
+        - name: WORKER_TYPE
+          value: "background"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        envFrom:
+        - configMapRef:
+            name: udp-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "300m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - |
+              import redis
+              import os
+              r = redis.from_url(os.environ['REDIS_URL'])
+              r.ping()
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - |
+              import redis
+              import os
+              r = redis.from_url(os.environ['REDIS_URL'])
+              r.ping()
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/.cache
+        - name: worker-data
+          mountPath: /app/worker-data
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 500Mi
+      - name: cache
+        emptyDir:
+          sizeLimit: 256Mi
+      - name: worker-data
+        emptyDir:
+          sizeLimit: 1Gi
+      terminationGracePeriodSeconds: 60
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+
+---
+# UDP Scheduler Deployment for cron jobs
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udp-scheduler
+  namespace: udp
+  labels:
+    app: udp
+    component: scheduler
+    tier: worker
+    version: v1
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Only one scheduler should run
+  selector:
+    matchLabels:
+      app: udp
+      component: scheduler
+  template:
+    metadata:
+      labels:
+        app: udp
+        component: scheduler
+        tier: worker
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: udp-worker
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: udp-scheduler
+        image: gcr.io/PROJECT_ID/udp:latest  # Will be replaced by deployment script
+        imagePullPolicy: Always
+        command:
+        - python
+        - -m
+        - celery
+        - beat
+        - -A
+        - udp.infrastructure.celery_app
+        - --loglevel=info
+        - --pidfile=/tmp/celerybeat.pid
+        - --schedule=/tmp/celerybeat-schedule
+        ports:
+        - containerPort: 8001
+          name: metrics
+          protocol: TCP
+        env:
+        # Database connection
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: udp-database-secret
+              key: DATABASE_URL
+        # Redis connection
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: udp-redis-secret
+              key: REDIS_URL
+        # Celery configuration
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: udp-redis-secret
+              key: REDIS_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: udp-redis-secret
+              key: REDIS_URL
+        # Security secrets
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: udp-secrets
+              key: SECRET_KEY
+        - name: ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: udp-secrets
+              key: ENCRYPTION_KEY
+        # Scheduler identification
+        - name: WORKER_TYPE
+          value: "scheduler"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        envFrom:
+        - configMapRef:
+            name: udp-config
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        livenessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/celerybeat.pid
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - test
+            - -f
+            - /tmp/celerybeat.pid
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/.cache
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 100Mi
+      - name: cache
+        emptyDir:
+          sizeLimit: 100Mi
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+
+---
+# Service for worker metrics
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-worker-metrics
+  namespace: udp
+  labels:
+    app: udp
+    component: worker
+    monitoring: prometheus
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: metrics
+  selector:
+    app: udp
+    component: worker
+
+---
+# Service Monitor for worker metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: udp-worker-metrics
+  namespace: udp
+  labels:
+    app: udp
+    component: worker
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: udp
+      component: worker
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - udp

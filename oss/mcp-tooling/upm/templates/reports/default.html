@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ report_metadata.organization_name }} - {{ report_metadata.report_type|title }} Report</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.2em;
+            font-weight: 300;
+        }
+        .header .meta {
+            font-size: 1em;
+            opacity: 0.9;
+            margin-top: 10px;
+        }
+        .section {
+            background: white;
+            margin-bottom: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .section-header {
+            background: #f8f9fa;
+            padding: 18px 25px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .section-header h2 {
+            margin: 0;
+            color: #495057;
+            font-size: 1.4em;
+        }
+        .section-content {
+            padding: 25px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .summary-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #28a745;
+        }
+        .summary-card.warning { border-left-color: #ffc107; }
+        .summary-card.danger { border-left-color: #dc3545; }
+        .summary-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .summary-label {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .compliance-score {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: white;
+        }
+        .compliance-score.A { background-color: #28a745; }
+        .compliance-score.B { background-color: #20c997; }
+        .compliance-score.C { background-color: #ffc107; color: #212529; }
+        .compliance-score.D { background-color: #fd7e14; }
+        .compliance-score.F { background-color: #dc3545; }
+        .risk-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .risk-indicator.low { background-color: #d4edda; color: #155724; }
+        .risk-indicator.medium { background-color: #fff3cd; color: #856404; }
+        .risk-indicator.high { background-color: #f8d7da; color: #721c24; }
+        .risk-indicator.critical { background-color: #dc3545; color: white; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+        }
+        .recommendations {
+            list-style: none;
+            padding: 0;
+        }
+        .recommendations li {
+            padding: 20px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            border-radius: 5px;
+        }
+        .recommendations .priority {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .recommendations .priority.critical { background-color: #dc3545; color: white; }
+        .recommendations .priority.high { background-color: #fd7e14; color: white; }
+        .recommendations .priority.medium { background-color: #ffc107; color: #212529; }
+        .recommendations .priority.low { background-color: #28a745; color: white; }
+        .progress-bar {
+            background-color: #e9ecef;
+            border-radius: 10px;
+            height: 18px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            transition: width 0.3s ease;
+        }
+        .footer {
+            text-align: center;
+            color: #6c757d;
+            padding: 25px;
+            font-size: 0.9em;
+            background: white;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f1f1;
+        }
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{{ report_metadata.report_type|title }} Report</h1>
+        <div class="meta">
+            {{ report_metadata.organization_name if report_metadata.organization_name else 'Organization' }} | 
+            Generated: {{ report_metadata.generated_at|datetime }} |
+            Period: {{ report_metadata.time_range.upper() }}
+        </div>
+    </div>
+
+    <!-- Executive Summary -->
+    {% if executive_summary %}
+    <div class="section">
+        <div class="section-header">
+            <h2>Executive Summary</h2>
+        </div>
+        <div class="section-content">
+            {% if executive_summary.organization_overview %}
+            <div style="margin-bottom: 25px;">
+                <h3>Organization Overview</h3>
+                <div class="metric-row">
+                    <span><strong>Name:</strong></span>
+                    <span>{{ executive_summary.organization_overview.name }}</span>
+                </div>
+                {% if executive_summary.organization_overview.domain %}
+                <div class="metric-row">
+                    <span><strong>Domain:</strong></span>
+                    <span>{{ executive_summary.organization_overview.domain }}</span>
+                </div>
+                {% endif %}
+                {% if executive_summary.organization_overview.industry %}
+                <div class="metric-row">
+                    <span><strong>Industry:</strong></span>
+                    <span>{{ executive_summary.organization_overview.industry }}</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if executive_summary.key_findings %}
+            <div class="summary-grid">
+                <div class="summary-card {% if executive_summary.key_findings.critical_vulnerabilities > 0 %}danger{% endif %}">
+                    <div class="summary-value">{{ executive_summary.key_findings.critical_vulnerabilities|number }}</div>
+                    <div class="summary-label">Critical Vulnerabilities</div>
+                </div>
+                <div class="summary-card {% if executive_summary.key_findings.license_compliance_rate < 70 %}warning{% endif %}">
+                    <div class="summary-value">{{ executive_summary.key_findings.license_compliance_rate|percentage }}</div>
+                    <div class="summary-label">License Compliance</div>
+                </div>
+                <div class="summary-card {% if executive_summary.key_findings.workflow_efficiency < 80 %}warning{% endif %}">
+                    <div class="summary-value">{{ executive_summary.key_findings.workflow_efficiency|percentage }}</div>
+                    <div class="summary-label">Workflow Efficiency</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Compliance Assessment -->
+    {% if compliance_assessment %}
+    <div class="section">
+        <div class="section-header">
+            <h2>Compliance Assessment</h2>
+        </div>
+        <div class="section-content">
+            <div style="text-align: center; margin-bottom: 25px;">
+                <div style="font-size: 3em; font-weight: bold; color: #28a745; margin-bottom: 10px;">
+                    {{ compliance_assessment.overall_score|number }}
+                </div>
+                <div class="compliance-score {{ compliance_assessment.compliance_grade }}">
+                    Grade: {{ compliance_assessment.compliance_grade }}
+                </div>
+            </div>
+
+            {% if compliance_assessment.framework_assessment %}
+            <h3>Framework Assessment: {{ compliance_assessment.framework_assessment.target_framework }}</h3>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                {% if compliance_assessment.framework_assessment.security_compliance %}
+                <div>
+                    <h4>Security Compliance</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ compliance_assessment.framework_assessment.security_compliance.score }}%;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span>{{ compliance_assessment.framework_assessment.security_compliance.score|number }}%</span>
+                        <span class="badge">{{ compliance_assessment.framework_assessment.security_compliance.status }}</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if compliance_assessment.framework_assessment.license_compliance %}
+                <div>
+                    <h4>License Compliance</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ compliance_assessment.framework_assessment.license_compliance.score }}%;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span>{{ compliance_assessment.framework_assessment.license_compliance.score|number }}%</span>
+                        <span class="badge">{{ compliance_assessment.framework_assessment.license_compliance.status }}</span>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if compliance_assessment.framework_assessment.policy_compliance %}
+                <div>
+                    <h4>Policy Compliance</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ compliance_assessment.framework_assessment.policy_compliance.score }}%;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span>{{ compliance_assessment.framework_assessment.policy_compliance.score|number }}%</span>
+                        <span class="badge">{{ compliance_assessment.framework_assessment.policy_compliance.status }}</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Security Analysis -->
+    {% if security_analysis %}
+    <div class="section">
+        <div class="section-header">
+            <h2>Security Analysis</h2>
+        </div>
+        <div class="section-content">
+            {% if security_analysis.vulnerability_summary %}
+            <div class="summary-grid">
+                <div class="summary-card danger">
+                    <div class="summary-value">{{ security_analysis.vulnerability_summary.critical_count|number }}</div>
+                    <div class="summary-label">Critical</div>
+                </div>
+                <div class="summary-card warning">
+                    <div class="summary-value">{{ security_analysis.vulnerability_summary.high_count|number }}</div>
+                    <div class="summary-label">High Severity</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-value">{{ security_analysis.vulnerability_summary.average_cvss|number }}</div>
+                    <div class="summary-label">Avg CVSS Score</div>
+                </div>
+                <div class="summary-card warning">
+                    <div class="summary-value">{{ security_analysis.vulnerability_summary.exploitable_packages|number }}</div>
+                    <div class="summary-label">Exploitable Packages</div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if security_analysis.risk_assessment %}
+            <div style="margin-top: 25px;">
+                <h3>Risk Assessment</h3>
+                <div class="metric-row">
+                    <span><strong>Overall Risk Level:</strong></span>
+                    <span class="risk-indicator {{ security_analysis.risk_assessment.overall_risk.lower() }}">
+                        {{ security_analysis.risk_assessment.overall_risk }}
+                    </span>
+                </div>
+                <div class="metric-row">
+                    <span><strong>Immediate Threats:</strong></span>
+                    <span>{{ security_analysis.risk_assessment.immediate_threats|number }} packages</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- License Analysis -->
+    {% if license_analysis %}
+    <div class="section">
+        <div class="section-header">
+            <h2>License Analysis</h2>
+        </div>
+        <div class="section-content">
+            {% if license_analysis.compliance_metrics %}
+            <div class="summary-grid">
+                <div class="summary-card {% if license_analysis.compliance_metrics.copyleft_percentage > 25 %}warning{% endif %}">
+                    <div class="summary-value">{{ license_analysis.compliance_metrics.copyleft_percentage|percentage }}</div>
+                    <div class="summary-label">Copyleft Licenses</div>
+                </div>
+                <div class="summary-card {% if license_analysis.compliance_metrics.enterprise_friendly_percentage < 70 %}warning{% endif %}">
+                    <div class="summary-value">{{ license_analysis.compliance_metrics.enterprise_friendly_percentage|percentage }}</div>
+                    <div class="summary-label">Enterprise Friendly</div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if license_analysis.risk_assessment %}
+            <div style="margin-top: 25px;">
+                <h3>License Risk Assessment</h3>
+                <div class="metric-row">
+                    <span><strong>Risk Level:</strong></span>
+                    <span class="risk-indicator {{ license_analysis.risk_assessment.license_risk_level.lower() }}">
+                        {{ license_analysis.risk_assessment.license_risk_level }}
+                    </span>
+                </div>
+                <div class="metric-row">
+                    <span><strong>Commercial Compatibility:</strong></span>
+                    <span>{{ 'Yes' if license_analysis.risk_assessment.commercial_compatibility else 'Needs Review' }}</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Operational Metrics -->
+    {% if operational_metrics %}
+    <div class="section">
+        <div class="section-header">
+            <h2>Operational Performance</h2>
+        </div>
+        <div class="section-content">
+            {% if operational_metrics.efficiency_metrics %}
+            <div class="summary-grid">
+                <div class="summary-card {% if operational_metrics.efficiency_metrics.completion_rate < 80 %}warning{% endif %}">
+                    <div class="summary-value">{{ operational_metrics.efficiency_metrics.completion_rate|percentage }}</div>
+                    <div class="summary-label">Completion Rate</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-value">{{ operational_metrics.efficiency_metrics.average_processing_time|number }}</div>
+                    <div class="summary-label">Avg Processing (min)</div>
+                </div>
+                <div class="summary-card {% if operational_metrics.efficiency_metrics.pending_approvals > 10 %}warning{% endif %}">
+                    <div class="summary-value">{{ operational_metrics.efficiency_metrics.pending_approvals|number }}</div>
+                    <div class="summary-label">Pending Approvals</div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if operational_metrics.performance_assessment %}
+            <div style="margin-top: 25px;">
+                <h3>Performance Assessment</h3>
+                <div class="metric-row">
+                    <span><strong>Efficiency Grade:</strong></span>
+                    <span class="badge">{{ operational_metrics.performance_assessment.efficiency_grade }}</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recommendations -->
+    {% if recommendations %}
+    <div class="section">
+        <div class="section-header">
+            <h2>Recommendations</h2>
+        </div>
+        <div class="section-content">
+            <ul class="recommendations">
+                {% for recommendation in recommendations %}
+                <li>
+                    <div class="priority {{ recommendation.priority.lower() }}">{{ recommendation.priority }}</div>
+                    <h4 style="margin: 10px 0;">{{ recommendation.title }}</h4>
+                    <p><strong>Category:</strong> {{ recommendation.category }}</p>
+                    <p>{{ recommendation.description }}</p>
+                    {% if recommendation.action_items %}
+                    <div style="margin-top: 15px;">
+                        <strong>Action Items:</strong>
+                        <ul style="margin-top: 8px;">
+                            {% for item in recommendation.action_items %}
+                            <li>{{ item }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                    {% if recommendation.timeline %}
+                    <p><strong>Timeline:</strong> {{ recommendation.timeline }}</p>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>
+            This {{ report_metadata.report_type }} report was generated on {{ report_metadata.generated_at|datetime }} 
+            for {{ report_metadata.organization_name if report_metadata.organization_name else 'your organization' }}.
+        </p>
+        <p style="margin-top: 10px;">
+            Report ID: {{ report_metadata.report_id }}
+        </p>
+        <p style="margin-top: 15px; font-style: italic;">
+            Universal Dependency Platform - Enterprise Compliance & Security
+        </p>
+    </div>
+</body>
+</html>

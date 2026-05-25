@@ -1,0 +1,417 @@
+# Prometheus ServiceMonitor for comprehensive monitoring
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: udp-comprehensive-monitoring
+  namespace: udp
+  labels:
+    app: udp
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      monitoring: prometheus
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - udp
+
+---
+# PrometheusRule for UDP-specific alerts
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: udp-alerts
+  namespace: udp
+  labels:
+    app: udp
+    monitoring: prometheus
+spec:
+  groups:
+  - name: udp.rules
+    rules:
+    # High CPU usage
+    - alert: UDPHighCPU
+      expr: rate(container_cpu_usage_seconds_total{namespace="udp"}[5m]) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "UDP pod has high CPU usage"
+        description: "CPU usage is above 80% for {{ $labels.pod }}"
+
+    # High memory usage
+    - alert: UDPHighMemory
+      expr: container_memory_usage_bytes{namespace="udp"} / container_spec_memory_limit_bytes > 0.9
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "UDP pod has high memory usage"
+        description: "Memory usage is above 90% for {{ $labels.pod }}"
+
+    # Pod restart rate
+    - alert: UDPPodRestarts
+      expr: increase(kube_pod_container_status_restarts_total{namespace="udp"}[1h]) > 3
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: "UDP pod is restarting frequently"
+        description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last hour"
+
+    # Database connection issues
+    - alert: UDPDatabaseDown
+      expr: up{job="udp-postgres"} == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "UDP database is down"
+        description: "PostgreSQL database is not responding"
+
+    # Redis connection issues
+    - alert: UDPRedisDown
+      expr: up{job="udp-redis"} == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "UDP Redis is down"
+        description: "Redis cache is not responding"
+
+    # High error rate
+    - alert: UDPHighErrorRate
+      expr: rate(udp_http_requests_total{status=~"5.."}[5m]) / rate(udp_http_requests_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "UDP has high error rate"
+        description: "Error rate is above 10% for 5 minutes"
+
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: udp-grafana-dashboard
+  namespace: udp
+  labels:
+    app: udp
+    component: monitoring
+    grafana_dashboard: "1"
+data:
+  udp-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "UDP Monitoring Dashboard",
+        "tags": ["udp"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "API Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(udp_http_requests_total[5m])",
+                "legendFormat": "{{ method }} {{ endpoint }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Requests/sec",
+                "min": 0
+              }
+            ],
+            "xAxis": {
+              "show": true
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 0
+            }
+          },
+          {
+            "id": 2,
+            "title": "Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(udp_http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(udp_http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "50th percentile"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Seconds",
+                "min": 0
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 0
+            }
+          },
+          {
+            "id": 3,
+            "title": "Pod CPU Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{namespace=\"udp\"}[5m])",
+                "legendFormat": "{{ pod }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "CPU Usage",
+                "max": 1,
+                "min": 0
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 8
+            }
+          },
+          {
+            "id": 4,
+            "title": "Pod Memory Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "container_memory_usage_bytes{namespace=\"udp\"}",
+                "legendFormat": "{{ pod }}"
+              }
+            ],
+            "yAxes": [
+              {
+                "label": "Bytes",
+                "min": 0
+              }
+            ],
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 8
+            }
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+
+---
+# Cost monitoring dashboard
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: udp-cost-dashboard
+  namespace: udp
+  labels:
+    app: udp
+    component: cost-monitoring
+data:
+  cost-queries.yaml: |
+    # BigQuery queries for cost monitoring
+    daily_cost: |
+      SELECT
+        service.description as service,
+        SUM(cost) as daily_cost,
+        currency
+      FROM `billing_export.gcp_billing_export_v1_*`
+      WHERE project.id = 'PROJECT_ID'
+        AND export_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY)
+      GROUP BY service.description, currency
+      ORDER BY daily_cost DESC
+
+    resource_cost: |
+      SELECT
+        labels.value as resource_name,
+        SUM(cost) as cost,
+        currency
+      FROM `billing_export.gcp_billing_export_v1_*`,
+      UNNEST(labels) as labels
+      WHERE project.id = 'PROJECT_ID'
+        AND labels.key = 'name'
+        AND export_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+      GROUP BY labels.value, currency
+      ORDER BY cost DESC
+
+---
+# Monitoring deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udp-monitoring
+  namespace: udp
+  labels:
+    app: udp
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: udp
+      component: monitoring
+  template:
+    metadata:
+      labels:
+        app: udp
+        component: monitoring
+        version: v1
+    spec:
+      serviceAccountName: udp-monitoring
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.45.0
+        args:
+          - '--config.file=/etc/prometheus/prometheus.yml'
+          - '--storage.tsdb.path=/prometheus/'
+          - '--web.console.libraries=/etc/prometheus/console_libraries'
+          - '--web.console.templates=/etc/prometheus/consoles'
+          - '--storage.tsdb.retention.time=7d'
+          - '--web.enable-lifecycle'
+        ports:
+        - containerPort: 9090
+          name: prometheus
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "300m"
+        volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus
+        - name: prometheus-storage
+          mountPath: /prometheus
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: prometheus-config
+        configMap:
+          name: prometheus-config
+      - name: prometheus-storage
+        emptyDir:
+          sizeLimit: 2Gi
+
+---
+# Prometheus configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: udp
+  labels:
+    app: udp
+    component: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 30s
+      evaluation_interval: 30s
+
+    rule_files:
+      - "/etc/prometheus/rules/*.yml"
+
+    scrape_configs:
+    - job_name: 'udp-api'
+      kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+          - udp
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: udp-api-service
+      - source_labels: [__meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: metrics
+
+    - job_name: 'udp-workers'
+      kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+          - udp
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: udp-worker-metrics
+
+    - job_name: 'udp-redis'
+      kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+          - udp
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        action: keep
+        regex: udp-redis-monitor
+
+---
+# Monitoring service
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-monitoring-service
+  namespace: udp
+  labels:
+    app: udp
+    component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: prometheus
+  selector:
+    app: udp
+    component: monitoring

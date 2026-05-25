@@ -1,0 +1,88 @@
+# UDP Configuration for Flutter Mobile App
+project: cross-platform-mobile-app
+target_language: dart
+flutter_version: "3.16.0"
+
+dependencies:
+  # Native Dart/Flutter dependencies
+  dart:
+    - "flutter:sdk"
+    - "http:^1.1.0"
+    - "provider:^6.1.1"
+    - "shared_preferences:^2.2.2"
+
+  # JavaScript for complex calculations
+  javascript:
+    - "ml-matrix:6.10.7"
+    - "simple-statistics:7.8.3"
+
+  # Python for data processing
+  python:
+    - "pandas:2.1.4"
+    - "pillow:10.1.0"
+
+  # Rust for performance-critical operations
+  rust:
+    - "image:0.24.7"
+    - "nalgebra:0.32.3"
+
+  # Java/Kotlin for Android-specific features
+  java:
+    - "androidx.biometric:biometric:1.1.0"
+    - "com.google.android.gms:play-services-location:21.0.1"
+
+bridges:
+  javascript:
+    enabled: true
+    runtime: "v8"  # Flutter's built-in JS engine
+    dependencies_path: "assets/js"
+
+  python:
+    enabled: true
+    runtime: subprocess
+    version: "3.11"
+    dependencies_path: "python_scripts"
+
+  rust:
+    enabled: true
+    runtime: ffi
+    target: "aarch64-linux-android"  # Android ARM64
+    dependencies_path: "android/src/main/jniLibs"
+
+  java:
+    enabled: true
+    runtime: "platform_channel"  # Flutter's method channel
+    dependencies_path: "android/app/libs"
+
+performance:
+  preload_bridges: true   # Mobile apps benefit from preloading
+  cache_modules: true
+  parallel_loading: false # Mobile devices prefer sequential loading
+
+udp_service:
+  url: "https://api.universaldependency.com"
+  api_key: "${UDP_API_KEY}"
+  organization_id: "${UDP_ORGANIZATION_ID}"
+
+security:
+  scan_vulnerabilities: true
+  fail_on_critical: true
+  allowed_licenses:
+    - "MIT"
+    - "Apache-2.0"
+    - "BSD-3-Clause"
+
+development:
+  hot_reload: true
+  debug_bridges: true
+
+production:
+  hot_reload: false
+  debug_bridges: false
+
+plugins:
+  pub:
+    platforms: ["android", "ios"]
+    build_hooks:
+      android: "udp generate-bridges --target android"
+      ios: "udp generate-bridges --target ios"

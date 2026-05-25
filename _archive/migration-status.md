@@ -67,6 +67,20 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned · `[!]` blocked
 
 See `founder_decisions_memo.md` + addendum §4.
 
+## May 2026 ranking second-pass corrections (2026-05-25)
+
+After the cross-folder May ranking memo (web-verified market analysis):
+
+- [x] **FinSavvy Cluster → 9th CORE product** — `products/finsavvy-cluster/` (9.7M from `02_AI_AGENTS/llm/`). Brand-aligned, top-ranked. Compete-or-niche decision pending.
+- [x] **UPM → OSS** — `oss/mcp-tooling/upm/` (13M from `03_Enterprize_application/products/devx-platform/upm/`). LICENSE present. Sibling to jpm/npmplus-core (not yet folded).
+- [x] **pixel-pets → EXTERNALIZE** — moved to `_archive/externalized/pixel-pets/`. Last-commit-2-days-ago contradicted the archive decision.
+- [ ] **Numbered folders audit** — background agent running. Will produce `_archive/numbered-folders-audit.md` with per-product KEEP_CANONICAL vs RE_MIGRATE_FROM_NUMBERED verdict.
+- [ ] **jpm + npmplus-core fold** — pending founder decision (memo recommends fold to `oss/mcp-tooling/`).
+- [ ] **08_open_source/ vendor move** — pending founder decision (memo: "not mine", move to `infrastructure/vendored/`).
+- [ ] **GTM top-3** — memo recommends TenantIQ + PushCI+PipeWarden + QueryFlux for next 60 days. Founder accept?
+
+See addendum §5.
+
 ## Website rebuild
 
 - [x] Scaffold `websites/finsavvyai.com/` — Astro 4 + Tailwind + TS strict — ARCHIVE-WEBSITE round 4. Headline + subhead from master plan. `Default.astro` layout (skip link, semantic landmarks, color-scheme), `Hero.astro` component, `index.astro` page, robots.txt allow-all, tailwind palette (`ink.50`/`ink.900`), Apple-HIG sans stack. CLAUDE.md extends portfolio rules with Astro coverage exception (visual-regression + a11y audit + Lighthouse CI replace `.astro` unit tests). README documents Cloudflare Pages deploy.

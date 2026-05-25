@@ -1,0 +1,69 @@
+# UDP Configuration for Rust CLI Application
+project: high-performance-cli
+target_language: rust
+rust_edition: "2021"
+
+dependencies:
+  # Native Rust dependencies
+  rust:
+    - "clap:4.4.11"
+    - "tokio:1.35.1"
+    - "serde:1.0.193"
+    - "anyhow:1.0.79"
+    - "reqwest:0.11.23"
+
+  # Python for data analysis
+  python:
+    - "numpy:1.26.2"
+    - "pandas:2.1.4"
+    - "matplotlib:3.8.2"
+
+  # JavaScript for web scraping
+  javascript:
+    - "puppeteer:21.6.1"
+    - "cheerio:1.0.0-rc.12"
+
+  # Java for enterprise integrations
+  java:
+    - "org.apache.kafka:kafka-clients:3.6.1"
+    - "org.postgresql:postgresql:42.7.1"
+
+bridges:
+  python:
+    enabled: true
+    runtime: subprocess
+    version: "3.11"
+    dependencies_path: "python_modules"
+
+  javascript:
+    enabled: true
+    runtime: subprocess
+    dependencies_path: "js_modules"
+
+  java:
+    enabled: true
+    runtime: subprocess
+    dependencies_path: "java_libs"
+
+performance:
+  preload_bridges: false  # CLI apps prefer lazy loading
+  cache_modules: true
+  parallel_loading: true
+
+udp_service:
+  url: "https://api.universaldependency.com"
+  api_key: "${UDP_API_KEY}"
+  organization_id: "${UDP_ORGANIZATION_ID}"
+
+security:
+  scan_vulnerabilities: true
+  fail_on_critical: true
+  allowed_licenses:
+    - "MIT"
+    - "Apache-2.0"
+    - "ISC"
+
+plugins:
+  cargo:
+    features: ["bridge-python", "bridge-java"]
+    build_script: true

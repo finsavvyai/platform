@@ -1,0 +1,775 @@
+#!/usr/bin/env python3
+"""
+FinSavvyAI CLI - Professional AWS-style command line interface
+Complete cluster management with AWS-style formatting and structure
+"""
+
+import argparse
+import asyncio
+import aiohttp
+import json
+import sys
+import time
+import os
+import subprocess
+import socket
+import textwrap
+import shlex
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from enum import Enum
+
+
+class OutputFormat(Enum):
+    """Output format types"""
+    JSON = "json"
+    TABLE = "table"
+    TEXT = "text"
+    YAML = "yaml"
+
+
+class Color:
+    """AWS-style color scheme"""
+    # Base colors
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+
+    # AWS-style colors
+    WHITE = "\033[37m"
+    GRAY = "\033[90m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    ORANGE = "\033[38;5;208m"
+    RED = "\033[31m"
+    BLUE = "\033[34m"
+    CYAN = "\033[36m"
+    MAGENTA = "\033[35m"
+
+    # Background colors
+    BG_GREEN = "\033[42m"
+    BG_YELLOW = "\033[43m"
+    BG_RED = "\033[41m"
+    BG_BLUE = "\033[44m"
+
+
+@dataclass
+class Column:
+    """Table column definition"""
+    name: str
+    width: int
+    align: str = "left"  # left, center, right
+    color: str = None
+
+
+class AWSStyleFormatter:
+    """AWS-style output formatter"""
+
+    def __init__(self, output_format: OutputFormat = OutputFormat.TABLE):
+        self.output_format = output_format
+        self.colors = Color()
+        self.terminal_width = self._get_terminal_width()
+
+    def _get_terminal_width(self) -> int:
+        """Get terminal width"""
+        try:
+            return os.get_terminal_size().columns
+        except:
+            return 80
+
+    def _colorize(self, text: str, color: str) -> str:
+        """Apply color to text"""
+        if self.output_format != OutputFormat.TABLE:
+            return text
+        color_code = getattr(self.colors, color.upper(), "")
+        return f"{color_code}{text}{self.colors.RESET}"
+
+    def _wrap_text(self, text: str, width: int) -> List[str]:
+        """Wrap text to specified width"""
+        if len(text) <= width:
+            return [text]
+        return textwrap.wrap(text, width, break_long_words=False, replace_whitespace=False)
+
+    def _format_table_row(self, columns: List[Column], values: List[str], is_header: bool = False) -> str:
+        """Format a single table row"""
+        formatted_cells = []
+
+        for i, (col, value) in enumerate(zip(columns, values)):
+            if is_header:
+                value = self._colorize(value.upper(), "bold" + ("white" if not col.color else col.color))
+                align_value = value.ljust(col.width)
+            else:
+                if col.color:
+                    value = self._colorize(value, col.color)
+
+                # Handle text wrapping
+                wrapped_lines = self._wrap_text(str(value), col.width)
+                align_value = wrapped_lines[0].ljust(col.width)
+
+                # Add wrapped lines as additional rows if needed
+                if len(wrapped_lines) > 1:
+                    for line in wrapped_lines[1:]:
+                        extra_row = []
+                        for j, c in enumerate(columns):
+                            if j == i:
+                                extra_cell = self._colorize(line, col.color if col.color else "white")
+                            else:
+                                extra_cell = ""
+                            extra_row.append(extra_cell.ljust(c.width))
+                        formatted_cells.append(" | ".join(extra_row))
+
+            formatted_cells.append(align_value)
+
+        primary_row = " | ".join(formatted_cells[:len(columns)])
+
+        # If we have wrapped lines, combine them
+        if len(formatted_cells) > len(columns):
+            return primary_row + "\n" + "\n".join(formatted_cells[len(columns):])
+
+        return primary_row
+
+    def format_table(self, data: List[Dict[str, any]], columns: List[Column], title: str = None) -> str:
+        """Format data as AWS-style table"""
+        if self.output_format == OutputFormat.JSON:
+            return json.dumps(data, indent=2, default=str)
+
+        if self.output_format == OutputFormat.YAML:
+            return self._format_yaml(data)
+
+        lines = []
+
+        # Title
+        if title:
+            lines.append(self._colorize(title.upper(), "bold"))
+            lines.append("-" * len(title))
+            lines.append("")
+
+        if not data:
+            lines.append(self._colorize("No items found", "gray"))
+            return "\n".join(lines)
+
+        # Header
+        header_values = [col.name for col in columns]
+        header_row = self._format_table_row(columns, header_values, is_header=True)
+        lines.append(header_row)
+
+        # Separator
+        separator_parts = []
+        for col in columns:
+            separator_parts.append("-" * col.width)
+        lines.append("-+-".join(separator_parts))
+
+        # Data rows
+        for item in data:
+            row_values = []
+            for col in columns:
+                value = str(item.get(col.name, ""))
+                if len(value) > col.width:
+                    value = value[:col.width-3] + "..."
+                row_values.append(value)
+
+            row = self._format_table_row(columns, row_values)
+            lines.append(row)
+
+        return "\n".join(lines)
+
+    def format_progress_bar(self, current: int, total: int, width: int = 40,
+                          prefix: str = "", suffix: str = "") -> str:
+        """Format AWS-style progress bar"""
+        if total == 0:
+            percent = 100
+        else:
+            percent = (current / total) * 100
+
+        filled_length = int(width * percent // 100)
+        bar = "█" * filled_length + "░" * (width - filled_length)
+
+        # Color based on progress
+        if percent < 30:
+            bar_color = "red"
+        elif percent < 70:
+            bar_color = "yellow"
+        else:
+            bar_color = "green"
+
+        colored_bar = self._colorize(bar, bar_color)
+
+        return f"{prefix} |{colored_bar}| {current}/{total} {suffix}"
+
+    def format_key_value(self, key: str, value: str, key_color: str = "cyan",
+                        value_color: str = "white", indent: int = 0) -> str:
+        """Format key-value pair"""
+        indent_str = " " * indent
+        colored_key = self._colorize(key.upper(), key_color)
+        colored_value = self._colorize(str(value), value_color)
+        return f"{indent_str}{colored_key}: {colored_value}"
+
+    def format_error(self, message: str, error_code: str = None) -> str:
+        """Format AWS-style error message"""
+        lines = []
+
+        if error_code:
+            lines.append(self._colorize(f"An error occurred ({error_code})", "red"))
+            lines.append("")
+
+        lines.append(self._colorize(message, "red"))
+        return "\n".join(lines)
+
+    def format_success(self, message: str) -> str:
+        """Format AWS-style success message"""
+        return self._colorize(message, "green")
+
+    def format_warning(self, message: str) -> str:
+        """Format AWS-style warning message"""
+        return self._colorize(message, "yellow")
+
+    def _format_yaml(self, data: List[Dict[str, any]]) -> str:
+        """Format data as YAML"""
+        if not data:
+            return "[]"
+
+        if len(data) == 1:
+            return self._dict_to_yaml(data[0], 0)
+        else:
+            lines = []
+            for i, item in enumerate(data):
+                lines.append(f"Item {i+1}:")
+                lines.append(self._dict_to_yaml(item, 2))
+            return "\n".join(lines)
+
+    def _dict_to_yaml(self, data: Dict[str, any], indent: int) -> str:
+        """Convert dict to YAML string"""
+        lines = []
+        for key, value in data.items():
+            if isinstance(value, dict):
+                lines.append(f"{' ' * indent}{key}:")
+                lines.append(self._dict_to_yaml(value, indent + 2))
+            elif isinstance(value, list):
+                lines.append(f"{' ' * indent}{key}:")
+                for item in value:
+                    if isinstance(item, dict):
+                        lines.append(f"{' ' * (indent + 2)}-")
+                        lines.append(self._dict_to_yaml(item, indent + 4))
+                    else:
+                        lines.append(f"{' ' * (indent + 2)}- {item}")
+            else:
+                lines.append(f"{' ' * indent}{key}: {value}")
+        return "\n".join(lines)
+
+
+class FinSavvyAICLI:
+    """Professional AWS-style FinSavvyAI CLI"""
+
+    def __init__(self):
+        self.master_host = "10.0.0.10"
+        self.master_port = 8000
+        self.worker_port = 8001
+        self.session = None
+        self.output_format = OutputFormat.TABLE
+        self.verbose = False
+        self.region = "home-cluster-1"  # AWS-style region concept
+        self.profile = "default"
+
+        self.formatter = AWSStyleFormatter(self.output_format)
+
+        # AWS-style CLI structure
+        self.service_name = "finsavvyai"
+        self.version = "1.0.0"
+        self.api_version = "2023-11-20"
+
+    def _get_local_ip(self) -> str:
+        """Get local IP address"""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+        except:
+            return "127.0.0.1"
+        finally:
+            s.close()
+
+    def _print_header(self, title: str, subtitle: str = None):
+        """Print AWS-style section header"""
+        print(self.formatter._colorize(title.upper(), "bold"))
+        if subtitle:
+            print(self.formatter._colorize(subtitle, "gray"))
+        print()
+
+    def _print_aws_header(self):
+        """Print AWS-style CLI header"""
+        print(f"{self.formatter._colorize('aws finsavvyai', 'bold')} version {self.version}")
+        if self.verbose:
+            print(f"{self.formatter._colorize('API Version:', 'gray')} {self.api_version}")
+            print(f"{self.formatter._colorize('Region:', 'gray')} {self.region}")
+            print(f"{self.formatter._colorize('Profile:', 'gray')} {self.profile}")
+        print()
+
+    async def _start_session(self):
+        """Start HTTP session"""
+        self.session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30),
+            headers={"User-Agent": f"aws-cli/{self.version} FinSavvyAI/{self.version}"}
+        )
+
+    async def _close_session(self):
+        """Close HTTP session"""
+        if self.session:
+            await self.session.close()
+
+    async def make_request(self, method: str, endpoint: str, data: dict = None) -> Tuple[bool, dict]:
+        """Make HTTP request with AWS-style error handling"""
+        if not self.session:
+            await self._start_session()
+
+        url = f"http://{self.master_host}:{self.master_port}{endpoint}"
+
+        try:
+            if self.verbose:
+                print(self.formatter._colorize(f"Request: {method} {url}", "dim"))
+                if data:
+                    print(self.formatter._colorize(f"Data: {json.dumps(data)}", "dim"))
+
+            async with self.session.request(method, url, json=data) as response:
+                response_data = await response.json() if response.content_type == "application/json" else await response.text()
+
+                if self.verbose:
+                    print(self.formatter._colorize(f"Response: {response.status}", "dim"))
+
+                if response.status < 400:
+                    return True, response_data
+                else:
+                    error_code = f"Http{response.status}"
+                    error_message = response_data if isinstance(response_data, str) else str(response_data)
+                    return False, {"error": error_message, "code": error_code}
+
+        except asyncio.TimeoutError:
+            return False, {"error": "Request timeout", "code": "TimeoutError"}
+        except Exception as e:
+            return False, {"error": str(e), "code": "ConnectionError"}
+
+    async def describe_clusters(self) -> bool:
+        """AWS-style cluster description"""
+        success, data = await self.make_request("GET", "/cluster/status")
+
+        if not success:
+            print(self.formatter.format_error(data.get("error", "Failed to get cluster status"), data.get("code")))
+            return False
+
+        # Format cluster information
+        cluster_info = [
+            {
+                "ClusterId": data.get("cluster_id", "unknown"),
+                "Status": self.formatter._colorize("AVAILABLE", "green"),
+                "Master": data.get("master", "unknown"),
+                "Nodes": str(data.get("total_nodes", 0)),
+                "OnlineNodes": str(data.get("online_nodes", 0)),
+                "Created": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+        ]
+
+        columns = [
+            Column("ClusterId", 20),
+            Column("Status", 12, color="green"),
+            Column("Master", 20),
+            Column("Nodes", 8),
+            Column("OnlineNodes", 8),
+            Column("Created", 20)
+        ]
+
+        self._print_header("CLUSTERS", "Describe FinSavvyAI clusters")
+        print(self.formatter.format_table(cluster_info, columns))
+        return True
+
+    async def describe_nodes(self, detailed: bool = False) -> bool:
+        """AWS-style node description"""
+        success, data = await self.make_request("GET", "/cluster/nodes")
+
+        if not success:
+            print(self.formatter.format_error(data.get("error", "Failed to get nodes"), data.get("code")))
+            return False
+
+        if not data.get("nodes"):
+            print(self.formatter.format_warning("No nodes found in cluster"))
+            return True
+
+        if detailed:
+            # Detailed view
+            for i, node in enumerate(data["nodes"]):
+                self._print_header(f"NODE {i+1}", node.get("name", "Unknown"))
+                print(self.formatter.format_key_value("Id", node.get("id", "unknown")))
+                print(self.formatter.format_key_value("Name", node.get("name", "unknown")))
+                print(self.formatter.format_key_value("Host", node.get("host", "unknown")))
+                print(self.formatter.format_key_value("Port", str(node.get("port", "unknown"))))
+                print(self.formatter.format_key_value("Status", node.get("status", "unknown"),
+                                                    value_color="green" if node.get("status") == "online" else "red"))
+                print(self.formatter.format_key_value("Load", f"{node.get('load', 0)}/{node.get('max_load', 100)}"))
+                print(self.formatter.format_key_value("Models", ", ".join(node.get("models", []))))
+                print(self.formatter.format_key_value("Last Heartbeat", node.get("last_heartbeat", "never")))
+                print()
+        else:
+            # Table view
+            node_info = []
+            for node in data["nodes"]:
+                status = node.get("status", "unknown")
+                status_colored = self.formatter._colorize(status.upper(),
+                                                         "green" if status == "online" else "red")
+
+                node_info.append({
+                    "NodeId": node.get("id", "unknown")[:20],
+                    "Name": node.get("name", "unknown")[:25],
+                    "Host": node.get("host", "unknown"),
+                    "Port": str(node.get("port", "unknown")),
+                    "Status": status_colored,
+                    "Models": str(len(node.get("models", []))),
+                    "Load": f"{node.get('load', 0)}/{node.get('max_load', 100)}"
+                })
+
+            columns = [
+                Column("NodeId", 20),
+                Column("Name", 25),
+                Column("Host", 15),
+                Column("Port", 6),
+                Column("Status", 10),
+                Column("Models", 8),
+                Column("Load", 10)
+            ]
+
+            self._print_header("NODES", "Describe FinSavvyAI cluster nodes")
+            print(self.formatter.format_table(node_info, columns))
+
+        return True
+
+    async def start_services(self, service: str = "all", foreground: bool = False) -> bool:
+        """AWS-style service start command"""
+        self._print_header("START SERVICE", f"Starting {service} service(s)")
+
+        services = []
+        if service in ["all", "master"]:
+            services.append(("master", "Cluster Master"))
+        if service in ["all", "worker"]:
+            services.append(("worker", "Worker Node"))
+
+        for svc_type, svc_name in services:
+            print(f"Starting {svc_name}...", end=" ", flush=True)
+
+            try:
+                # Kill existing process
+                subprocess.run(["pkill", "-f", f"{svc_type}" if svc_type == "master" else "worker_node.py"],
+                             capture_output=True)
+
+                if foreground and svc_type == "master":
+                    print()
+                    subprocess.run(["python3", "start_master.py"], cwd=os.getcwd())
+                else:
+                    if svc_type == "master":
+                        process = subprocess.Popen(
+                            ["python3", "start_master.py"],
+                            cwd=os.getcwd(),
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL
+                        )
+                    else:
+                        process = subprocess.Popen(
+                            ["python3", "worker_node.py", "--master", self.master_host],
+                            cwd=os.getcwd(),
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL
+                        )
+
+                    # Wait a moment and check if process is still running
+                    await asyncio.sleep(2)
+                    if process.poll() is None:
+                        print(self.formatter.format_success("✓ Running"))
+                    else:
+                        print(self.formatter.format_error("✗ Failed"))
+                        return False
+
+            except Exception as e:
+                print(self.formatter.format_error(f"✗ {str(e)}"))
+                return False
+
+        if not foreground:
+            print()
+            print(self.formatter.format_success(f"{service.upper()} service(s) started successfully"))
+
+        return True
+
+    async def stop_services(self, service: str = "all") -> bool:
+        """AWS-style service stop command"""
+        self._print_header("STOP SERVICE", f"Stopping {service} service(s)")
+
+        services = []
+        if service in ["all", "master"]:
+            services.append(("master", "Cluster Master"))
+        if service in ["all", "worker"]:
+            services.append(("worker", "Worker Node"))
+
+        for svc_type, svc_name in services:
+            print(f"Stopping {svc_name}...", end=" ", flush=True)
+
+            try:
+                if svc_type == "master":
+                    result = subprocess.run(["pkill", "-f", "start_master.py"], capture_output=True)
+                else:
+                    result = subprocess.run(["pkill", "-f", "worker_node.py"], capture_output=True)
+
+                if result.returncode == 0 or result.returncode == 1:  # 1 means process was not running
+                    print(self.formatter.format_success("✓ Stopped"))
+                else:
+                    print(self.formatter.format_warning("⚠ Already stopped"))
+
+            except Exception as e:
+                print(self.formatter.format_error(f"✗ {str(e)}"))
+                return False
+
+        print()
+        print(self.formatter.format_success(f"{service.upper()} service(s) stopped successfully"))
+        return True
+
+    async def get_service_status(self) -> bool:
+        """AWS-style service status"""
+        self._print_header("SERVICE STATUS", "FinSavvyAI cluster service status")
+
+        # Check master service
+        master_running = False
+        try:
+            result = subprocess.run(["lsof", "-i", f":{self.master_port}"], capture_output=True, text=True)
+            master_running = result.returncode == 0
+        except:
+            pass
+
+        # Check worker service
+        worker_running = False
+        try:
+            result = subprocess.run(["lsof", "-i", f":{self.worker_port}"], capture_output=True, text=True)
+            worker_running = result.returncode == 0
+        except:
+            pass
+
+        services = [
+            {
+                "Service": "master",
+                "Status": self.formatter._colorize("RUNNING", "green") if master_running else self.formatter._colorize("STOPPED", "red"),
+                "Port": str(self.master_port),
+                "Endpoint": f"http://{self.master_host}:{self.master_port}"
+            },
+            {
+                "Service": "worker",
+                "Status": self.formatter._colorize("RUNNING", "green") if worker_running else self.formatter._colorize("STOPPED", "red"),
+                "Port": str(self.worker_port),
+                "Endpoint": f"http://{self.master_host}:{self.worker_port}"
+            }
+        ]
+
+        columns = [
+            Column("Service", 10),
+            Column("Status", 10),
+            Column("Port", 6),
+            Column("Endpoint", 30)
+        ]
+
+        print(self.formatter.format_table(services, columns))
+
+        # Overall cluster status
+        print()
+        overall_status = "AVAILABLE" if master_running and worker_running else "UNAVAILABLE"
+        overall_color = "green" if master_running and worker_running else "red"
+
+        print(self.formatter.format_key_value("Cluster Status", overall_status, value_color=overall_color))
+        print(self.formatter.format_key_value("Local IP", self._get_local_ip()))
+        print(self.formatter.format_key_value("API Key", "finsavvy-5d19b8e7c71d4679"))
+
+        return True
+
+    async def show_help(self):
+        """AWS-style help system"""
+        self._print_aws_header()
+
+        help_text = f"""
+{self.formatter._colorize('USAGE', 'bold')}
+    {self.formatter._colorize('aws finsavvyai', 'cyan')} <{self.formatter._colorize('command', 'yellow')}> <{self.formatter._colorize('subcommand', 'magenta')}> [{self.formatter._colorize('options', 'gray')}]
+
+{self.formatter._colorize('AVAILABLE COMMANDS', 'bold')}
+    {self.formatter._colorize('describe', 'cyan')}        Describe FinSavvyAI resources
+        {self.formatter._colorize('clusters', 'magenta')}       List all FinSavvyAI clusters
+        {self.formatter._colorize('nodes', 'magenta')}          List all nodes in the cluster
+        {self.formatter._colorize('services', 'magenta')}       Show service status
+
+    {self.formatter._colorize('start', 'cyan')}           Start FinSavvyAI services
+        {self.formatter._colorize('service', 'magenta')}        Start specific service [all|master|worker]
+
+    {self.formatter._colorize('stop', 'cyan')}            Stop FinSavvyAI services
+        {self.formatter._colorize('service', 'magenta')}        Stop specific service [all|master|worker]
+
+    {self.formatter._colorize('deploy', 'cyan')}          Deploy cluster to global access
+
+    {self.formatter._colorize('test', 'cyan')}            Test cluster performance
+
+    {self.formatter._colorize('monitor', 'cyan')}         Monitor cluster in real-time
+
+    {self.formatter._colorize('help', 'cyan')}            Show this help message
+
+{self.formatter._colorize('GLOBAL OPTIONS', 'bold')}
+    {self.formatter._colorize('--region', 'yellow')} <region>      AWS-style region (default: home-cluster-1)
+    {self.formatter._colorize('--output', 'yellow')} <format>      Output format [json|table|yaml|text] (default: table)
+    {self.formatter._colorize('--profile', 'yellow')} <profile>     Profile name (default: default)
+    {self.formatter._colorize('--verbose', 'yellow')}                Verbose output
+    {self.formatter._colorize('--no-color', 'yellow')}              Disable colored output
+
+{self.formatter._colorize('EXAMPLES', 'bold')}
+    {self.formatter._colorize('# List all clusters', 'gray')}
+    aws finsavvyai describe clusters
+
+    {self.formatter._colorize('# Show detailed node information', 'gray')}
+    aws finsavvyai describe nodes --detailed
+
+    {self.formatter._colorize('# Start master service only', 'gray')}
+    aws finsavvyai start service master
+
+    {self.formatter._colorize('# Get status in JSON format', 'gray')}
+    aws finsavvyai describe services --output json
+
+    {self.formatter._colorize('# Use custom profile', 'gray')}
+    aws finsavvyai describe clusters --profile production
+
+{self.formatter._colorize('SEE ALSO', 'bold')}
+    FinSavvyAI Documentation: https://docs.finsavvyai.com
+    GitHub Repository: https://github.com/finsavvyai/cli
+        """
+
+        print(help_text)
+
+
+def create_parser() -> argparse.ArgumentParser:
+    """Create AWS-style argument parser"""
+    parser = argparse.ArgumentParser(
+        prog="aws finsavvyai",
+        description="FinSavvyAI CLI - Professional AWS-style cluster management",
+        add_help=False  # We'll handle help ourselves
+    )
+
+    # Global options
+    parser.add_argument("--region", default="home-cluster-1", help="AWS-style region")
+    parser.add_argument("--output", choices=["json", "table", "yaml", "text"], default="table", help="Output format")
+    parser.add_argument("--profile", default="default", help="Profile name")
+    parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("--no-color", action="store_true", help="Disable colored output")
+
+    # Subcommands
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # describe command
+    describe_parser = subparsers.add_parser("describe", help="Describe FinSavvyAI resources")
+    describe_subparsers = describe_parser.add_subparsers(dest="resource", help="Resource to describe")
+
+    # describe clusters
+    describe_subparsers.add_parser("clusters", help="List all clusters")
+
+    # describe nodes
+    nodes_parser = describe_subparsers.add_parser("nodes", help="List nodes")
+    nodes_parser.add_argument("--detailed", action="store_true", help="Show detailed information")
+
+    # describe services
+    describe_subparsers.add_parser("services", help="Show service status")
+
+    # start command
+    start_parser = subparsers.add_parser("start", help="Start services")
+    start_subparsers = start_parser.add_subparsers(dest="target", help="Target to start")
+    service_parser = start_subparsers.add_parser("service", help="Start specific service")
+    service_parser.add_argument("service_type", choices=["all", "master", "worker"], default="all", nargs="?", help="Service type")
+    service_parser.add_argument("--foreground", action="store_true", help="Run in foreground")
+
+    # stop command
+    stop_parser = subparsers.add_parser("stop", help="Stop services")
+    stop_subparsers = stop_parser.add_subparsers(dest="target", help="Target to stop")
+    stop_service_parser = stop_subparsers.add_parser("service", help="Stop specific service")
+    stop_service_parser.add_argument("service_type", choices=["all", "master", "worker"], default="all", nargs="?", help="Service type")
+
+    # other commands
+    subparsers.add_parser("deploy", help="Deploy to global access")
+    subparsers.add_parser("test", help="Test cluster performance")
+    subparsers.add_parser("monitor", help="Monitor cluster")
+
+    # help
+    subparsers.add_parser("help", help="Show help")
+
+    return parser
+
+
+async def main():
+    """Main CLI entry point"""
+    parser = create_parser()
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return
+
+    args = parser.parse_args()
+
+    # Create CLI instance
+    cli = FinSavvyAICLI()
+    cli.region = args.region
+    cli.output_format = OutputFormat(args.output)
+    cli.profile = args.profile
+    cli.verbose = args.verbose
+
+    # Update formatter
+    cli.formatter = AWSStyleFormatter(cli.output_format)
+
+    # Disable colors if requested
+    if args.no_color:
+        for attr in dir(Color):
+            if not attr.startswith('_'):
+                setattr(Color, attr, "")
+
+    try:
+        # Route to appropriate command
+        if args.command == "help" or not args.command:
+            await cli.show_help()
+        elif args.command == "describe":
+            if args.resource == "clusters":
+                await cli.describe_clusters()
+            elif args.resource == "nodes":
+                await cli.describe_nodes(getattr(args, 'detailed', False))
+            elif args.resource == "services":
+                await cli.get_service_status()
+            else:
+                print(f"Unknown resource: {args.resource}")
+                await cli.show_help()
+        elif args.command == "start":
+            if args.target == "service":
+                service_type = getattr(args, 'service_type', 'all')
+                foreground = getattr(args, 'foreground', False)
+                await cli.start_services(service_type, foreground)
+            else:
+                await cli.start_services("all")
+        elif args.command == "stop":
+            if args.target == "service":
+                service_type = getattr(args, 'service_type', 'all')
+                await cli.stop_services(service_type)
+            else:
+                await cli.stop_services("all")
+        elif args.command == "deploy":
+            print("Deploy command not yet implemented")
+        elif args.command == "test":
+            print("Test command not yet implemented")
+        elif args.command == "monitor":
+            print("Monitor command not yet implemented")
+        else:
+            print(f"Unknown command: {args.command}")
+            await cli.show_help()
+
+    except KeyboardInterrupt:
+        print(f"\n{cli.formatter.format_error('Operation cancelled by user')}")
+    except Exception as e:
+        print(f"\n{cli.formatter.format_error(f'Unexpected error: {str(e)}')}")
+        if cli.verbose:
+            import traceback
+            traceback.print_exc()
+    finally:
+        await cli._close_session()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

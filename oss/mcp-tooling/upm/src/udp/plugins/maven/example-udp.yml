@@ -1,0 +1,119 @@
+# Example UDP Configuration for Java Projects
+# This file demonstrates how to configure cross-language dependencies in a Java project
+
+# Basic project information
+project: example-java-project
+target_language: java
+java_version: "8"
+
+# Dependencies from multiple ecosystems
+dependencies:
+  # Java dependencies (handled normally by Maven)
+  java:
+    - "org.apache.commons:commons-lang3:3.12.0"
+    - "com.fasterxml.jackson.core:jackson-databind:2.15.2"
+    - "org.postgresql:postgresql:42.2.25"
+    - "junit:junit:4.13.2"
+
+  # Python packages for data science and HTTP
+  python:
+    - "pandas:1.5.2"          # Data manipulation and analysis
+    - "requests:2.28.1"       # HTTP library
+    - "numpy:1.21.0"          # Numerical computing
+    - "scikit-learn:1.2.0"    # Machine learning
+    - "matplotlib:3.6.0"      # Plotting library
+
+  # JavaScript/Node.js modules for utilities
+  javascript:
+    - "lodash:4.17.21"        # Utility library
+    - "moment:2.29.4"         # Date manipulation
+    - "validator:13.7.0"      # Input validation
+    - "axios:1.2.0"           # HTTP client
+    - "uuid:9.0.0"            # UUID generation
+
+  # Rust crates for performance-critical operations
+  rust:
+    - "serde:1.0.152"         # Serialization framework
+    - "regex:1.7.0"           # Regular expressions
+    - "tokio:1.24.0"          # Async runtime
+    - "reqwest:0.11.13"       # HTTP client
+
+  # Generic dependencies with explicit configuration
+  generic:
+    - name: "tensorflow"
+      version: "2.11.0"
+      ecosystem: "pypi"
+      bridge: "jython"
+      optional: false
+
+    - name: "sharp"
+      version: "0.32.0"
+      ecosystem: "npm"
+      bridge: "graalvm"
+      optional: true
+
+# Bridge configuration for cross-language integration
+bridges:
+  # Python bridge using Jython
+  python:
+    enabled: true
+    runtime: jython              # Options: jython, graalvm, subprocess
+    version: "3.8"
+    dependencies_path: "lib/python"
+
+  # JavaScript bridge using GraalVM
+  javascript:
+    enabled: true
+    runtime: graalvm             # Options: graalvm, nashorn, subprocess
+    version: "es2020"
+    dependencies_path: "lib/js"
+
+  # Rust bridge using JNI
+  rust:
+    enabled: true
+    runtime: jni                 # JNI is the primary option for Rust
+    target: "x86_64-unknown-linux-gnu"
+    dependencies_path: "lib/rust"
+
+# Performance optimization settings
+performance:
+  preload_bridges: true          # Preload bridge modules at startup
+  cache_modules: true            # Cache loaded modules between invocations
+  parallel_loading: true         # Load dependencies in parallel
+  cache_directory: ".udp/cache"  # Local cache directory
+
+# UDP service configuration
+udp_service:
+  url: "http://localhost:8040"                    # UDP service endpoint
+  api_key: "${UDP_API_KEY}"                       # API key from environment
+  organization_id: "${UDP_ORGANIZATION_ID}"       # Organization ID from environment
+  timeout: 30                                     # Request timeout in seconds
+  retry_count: 3                                  # Number of retries on failure
+
+# Security and compliance settings
+security:
+  scan_vulnerabilities: true     # Scan for security vulnerabilities
+  fail_on_critical: true         # Fail build on critical vulnerabilities
+  fail_on_high: false           # Don't fail on high severity (warn only)
+  allowed_licenses:             # Allowed dependency licenses
+    - "Apache-2.0"
+    - "MIT"
+    - "BSD-3-Clause"
+    - "ISC"
+
+# Development environment settings
+development:
+  hot_reload: true              # Enable hot reload for development
+  debug_bridges: false          # Enable bridge debugging
+  verbose_logging: false        # Enable verbose logging
+
+# Production environment overrides
+# These settings override development settings in production
+production:
+  hot_reload: false
+  debug_bridges: false
+  verbose_logging: false
+  performance:
+    preload_bridges: true
+    cache_modules: true
+    parallel_loading: true

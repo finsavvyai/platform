@@ -1,0 +1,272 @@
+# Horizontal Pod Autoscaler for UDP API
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: udp-api-hpa
+  namespace: udp
+  labels:
+    app: udp
+    component: autoscaler
+    target: api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: udp-api
+  minReplicas: 1  # Start with 1 for cost optimization
+  maxReplicas: 5  # Limit to 5 for free tier
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Custom metrics (when available)
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5 minutes
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60   # 1 minute
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+# Horizontal Pod Autoscaler for UDP Workers
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: udp-worker-hpa
+  namespace: udp
+  labels:
+    app: udp
+    component: autoscaler
+    target: worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: udp-worker
+  minReplicas: 1  # Start with 1 for cost optimization
+  maxReplicas: 3  # Limit to 3 for free tier
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  # Queue depth metric (when available)
+  - type: Object
+    object:
+      metric:
+        name: celery_queue_length
+      target:
+        type: Value
+        value: "10"
+      describedObject:
+        apiVersion: v1
+        kind: Service
+        name: udp-redis
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # 10 minutes for workers
+      policies:
+      - type: Percent
+        value: 33
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 120  # 2 minutes
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Max
+
+---
+# Vertical Pod Autoscaler for Redis Proxy (optional)
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: udp-redis-proxy-vpa
+  namespace: udp
+  labels:
+    app: udp
+    component: vpa
+    target: redis-proxy
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: udp-redis-proxy
+  updatePolicy:
+    updateMode: "Auto"  # Can be "Off", "Initial", or "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: redis-proxy
+      minAllowed:
+        cpu: 10m
+        memory: 16Mi
+      maxAllowed:
+        cpu: 100m
+        memory: 128Mi
+      controlledResources: ["cpu", "memory"]
+
+---
+# Vertical Pod Autoscaler for Cloud SQL Proxy
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: udp-cloudsql-proxy-vpa
+  namespace: udp
+  labels:
+    app: udp
+    component: vpa
+    target: cloudsql-proxy
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: udp-cloudsql-proxy
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: cloud-sql-proxy
+      minAllowed:
+        cpu: 25m
+        memory: 32Mi
+      maxAllowed:
+        cpu: 200m
+        memory: 256Mi
+      controlledResources: ["cpu", "memory"]
+
+---
+# Cost-aware scaling policy via CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: udp-cost-aware-scaler
+  namespace: udp
+  labels:
+    app: udp
+    component: cost-scaler
+spec:
+  schedule: "0 18 * * *"  # 6 PM daily - scale down for night
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: udp
+            component: cost-scaler
+        spec:
+          serviceAccountName: udp-worker
+          restartPolicy: OnFailure
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Scaling down for cost optimization..."
+              # Scale API to minimum
+              kubectl scale deployment udp-api --replicas=1 -n udp
+              # Scale workers to minimum
+              kubectl scale deployment udp-worker --replicas=1 -n udp
+              echo "Scaled down completed"
+            resources:
+              requests:
+                memory: "32Mi"
+                cpu: "10m"
+              limits:
+                memory: "64Mi"
+                cpu: "50m"
+
+---
+# Morning scale-up CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: udp-morning-scaler
+  namespace: udp
+  labels:
+    app: udp
+    component: morning-scaler
+spec:
+  schedule: "0 8 * * MON-FRI"  # 8 AM weekdays - scale up for business hours
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: udp
+            component: morning-scaler
+        spec:
+          serviceAccountName: udp-worker
+          restartPolicy: OnFailure
+          containers:
+          - name: scaler
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Scaling up for business hours..."
+              # Scale API for business load
+              kubectl scale deployment udp-api --replicas=2 -n udp
+              # Ensure workers are ready
+              kubectl scale deployment udp-worker --replicas=1 -n udp
+              echo "Scale up completed"
+            resources:
+              requests:
+                memory: "32Mi"
+                cpu: "10m"
+              limits:
+                memory: "64Mi"
+                cpu: "50m"

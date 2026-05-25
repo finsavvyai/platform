@@ -1,0 +1,572 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "UPM Enterprise Onboarding API",
+    "description": "API for enterprise customer onboarding with MCP integration",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.upm.io",
+      "description": "Production server"
+    },
+    {
+      "url": "https://api.staging.upm.io",
+      "description": "Staging server"
+    }
+  ],
+  "paths": {
+    "/api/v1/onboarding/start": {
+      "post": {
+        "summary": "Start enterprise onboarding",
+        "description": "Initiates the onboarding process for a new enterprise customer",
+        "operationId": "startOnboarding",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartOnboardingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Onboarding started successfully",
+            "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/OnboardingSession"
+                  }
+                }
+              }
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/{session_id}/advance": {
+      "post": {
+        "summary": "Advance to next onboarding stage",
+        "description": "Progress the onboarding process to the next stage",
+        "operationId": "advanceOnboarding",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvanceOnboardingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Onboarding advanced successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingProgress"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/{session_id}/current": {
+      "get": {
+        "summary": "Get current onboarding state",
+        "description": "Retrieves the current onboarding progress and next steps",
+        "operationId": "getOnboardingState",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current onboarding state",
+            "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/OnboardingState"
+                  }
+                }
+              }
+          }
+        }
+      }
+    },
+    "/api/v1/mcp/tools": {
+      "get": {
+        "summary": "List available MCP tools",
+        "description": "Returns list of MCP tools available for AI assistant integration",
+        "operationId": "listMCPTools",
+        "responses": {
+          "200": {
+            "description": "List of MCP tools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MCPTool"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mcp/invoke": {
+      "post": {
+        "summary": "Invoke MCP tool",
+        "description": "Execute an MCP tool via AI assistant or API call",
+        "operationId": "invokeMCPTool",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MCPToolInvocation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tool execution result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPToolResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/{session_id}/mcp-assist": {
+      "post": {
+        "summary": "Get AI-assisted onboarding guidance",
+        "description": "Use MCP to get personalized onboarding help from AI assistant",
+        "operationId": "getMCPAssist",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "description": "User's question or current challenge"
+                  },
+                  "context": {
+                    "type": "object",
+                    "description": "Current onboarding context"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI-generated guidance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MCPAssistResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user-journey/{user_id}/events": {
+      "post": {
+        "summary": "Track user journey event",
+        "description": "Record user behavior events for journey optimization",
+        "operationId": "trackJourneyEvent",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JourneyEvent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event tracked successfully"
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/onboarding-funnel": {
+      "get": {
+        "summary": "Get onboarding funnel analytics",
+        "description": "Returns conversion metrics across onboarding stages",
+        "operationId": "getOnboardingFunnel",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["7d", "30d", "90d", "all"],
+              "default": "30d"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Funnel analytics data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingFunnel"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "StartOnboardingRequest": {
+        "type": "object",
+        "required": ["organization_name", "admin_email", "admin_name", "plan"],
+        "properties": {
+          "organization_name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "admin_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "admin_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "plan": {
+            "type": "string",
+            "enum": ["starter", "professional", "enterprise"]
+          },
+          "company_size": {
+            "type": "string",
+            "enum": ["1-10", "11-50", "51-200", "201-500", "500+"]
+          },
+          "ecosystems": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["maven", "npm", "pypi", "cargo", "go", "php", "nuget"]
+            }
+          }
+        }
+      },
+      "OnboardingSession": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "organization_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "admin_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "onboarding_token": {
+            "type": "string"
+          },
+          "first_step": {
+            "type": "object",
+            "properties": {
+              "title": {"type": "string"},
+              "description": {"type": "string"},
+              "estimated_time": {"type": "string"},
+              "actions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "action": {"type": "string"},
+                    "description": {"type": "string"}
+                  }
+                }
+              }
+            }
+          },
+          "progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        }
+      },
+      "AdvanceOnboardingRequest": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "account_creation",
+              "organization_setup",
+              "team_invitation",
+              "repository_connection",
+              "initial_scan",
+              "policy_config",
+              "ci_integration",
+              "ide_plugins",
+              "training_completion",
+              "activation"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "description": "Stage-specific configuration data"
+          }
+        }
+      },
+      "OnboardingProgress": {
+        "type": "object",
+        "properties": {
+          "current_stage": {
+            "type": "string"
+          },
+          "completed_stage": {
+            "type": "string"
+          },
+          "result": {
+            "type": "object",
+            "description": "Stage execution results"
+          },
+          "next_step": {
+            "type": "object",
+            "description": "Next stage instructions"
+          },
+          "progress": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        }
+      },
+      "OnboardingState": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "current_stage": {
+            "type": "string"
+          },
+          "completed_stages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estimated_completion": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current_step": {
+            "type": "object",
+            "description": "Current step instructions"
+          }
+        }
+      },
+      "MCPTool": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "inputSchema": {
+            "type": "object"
+          },
+          "outputSchema": {
+            "type": "object"
+          }
+        }
+      },
+      "MCPToolInvocation": {
+        "type": "object",
+        "required": ["tool", "parameters"],
+        "properties": {
+          "tool": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "object"
+          },
+          "context": {
+            "type": "object",
+            "description": "Additional context for tool execution"
+          }
+        }
+      },
+      "MCPToolResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "result": {
+            "type": "object"
+          },
+          "error": {
+            "type": "string"
+          },
+          "execution_time_ms": {
+            "type": "number"
+          }
+        }
+      },
+      "MCPAssistResponse": {
+        "type": "object",
+        "properties": {
+          "guidance": {
+            "type": "string"
+          },
+          "suggested_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "relevant_resources": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "next_step": {
+            "type": "string"
+          }
+        }
+      },
+      "JourneyEvent": {
+        "type": "object",
+        "required": ["event_type", "user_id"],
+        "properties": {
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "page_view",
+              "button_click",
+              "form_submit",
+              "error",
+              "feature_use",
+              "milestone_reached"
+            ]
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "properties": {
+            "type": "object",
+            "description": "Event-specific properties"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OnboardingFunnel": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string"
+          },
+          "entrants": {
+            "type": "integer"
+          },
+          "dropoffs": {
+            "type": "integer"
+          },
+          "completions": {
+            "type": "integer"
+          },
+          "conversion_rate": {
+            "type": "number",
+            "format": "float"
+          },
+          "avg_time_to_complete": {
+            "type": "number",
+            "description": "Average time in seconds to complete this stage"
+          }
+        }
+      }
+    }
+  }
+}

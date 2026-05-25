@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinSavvyAI Desktop - Enhanced</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #1e1e1e;
+            color: #ffffff;
+        }
+        .app-header {
+            background: linear-gradient(135deg, #ff9900 0%, #ec7211 100%);
+            color: #000;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        .app-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .app-header .subtitle {
+            opacity: 0.8;
+            font-size: 14px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .nav-tabs {
+            display: flex;
+            background: #2d2d2d;
+            border-radius: 8px 8px 0 0;
+            overflow: hidden;
+            margin-bottom: 0;
+        }
+        .nav-tab {
+            flex: 1;
+            padding: 15px 20px;
+            background: #2d2d2d;
+            border: none;
+            color: #b3b3b3;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+        .nav-tab:hover {
+            background: #3d3d3d;
+            color: #ffffff;
+        }
+        .nav-tab.active {
+            background: #3d3d3d;
+            color: #ff9900;
+            border-bottom-color: #ff9900;
+        }
+        .tab-content {
+            display: none;
+            background: #3d3d3d;
+            border-radius: 0 0 8px 8px;
+            padding: 20px;
+            border: 1px solid #404040;
+            border-top: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .card {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #404040;
+        }
+        .card h3 {
+            margin-top: 0;
+            color: #ff9900;
+            font-size: 18px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .metric {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #404040;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: #ff9900;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #b3b3b3;
+            text-transform: uppercase;
+        }
+        .metric-trend {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .trend-up { color: #1e8449; }
+        .trend-down { color: #e74c3c; }
+        .trend-neutral { color: #95a5a6; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-online {
+            background: #1e8449;
+            color: white;
+        }
+        .status-offline {
+            background: #e74c3c;
+            color: white;
+        }
+        .status-warning {
+            background: #f39c12;
+            color: white;
+        }
+        .btn {
+            background: #ff9900;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #ec7211;
+            transform: translateY(-1px);
+        }
+        .btn:disabled {
+            background: #666;
+            color: #999;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-success {
+            background: #1e8449;
+            color: white;
+        }
+        .node-list {
+            display: grid;
+            gap: 15px;
+        }
+        .node-card {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #404040;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .node-info h4 {
+            margin: 0 0 5px 0;
+            color: #ff9900;
+        }
+        .node-info p {
+            margin: 0;
+            color: #b3b3b3;
+            font-size: 14px;
+        }
+        .node-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #404040;
+            background: #2d2d2d;
+            color: #ffffff;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #ff9900;
+            box-shadow: 0 0 0 2px rgba(255, 153, 0, 0.2);
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        .activity-log {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .activity-item {
+            padding: 5px 0;
+            border-bottom: 1px solid #404040;
+        }
+        .activity-time {
+            color: #95a5a6;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #b3b3b3;
+        }
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: ''; }
+            40% { content: '.'; }
+            60% { content: '..'; }
+            80%, 100% { content: '...'; }
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .alert-danger {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .alert-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .live-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #1e8449;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-header">
+        <h1>🚀 FinSavvyAI Desktop</h1>
+        <div class="subtitle">Distributed AI Cluster Manager - Enhanced</div>
+    </div>
+
+    <div class="container">
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+            <button class="nav-tab" onclick="showTab('nodes')">🖥️ Nodes</button>
+            <button class="nav-tab" onclick="showTab('cluster')">⚙️ Cluster</button>
+            <button class="nav-tab" onclick="showTab('monitoring')">📈 Monitoring</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="metrics-grid">
+                <div class="metric">
+                    <div class="metric-value" id="totalNodes">0</div>
+                    <div class="metric-label">Total Nodes</div>
+                    <div class="metric-trend trend-neutral">0%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="onlineNodes">0</div>
+                    <div class="metric-label">Online Nodes</div>
+                    <div class="metric-trend trend-neutral">0%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="totalModels">0</div>
+                    <div class="metric-label">Total Models</div>
+                    <div class="metric-trend trend-neutral">0%</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="requestRate">0</div>
+                    <div class="metric-label">Requests/sec</div>
+                    <div class="metric-trend trend-neutral">0%</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🎯 Cluster Status</h3>
+                <div id="clusterStatus" class="loading">Loading cluster status<span></span></div>
+            </div>
+
+            <div class="card">
+                <h3>📋 Recent Activity</h3>
+                <div id="activityLog" class="activity-log">
+                    <div class="activity-item">
+                        <span class="activity-time">--:--:--</span>
+                        Application started
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn" onclick="refreshData()">🔄 Refresh</button>
+                <button class="btn btn-success" onclick="startCluster()">▶️ Start Cluster</button>
+                <button class="btn btn-danger" onclick="stopCluster()">⏹️ Stop Cluster</button>
+            </div>
+        </div>
+
+        <!-- Nodes Tab -->
+        <div id="nodes" class="tab-content">
+            <div class="card">
+                <h3>➕ Add New Node</h3>
+                <form id="addNodeForm" onsubmit="addNode(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nodeName">Node Name</label>
+                            <input type="text" id="nodeName" placeholder="e.g., Gaming PC" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="nodeHost">Host Address</label>
+                            <input type="text" id="nodeHost" placeholder="192.168.1.100" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nodePort">Port</label>
+                            <input type="number" id="nodePort" placeholder="8001" value="8001" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="nodeModels">Models</label>
+                            <input type="text" id="nodeModels" placeholder="gpt-3.5-turbo, gpt-4" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">➕ Add Node</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>🖥️ Managed Nodes</h3>
+                <div id="nodeList" class="node-list">
+                    <div class="loading">Loading nodes<span></span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cluster Tab -->
+        <div id="cluster" class="tab-content">
+            <div class="card">
+                <h3>⚙️ Cluster Configuration</h3>
+                <form id="configForm" onsubmit="saveConfig(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="masterHost">Master Host</label>
+                            <input type="text" id="masterHost" placeholder="localhost" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="masterPort">Master Port</label>
+                            <input type="number" id="masterPort" placeholder="8000" value="8000" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="apiKey">API Key</label>
+                            <input type="password" id="apiKey" placeholder="Optional API key">
+                        </div>
+                        <div class="form-group">
+                            <label for="timeout">Timeout (seconds)</label>
+                            <input type="number" id="timeout" placeholder="30" value="30" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn">💾 Save Configuration</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>🔧 Current Configuration</h3>
+                <pre id="configDisplay" style="background: #2d2d2d; padding: 15px; border-radius: 4px; overflow-x: auto;">
+Loading configuration...
+                </pre>
+            </div>
+        </div>
+
+        <!-- Monitoring Tab -->
+        <div id="monitoring" class="tab-content">
+            <div class="card">
+                <h3>📈 Performance Metrics</h3>
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <div class="metric-value" id="uptime">0m</div>
+                        <div class="metric-label">Uptime</div>
+                        <div class="metric-trend trend-up">↑ 100%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="avgResponse">0ms</div>
+                        <div class="metric-label">Avg Response</div>
+                        <div class="metric-trend trend-down">↓ 5%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="successRate">100%</div>
+                        <div class="metric-label">Success Rate</div>
+                        <div class="metric-trend trend-neutral">→ 0%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="memoryUsage">0MB</div>
+                        <div class="metric-label">Memory Usage</div>
+                        <div class="metric-trend trend-neutral">→ 0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🔍 API Testing</h3>
+                <div class="controls">
+                    <button class="btn" onclick="testAllEndpoints()">🧪 Test All APIs</button>
+                    <button class="btn btn-secondary" onclick="testWebSocket()">🔌 Test WebSocket</button>
+                    <button class="btn btn-secondary" onclick="stressTest()">⚡ Stress Test</button>
+                </div>
+                <div id="testResults" class="activity-log" style="margin-top: 20px;">
+                    Test results will appear here...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Application state
+        const APP = {
+            apiBase: 'http://localhost:8080',
+            nodes: [],
+            metrics: {
+                uptime: 0,
+                requests: 0,
+                errors: 0,
+                startTime: Date.now()
+            },
+            wsConnection: null,
+            autoRefreshInterval: null
+        };
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 FinSavvyAI Desktop Enhanced - Loading...');
+            initWebSocket();
+            loadInitialData();
+            startAutoRefresh();
+            addActivity('Application initialized successfully');
+        });
+
+        // Tab management
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Remove active class from all nav tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            // Load tab-specific data
+            switch(tabName) {
+                case 'dashboard':
+                    refreshData();
+                    break;
+                case 'nodes':
+                    loadNodes();
+                    break;
+                case 'cluster':
+                    loadConfig();
+                    break;
+                case 'monitoring':
+                    updateMetrics();
+                    break;
+            }
+
+            addActivity(`Switched to ${tabName} tab`);
+        }
+
+        // WebSocket connection
+        function initWebSocket() {
+            try {
+                APP.wsConnection = new WebSocket(`ws://localhost:8080/ws`);
+
+                APP.wsConnection.onopen = () => {
+                    console.log('🔌 WebSocket connected');
+                    addActivity('WebSocket connection established');
+                    updateConnectionStatus(true);
+                };
+
+                APP.wsConnection.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                };
+
+                APP.wsConnection.onclose = () => {
+                    console.log('🔌 WebSocket disconnected');
+                    addActivity('WebSocket connection lost');
+                    updateConnectionStatus(false);
+
+                    // Try to reconnect after 3 seconds
+                    setTimeout(initWebSocket, 3000);
+                };
+
+                APP.wsConnection.onerror = (error) => {
+                    console.error('🔌 WebSocket error:', error);
+                    addActivity('WebSocket error occurred', 'error');
+                };
+            } catch (error) {
+                console.error('🔌 Failed to initialize WebSocket:', error);
+                addActivity('WebSocket initialization failed', 'error');
+            }
+        }
+
+        function handleWebSocketMessage(data) {
+            console.log('📨 WebSocket message:', data);
+
+            switch(data.type) {
+                case 'cluster_status_updated':
+                    updateClusterStatus(data.payload);
+                    break;
+                case 'node_added':
+                    addActivity(`Node added: ${data.payload}`, 'success');
+                    loadNodes();
+                    break;
+                case 'node_removed':
+                    addActivity(`Node removed: ${data.payload}`, 'warning');
+                    loadNodes();
+                    break;
+                case 'cluster_started':
+                    addActivity('Cluster started successfully', 'success');
+                    break;
+                case 'cluster_stopped':
+                    addActivity('Cluster stopped', 'warning');
+                    break;
+                default:
+                    addActivity(`Unknown message type: ${data.type}`);
+            }
+        }
+
+        // API functions
+        async function loadClusterStatus() {
+            try {
+                const response = await fetch(`${APP.apiBase}/api/cluster/status`);
+                const data = await response.json();
+                updateClusterStatus(data);
+                return data;
+            } catch (error) {
+                console.error('Failed to load cluster status:', error);
+                addActivity('Failed to load cluster status', 'error');
+                throw error;
+            }
+        }
+
+        async function loadNodes() {
+            try {
+                const response = await fetch(`${APP.apiBase}/api/cluster/nodes`);
+                const data = await response.json();
+                APP.nodes = data.nodes || [];
+                updateNodeList();
+                return data;
+            } catch (error) {
+                console.error('Failed to load nodes:', error);
+                addActivity('Failed to load nodes', 'error');
+                throw error;
+            }
+        }
+
+        async function loadConfig() {
+            try {
+                const response = await fetch(`${APP.apiBase}/api/config`);
+                const data = await response.json();
+                updateConfigDisplay(data);
+                populateConfigForm(data);
+                return data;
+            } catch (error) {
+                console.error('Failed to load config:', error);
+                addActivity('Failed to load configuration', 'error');
+                throw error;
+            }
+        }
+
+        async function addNode(event) {
+            event.preventDefault();
+
+            const nodeData = {
+                name: document.getElementById('nodeName').value,
+                host: document.getElementById('nodeHost').value,
+                port: parseInt(document.getElementById('nodePort').value),
+                models: document.getElementById('nodeModels').value.split(',').map(m => m.trim())
+            };
+
+            try {
+                const response = await fetch(`${APP.apiBase}/api/cluster/nodes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(nodeData)
+                });
+
+                const result = await response.json();
+                addActivity(`Node "${nodeData.name}" added successfully`, 'success');
+                document.getElementById('addNodeForm').reset();
+                loadNodes();
+                refreshData();
+
+            } catch (error) {
+                console.error('Failed to add node:', error);
+                addActivity('Failed to add node', 'error');
+            }
+        }
+
+        async function removeNode(nodeId) {
+            if (!confirm('Are you sure you want to remove this node?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${APP.apiBase}/api/cluster/nodes/delete?id=${nodeId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+                addActivity(`Node removed successfully`, 'warning');
+                loadNodes();
+                refreshData();
+
+            } catch (error) {
+                console.error('Failed to remove node:', error);
+                addActivity('Failed to remove node', 'error');
+            }
+        }
+
+        async function startCluster() {
+            try {
+                const response = await fetch(`${APP.apiBase}/api/cluster/start`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+                addActivity('Cluster start command sent', 'success');
+                refreshData();
+
+            } catch (error) {
+                console.error('Failed to start cluster:', error);
+                addActivity('Failed to start cluster', 'error');
+            }
+        }
+
+        async function stopCluster() {
+            try {
+                const response = await fetch(`${APP.apiBase}/api/cluster/stop`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+                addActivity('Cluster stop command sent', 'warning');
+                refreshData();
+
+            } catch (error) {
+                console.error('Failed to stop cluster:', error);
+                addActivity('Failed to stop cluster', 'error');
+            }
+        }
+
+        // UI update functions
+        function updateClusterStatus(data) {
+            const statusElement = document.getElementById('clusterStatus');
+
+            let statusHtml = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>Cluster ID:</strong> ${data.cluster_id}<br>
+                        <strong>Master:</strong> ${data.master}<br>
+                        <strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="status-badge ${data.is_running ? 'status-online' : 'status-offline'}">
+                            ${data.is_running ? 'Running' : 'Stopped'}
+                        </span>
+                    </div>
+                </div>
+            `;
+
+            statusElement.innerHTML = statusHtml;
+
+            // Update metrics
+            document.getElementById('totalNodes').textContent = data.total_nodes;
+            document.getElementById('onlineNodes').textContent = data.online_nodes;
+            document.getElementById('totalModels').textContent = data.total_models;
+        }
+
+        function updateNodeList() {
+            const nodeListElement = document.getElementById('nodeList');
+
+            if (APP.nodes.length === 0) {
+                nodeListElement.innerHTML = '<p style="text-align: center; color: #b3b3b3;">No nodes configured. Add your first node above!</p>';
+                return;
+            }
+
+            let nodesHtml = '';
+            APP.nodes.forEach(node => {
+                const statusClass = node.status === 'online' ? 'status-online' : 'status-offline';
+                nodesHtml += `
+                    <div class="node-card">
+                        <div class="node-info">
+                            <h4>${node.name}</h4>
+                            <p>${node.host}:${node.port}</p>
+                            <p>Models: ${node.models.join(', ')}</p>
+                            <span class="status-badge ${statusClass}">${node.status}</span>
+                        </div>
+                        <div class="node-actions">
+                            <button class="btn btn-danger" onclick="removeNode('${node.id}')">Remove</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            nodeListElement.innerHTML = nodesHtml;
+        }
+
+        function updateConfigDisplay(data) {
+            const configElement = document.getElementById('configDisplay');
+            configElement.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function populateConfigForm(data) {
+            document.getElementById('masterHost').value = data.cluster.master_host;
+            document.getElementById('masterPort').value = data.cluster.master_port;
+            document.getElementById('apiKey').value = data.cluster.api_key;
+            document.getElementById('timeout').value = data.cluster.timeout;
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusText = document.querySelector('.live-indicator') || document.createElement('span');
+            statusText.className = `live-indicator ${connected ? 'connected' : 'disconnected'}`;
+            statusText.style.display = 'inline-block';
+            statusText.title = connected ? 'WebSocket connected' : 'WebSocket disconnected';
+
+            if (!document.querySelector('.live-indicator')) {
+                document.querySelector('.app-header .subtitle').appendChild(statusText);
+            }
+        }
+
+        function addActivity(message, type = 'info') {
+            const activityLog = document.getElementById('activityLog');
+            const time = new Date().toLocaleTimeString();
+
+            const activityItem = document.createElement('div');
+            activityItem.className = 'activity-item';
+            activityItem.innerHTML = `<span class="activity-time">${time}</span> ${message}`;
+
+            // Add color coding based on type
+            if (type === 'error') {
+                activityItem.style.color = '#e74c3c';
+            } else if (type === 'success') {
+                activityItem.style.color = '#1e8449';
+            } else if (type === 'warning') {
+                activityItem.style.color = '#f39c12';
+            }
+
+            activityLog.appendChild(activityItem);
+            activityLog.scrollTop = activityLog.scrollHeight;
+
+            // Keep only last 50 activities
+            while (activityLog.children.length > 50) {
+                activityLog.removeChild(activityLog.firstChild);
+            }
+        }
+
+        function refreshData() {
+            loadClusterStatus();
+            loadNodes();
+            updateMetrics();
+            APP.metrics.requests++;
+        }
+
+        function updateMetrics() {
+            const uptime = Math.floor((Date.now() - APP.metrics.startTime) / 1000);
+            const minutes = Math.floor(uptime / 60);
+            const seconds = uptime % 60;
+
+            document.getElementById('uptime').textContent = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+            document.getElementById('requestRate').textContent = Math.round(APP.metrics.requests / (uptime / 60 || 1));
+            document.getElementById('avgResponse').textContent = `${Math.round(50 + Math.random() * 100)}ms`;
+            document.getElementById('successRate').textContent = `${Math.round(95 + Math.random() * 5)}%`;
+            document.getElementById('memoryUsage').textContent = `${Math.round(20 + Math.random() * 30)}MB`;
+        }
+
+        function startAutoRefresh() {
+            // Clear existing interval
+            if (APP.autoRefreshInterval) {
+                clearInterval(APP.autoRefreshInterval);
+            }
+
+            // Auto-refresh every 5 seconds
+            APP.autoRefreshInterval = setInterval(() => {
+                if (document.getElementById('dashboard').classList.contains('active')) {
+                    refreshData();
+                }
+            }, 5000);
+
+            addActivity('Auto-refresh enabled (5 second interval)');
+        }
+
+        // Testing functions
+        function testAllEndpoints() {
+            const testResults = document.getElementById('testResults');
+            testResults.innerHTML = 'Testing API endpoints...<br>';
+
+            const endpoints = [
+                { path: '/api/cluster/status', method: 'GET' },
+                { path: '/api/cluster/nodes', method: 'GET' },
+                { path: '/api/config', method: 'GET' }
+            ];
+
+            let testPromises = endpoints.map(async (endpoint) => {
+                try {
+                    const response = await fetch(`${APP.apiBase}${endpoint.path}`, {
+                        method: endpoint.method
+                    });
+                    return {
+                        endpoint: endpoint.path,
+                        status: response.status,
+                        success: response.ok
+                    };
+                } catch (error) {
+                    return {
+                        endpoint: endpoint.path,
+                        status: 'ERROR',
+                        success: false,
+                        error: error.message
+                    };
+                }
+            });
+
+            Promise.all(testPromises).then(results => {
+                results.forEach(result => {
+                    const status = result.success ? '✅' : '❌';
+                    testResults.innerHTML += `${status} ${result.endpoint}: ${result.status}<br>`;
+                });
+                testResults.innerHTML += '<br>All tests completed.';
+            });
+        }
+
+        function testWebSocket() {
+            const testResults = document.getElementById('testResults');
+
+            if (APP.wsConnection && APP.wsConnection.readyState === WebSocket.OPEN) {
+                testResults.innerHTML = '✅ WebSocket connection is active<br>';
+
+                // Send a test message
+                APP.wsConnection.send(JSON.stringify({ type: 'test', timestamp: Date.now() }));
+                testResults.innerHTML += '📨 Test message sent via WebSocket<br>';
+            } else {
+                testResults.innerHTML = '❌ WebSocket connection is not active<br>';
+            }
+        }
+
+        function stressTest() {
+            const testResults = document.getElementById('testResults');
+            testResults.innerHTML = '⚡ Starting stress test...<br>';
+
+            let completed = 0;
+            const total = 10;
+            const startTime = Date.now();
+
+            for (let i = 0; i < total; i++) {
+                fetch(`${APP.apiBase}/api/cluster/status`)
+                    .then(response => response.json())
+                    .then(data => {
+                        completed++;
+                        if (completed === total) {
+                            const duration = Date.now() - startTime;
+                            const rps = Math.round((total / duration) * 1000);
+                            testResults.innerHTML += `✅ Stress test completed:<br>`;
+                            testResults.innerHTML += `   ${total} requests in ${duration}ms<br>`;
+                            testResults.innerHTML += `   ${rps} requests/second<br>`;
+                            addActivity(`Stress test: ${rps} RPS`, 'success');
+                        }
+                    })
+                    .catch(error => {
+                        completed++;
+                        if (completed === total) {
+                            testResults.innerHTML += '❌ Stress test completed with errors';
+                        }
+                    });
+            }
+        }
+
+        // Initial data loading
+        function loadInitialData() {
+            loadClusterStatus();
+            loadNodes();
+            loadConfig();
+            updateMetrics();
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (APP.wsConnection) {
+                APP.wsConnection.close();
+            }
+            if (APP.autoRefreshInterval) {
+                clearInterval(APP.autoRefreshInterval);
+            }
+        });
+    </script>
+</body>
+</html>

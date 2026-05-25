@@ -1,0 +1,328 @@
+# UDP API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udp-api
+  namespace: udp
+  labels:
+    app: udp
+    component: api
+    tier: backend
+    version: v1
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: udp
+      component: api
+  template:
+    metadata:
+      labels:
+        app: udp
+        component: api
+        tier: backend
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: udp-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - api
+              topologyKey: kubernetes.io/hostname
+      initContainers:
+      - name: wait-for-dependencies
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for PostgreSQL..."
+          until nc -z udp-postgres 5432; do
+            echo "PostgreSQL not ready, waiting..."
+            sleep 2
+          done
+          echo "Waiting for Redis..."
+          until nc -z udp-redis 6379; do
+            echo "Redis not ready, waiting..."
+            sleep 2
+          done
+          echo "Dependencies ready!"
+        resources:
+          requests:
+            memory: "16Mi"
+            cpu: "10m"
+          limits:
+            memory: "32Mi"
+            cpu: "50m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_CONNECT
+      containers:
+      - name: udp-api
+        image: gcr.io/PROJECT_ID/udp:latest  # Will be replaced by deployment script
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 8001
+          name: metrics
+          protocol: TCP
+        env:
+        # Database connection
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: udp-database-secret
+              key: DATABASE_URL
+        # Redis connection
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: udp-redis-secret
+              key: REDIS_URL
+        # Security secrets
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: udp-secrets
+              key: SECRET_KEY
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: udp-secrets
+              key: JWT_SECRET
+        # Celery broker URL
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: udp-redis-secret
+              key: REDIS_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: udp-redis-secret
+              key: REDIS_URL
+        # Pod information
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        # Node information
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        envFrom:
+        - configMapRef:
+            name: udp-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health/startup
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 12
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/.cache
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: cache
+        emptyDir:
+          sizeLimit: 500Mi
+      - name: logs
+        emptyDir:
+          sizeLimit: 500Mi
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+
+---
+# UDP API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-api-service
+  namespace: udp
+  labels:
+    app: udp
+    component: api
+    tier: backend
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8001"
+    prometheus.io/path: "/metrics"
+    cloud.google.com/backend-config: '{"default": "udp-api-backend-config"}'
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: metrics
+  selector:
+    app: udp
+    component: api
+
+---
+# NodePort service for external access (for testing)
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-api-nodeport
+  namespace: udp
+  labels:
+    app: udp
+    component: api
+    access: external
+spec:
+  type: NodePort
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+    nodePort: 30800
+  selector:
+    app: udp
+    component: api
+
+---
+# Backend configuration for Google Cloud Load Balancer
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: udp-api-backend-config
+  namespace: udp
+  labels:
+    app: udp
+    component: api
+spec:
+  healthCheck:
+    checkIntervalSec: 30
+    timeoutSec: 10
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /health/ready
+    port: 8000
+  sessionAffinity:
+    affinityType: "CLIENT_IP"
+    affinityCookieTtlSec: 3600
+  timeoutSec: 30
+  connectionDraining:
+    drainingTimeoutSec: 60
+  logging:
+    enable: true
+    sampleRate: 1.0
+
+---
+# Service Monitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: udp-api-metrics
+  namespace: udp
+  labels:
+    app: udp
+    component: api
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: udp
+      component: api
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    scrapeTimeout: 10s
+  namespaceSelector:
+    matchNames:
+    - udp

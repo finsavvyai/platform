@@ -1,0 +1,72 @@
+plugins {
+    id 'java'
+    id 'groovy'
+    id 'java-gradle-plugin'
+    id 'maven-publish'
+}
+
+group = 'com.udp'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+dependencies {
+    implementation gradleApi()
+    implementation localGroovy()
+
+    // YAML processing
+    implementation 'org.yaml:snakeyaml:2.0'
+
+    // HTTP client for UDP API
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+
+    // JSON processing
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.2'
+
+    // Utilities
+    implementation 'commons-io:commons-io:2.11.0'
+    implementation 'org.apache.commons:commons-lang3:3.12.0'
+
+    // Template engine for code generation
+    implementation 'org.freemarker:freemarker:2.3.32'
+
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:5.4.0'
+    testImplementation gradleTestKit()
+}
+
+gradlePlugin {
+    plugins {
+        udpPlugin {
+            id = 'com.udp.gradle'
+            implementationClass = 'com.udp.gradle.UdpPlugin'
+            displayName = 'UDP Gradle Plugin'
+            description = 'Gradle plugin for Universal Dependency Platform (UDP) integration'
+        }
+    }
+}
+
+publishing {
+    repositories {
+        maven {
+            name = 'udpReleases'
+            url = 'https://nexus.universaldependency.com/repository/gradle-releases/'
+            credentials {
+                username = project.findProperty('udpNexusUsername') ?: System.getenv('UDP_NEXUS_USERNAME')
+                password = project.findProperty('udpNexusPassword') ?: System.getenv('UDP_NEXUS_PASSWORD')
+            }
+        }
+    }
+}
+
+test {
+    useJUnit()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}

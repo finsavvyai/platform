@@ -1,0 +1,212 @@
+<!-- Plugin Configuration File for UPM IntelliJ Plugin -->
+<idea-plugin>
+    <!-- Plugin Metadata -->
+    <id>com.upm.intellij</id>
+    <name>Universal Dependency Platform</name>
+    <vendor email="support@upm.com" url="https://upm.com">Universal Dependency Platform</vendor>
+    <url>https://upm.com/docs/intellij-plugin</url>
+
+    <!-- Plugin Description -->
+    <description><![CDATA[
+        <p>
+            Universal Dependency Platform (UPM) IntelliJ IDEA plugin provides real-time dependency
+            management, vulnerability scanning, and policy compliance checking directly in your IDE.
+        </p>
+        <h3>Key Features:</h3>
+        <ul>
+            <li>Real-time dependency vulnerability highlighting in the editor</li>
+            <li>Inline security warnings with quick fix suggestions</li>
+            <li>Policy compliance checking and build prevention</li>
+            <li>Unified dependency tree visualization</li>
+            <li>WebSocket-based real-time updates</li>
+            <li>Cross-language dependency management support</li>
+        </ul>
+        <p>
+            Stay secure and compliant with instant feedback on your project dependencies.
+        </p>
+    ]]></description>
+
+    <!-- Version Information -->
+    <version>1.0.0</version>
+
+    <!-- Compatibility -->
+    <idea-version since-build="233" until-build="241.*"/>
+
+    <!-- Dependencies -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+    <depends optional="true" config-file="kotlin-plugin.xml">org.jetbrains.kotlin</depends>
+    <depends optional="true" config-file="maven-plugin.xml">org.apache.maven</depends>
+    <depends optional="true" config-file="gradle-plugin.xml">Gradle</depends>
+
+    <!-- Extension Points -->
+    <extensionPoints>
+        <extensionPoint name="dependencyAnalyzer" interface="com.upm.plugin.api.DependencyAnalyzer"/>
+        <extensionPoint name="securityNotifier" interface="com.upm.plugin.api.SecurityNotifier"/>
+        <extensionPoint name="policyEnforcer" interface="com.upm.plugin.api.PolicyEnforcer"/>
+    </extensionPoints>
+
+    <!-- Application Components -->
+    <application-components>
+        <component>
+            <implementation-class>com.upm.plugin.UPMApplicationComponent</implementation-class>
+        </component>
+    </application-components>
+
+    <!-- Project Components -->
+    <project-components>
+        <component>
+            <implementation-class>com.upm.plugin.UPMProjectComponent</implementation-class>
+            <interface-class>com.upm.plugin.api.UPMService</interface-class>
+        </component>
+    </project-components>
+
+    <!-- Extensions -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Tool Window -->
+        <toolWindow id="UPM" secondary="true" icon="/icons/upm-toolwindow.svg" anchor="left"
+                    factoryClass="com.upm.plugin.ui.UPMToolWindowFactory"/>
+
+        <!-- Editor Notifications -->
+        <editorNotificationProvider implementation="com.upm.plugin.ui.UPMEditorNotificationProvider"/>
+
+        <!-- Project View Decorators -->
+        <projectViewNodeDecorator implementation="com.upm.plugin.ui.UPMProjectViewDecorator"/>
+
+        <!-- Build System Integration -->
+        <buildTaskRunner implementation="com.upm.plugin.build.UPMBuildTaskRunner"/>
+        <runConfigurationExtension implementation="com.upm.plugin.build.UPMRunConfigurationExtension"/>
+
+        <!-- Inspections -->
+        <localInspection displayName="UPM Vulnerability Detection"
+                        groupName="UPM Security"
+                        enabledByDefault="true"
+                        level="ERROR"
+                        language="XML"
+                        implementationClass="com.upm.plugin.inspections.VulnerabilityInspection"/>
+        <localInspection displayName="UPM Policy Violation Detection"
+                        groupName="UPM Security"
+                        enabledByDefault="true"
+                        level="WARNING"
+                        language="XML"
+                        implementationClass="com.upm.plugin.inspections.PolicyViolationInspection"/>
+        <localInspection displayName="UPM Outdated Dependency Detection"
+                        groupName="UPM Security"
+                        enabledByDefault="true"
+                        level="WARNING"
+                        language="XML"
+                        implementationClass="com.upm.plugin.inspections.OutdatedDependencyInspection"/>
+
+        <!-- Code Completion -->
+        <completion.contributor language="XML" implementationClass="com.upm.plugin.completion.DependencyCompletionContributor"/>
+
+        <!-- Intentions -->
+        <intentionAction>
+            <className>com.upm.plugin.intentions.UpdateDependencyIntention</className>
+            <category>UPM Dependency Management</category>
+            <descriptionDirectoryName>UpdateDependency</descriptionDirectoryName>
+        </intentionAction>
+
+        <!-- Highlighting -->
+        <highlightVisitor implementation="com.upm.plugin.highlighting.DependencyHighlightingVisitor"/>
+
+        <!-- Annotators -->
+        <annotator language="XML" implementationClass="com.upm.plugin.annotators.DependencyAnnotator"/>
+        <annotator language="JAVA" implementationClass="com.upm.plugin.annotators.JavaImportAnnotator"/>
+
+        <!-- External Annotations -->
+        <externalAnnotator language="KOTLIN" implementationClass="com.upm.plugin.annotators.KotlinDependencyAnnotator"/>
+
+        <!-- Application Settings -->
+        <applicationConfigurable parentId="tools" instance="com.upm.plugin.settings.UPMApplicationSettingsConfigurable"
+                                 id="com.upm.settings" displayName="UPM"/>
+
+        <!-- Project Settings -->
+        <projectConfigurable parentId="buildTools" instance="com.upm.plugin.settings.UPMProjectSettingsConfigurable"
+                             id="com.upm.project.settings" displayName="UPM Project"/>
+    </extensions>
+
+    <!-- Actions -->
+    <actions>
+        <!-- Main Toolbar Actions -->
+        <action id="UPM.RefreshDependencies" class="com.upm.plugin.actions.RefreshDependenciesAction"
+                text="Refresh Dependencies" description="Refresh UPM dependency analysis"
+                icon="/icons/refresh.svg">
+            <add-to-group group-id="MainToolBar" anchor="last"/>
+        </action>
+
+        <!-- Editor Popup Actions -->
+        <action id="UPM.ShowDependencyInfo" class="com.upm.plugin.actions.ShowDependencyInfoAction"
+                text="Show Dependency Info" description="Show detailed information about this dependency">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+        </action>
+
+        <!-- Project View Actions -->
+        <action id="UPM.AnalyzeDependencies" class="com.upm.plugin.actions.AnalyzeDependenciesAction"
+                text="Analyze Dependencies" description="Run full dependency analysis"
+                icon="/icons/analyze.svg">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="Compile"/>
+        </action>
+
+        <!-- Build Menu Actions -->
+        <group id="UPM.BuildMenu" text="UPM Build Actions">
+            <action id="UPM.BuildWithSecurityCheck" class="com.upm.plugin.actions.BuildWithSecurityCheckAction"
+                    text="Build with Security Check" description="Build project with UPM security verification"/>
+            <action id="UPM.GenerateSBOM" class="com.upm.plugin.actions.GenerateSBOMAction"
+                    text="Generate SBOM" description="Generate Software Bill of Materials"/>
+            <add-to-group group-id="BuildMenu" anchor="last"/>
+        </group>
+
+        <!-- Tools Menu -->
+        <group id="UPM.ToolsMenu" text="UPM">
+            <action id="UPM.OpenDashboard" class="com.upm.plugin.actions.OpenDashboardAction"
+                    text="Open UPM Dashboard" description="Open UPM web dashboard"/>
+            <action id="UPM.ConfigureSettings" class="com.upm.plugin.actions.ConfigureSettingsAction"
+                    text="Configure UPM Settings" description="Open UPM plugin settings"/>
+            <separator/>
+            <action id="UPM.ReportIssue" class="com.upm.plugin.actions.ReportIssueAction"
+                    text="Report Issue" description="Report an issue with UPM"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </group>
+    </actions>
+
+    <!-- Message Bus Connections -->
+    <application-listeners>
+        <listener topic="com.intellij.openapi.project.ProjectManagerListener"
+                  class="com.upm.plugin.listeners.UPMProjectManagerListener"/>
+        <listener topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"
+                  class="com.upm.plugin.listeners.UPMFileEditorListener"/>
+    </application-listeners>
+
+    <project-listeners>
+        <listener topic="com.intellij.openapi.compiler.CompilationStatusListener"
+                  class="com.upm.plugin.listeners.UPMCompilationListener"/>
+        <listener topic="com.intellij.openapi.vfs.newvfs.BulkFileListener"
+                  class="com.upm.plugin.listeners.UPMBulkFileListener"/>
+        <listener topic="com.intellij.task.ProjectTaskListener"
+                  class="com.upm.plugin.listeners.UPMTaskListener"/>
+    </project-listeners>
+
+    <!-- Additional Configuration Files -->
+    <depends-config-file>kotlin-plugin.xml</depends-config-file>
+    <depends-config-file>maven-plugin.xml</depends-config-file>
+    <depends-config-file>gradle-plugin.xml</depends-config-file>
+
+    <!-- Resource Bundles -->
+    <resource-bundle>messages.UPMMessages</resource-bundle>
+
+    <!-- Change Notes -->
+    <change-notes><![CDATA[
+        <h3>Version 1.0.0</h3>
+        <ul>
+            <li>Initial release of UPM IntelliJ Plugin</li>
+            <li>Real-time dependency vulnerability highlighting</li>
+            <li>Policy compliance checking with build prevention</li>
+            <li>WebSocket-based real-time updates</li>
+            <li>Support for Maven and Gradle projects</li>
+            <li>Comprehensive dependency tree visualization</li>
+            <li>Quick fix actions for vulnerability remediation</li>
+            <li>SBOM generation and export</li>
+        </ul>
+    ]]></change-notes>
+</idea-plugin>

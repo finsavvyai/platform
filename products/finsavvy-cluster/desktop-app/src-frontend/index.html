@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinSavvyAI - Distributed AI Cluster Manager</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="icon" type="image/png" sizes="32x32" href="../icons/32x32.png">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <img src="../icons/32x32.png" alt="FinSavvyAI" class="logo">
+                <h1>FinSavvyAI</h1>
+                <span class="subtitle">Distributed AI Cluster Manager</span>
+            </div>
+            <div class="header-right">
+                <div class="cluster-status" id="clusterStatus">
+                    <span class="status-indicator offline"></span>
+                    <span class="status-text">Offline</span>
+                </div>
+                <button class="btn btn-primary" id="startClusterBtn">Start Cluster</button>
+                <button class="btn btn-secondary" id="stopClusterBtn" disabled>Stop Cluster</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <nav class="nav-menu">
+                    <a href="#dashboard" class="nav-item active" data-section="dashboard">
+                        <i class="icon-dashboard"></i>
+                        Dashboard
+                    </a>
+                    <a href="#nodes" class="nav-item" data-section="nodes">
+                        <i class="icon-nodes"></i>
+                        Nodes
+                    </a>
+                    <a href="#models" class="nav-item" data-section="models">
+                        <i class="icon-models"></i>
+                        Models
+                    </a>
+                    <a href="#monitoring" class="nav-item" data-section="monitoring">
+                        <i class="icon-monitoring"></i>
+                        Monitoring
+                    </a>
+                    <a href="#settings" class="nav-item" data-section="settings">
+                        <i class="icon-settings"></i>
+                        Settings
+                    </a>
+                </nav>
+            </aside>
+
+            <!-- Content Area -->
+            <section class="content">
+                <!-- Dashboard Section -->
+                <div id="dashboard" class="section active">
+                    <div class="section-header">
+                        <h2>Cluster Dashboard</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-outline" id="refreshBtn">
+                                <i class="icon-refresh"></i>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <!-- Cluster Overview Card -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Cluster Overview</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="metrics-grid">
+                                    <div class="metric">
+                                        <div class="metric-value" id="totalNodes">0</div>
+                                        <div class="metric-label">Total Nodes</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-value" id="onlineNodes">0</div>
+                                        <div class="metric-label">Online Nodes</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-value" id="totalModels">0</div>
+                                        <div class="metric-label">Total Models</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-value" id="activeRequests">0</div>
+                                        <div class="metric-label">Active Requests</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Performance Metrics Card -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Performance Metrics</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="metrics-grid">
+                                    <div class="metric">
+                                        <div class="metric-value" id="avgResponseTime">0ms</div>
+                                        <div class="metric-label">Avg Response Time</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-value" id="successRate">100%</div>
+                                        <div class="metric-label">Success Rate</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-value" id="totalRequests">0</div>
+                                        <div class="metric-label">Total Requests</div>
+                                    </div>
+                                    <div class="metric">
+                                        <div class="metric-value" id="clusterUptime">0m</div>
+                                        <div class="metric-label">Uptime</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Activity Card -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Recent Activity</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="activityLog" class="activity-log">
+                                    <div class="activity-item">
+                                        <span class="activity-time">--:--</span>
+                                        <span class="activity-message">Waiting for cluster activity...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Actions Card -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Quick Actions</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="quick-actions">
+                                    <button class="btn btn-outline" id="addNodeBtn">
+                                        <i class="icon-plus"></i>
+                                        Add Node
+                                    </button>
+                                    <button class="btn btn-outline" id="viewLogsBtn">
+                                        <i class="icon-logs"></i>
+                                        View Logs
+                                    </button>
+                                    <button class="btn btn-outline" id="configBtn">
+                                        <i class="icon-config"></i>
+                                        Configuration
+                                    </button>
+                                    <button class="btn btn-outline" id="exportBtn">
+                                        <i class="icon-export"></i>
+                                        Export Data
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nodes Section -->
+                <div id="nodes" class="section">
+                    <div class="section-header">
+                        <h2>Cluster Nodes</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-primary" id="addNodeModalBtn">
+                                <i class="icon-plus"></i>
+                                Add Node
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            <div id="nodesList" class="nodes-list">
+                                <div class="empty-state">
+                                    <i class="icon-nodes-large"></i>
+                                    <h3>No nodes configured</h3>
+                                    <p>Add your first worker node to get started with the cluster.</p>
+                                    <button class="btn btn-primary" id="addFirstNodeBtn">Add Node</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Models Section -->
+                <div id="models" class="section">
+                    <div class="section-header">
+                        <h2>Available Models</h2>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-body">
+                            <div id="modelsList" class="models-list">
+                                <div class="empty-state">
+                                    <i class="icon-models-large"></i>
+                                    <h3>No models available</h3>
+                                    <p>Connect nodes to see available AI models.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monitoring Section -->
+                <div id="monitoring" class="section">
+                    <div class="section-header">
+                        <h2>Cluster Monitoring</h2>
+                        <div class="section-actions">
+                            <select class="select" id="timeRangeSelect">
+                                <option value="1h">Last Hour</option>
+                                <option value="24h">Last 24 Hours</option>
+                                <option value="7d">Last 7 Days</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="monitoring-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Resource Usage</h3>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="resourceChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Request Statistics</h3>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="requestChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Node Performance</h3>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="performanceChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Section -->
+                <div id="settings" class="section">
+                    <div class="section-header">
+                        <h2>Settings</h2>
+                    </div>
+
+                    <div class="settings-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Cluster Configuration</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="clusterConfigForm">
+                                    <div class="form-group">
+                                        <label for="masterHost">Master Host</label>
+                                        <input type="text" id="masterHost" class="input" value="localhost">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="masterPort">Master Port</label>
+                                        <input type="number" id="masterPort" class="input" value="8000">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="apiKey">API Key</label>
+                                        <input type="password" id="apiKey" class="input" placeholder="Optional">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="timeout">Timeout (seconds)</label>
+                                        <input type="number" id="timeout" class="input" value="30">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Save Configuration</button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Application Settings</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="appConfigForm">
+                                    <div class="form-group">
+                                        <label for="theme">Theme</label>
+                                        <select id="theme" class="select">
+                                            <option value="dark">Dark</option>
+                                            <option value="light">Light</option>
+                                            <option value="auto">Auto</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="language">Language</label>
+                                        <select id="language" class="select">
+                                            <option value="en">English</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="checkbox">
+                                            <input type="checkbox" id="autoStart">
+                                            <span>Auto-start cluster on launch</span>
+                                        </label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="checkbox">
+                                            <input type="checkbox" id="minimizeToTray" checked>
+                                            <span>Minimize to system tray</span>
+                                        </label>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="checkbox">
+                                            <input type="checkbox" id="showNotifications" checked>
+                                            <span>Show notifications</span>
+                                        </label>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-left">
+                <span>FinSavvyAI Desktop v1.0.0</span>
+            </div>
+            <div class="footer-right">
+                <span id="connectionStatus">Disconnected</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modals -->
+    <div id="addNodeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Worker Node</h3>
+                <button class="modal-close" id="closeModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="addNodeForm">
+                    <div class="form-group">
+                        <label for="nodeName">Node Name</label>
+                        <input type="text" id="nodeName" class="input" placeholder="e.g., Gaming PC" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="nodeHost">Host Address</label>
+                        <input type="text" id="nodeHost" class="input" placeholder="e.g., 192.168.1.100" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="nodePort">Port</label>
+                        <input type="number" id="nodePort" class="input" placeholder="8001" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="nodeModels">Available Models (comma-separated)</label>
+                        <input type="text" id="nodeModels" class="input" placeholder="gpt-3.5-turbo, gpt-4" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelAddNodeBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Node</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading...</div>
+    </div>
+
+    <div id="notification" class="notification hidden">
+        <div class="notification-content">
+            <span class="notification-message"></span>
+            <button class="notification-close">&times;</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/api.js?v=1763677722"></script>
+    <script src="js/components.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/nodes.js"></script>
+    <script src="js/models.js"></script>
+    <script src="js/monitoring.js"></script>
+    <script src="js/settings.js"></script>
+    <script src="js/app.js?v=1763677722"></script>
+</body>
+</html>

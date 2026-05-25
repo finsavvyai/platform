@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>FinSavvyAI Desktop - Working</title>
+        <style>
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: #1e1e1e;
+                color: #ffffff;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+            }
+            .header {
+                background: #ff9900;
+                color: #000;
+                padding: 20px;
+                border-radius: 8px;
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .card {
+                background: #2d2d2d;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                border: 1px solid #404040;
+            }
+            .btn {
+                background: #ff9900;
+                color: #000;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                margin: 5px;
+            }
+            .btn:hover {
+                background: #ec7211;
+            }
+            .status {
+                padding: 10px;
+                border-radius: 4px;
+                margin: 10px 0;
+            }
+            .online {
+                background: #1e8449;
+                color: #fff;
+            }
+            .offline {
+                background: #e74c3c;
+                color: #fff;
+            }
+            .metrics {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 15px;
+                margin: 20px 0;
+            }
+            .metric {
+                text-align: center;
+                background: #3d3d3d;
+                padding: 15px;
+                border-radius: 4px;
+            }
+            .metric-value {
+                font-size: 24px;
+                font-weight: bold;
+                color: #ff9900;
+            }
+            .metric-label {
+                font-size: 12px;
+                color: #999;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🚀 FinSavvyAI Desktop Application</h1>
+                <p>Distributed AI Cluster Manager</p>
+            </div>
+
+            <div class="card">
+                <h2>📊 System Status</h2>
+                <div id="status" class="status offline">Loading...</div>
+
+                <div class="metrics">
+                    <div class="metric">
+                        <div class="metric-value" id="totalNodes">-</div>
+                        <div class="metric-label">Total Nodes</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="onlineNodes">-</div>
+                        <div class="metric-label">Online Nodes</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="totalModels">-</div>
+                        <div class="metric-label">Total Models</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="apiStatus">-</div>
+                        <div class="metric-label">API Status</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🔧 Quick Actions</h2>
+                <button class="btn" onclick="checkStatus()">
+                    Check Status
+                </button>
+                <button class="btn" onclick="checkConfig()">
+                    Check Config
+                </button>
+                <button class="btn" onclick="testAPI()">Test API</button>
+                <button class="btn" onclick="showLogs()">Show Logs</button>
+            </div>
+
+            <div class="card">
+                <h2>📋 API Response</h2>
+                <pre id="apiResponse">
+Click "Check Status" to see API response...</pre
+                >
+            </div>
+
+            <div class="card">
+                <h2>🎯 What's Working</h2>
+                <ul>
+                    <li>✅ Go Backend Server - API endpoints responding</li>
+                    <li>✅ Frontend Server - Serving this page</li>
+                    <li>
+                        ✅ Cluster Status API - Returns mock data when Python
+                        cluster offline
+                    </li>
+                    <li>✅ Configuration API - Returns app settings</li>
+                    <li>
+                        ⚠️ Python Cluster - Needs to be started on port 8000 for
+                        full functionality
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <script>
+            // API configuration
+            const API_BASE = "http://localhost:8080";
+
+            // Check status on page load
+            window.onload = function () {
+                checkStatus();
+                updateMetrics();
+            };
+
+            async function checkStatus() {
+                try {
+                    const response = await fetch(
+                        `${API_BASE}/api/cluster/status`,
+                    );
+                    const data = await response.json();
+
+                    document.getElementById("apiResponse").textContent =
+                        JSON.stringify(data, null, 2);
+                    document.getElementById("status").className =
+                        "status online";
+                    document.getElementById("status").textContent =
+                        "✅ Connected to Backend";
+
+                    updateMetrics();
+                } catch (error) {
+                    document.getElementById("apiResponse").textContent =
+                        "Error: " + error.message;
+                    document.getElementById("status").className =
+                        "status offline";
+                    document.getElementById("status").textContent =
+                        "❌ Backend Connection Failed";
+                }
+            }
+
+            async function checkConfig() {
+                try {
+                    const response = await fetch(`${API_BASE}/api/config`);
+                    const data = await response.json();
+                    document.getElementById("apiResponse").textContent =
+                        JSON.stringify(data, null, 2);
+                } catch (error) {
+                    document.getElementById("apiResponse").textContent =
+                        "Config Error: " + error.message;
+                }
+            }
+
+            async function testAPI() {
+                const endpoints = [
+                    "/api/cluster/status",
+                    "/api/cluster/nodes",
+                    "/api/config",
+                ];
+                let results = {};
+
+                for (const endpoint of endpoints) {
+                    try {
+                        const response = await fetch(`${API_BASE}${endpoint}`);
+                        results[endpoint] = {
+                            status: response.status,
+                            success: response.ok,
+                        };
+                    } catch (error) {
+                        results[endpoint] = {
+                            status: "ERROR",
+                            success: false,
+                            error: error.message,
+                        };
+                    }
+                }
+
+                document.getElementById("apiResponse").textContent =
+                    JSON.stringify(results, null, 2);
+            }
+
+            async function updateMetrics() {
+                try {
+                    const response = await fetch(
+                        `${API_BASE}/api/cluster/status`,
+                    );
+                    const data = await response.json();
+
+                    document.getElementById("totalNodes").textContent =
+                        data.total_nodes || 0;
+                    document.getElementById("onlineNodes").textContent =
+                        data.online_nodes || 0;
+                    document.getElementById("totalModels").textContent =
+                        data.total_models || 0;
+                    document.getElementById("apiStatus").textContent = "✅";
+                } catch (error) {
+                    document.getElementById("totalNodes").textContent = "0";
+                    document.getElementById("onlineNodes").textContent = "0";
+                    document.getElementById("totalModels").textContent = "0";
+                    document.getElementById("apiStatus").textContent = "❌";
+                }
+            }
+
+            function showLogs() {
+                document.getElementById("apiResponse").textContent =
+                    "Application logs would appear here.\\n\\n" +
+                    "Current Time: " +
+                    new Date().toLocaleString() +
+                    "\\n" +
+                    "Backend URL: " +
+                    API_BASE +
+                    "\\n" +
+                    "Frontend URL: " +
+                    window.location.origin +
+                    "\\n\\n" +
+                    "🎉 FinSavvyAI Desktop is working!";
+            }
+
+            // Auto-refresh every 5 seconds
+            setInterval(checkStatus, 5000);
+        </script>
+    </body>
+</html>

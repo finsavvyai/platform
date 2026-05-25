@@ -1,0 +1,204 @@
+# Cloud-optimized multi-stage Dockerfile for Universal Dependency Platform
+# Optimized for production deployment with security and performance best practices
+
+ARG PYTHON_VERSION=3.11
+ARG POETRY_VERSION=1.7.1
+
+# Base image with security updates
+FROM python:${PYTHON_VERSION}-slim-bookworm as base
+
+# Set environment variables for security and performance
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONFAULTHANDLER=1 \
+    PYTHONHASHSEED=random \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# Install system dependencies with security best practices
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    libpq-dev \
+    pkg-config \
+    libffi-dev \
+    libssl-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /bin/bash --uid 1001 udp
+
+# Install Poetry with specific version for reproducibility
+RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
+
+# Configure Poetry for container environment
+ENV POETRY_NO_INTERACTION=1 \
+    POETRY_VENV_IN_PROJECT=1 \
+    POETRY_CACHE_DIR=/tmp/poetry_cache \
+    POETRY_HOME="/opt/poetry" \
+    POETRY_VENV_PATH="/opt/poetry/venv"
+
+WORKDIR /app
+
+# Dependency installation stage
+FROM base as dependencies
+
+# Copy dependency files first for better layer caching
+COPY pyproject.toml poetry.lock ./
+
+# Install dependencies separately for better caching
+RUN poetry install --only=main --no-dev && rm -rf $POETRY_CACHE_DIR
+
+# Development stage with dev dependencies
+FROM base as development
+
+# Copy dependency files
+COPY pyproject.toml poetry.lock ./
+
+# Install all dependencies including dev tools
+RUN poetry install --with dev,docs && rm -rf $POETRY_CACHE_DIR
+
+# Copy application source
+COPY --chown=udp:udp . .
+
+# Switch to non-root user
+USER udp
+
+# Expose port
+EXPOSE 8000
+
+# Health check for development
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Development command with hot reload
+CMD ["poetry", "run", "uvicorn", "src.udp.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+# Production builder stage
+FROM dependencies as builder
+
+# Copy source code
+COPY --chown=udp:udp . .
+
+# Build the wheel package
+RUN poetry build
+
+# Final production stage - minimal image
+FROM python:${PYTHON_VERSION}-slim-bookworm as production
+
+# Copy security-focused environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONFAULTHANDLER=1 \
+    PYTHONHASHSEED=random \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    ca-certificates \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --shell /bin/bash --uid 1001 udp
+
+# Install gunicorn and uvicorn for production ASGI server
+RUN pip install --no-cache-dir gunicorn uvicorn[standard] structlog
+
+# Copy built wheel from builder stage
+COPY --from=builder /app/dist/*.whl /tmp/
+
+# Install the application
+RUN pip install --no-cache-dir /tmp/*.whl && rm -rf /tmp/*
+
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/logs /app/uploads /app/cache \
+    && chown -R udp:udp /app
+
+WORKDIR /app
+
+# Switch to non-root user for security
+USER udp
+
+# Expose port
+EXPOSE 8000
+
+# Enhanced health check for production
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Production command with proper ASGI server
+CMD ["gunicorn", "udp.api.main:app", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--workers", "4", \
+     "--bind", "0.0.0.0:8000", \
+     "--timeout", "120", \
+     "--keepalive", "5", \
+     "--max-requests", "1000", \
+     "--max-requests-jitter", "100", \
+     "--preload", \
+     "--log-level", "info", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]
+
+# Celery worker stage
+FROM production as celery-worker
+
+# Override the default command for Celery worker
+CMD ["celery", "-A", "udp.core.celery_app", "worker", \
+     "--loglevel=info", \
+     "--concurrency=4", \
+     "--prefetch-multiplier=1", \
+     "--max-tasks-per-child=1000"]
+
+# Celery beat scheduler stage
+FROM production as celery-beat
+
+# Override the default command for Celery beat
+CMD ["celery", "-A", "udp.core.celery_app", "beat", \
+     "--loglevel=info", \
+     "--schedule=/tmp/celerybeat-schedule"]
+
+# Testing stage for CI/CD
+FROM development as testing
+
+# Install test dependencies
+RUN poetry install --with dev
+
+# Copy test configuration
+COPY tests/ ./tests/
+COPY pytest.ini ./
+COPY .coverage ./
+
+# Set test environment
+ENV ENVIRONMENT=testing
+
+# Run tests by default
+CMD ["poetry", "run", "pytest", "--cov=src/udp", "--cov-report=xml", "--cov-report=term"]
+
+# Plugin development stage
+FROM development as plugin-dev
+
+# Install additional tools for plugin development
+RUN poetry add --group dev cookiecutter
+
+# Create plugin template directory
+RUN mkdir -p /app/plugin-templates
+
+# Plugin runtime stage
+FROM production as plugin-runtime
+
+# Add plugin execution environment
+ENV UDP_PLUGIN_MODE=true \
+    UDP_PLUGIN_DIR=/app/plugins
+
+# Create plugin directory
+RUN mkdir -p /app/plugins && chown udp:udp /app/plugins
+
+# Override for plugin execution
+CMD ["python", "-m", "udp.plugins.runner"]

@@ -1,0 +1,117 @@
+# Development Docker Compose for Universal Dependency Platform
+
+version: "3.8"
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: upm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d upm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis cache and session storage
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Celery worker for background tasks
+  celery-worker:
+    build: .
+    restart: unless-stopped
+    command: poetry run celery -A udp.workers.celery worker --loglevel=info --concurrency=$(nproc)
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/upm
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+    depends_on:
+      - postgres
+      - redis
+    user: appuser
+
+  # Celery flower for monitoring
+  flower:
+    build: .
+    restart: unless-stopped
+    command: poetry run celery -A udp.workers.celery flower --port=5555
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    user: appuser
+
+  # UPM API server
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8040:8040"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/upm
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+    depends_on:
+      - postgres
+      - redis
+      - celery-worker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8040/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    user: appuser
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    profiles:
+      - proxy
+
+volumes:
+  postgres_data:
+  redis_data:

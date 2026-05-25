@@ -1,0 +1,301 @@
+# Google Cloud Build configuration for Universal Dependency Platform
+# Multi-step build pipeline with security, testing, and deployment
+
+steps:
+# Setup and install dependencies
+- name: 'python:3.11'
+  id: 'setup'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    pip install --upgrade pip
+    pip install poetry==1.7.1
+    poetry config virtualenvs.in-project true
+    poetry install --with dev,docs
+
+# Security scanning
+- name: 'python:3.11'
+  id: 'security-scan'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    pip install bandit safety
+    bandit -r src/udp -f json -o bandit-report.json || true
+    safety check --json --output safety-report.json || true
+  waitFor: ['-']
+
+# Code quality checks
+- name: 'python:3.11'
+  id: 'code-quality'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    pip install poetry==1.7.1
+    poetry config virtualenvs.in-project true
+    poetry install --with dev
+    poetry run ruff check src/ tests/ --output-format=json > ruff-report.json || true
+    poetry run ruff format --check src/ tests/
+    poetry run mypy src/udp --junit-xml=mypy-report.xml || true
+  waitFor: ['-']
+
+# Start test services
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'start-test-services'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    docker network create test-network || true
+    docker run -d --name postgres-test --network test-network \
+      -e POSTGRES_DB=udp_test \
+      -e POSTGRES_USER=postgres \
+      -e POSTGRES_PASSWORD=postgres \
+      postgres:15-alpine
+    docker run -d --name redis-test --network test-network \
+      redis:7-alpine
+    sleep 15
+  waitFor: ['-']
+
+# Run tests
+- name: 'python:3.11'
+  id: 'run-tests'
+  entrypoint: 'bash'
+  env:
+  - 'DATABASE_URL=postgresql://postgres:postgres@postgres-test:5432/udp_test'
+  - 'REDIS_URL=redis://redis-test:6379/0'
+  - 'SECRET_KEY=test-secret-key-for-gcp-cloudbuild-pipeline'
+  - 'ENVIRONMENT=testing'
+  args:
+  - '-c'
+  - |
+    pip install poetry==1.7.1
+    poetry config virtualenvs.in-project true
+    poetry install --with dev
+    poetry run pytest tests/ -v \
+      --cov=src/udp \
+      --cov-report=xml \
+      --cov-report=html \
+      --junit-xml=test-results.xml
+  waitFor: ['start-test-services']
+
+# Build API image
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'build-api-image'
+  args:
+  - 'build'
+  - '--target=production'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/udp/api:$BUILD_ID'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/udp/api:latest'
+  - '-f'
+  - 'Dockerfile.cloud'
+  - '.'
+  waitFor: ['run-tests']
+
+# Build Worker image
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'build-worker-image'
+  args:
+  - 'build'
+  - '--target=celery-worker'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/udp/worker:$BUILD_ID'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/udp/worker:latest'
+  - '-f'
+  - 'Dockerfile.cloud'
+  - '.'
+  waitFor: ['run-tests']
+
+# Build Beat image
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'build-beat-image'
+  args:
+  - 'build'
+  - '--target=celery-beat'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/udp/beat:$BUILD_ID'
+  - '-t'
+  - 'gcr.io/$PROJECT_ID/udp/beat:latest'
+  - '-f'
+  - 'Dockerfile.cloud'
+  - '.'
+  waitFor: ['run-tests']
+
+# Container security scanning
+- name: 'aquasec/trivy'
+  id: 'scan-api-image'
+  args:
+  - 'image'
+  - '--exit-code=0'
+  - '--format=json'
+  - '--output=trivy-api-report.json'
+  - 'gcr.io/$PROJECT_ID/udp/api:$BUILD_ID'
+  waitFor: ['build-api-image']
+
+- name: 'aquasec/trivy'
+  id: 'scan-worker-image'
+  args:
+  - 'image'
+  - '--exit-code=0'
+  - '--format=json'
+  - '--output=trivy-worker-report.json'
+  - 'gcr.io/$PROJECT_ID/udp/worker:$BUILD_ID'
+  waitFor: ['build-worker-image']
+
+# Push images to Google Container Registry
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'push-api-image'
+  args: ['push', 'gcr.io/$PROJECT_ID/udp/api:$BUILD_ID']
+  waitFor: ['scan-api-image']
+
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'push-api-latest'
+  args: ['push', 'gcr.io/$PROJECT_ID/udp/api:latest']
+  waitFor: ['scan-api-image']
+
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'push-worker-image'
+  args: ['push', 'gcr.io/$PROJECT_ID/udp/worker:$BUILD_ID']
+  waitFor: ['scan-worker-image']
+
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'push-worker-latest'
+  args: ['push', 'gcr.io/$PROJECT_ID/udp/worker:latest']
+  waitFor: ['scan-worker-image']
+
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'push-beat-image'
+  args: ['push', 'gcr.io/$PROJECT_ID/udp/beat:$BUILD_ID']
+  waitFor: ['build-beat-image']
+
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'push-beat-latest'
+  args: ['push', 'gcr.io/$PROJECT_ID/udp/beat:latest']
+  waitFor: ['build-beat-image']
+
+# Deploy to GKE Development (develop branch)
+- name: 'gcr.io/cloud-builders/gke-deploy'
+  id: 'deploy-development'
+  args:
+  - 'run'
+  - '--filename=k8s/overlays/development/'
+  - '--cluster=$_GKE_DEV_CLUSTER'
+  - '--location=$_GKE_DEV_LOCATION'
+  - '--image=gcr.io/$PROJECT_ID/udp/api:$BUILD_ID'
+  - '--image=gcr.io/$PROJECT_ID/udp/worker:$BUILD_ID'
+  - '--image=gcr.io/$PROJECT_ID/udp/beat:$BUILD_ID'
+  waitFor: ['push-api-image', 'push-worker-image', 'push-beat-image']
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=$_GKE_DEV_LOCATION'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=$_GKE_DEV_CLUSTER'
+
+# Deploy to GKE Staging (staging branch)
+- name: 'gcr.io/cloud-builders/gke-deploy'
+  id: 'deploy-staging'
+  args:
+  - 'run'
+  - '--filename=k8s/overlays/staging/'
+  - '--cluster=$_GKE_STAGING_CLUSTER'
+  - '--location=$_GKE_STAGING_LOCATION'
+  - '--image=gcr.io/$PROJECT_ID/udp/api:$BUILD_ID'
+  - '--image=gcr.io/$PROJECT_ID/udp/worker:$BUILD_ID'
+  - '--image=gcr.io/$PROJECT_ID/udp/beat:$BUILD_ID'
+  waitFor: ['push-api-image', 'push-worker-image', 'push-beat-image']
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=$_GKE_STAGING_LOCATION'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=$_GKE_STAGING_CLUSTER'
+
+# Deploy to GKE Production (main branch)
+- name: 'gcr.io/cloud-builders/gke-deploy'
+  id: 'deploy-production'
+  args:
+  - 'run'
+  - '--filename=k8s/overlays/production/'
+  - '--cluster=$_GKE_PROD_CLUSTER'
+  - '--location=$_GKE_PROD_LOCATION'
+  - '--image=gcr.io/$PROJECT_ID/udp/api:$BUILD_ID'
+  - '--image=gcr.io/$PROJECT_ID/udp/worker:$BUILD_ID'
+  - '--image=gcr.io/$PROJECT_ID/udp/beat:$BUILD_ID'
+  waitFor: ['push-api-image', 'push-worker-image', 'push-beat-image']
+  env:
+  - 'CLOUDSDK_COMPUTE_ZONE=$_GKE_PROD_LOCATION'
+  - 'CLOUDSDK_CONTAINER_CLUSTER=$_GKE_PROD_CLUSTER'
+
+# Health check
+- name: 'gcr.io/cloud-builders/curl'
+  id: 'health-check'
+  args: ['-f', 'https://api.universaldependency.com/health']
+  waitFor: ['deploy-production']
+
+# Performance testing (staging only)
+- name: 'python:3.11'
+  id: 'performance-test'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    pip install locust
+    cd tests/performance
+    locust --headless \
+      --users 100 \
+      --spawn-rate 10 \
+      --run-time 300s \
+      --host https://staging-api.universaldependency.com \
+      --html performance-report.html \
+      --csv performance || true
+  waitFor: ['deploy-staging']
+
+# Cleanup test containers
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'cleanup'
+  entrypoint: 'bash'
+  args:
+  - '-c'
+  - |
+    docker rm -f postgres-test redis-test || true
+    docker network rm test-network || true
+  waitFor: ['run-tests']
+
+# Branch-specific triggers configuration
+substitutions:
+  # Development environment
+  _GKE_DEV_CLUSTER: 'udp-dev-cluster'
+  _GKE_DEV_LOCATION: 'us-central1-a'
+
+  # Staging environment
+  _GKE_STAGING_CLUSTER: 'udp-staging-cluster'
+  _GKE_STAGING_LOCATION: 'us-central1-b'
+
+  # Production environment
+  _GKE_PROD_CLUSTER: 'udp-prod-cluster'
+  _GKE_PROD_LOCATION: 'us-central1-c'
+
+options:
+  machineType: 'N1_HIGHCPU_8'
+  diskSizeGb: '100'
+  env:
+  - 'PYTHONPATH=/workspace'
+
+timeout: '3600s'
+
+logsBucket: 'gs://$PROJECT_ID-cloud-build-logs'
+
+artifacts:
+  objects:
+    location: 'gs://$PROJECT_ID-build-artifacts/$BUILD_ID'
+    paths:
+    - 'test-results.xml'
+    - 'mypy-report.xml'
+    - 'coverage.xml'
+    - 'htmlcov/**'
+    - 'bandit-report.json'
+    - 'safety-report.json'
+    - 'trivy-*-report.json'
+    - 'ruff-report.json'
+    - 'tests/performance/performance-report.html'
+    - 'tests/performance/performance_*.csv'

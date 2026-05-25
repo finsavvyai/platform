@@ -1,0 +1,235 @@
+# AWS CodeBuild specification for Universal Dependency Platform
+# Multi-phase build with security scanning and deployment
+
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+      docker: 20
+    commands:
+      # Install system dependencies
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
+
+      # Install build dependencies
+      - pip install --upgrade pip
+      - pip install poetry==1.7.1
+      - curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      - chmod +x kubectl && mv kubectl /usr/local/bin/
+      - curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+      - chmod +x kustomize && mv kustomize /usr/local/bin/
+
+  pre_build:
+    commands:
+      # Set up environment variables
+      - export REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - export IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:8}
+      - export BUILD_VERSION=${CODEBUILD_BUILD_NUMBER}-${IMAGE_TAG}
+
+      # Configure Poetry
+      - poetry config virtualenvs.in-project true
+      - poetry install --with dev,docs
+
+      # Set up test environment
+      - export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/udp_test
+      - export REDIS_URL=redis://localhost:6379/0
+      - export SECRET_KEY=test-secret-key-for-aws-codebuild-pipeline
+      - export ENVIRONMENT=testing
+
+  build:
+    commands:
+      # Security and quality checks
+      - echo "Running security scans..."
+      - poetry run bandit -r src/udp -f json -o bandit-report.json || true
+      - poetry run safety check --json --output safety-report.json || true
+
+      # Code quality checks
+      - echo "Running code quality checks..."
+      - poetry run ruff check src/ tests/ --output-format=json > ruff-report.json || true
+      - poetry run ruff format --check src/ tests/
+      - poetry run mypy src/udp --junit-xml=mypy-report.xml || true
+
+      # Start test services
+      - echo "Starting test services..."
+      - docker run -d --name postgres-test -p 5432:5432 \
+          -e POSTGRES_DB=udp_test \
+          -e POSTGRES_USER=postgres \
+          -e POSTGRES_PASSWORD=postgres \
+          postgres:15-alpine
+      - docker run -d --name redis-test -p 6379:6379 redis:7-alpine
+      - sleep 15
+
+      # Run tests
+      - echo "Running tests..."
+      - poetry run pytest tests/ -v \
+          --cov=src/udp \
+          --cov-report=xml \
+          --cov-report=html \
+          --junit-xml=test-results.xml
+
+      # Build Docker images
+      - echo "Build started on `date`"
+      - echo "Building the Docker images..."
+
+      # API Image
+      - docker build \
+          --target production \
+          --tag $REPOSITORY_URI/api:latest \
+          --tag $REPOSITORY_URI/api:$BUILD_VERSION \
+          -f Dockerfile.cloud .
+
+      # Worker Image
+      - docker build \
+          --target celery-worker \
+          --tag $REPOSITORY_URI/worker:latest \
+          --tag $REPOSITORY_URI/worker:$BUILD_VERSION \
+          -f Dockerfile.cloud .
+
+      # Beat Image
+      - docker build \
+          --target celery-beat \
+          --tag $REPOSITORY_URI/beat:latest \
+          --tag $REPOSITORY_URI/beat:$BUILD_VERSION \
+          -f Dockerfile.cloud .
+
+      # Container security scanning
+      - echo "Running container security scans..."
+      - |
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+          aquasec/trivy image \
+          --exit-code 0 \
+          --format json \
+          --output trivy-api-report.json \
+          $REPOSITORY_URI/api:$BUILD_VERSION || true
+
+      - |
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+          aquasec/trivy image \
+          --exit-code 0 \
+          --format json \
+          --output trivy-worker-report.json \
+          $REPOSITORY_URI/worker:$BUILD_VERSION || true
+
+  post_build:
+    commands:
+      # Push images to ECR
+      - echo "Build completed on `date`"
+      - echo "Pushing the Docker images..."
+      - docker push $REPOSITORY_URI/api:latest
+      - docker push $REPOSITORY_URI/api:$BUILD_VERSION
+      - docker push $REPOSITORY_URI/worker:latest
+      - docker push $REPOSITORY_URI/worker:$BUILD_VERSION
+      - docker push $REPOSITORY_URI/beat:latest
+      - docker push $REPOSITORY_URI/beat:$BUILD_VERSION
+
+      # Deploy to EKS (if on main branch)
+      - |
+        if [ "$CODEBUILD_SOURCE_VERSION" = "refs/heads/main" ]; then
+          echo "Deploying to production EKS cluster..."
+          aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name $EKS_CLUSTER_NAME
+
+          cd k8s/overlays/production
+          kustomize edit set image \
+            udp/api=$REPOSITORY_URI/api:$BUILD_VERSION \
+            udp/worker=$REPOSITORY_URI/worker:$BUILD_VERSION \
+            udp/beat=$REPOSITORY_URI/beat:$BUILD_VERSION
+
+          kustomize build . | kubectl apply -f -
+          kubectl rollout status deployment/udp-api -n udp-prod --timeout=600s
+
+          # Health check
+          sleep 60
+          curl -f https://api.universaldependency.com/health || exit 1
+        fi
+
+      # Deploy to staging (if on staging branch)
+      - |
+        if [ "$CODEBUILD_SOURCE_VERSION" = "refs/heads/staging" ]; then
+          echo "Deploying to staging EKS cluster..."
+          aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name $EKS_STAGING_CLUSTER_NAME
+
+          cd k8s/overlays/staging
+          kustomize edit set image \
+            udp/api=$REPOSITORY_URI/api:$BUILD_VERSION \
+            udp/worker=$REPOSITORY_URI/worker:$BUILD_VERSION \
+            udp/beat=$REPOSITORY_URI/beat:$BUILD_VERSION
+
+          kustomize build . | kubectl apply -f -
+          kubectl rollout status deployment/udp-api -n udp-staging --timeout=600s
+        fi
+
+      # Deploy to development (if on develop branch)
+      - |
+        if [ "$CODEBUILD_SOURCE_VERSION" = "refs/heads/develop" ]; then
+          echo "Deploying to development EKS cluster..."
+          aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name $EKS_DEV_CLUSTER_NAME
+
+          cd k8s/overlays/development
+          kustomize edit set image \
+            udp/api=$REPOSITORY_URI/api:$BUILD_VERSION \
+            udp/worker=$REPOSITORY_URI/worker:$BUILD_VERSION \
+            udp/beat=$REPOSITORY_URI/beat:$BUILD_VERSION
+
+          kustomize build . | kubectl apply -f -
+          kubectl rollout status deployment/udp-api -n udp-dev --timeout=600s
+        fi
+
+      # Clean up test containers
+      - docker rm -f postgres-test redis-test || true
+
+      # Performance testing (if on staging)
+      - |
+        if [ "$CODEBUILD_SOURCE_VERSION" = "refs/heads/staging" ]; then
+          echo "Running performance tests..."
+          pip install locust
+          cd tests/performance
+          locust --headless \
+            --users 100 \
+            --spawn-rate 10 \
+            --run-time 300s \
+            --host https://staging-api.universaldependency.com \
+            --html performance-report.html \
+            --csv performance || true
+        fi
+
+artifacts:
+  files:
+    - '**/*'
+  secondary-artifacts:
+    test-reports:
+      files:
+        - 'test-results.xml'
+        - 'mypy-report.xml'
+        - 'coverage.xml'
+        - 'htmlcov/**/*'
+      name: test-reports
+    security-reports:
+      files:
+        - 'bandit-report.json'
+        - 'safety-report.json'
+        - 'trivy-*-report.json'
+        - 'ruff-report.json'
+      name: security-reports
+    performance-reports:
+      files:
+        - 'tests/performance/performance-report.html'
+        - 'tests/performance/performance_*.csv'
+      name: performance-reports
+
+reports:
+  test-report:
+    files:
+      - 'test-results.xml'
+    file-format: 'JUNITXML'
+  code-coverage:
+    files:
+      - 'coverage.xml'
+    file-format: 'COBERTURAXML'
+
+cache:
+  paths:
+    - '.cache/**/*'
+    - '.venv/**/*'

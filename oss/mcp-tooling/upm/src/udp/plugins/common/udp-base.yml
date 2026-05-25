@@ -1,0 +1,201 @@
+# Base UDP Configuration Template
+# This template serves as the foundation for all plugin-specific configurations
+
+# Project metadata
+project: ""                    # Project name (required)
+target_language: ""            # Primary language (java, javascript, python, rust, go, php, csharp, swift, dart, ruby, elixir)
+version: "1.0.0"              # Project version
+
+# Cross-ecosystem dependencies
+dependencies:
+  # Java ecosystem
+  java:
+    - "org.apache.commons:commons-lang3:3.12.0"
+    - "com.fasterxml.jackson.core:jackson-databind:2.15.2"
+
+  # JavaScript/Node.js ecosystem
+  javascript:
+    - "lodash:4.17.21"
+    - "moment:2.29.4"
+    - "axios:1.2.0"
+
+  # Python ecosystem
+  python:
+    - "pandas:1.5.2"
+    - "requests:2.28.1"
+    - "numpy:1.21.0"
+
+  # Rust ecosystem
+  rust:
+    - "serde:1.0.152"
+    - "tokio:1.24.0"
+    - "regex:1.7.0"
+
+  # Go ecosystem
+  go:
+    - "github.com/gin-gonic/gin:v1.9.1"
+    - "github.com/spf13/cobra:v1.8.0"
+
+  # PHP ecosystem
+  php:
+    - "symfony/console:^6.0"
+    - "guzzlehttp/guzzle:^7.0"
+
+  # .NET ecosystem
+  dotnet:
+    - "Newtonsoft.Json:13.0.3"
+    - "Microsoft.Extensions.Hosting:8.0.0"
+
+  # Swift ecosystem
+  swift:
+    - "Alamofire:5.8.0"
+    - "SwiftyJSON:5.0.1"
+
+  # Dart ecosystem
+  dart:
+    - "http:^1.1.0"
+    - "yaml:^3.1.2"
+
+  # Ruby ecosystem
+  ruby:
+    - "httparty:~> 0.21"
+    - "thor:~> 1.3"
+
+  # Elixir ecosystem
+  elixir:
+    - "httpoison:~> 2.2"
+    - "jason:~> 1.4"
+
+  # Generic dependencies with explicit configuration
+  generic:
+    - name: "custom-package"
+      version: "1.0.0"
+      ecosystem: "custom"
+      bridge: "ffi"
+      optional: true
+
+# Bridge configuration for cross-language integration
+bridges:
+  # Python bridge
+  python:
+    enabled: false
+    runtime: "subprocess"        # Options: jython, graalvm, subprocess, embedded
+    version: "3.8"
+    dependencies_path: "lib/python"
+    environment_vars:
+      PYTHONPATH: "lib/python"
+
+  # JavaScript bridge
+  javascript:
+    enabled: false
+    runtime: "subprocess"        # Options: graalvm, nashorn, v8, subprocess
+    version: "es2020"
+    dependencies_path: "lib/js"
+    environment_vars:
+      NODE_PATH: "lib/js/node_modules"
+
+  # Java bridge
+  java:
+    enabled: false
+    runtime: "jvm"               # Options: jvm, graalvm
+    version: "8"
+    dependencies_path: "lib/java"
+    classpath: "lib/java/*"
+
+  # Rust bridge
+  rust:
+    enabled: false
+    runtime: "ffi"               # Options: ffi, wasm
+    target: "x86_64-unknown-linux-gnu"
+    dependencies_path: "lib/rust"
+
+  # Go bridge
+  go:
+    enabled: false
+    runtime: "cgo"               # Options: cgo, subprocess
+    dependencies_path: "lib/go"
+
+  # C/C++ bridge
+  c:
+    enabled: false
+    runtime: "ffi"
+    dependencies_path: "lib/c"
+
+# Performance optimization settings
+performance:
+  preload_bridges: true          # Preload bridge modules at startup
+  cache_modules: true            # Cache loaded modules between invocations
+  parallel_loading: true         # Load dependencies in parallel
+  cache_directory: ".udp/cache"  # Local cache directory
+  max_parallel_downloads: 4      # Maximum concurrent downloads
+
+# UDP service configuration
+udp_service:
+  url: "http://localhost:8040"                    # UDP service endpoint
+  api_key: "${UDP_API_KEY}"                       # API key from environment
+  organization_id: "${UDP_ORGANIZATION_ID}"       # Organization ID from environment
+  timeout: 30                                     # Request timeout in seconds
+  retry_count: 3                                  # Number of retries on failure
+  verify_ssl: true                               # Verify SSL certificates
+
+# Security and compliance settings
+security:
+  scan_vulnerabilities: true     # Scan for security vulnerabilities
+  fail_on_critical: true         # Fail build on critical vulnerabilities
+  fail_on_high: false           # Don't fail on high severity (warn only)
+  allowed_licenses:             # Allowed dependency licenses
+    - "Apache-2.0"
+    - "MIT"
+    - "BSD-3-Clause"
+    - "ISC"
+    - "BSD-2-Clause"
+  blocked_packages:             # Packages to block
+    - "malicious-package"
+  license_check: true           # Enable license checking
+
+# Development environment settings
+development:
+  hot_reload: true              # Enable hot reload for development
+  debug_bridges: false          # Enable bridge debugging
+  verbose_logging: false        # Enable verbose logging
+  auto_update: true            # Auto-update dependencies
+
+# Production environment overrides
+production:
+  hot_reload: false
+  debug_bridges: false
+  verbose_logging: false
+  auto_update: false
+  performance:
+    preload_bridges: true
+    cache_modules: true
+    parallel_loading: true
+
+# Build integration settings
+build:
+  pre_compile_hooks:            # Commands to run before compilation
+    - "udp download"
+    - "udp generate-bridges"
+  post_compile_hooks: []        # Commands to run after compilation
+  clean_hooks:                  # Commands to run during clean
+    - "rm -rf .udp/cache"
+
+# Plugin-specific configuration (optional)
+plugins:
+  maven:
+    goals: ["udp:analyze", "udp:download", "udp:generate-bridges"]
+  gradle:
+    tasks: ["udpAnalyze", "udpDownload", "udpGenerateBridges"]
+  npm:
+    scripts:
+      preinstall: "udp setup"
+      postinstall: "udp verify"
+  cargo:
+    build_dependencies: ["udp-cargo-plugin"]
+  pip:
+    requirements_file: "requirements-udp.txt"
+  composer:
+    scripts:
+      pre-install-cmd: ["udp setup"]
+  nuget:
+    targets: ["UdpSetup", "UdpDownload", "UdpGenerateBridges"]

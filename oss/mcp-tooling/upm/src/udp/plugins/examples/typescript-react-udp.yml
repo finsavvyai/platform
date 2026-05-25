@@ -1,0 +1,76 @@
+# UDP Configuration for TypeScript React Project
+project: modern-react-app
+target_language: javascript
+node_version: "20"
+
+dependencies:
+  # Native JavaScript/TypeScript dependencies
+  javascript:
+    - "react:18.2.0"
+    - "react-dom:18.2.0"
+    - "typescript:5.3.3"
+    - "@types/react:18.2.45"
+    - "axios:1.6.2"
+    - "lodash:4.17.21"
+
+  # Python libraries for data processing
+  python:
+    - "pandas:2.1.4"
+    - "plotly:5.17.0"
+    - "scikit-learn:1.3.2"
+
+  # Rust libraries for WebAssembly
+  rust:
+    - "wasm-bindgen:0.2.89"
+    - "serde-wasm-bindgen:0.6.3"
+    - "web-sys:0.3.66"
+
+  # Go utilities
+  go:
+    - "github.com/gorilla/websocket:v1.5.1"
+
+bridges:
+  python:
+    enabled: true
+    runtime: subprocess
+    version: "3.11"
+    dependencies_path: "src/python"
+    environment_vars:
+      PYTHONPATH: "src/python"
+
+  rust:
+    enabled: true
+    runtime: wasm
+    target: "wasm32-unknown-unknown"
+    dependencies_path: "src/wasm"
+
+  go:
+    enabled: true
+    runtime: subprocess
+    dependencies_path: "src/go"
+
+performance:
+  preload_bridges: false
+  cache_modules: true
+  parallel_loading: true
+
+udp_service:
+  url: "https://api.universaldependency.com"
+  api_key: "${UDP_API_KEY}"
+  organization_id: "${UDP_ORGANIZATION_ID}"
+
+development:
+  hot_reload: true
+  debug_bridges: true
+  verbose_logging: true
+
+production:
+  hot_reload: false
+  debug_bridges: false
+  verbose_logging: false
+
+plugins:
+  npm:
+    scripts:
+      predev: "udp setup"
+      prebuild: "udp generate-bridges"

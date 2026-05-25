@@ -1,0 +1,246 @@
+policies:
+  - policy_id: "enterprise_security_policy_v2"
+    name: "Enterprise Security Policy v2.0"
+    description: "Comprehensive security requirements for enterprise environments"
+    policy_type: "security"
+    version: "2.0.0"
+    enabled: true
+    priority: 100
+    applicable_ecosystems: ["npm", "pypi", "maven", "cargo"]
+    action: "block"
+    compliance_frameworks: ["SOX", "ISO27001", "NIST"]
+    exceptions: []
+    rules:
+      - rule_id: "no_critical_vulnerabilities"
+        description: "Block packages with critical vulnerabilities (CVSS >= 9.0)"
+        field: "max_cvss_score"
+        operator: "less_than"
+        value: 9.0
+        severity: "critical"
+        message: "Package contains critical security vulnerabilities that must be addressed"
+        exceptions: []
+      
+      - rule_id: "limit_high_vulnerabilities"
+        description: "Limit high-severity vulnerabilities to maximum of 2"
+        field: "vulnerability_count"
+        operator: "less_equal"
+        value: 2
+        severity: "high"
+        message: "Package has too many high-severity vulnerabilities"
+        exceptions: ["security-patches", "test-packages"]
+      
+      - rule_id: "no_known_malware"
+        description: "Block packages with known malware signatures"
+        field: "name"
+        operator: "not_matches"
+        value: ".*(malware|trojan|backdoor|exploit).*"
+        severity: "critical"
+        message: "Package name suggests potential malware"
+        exceptions: ["security-testing-tools"]
+
+  - policy_id: "enterprise_license_policy_v2"
+    name: "Enterprise License Policy v2.0"
+    description: "License compliance policy for enterprise software"
+    policy_type: "license"
+    version: "2.0.0"
+    enabled: true
+    priority: 90
+    applicable_ecosystems: ["npm", "pypi", "maven", "cargo"]
+    action: "require_approval"
+    compliance_frameworks: ["Legal", "IP_Compliance"]
+    exceptions: ["internal-packages"]
+    rules:
+      - rule_id: "approved_licenses_whitelist"
+        description: "Only use pre-approved licenses"
+        field: "license"
+        operator: "in"
+        value: ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC"]
+        severity: "medium"
+        message: "Package license is not in the approved whitelist"
+        exceptions: ["legacy-systems"]
+      
+      - rule_id: "no_copyleft_strict"
+        description: "Strictly prohibit strong copyleft licenses"
+        field: "license"
+        operator: "not_in"
+        value: ["GPL-2.0", "GPL-3.0", "AGPL-1.0", "AGPL-3.0"]
+        severity: "high"
+        message: "Copyleft license incompatible with proprietary software distribution"
+        exceptions: []
+      
+      - rule_id: "no_unknown_licenses"
+        description: "Require known license identification"
+        field: "license"
+        operator: "not_equals"
+        value: "Unknown"
+        severity: "medium"
+        message: "Package license must be clearly identified"
+        exceptions: ["internal-tools"]
+
+  - policy_id: "financial_sector_compliance"
+    name: "Financial Sector Compliance Policy"
+    description: "Specialized compliance requirements for financial services"
+    policy_type: "compliance"
+    version: "1.0.0"
+    enabled: false  # Enable only for financial organizations
+    priority: 110
+    applicable_ecosystems: ["npm", "pypi", "maven"]
+    action: "block"
+    compliance_frameworks: ["PCI_DSS", "SOX", "GDPR", "FFIEC"]
+    exceptions: ["pre-approved-financial-packages"]
+    rules:
+      - rule_id: "no_crypto_weak"
+        description: "Block packages with weak cryptographic implementations"
+        field: "name"
+        operator: "not_matches"
+        value: ".*(md5|sha1|des|rc4).*"
+        severity: "critical"
+        message: "Package may contain weak cryptographic algorithms"
+        exceptions: ["crypto-migration-tools"]
+      
+      - rule_id: "pci_dss_compliance"
+        description: "Ensure PCI DSS compliance for payment processing"
+        field: "name"
+        operator: "not_contains"
+        value: "payment"
+        severity: "high"
+        message: "Payment-related packages require special PCI DSS review"
+        exceptions: ["certified-payment-gateways"]
+
+  - policy_id: "version_management_policy"
+    name: "Version Management Policy"
+    description: "Enterprise version control and stability requirements"
+    policy_type: "version"
+    version: "1.0.0"
+    enabled: true
+    priority: 80
+    applicable_ecosystems: ["npm", "pypi", "maven", "cargo"]
+    action: "warn"
+    compliance_frameworks: ["Operational"]
+    exceptions: []
+    rules:
+      - rule_id: "no_prerelease_production"
+        description: "Prohibit pre-release versions in production"
+        field: "version"
+        operator: "not_matches"
+        value: ".*-(alpha|beta|rc|dev|snapshot|pre).*"
+        severity: "medium"
+        message: "Pre-release versions not suitable for production deployment"
+        exceptions: ["development-environment", "staging-environment"]
+      
+      - rule_id: "minimum_version_age"
+        description: "Require packages to be at least 30 days old"
+        field: "published_at"
+        operator: "less_than"
+        value: "30_days_ago"  # Special value handled by engine
+        severity: "low"
+        message: "Package version is too new, consider waiting for community validation"
+        exceptions: ["security-patches", "internal-packages"]
+      
+      - rule_id: "no_deprecated_packages"
+        description: "Avoid packages marked as deprecated"
+        field: "name"
+        operator: "not_matches"
+        value: ".*(deprecated|obsolete|legacy|unmaintained).*"
+        severity: "medium"
+        message: "Package appears to be deprecated or unmaintained"
+        exceptions: ["approved-legacy-systems"]
+
+  - policy_id: "performance_policy"
+    name: "Performance and Size Policy"
+    description: "Package size and performance impact controls"
+    policy_type: "performance"
+    version: "1.0.0"
+    enabled: true
+    priority: 70
+    applicable_ecosystems: ["npm", "pypi"]
+    action: "warn"
+    compliance_frameworks: ["Performance"]
+    exceptions: ["ui-frameworks"]
+    rules:
+      - rule_id: "max_package_size"
+        description: "Limit package size to 50MB"
+        field: "size_bytes"
+        operator: "less_equal"
+        value: 52428800  # 50MB in bytes
+        severity: "medium"
+        message: "Package size exceeds recommended limit"
+        exceptions: ["ml-models", "data-processing-tools"]
+      
+      - rule_id: "dependency_count_limit"
+        description: "Limit transitive dependencies"
+        field: "dependency_count"
+        operator: "less_equal"
+        value: 100
+        severity: "low"
+        message: "Package has excessive number of dependencies"
+        exceptions: ["meta-packages", "framework-packages"]
+
+  - policy_id: "organizational_standards"
+    name: "Organizational Standards Policy"
+    description: "Company-specific standards and requirements"
+    policy_type: "organizational"
+    version: "1.0.0"
+    enabled: true
+    priority: 60
+    applicable_ecosystems: ["npm", "pypi", "maven", "cargo"]
+    action: "require_approval"
+    compliance_frameworks: ["Internal"]
+    exceptions: []
+    rules:
+      - rule_id: "approved_vendors_only"
+        description: "Only use packages from approved vendors"
+        field: "author"
+        operator: "matches"
+        value: ".*(microsoft|google|amazon|apache|mozilla|nodejs|python).*"
+        severity: "medium"
+        message: "Package author not in approved vendor list"
+        exceptions: ["internal-authors", "open-source-maintainers"]
+      
+      - rule_id: "require_documentation"
+        description: "Packages must have documentation URL"
+        field: "homepage"
+        operator: "not_equals"
+        value: null
+        severity: "low"
+        message: "Package should have documentation or homepage URL"
+        exceptions: ["utility-packages"]
+      
+      - rule_id: "minimum_github_stars"
+        description: "Popular packages preferred (>100 stars)"
+        field: "github_stars"
+        operator: "greater_equal"
+        value: 100
+        severity: "low"
+        message: "Consider using more popular packages with community validation"
+        exceptions: ["specialized-tools", "internal-packages"]
+
+  - policy_id: "emergency_security_policy"
+    name: "Emergency Security Response Policy"
+    description: "Immediate response policy for critical security events"
+    policy_type: "security"
+    version: "1.0.0"
+    enabled: false  # Enabled only during security emergencies
+    priority: 200
+    applicable_ecosystems: ["npm", "pypi", "maven", "cargo"]
+    action: "block"
+    compliance_frameworks: ["Emergency_Response", "CISA"]
+    exceptions: []
+    rules:
+      - rule_id: "block_specific_packages"
+        description: "Block specific packages identified in security advisory"
+        field: "name"
+        operator: "not_in"
+        value: []  # Populated dynamically during emergencies
+        severity: "critical"
+        message: "Package blocked due to active security advisory"
+        exceptions: []
+      
+      - rule_id: "block_affected_versions"
+        description: "Block specific version ranges under security advisory"
+        field: "version"
+        operator: "version_satisfies"
+        value: "!=*"  # Populated dynamically
+        severity: "critical"
+        message: "Package version affected by security advisory"
+        exceptions: []

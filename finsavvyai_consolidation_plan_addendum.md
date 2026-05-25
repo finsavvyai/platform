@@ -228,4 +228,50 @@ QueryFlux slots in early — every developer using AI code-gen also needs a safe
 
 ---
 
+## 5. May 2026 Ranking Corrections (2026-05-25 second pass)
+
+The May 2026 cross-folder ranking memo (web-verified market context) revealed that the previous matrix missed three projects entirely. Founder corrections applied:
+
+| Repo | Old | **New** | Reason |
+|---|---|---|---|
+| `02_AI_AGENTS/llm` | not in plan | **CORE (9th product)** | Top-ranked in Feb assessment (89/88). FinSavvy brand-aligned. Distributed local LLM cluster. Promoted as `products/finsavvy-cluster/`. |
+| `03_Enterprize_application/products/devx-platform/upm` | not in plan | **OSS** | Ranked #3 overall (86/88). Folded as `oss/mcp-tooling/upm/`. LICENSE present. |
+| `pixel-pets` | ARCHIVE | **EXTERNALIZE** | Last commit 2 days before archive sweep (active sprint loop). Off-thesis (consumer AI franchise) but kill destroys value. Moved to `_archive/externalized/pixel-pets/`. |
+
+### Updated counts (post-second-pass)
+
+- **CORE**: 8 → **9** (added FinSavvy Cluster)
+- **OSS**: 7 → 8 (added UPM)
+- **EXTERNALIZE**: 1 → 2 (added pixel-pets)
+- **ARCHIVE**: -1 (pixel-pets removed)
+
+### Executed in this pass
+
+- `products/finsavvy-cluster/` created (rsync from `02_AI_AGENTS/llm/`, 9.7M). README/CLAUDE.md/MIGRATION_NOTES written. Source README preserved as `README.source.md`. CONSOLIDATION_TODO embedded in CLAUDE.md.
+- `oss/mcp-tooling/upm/` created (rsync from `03_Enterprize_application/products/devx-platform/upm/`, 13M). MIGRATION_NOTES written. LICENSE confirmed present.
+- `_archive/externalized/pixel-pets/EXTERNALIZE_PLAN.md` written. Prior archive manifest preserved as `PRIOR_ARCHIVED.md`. Snapshot dir removed from `_archive/portfolio-snapshots/`.
+
+### Parallel monorepo discovery
+
+The May 2026 ranking surfaced that `/Users/shaharsolomon/dev/projects/01_-09_` numbered folders contain "a more mature version of the same work being re-migrated." Background audit agent dispatched to produce `_archive/numbered-folders-audit.md` — per-product KEEP_CANONICAL vs RE_MIGRATE_FROM_NUMBERED vs MERGE verdict. Founder reviews before any re-migration.
+
+### Still pending founder decisions surfaced by May ranking
+
+- **Top-3 60-day focus** — memo recommends TenantIQ + PushCI+PipeWarden + QueryFlux. Accept?
+- **Defer or sharpen** — LunaOS (positioning), OpenSyber (competitive window closing per Lakera acquisition), FinSavvy Cluster (compete or niche?).
+- **mcp-tooling siblings (jpm, npmplus-core)** at `02_AI_AGENTS/mcp-servers/` — fold like UPM, or leave alone?
+- **08_open_source/** — user clarified "not mine" per memo. Confirm move to `infrastructure/vendored/opensource/`?
+- **Numbered folder structure** — once audit returns, decide which products to re-migrate from numbered folders.
+
+### Still requires external user action (cumulative across §1-§5)
+
+- Take down `fastpm.dev` + DNS redirect → `finsavvyai.com`
+- Spin out Looma as separate entity
+- Decide pixel-pets path (spin-out vs maintenance-only)
+- Decide FinSavvy Cluster GTM (sharpen vs compete vs niche)
+- Manual delete `/portfolio/{autoboot,looma-sh,queryflux-git,querylens,pixel-pets}` after verification (no migration needed; sources untouched per Week-8 rule)
+- Optional: delete `/02_AI_AGENTS/llm` source once `products/finsavvy-cluster/` verified
+
+---
+
 *End of addendum. Pair with `finsavvyai_full_extended_consolidation_plan.md`.*

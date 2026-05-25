@@ -1,0 +1,327 @@
+# GitLab CI/CD Pipeline for Universal Dependency Platform
+# Complete pipeline with security, testing, building, and deployment
+
+stages:
+  - security
+  - test
+  - build
+  - deploy-dev
+  - deploy-staging
+  - deploy-prod
+
+variables:
+  # Container Registry
+  REGISTRY: $CI_REGISTRY
+  IMAGE_NAME: $CI_PROJECT_PATH
+
+  # Python Configuration
+  PYTHON_VERSION: "3.11"
+  POETRY_VERSION: "1.7.1"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/poetry"
+
+  # Docker Configuration
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  BUILDX_VERSION: "v0.11.2"
+
+# Cache configuration
+cache:
+  key:
+    files:
+      - poetry.lock
+  paths:
+    - .cache/pip
+    - .cache/poetry
+    - .venv/
+
+# Templates
+.python_template: &python_template
+  image: python:$PYTHON_VERSION
+  before_script:
+    - pip install --upgrade pip
+    - pip install poetry==$POETRY_VERSION
+    - poetry config virtualenvs.in-project true
+    - poetry install --with dev,docs
+
+.docker_template: &docker_template
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+# Security Stage
+sast:
+  stage: security
+  image: python:$PYTHON_VERSION
+  script:
+    - pip install bandit safety
+    - bandit -r src/udp -f json -o bandit-report.json || true
+    - safety check --json --output safety-report.json || true
+  artifacts:
+    reports:
+      sast: bandit-report.json
+    paths:
+      - bandit-report.json
+      - safety-report.json
+    expire_in: 1 week
+  only:
+    - merge_requests
+    - main
+    - develop
+
+container_scanning:
+  stage: security
+  image: docker:stable
+  services:
+    - docker:stable-dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    CI_APPLICATION_REPOSITORY: $CI_REGISTRY_IMAGE
+    CI_APPLICATION_TAG: $CI_COMMIT_SHA
+  script:
+    - docker build -t $CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG -f Dockerfile.cloud --target production .
+    - |
+      docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+        -v $PWD:/tmp aquasec/trivy image \
+        --exit-code 0 \
+        --format template \
+        --template "@/tmp/trivy-template.tpl" \
+        -o /tmp/gl-container-scanning-report.json \
+        $CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG
+  artifacts:
+    reports:
+      container_scanning: gl-container-scanning-report.json
+
+# Test Stage
+unit_tests:
+  stage: test
+  <<: *python_template
+  services:
+    - postgres:15-alpine
+    - redis:7-alpine
+  variables:
+    POSTGRES_DB: udp_test
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    POSTGRES_HOST_AUTH_METHOD: trust
+    DATABASE_URL: postgresql://postgres:postgres@postgres:5432/udp_test
+    REDIS_URL: redis://redis:6379/0
+    SECRET_KEY: test-secret-key-for-gitlab-ci-pipeline
+    ENVIRONMENT: testing
+  script:
+    - poetry run pytest tests/ -v --cov=src/udp --cov-report=xml --cov-report=term --junit-xml=test-report.xml
+  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
+  artifacts:
+    reports:
+      junit: test-report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.xml
+      - htmlcov/
+    expire_in: 1 week
+
+code_quality:
+  stage: test
+  <<: *python_template
+  script:
+    - poetry run ruff check src/ tests/ --output-format=gitlab > ruff-report.json || true
+    - poetry run mypy src/udp --junit-xml=mypy-report.xml || true
+  artifacts:
+    reports:
+      codequality: ruff-report.json
+      junit: mypy-report.xml
+    paths:
+      - ruff-report.json
+      - mypy-report.xml
+    expire_in: 1 week
+
+# Build Stage
+build_images:
+  stage: build
+  <<: *docker_template
+  variables:
+    BUILDX_BUILDER: mybuilder
+  script:
+    # Set up buildx for multi-platform builds
+    - docker buildx create --use --name $BUILDX_BUILDER --driver docker-container
+    - docker buildx inspect --bootstrap
+
+    # Build and push API image
+    - |
+      docker buildx build \
+        --platform linux/amd64,linux/arm64 \
+        --target production \
+        --tag $REGISTRY/$IMAGE_NAME/api:$CI_COMMIT_SHA \
+        --tag $REGISTRY/$IMAGE_NAME/api:latest \
+        --push \
+        -f Dockerfile.cloud .
+
+    # Build and push Worker image
+    - |
+      docker buildx build \
+        --platform linux/amd64,linux/arm64 \
+        --target celery-worker \
+        --tag $REGISTRY/$IMAGE_NAME/worker:$CI_COMMIT_SHA \
+        --tag $REGISTRY/$IMAGE_NAME/worker:latest \
+        --push \
+        -f Dockerfile.cloud .
+
+    # Build and push Beat image
+    - |
+      docker buildx build \
+        --platform linux/amd64,linux/arm64 \
+        --target celery-beat \
+        --tag $REGISTRY/$IMAGE_NAME/beat:$CI_COMMIT_SHA \
+        --tag $REGISTRY/$IMAGE_NAME/beat:latest \
+        --push \
+        -f Dockerfile.cloud .
+  only:
+    - main
+    - develop
+    - staging
+
+# Development Deployment
+deploy_development:
+  stage: deploy-dev
+  image: bitnami/kubectl:latest
+  environment:
+    name: development
+    url: https://dev-api.universaldependency.com
+  variables:
+    KUBE_NAMESPACE: udp-dev
+  script:
+    - echo $KUBE_CONFIG_DEV | base64 -d > kubeconfig
+    - export KUBECONFIG=kubeconfig
+    - kubectl config current-context
+
+    # Update image tags in kustomization
+    - cd k8s/overlays/development
+    - |
+      kustomize edit set image \
+        udp/api=$REGISTRY/$IMAGE_NAME/api:$CI_COMMIT_SHA \
+        udp/worker=$REGISTRY/$IMAGE_NAME/worker:$CI_COMMIT_SHA \
+        udp/beat=$REGISTRY/$IMAGE_NAME/beat:$CI_COMMIT_SHA
+
+    # Deploy to development
+    - kustomize build . | kubectl apply -f -
+    - kubectl rollout status deployment/udp-api -n $KUBE_NAMESPACE --timeout=600s
+    - kubectl rollout status deployment/udp-worker -n $KUBE_NAMESPACE --timeout=600s
+
+    # Run health check
+    - sleep 30
+    - kubectl exec -n $KUBE_NAMESPACE deploy/udp-api -- curl -f http://localhost:8000/health
+  only:
+    - develop
+
+# Staging Deployment
+deploy_staging:
+  stage: deploy-staging
+  image: bitnami/kubectl:latest
+  environment:
+    name: staging
+    url: https://staging-api.universaldependency.com
+  variables:
+    KUBE_NAMESPACE: udp-staging
+  script:
+    - echo $KUBE_CONFIG_STAGING | base64 -d > kubeconfig
+    - export KUBECONFIG=kubeconfig
+
+    - cd k8s/overlays/staging
+    - |
+      kustomize edit set image \
+        udp/api=$REGISTRY/$IMAGE_NAME/api:$CI_COMMIT_SHA \
+        udp/worker=$REGISTRY/$IMAGE_NAME/worker:$CI_COMMIT_SHA \
+        udp/beat=$REGISTRY/$IMAGE_NAME/beat:$CI_COMMIT_SHA
+
+    - kustomize build . | kubectl apply -f -
+    - kubectl rollout status deployment/udp-api -n $KUBE_NAMESPACE --timeout=600s
+
+    # Run integration tests
+    - sleep 60
+    - |
+      curl -f https://staging-api.universaldependency.com/health || {
+        echo "Health check failed"
+        exit 1
+      }
+  only:
+    - staging
+
+# Production Deployment
+deploy_production:
+  stage: deploy-prod
+  image: bitnami/kubectl:latest
+  environment:
+    name: production
+    url: https://api.universaldependency.com
+  variables:
+    KUBE_NAMESPACE: udp-prod
+  script:
+    - echo $KUBE_CONFIG_PROD | base64 -d > kubeconfig
+    - export KUBECONFIG=kubeconfig
+
+    - cd k8s/overlays/production
+    - |
+      kustomize edit set image \
+        udp/api=$REGISTRY/$IMAGE_NAME/api:$CI_COMMIT_SHA \
+        udp/worker=$REGISTRY/$IMAGE_NAME/worker:$CI_COMMIT_SHA \
+        udp/beat=$REGISTRY/$IMAGE_NAME/beat:$CI_COMMIT_SHA
+
+    - kustomize build . | kubectl apply -f -
+    - kubectl rollout status deployment/udp-api -n $KUBE_NAMESPACE --timeout=600s
+
+    # Post-deployment verification
+    - sleep 60
+    - |
+      curl -f https://api.universaldependency.com/health || {
+        echo "Production health check failed"
+        kubectl rollout undo deployment/udp-api -n $KUBE_NAMESPACE
+        exit 1
+      }
+
+    # Run smoke tests
+    - cd tests/e2e
+    - python -m pytest test_smoke.py --base-url=https://api.universaldependency.com
+  when: manual
+  only:
+    - main
+
+# Performance Testing
+performance_test:
+  stage: deploy-staging
+  image: python:$PYTHON_VERSION
+  dependencies:
+    - deploy_staging
+  script:
+    - pip install locust
+    - cd tests/performance
+    - |
+      locust --headless \
+        --users 100 \
+        --spawn-rate 10 \
+        --run-time 300s \
+        --host https://staging-api.universaldependency.com \
+        --html performance-report.html \
+        --csv performance
+  artifacts:
+    paths:
+      - tests/performance/performance-report.html
+      - tests/performance/performance_*.csv
+    expire_in: 1 week
+  only:
+    - staging
+
+# Cleanup
+cleanup_images:
+  stage: deploy-prod
+  image: docker:stable
+  script:
+    - docker system prune -af
+  when: always
+  only:
+    - main
+    - develop
+    - staging

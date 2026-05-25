@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-api-service
+  namespace: udp-system
+  labels:
+    app.kubernetes.io/name: universal-dependency-platform
+    app.kubernetes.io/component: api-service
+    app.kubernetes.io/version: "0.1.0"
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: udp-api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-api-headless
+  namespace: udp-system
+  labels:
+    app.kubernetes.io/name: universal-dependency-platform
+    app.kubernetes.io/component: api-headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 8000
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: udp-api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: udp-system
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgresql
+  selector:
+    app: postgresql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: udp-system
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  selector:
+    app: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: udp-system
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: web
+  selector:
+    app: prometheus
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: udp-system
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: dashboards
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: web
+  selector:
+    app: grafana

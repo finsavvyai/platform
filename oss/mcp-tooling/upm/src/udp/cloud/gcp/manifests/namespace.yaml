@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: udp
+  labels:
+    name: udp
+    project: universal-dependency-platform
+    environment: production
+    cost-optimization: "true"
+  annotations:
+    description: "Universal Dependency Platform namespace"
+---
+# Network policy to secure pod-to-pod communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: udp-network-policy
+  namespace: udp
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: udp
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+  - from: []
+    ports:
+    - protocol: TCP
+      port: 8000  # UDP API port
+    - protocol: TCP
+      port: 8001  # Metrics port
+  egress:
+  - {}  # Allow all egress for external API calls
+---
+# Resource quota to prevent resource exhaustion
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: udp-resource-quota
+  namespace: udp
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    persistentvolumeclaims: "5"
+    pods: "20"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+---
+# Limit range to ensure consistent resource allocation
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: udp-limit-range
+  namespace: udp
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - default:
+      storage: "1Gi"
+    type: PersistentVolumeClaim

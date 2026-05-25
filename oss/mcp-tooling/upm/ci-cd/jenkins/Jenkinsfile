@@ -1,0 +1,551 @@
+/* Jenkins Pipeline for Universal Dependency Platform
+ * Multi-stage pipeline with parallel execution, security scanning, and deployment
+ */
+
+pipeline {
+    agent {
+        kubernetes {
+            yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins: slave
+spec:
+  containers:
+  - name: python
+    image: python:3.11
+    command:
+    - cat
+    tty: true
+    volumeMounts:
+    - name: docker-sock
+      mountPath: /var/run/docker.sock
+  - name: docker
+    image: docker:24.0.5
+    command:
+    - cat
+    tty: true
+    volumeMounts:
+    - name: docker-sock
+      mountPath: /var/run/docker.sock
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command:
+    - cat
+    tty: true
+  volumes:
+  - name: docker-sock
+    hostPath:
+      path: /var/run/docker.sock
+"""
+        }
+    }
+
+    environment {
+        // Registry Configuration
+        REGISTRY = 'docker.io'
+        IMAGE_NAME = 'universaldependency/udp'
+
+        // Build Configuration
+        PYTHON_VERSION = '3.11'
+        POETRY_VERSION = '1.7.1'
+
+        // Credentials
+        DOCKER_REGISTRY_CREDS = credentials('docker-registry')
+        KUBE_CONFIG_DEV = credentials('kube-config-dev')
+        KUBE_CONFIG_STAGING = credentials('kube-config-staging')
+        KUBE_CONFIG_PROD = credentials('kube-config-prod')
+
+        // Environment URLs
+        DEV_URL = 'https://dev-api.universaldependency.com'
+        STAGING_URL = 'https://staging-api.universaldependency.com'
+        PROD_URL = 'https://api.universaldependency.com'
+    }
+
+    options {
+        // Keep builds for 30 days
+        buildDiscarder(logRotator(daysToKeepStr: '30', numToKeepStr: '50'))
+
+        // Timeout after 1 hour
+        timeout(time: 1, unit: 'HOURS')
+
+        // Retry failed stages
+        retry(3)
+
+        // Skip default checkout
+        skipDefaultCheckout(true)
+    }
+
+    triggers {
+        // Poll SCM every 5 minutes
+        pollSCM('H/5 * * * *')
+
+        // Build on cron schedule for nightly builds
+        cron(env.BRANCH_NAME == 'main' ? '@midnight' : '')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                    env.BUILD_VERSION = "${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
+                }
+            }
+        }
+
+        stage('Setup') {
+            parallel {
+                stage('Python Setup') {
+                    steps {
+                        container('python') {
+                            sh '''
+                                pip install --upgrade pip
+                                pip install poetry==$POETRY_VERSION
+                                poetry config virtualenvs.in-project true
+                                poetry install --with dev,docs
+                            '''
+                        }
+                    }
+                }
+
+                stage('Docker Setup') {
+                    steps {
+                        container('docker') {
+                            sh '''
+                                docker --version
+                                echo $DOCKER_REGISTRY_CREDS_PSW | docker login -u $DOCKER_REGISTRY_CREDS_USR --password-stdin $REGISTRY
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Code Quality') {
+            parallel {
+                stage('Linting') {
+                    steps {
+                        container('python') {
+                            sh '''
+                                poetry run ruff check src/ tests/ --output-format=json > ruff-report.json || true
+                                poetry run ruff format --check src/ tests/
+                            '''
+                            archiveArtifacts artifacts: 'ruff-report.json', allowEmptyArchive: true
+                        }
+                    }
+                }
+
+                stage('Type Checking') {
+                    steps {
+                        container('python') {
+                            sh '''
+                                poetry run mypy src/udp --junit-xml=mypy-report.xml || true
+                            '''
+                            publishTestResults testResultsPattern: 'mypy-report.xml'
+                        }
+                    }
+                }
+
+                stage('Security Scan') {
+                    steps {
+                        container('python') {
+                            sh '''
+                                poetry run bandit -r src/udp -f json -o bandit-report.json || true
+                                poetry run safety check --json --output safety-report.json || true
+                            '''
+                            archiveArtifacts artifacts: 'bandit-report.json,safety-report.json', allowEmptyArchive: true
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Test') {
+            parallel {
+                stage('Unit Tests') {
+                    steps {
+                        container('python') {
+                            sh '''
+                                # Start test services
+                                docker run -d --name postgres-test -p 5432:5432 \
+                                    -e POSTGRES_DB=udp_test \
+                                    -e POSTGRES_USER=postgres \
+                                    -e POSTGRES_PASSWORD=postgres \
+                                    postgres:15-alpine
+
+                                docker run -d --name redis-test -p 6379:6379 redis:7-alpine
+
+                                # Wait for services
+                                sleep 10
+
+                                # Run tests
+                                export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/udp_test
+                                export REDIS_URL=redis://localhost:6379/0
+                                export SECRET_KEY=test-secret-key-for-jenkins-pipeline
+                                export ENVIRONMENT=testing
+
+                                poetry run pytest tests/ -v \
+                                    --cov=src/udp \
+                                    --cov-report=xml \
+                                    --cov-report=html \
+                                    --junit-xml=test-results.xml
+
+                                # Cleanup
+                                docker rm -f postgres-test redis-test || true
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            publishTestResults testResultsPattern: 'test-results.xml'
+                            publishCoverage adapters: [
+                                coberturaAdapter('coverage.xml')
+                            ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
+                            archiveArtifacts artifacts: 'htmlcov/**', allowEmptyArchive: true
+                        }
+                    }
+                }
+
+                stage('Integration Tests') {
+                    when {
+                        anyOf {
+                            branch 'main'
+                            branch 'develop'
+                            branch 'staging'
+                        }
+                    }
+                    steps {
+                        container('python') {
+                            sh '''
+                                # Run integration tests with docker-compose
+                                docker-compose -f docker-compose.cloud.yml up -d postgres redis
+                                sleep 30
+
+                                export DATABASE_URL=postgresql://udp_user:udp_password@localhost:5432/udp_prod
+                                export REDIS_URL=redis://localhost:6379/0
+
+                                poetry run pytest tests/integration/ -v \
+                                    --junit-xml=integration-results.xml
+
+                                docker-compose -f docker-compose.cloud.yml down
+                            '''
+                        }
+                    }
+                    post {
+                        always {
+                            publishTestResults testResultsPattern: 'integration-results.xml'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Images') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                    branch 'staging'
+                }
+            }
+            parallel {
+                stage('API Image') {
+                    steps {
+                        container('docker') {
+                            sh '''
+                                docker build \
+                                    --target production \
+                                    --tag $REGISTRY/$IMAGE_NAME/api:$BUILD_VERSION \
+                                    --tag $REGISTRY/$IMAGE_NAME/api:latest \
+                                    -f Dockerfile.cloud .
+
+                                docker push $REGISTRY/$IMAGE_NAME/api:$BUILD_VERSION
+                                docker push $REGISTRY/$IMAGE_NAME/api:latest
+                            '''
+                        }
+                    }
+                }
+
+                stage('Worker Image') {
+                    steps {
+                        container('docker') {
+                            sh '''
+                                docker build \
+                                    --target celery-worker \
+                                    --tag $REGISTRY/$IMAGE_NAME/worker:$BUILD_VERSION \
+                                    --tag $REGISTRY/$IMAGE_NAME/worker:latest \
+                                    -f Dockerfile.cloud .
+
+                                docker push $REGISTRY/$IMAGE_NAME/worker:$BUILD_VERSION
+                                docker push $REGISTRY/$IMAGE_NAME/worker:latest
+                            '''
+                        }
+                    }
+                }
+
+                stage('Beat Image') {
+                    steps {
+                        container('docker') {
+                            sh '''
+                                docker build \
+                                    --target celery-beat \
+                                    --tag $REGISTRY/$IMAGE_NAME/beat:$BUILD_VERSION \
+                                    --tag $REGISTRY/$IMAGE_NAME/beat:latest \
+                                    -f Dockerfile.cloud .
+
+                                docker push $REGISTRY/$IMAGE_NAME/beat:$BUILD_VERSION
+                                docker push $REGISTRY/$IMAGE_NAME/beat:latest
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Security Scanning') {
+            when {
+                anyOf {
+                    branch 'main'
+                    branch 'develop'
+                    branch 'staging'
+                }
+            }
+            parallel {
+                stage('Container Scan API') {
+                    steps {
+                        container('docker') {
+                            sh '''
+                                docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                                    aquasec/trivy image \
+                                    --exit-code 0 \
+                                    --format json \
+                                    --output trivy-api-report.json \
+                                    $REGISTRY/$IMAGE_NAME/api:$BUILD_VERSION || true
+                            '''
+                            archiveArtifacts artifacts: 'trivy-api-report.json', allowEmptyArchive: true
+                        }
+                    }
+                }
+
+                stage('Container Scan Worker') {
+                    steps {
+                        container('docker') {
+                            sh '''
+                                docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                                    aquasec/trivy image \
+                                    --exit-code 0 \
+                                    --format json \
+                                    --output trivy-worker-report.json \
+                                    $REGISTRY/$IMAGE_NAME/worker:$BUILD_VERSION || true
+                            '''
+                            archiveArtifacts artifacts: 'trivy-worker-report.json', allowEmptyArchive: true
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Development') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                container('kubectl') {
+                    script {
+                        withCredentials([file(credentialsId: 'kube-config-dev', variable: 'KUBECONFIG')]) {
+                            sh '''
+                                kubectl config current-context
+
+                                cd k8s/overlays/development
+
+                                # Update image tags
+                                kustomize edit set image \
+                                    udp/api=$REGISTRY/$IMAGE_NAME/api:$BUILD_VERSION \
+                                    udp/worker=$REGISTRY/$IMAGE_NAME/worker:$BUILD_VERSION \
+                                    udp/beat=$REGISTRY/$IMAGE_NAME/beat:$BUILD_VERSION
+
+                                # Deploy
+                                kustomize build . | kubectl apply -f -
+
+                                # Wait for rollout
+                                kubectl rollout status deployment/udp-api -n udp-dev --timeout=600s
+                                kubectl rollout status deployment/udp-worker -n udp-dev --timeout=600s
+                            '''
+                        }
+                    }
+                }
+            }
+            post {
+                success {
+                    sh "curl -f $DEV_URL/health || exit 1"
+                    slackSend(
+                        channel: '#deployments',
+                        color: 'good',
+                        message: "✅ UDP deployed to Development: $DEV_URL"
+                    )
+                }
+                failure {
+                    slackSend(
+                        channel: '#deployments',
+                        color: 'danger',
+                        message: "❌ UDP deployment to Development failed"
+                    )
+                }
+            }
+        }
+
+        stage('Deploy Staging') {
+            when {
+                branch 'staging'
+            }
+            steps {
+                container('kubectl') {
+                    script {
+                        withCredentials([file(credentialsId: 'kube-config-staging', variable: 'KUBECONFIG')]) {
+                            sh '''
+                                cd k8s/overlays/staging
+
+                                kustomize edit set image \
+                                    udp/api=$REGISTRY/$IMAGE_NAME/api:$BUILD_VERSION \
+                                    udp/worker=$REGISTRY/$IMAGE_NAME/worker:$BUILD_VERSION \
+                                    udp/beat=$REGISTRY/$IMAGE_NAME/beat:$BUILD_VERSION
+
+                                kustomize build . | kubectl apply -f -
+                                kubectl rollout status deployment/udp-api -n udp-staging --timeout=600s
+                            '''
+                        }
+                    }
+                }
+            }
+            post {
+                success {
+                    sh "sleep 60 && curl -f $STAGING_URL/health || exit 1"
+                    slackSend(
+                        channel: '#deployments',
+                        color: 'good',
+                        message: "✅ UDP deployed to Staging: $STAGING_URL"
+                    )
+                }
+            }
+        }
+
+        stage('Performance Testing') {
+            when {
+                branch 'staging'
+            }
+            steps {
+                container('python') {
+                    sh '''
+                        pip install locust
+                        cd tests/performance
+
+                        locust --headless \
+                            --users 100 \
+                            --spawn-rate 10 \
+                            --run-time 300s \
+                            --host $STAGING_URL \
+                            --html performance-report.html \
+                            --csv performance
+                    '''
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'tests/performance/*', allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Deploy Production') {
+            when {
+                allOf {
+                    branch 'main'
+                    not { triggeredBy 'TimerTrigger' }
+                }
+            }
+            steps {
+                script {
+                    def deployApproval = input(
+                        message: 'Deploy to Production?',
+                        parameters: [
+                            choice(
+                                name: 'DEPLOY_DECISION',
+                                choices: ['Deploy', 'Abort'],
+                                description: 'Proceed with production deployment?'
+                            )
+                        ]
+                    )
+
+                    if (deployApproval == 'Deploy') {
+                        container('kubectl') {
+                            withCredentials([file(credentialsId: 'kube-config-prod', variable: 'KUBECONFIG')]) {
+                                sh '''
+                                    cd k8s/overlays/production
+
+                                    kustomize edit set image \
+                                        udp/api=$REGISTRY/$IMAGE_NAME/api:$BUILD_VERSION \
+                                        udp/worker=$REGISTRY/$IMAGE_NAME/worker:$BUILD_VERSION \
+                                        udp/beat=$REGISTRY/$IMAGE_NAME/beat:$BUILD_VERSION
+
+                                    kustomize build . | kubectl apply -f -
+                                    kubectl rollout status deployment/udp-api -n udp-prod --timeout=600s
+                                '''
+                            }
+                        }
+                    } else {
+                        error('Production deployment aborted by user')
+                    }
+                }
+            }
+            post {
+                success {
+                    sh "sleep 60 && curl -f $PROD_URL/health || exit 1"
+                    slackSend(
+                        channel: '#deployments',
+                        color: 'good',
+                        message: "🚀 UDP deployed to Production: $PROD_URL"
+                    )
+                }
+                failure {
+                    slackSend(
+                        channel: '#deployments',
+                        color: 'danger',
+                        message: "💥 UDP production deployment failed"
+                    )
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Cleanup workspace
+            cleanWs()
+        }
+        success {
+            echo "Pipeline completed successfully!"
+        }
+        failure {
+            echo "Pipeline failed!"
+            slackSend(
+                channel: '#ci-cd',
+                color: 'danger',
+                message: "❌ UDP Pipeline failed: ${env.BUILD_URL}"
+            )
+        }
+        unstable {
+            echo "Pipeline is unstable"
+            slackSend(
+                channel: '#ci-cd',
+                color: 'warning',
+                message: "⚠️ UDP Pipeline unstable: ${env.BUILD_URL}"
+            )
+        }
+    }
+}

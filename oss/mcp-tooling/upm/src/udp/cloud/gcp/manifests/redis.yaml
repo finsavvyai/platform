@@ -1,0 +1,305 @@
+# Redis connection service
+# This connects to Google Cloud Memorystore (Redis) instance
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-redis-service
+  namespace: udp
+  labels:
+    app: udp
+    component: cache
+    tier: data
+spec:
+  type: ExternalName
+  externalName: udp-redis  # This will be updated by deployment script with actual Redis IP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+
+---
+# Redis proxy deployment for connection management
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udp-redis-proxy
+  namespace: udp
+  labels:
+    app: udp
+    component: redis-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: udp
+      component: redis-proxy
+  template:
+    metadata:
+      labels:
+        app: udp
+        component: redis-proxy
+        version: v1
+      annotations:
+        prometheus.io/scrape: "false"
+    spec:
+      serviceAccountName: udp-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+      - name: redis-proxy
+        image: haproxy:2.8-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "25m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        livenessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          tcpSocket:
+            port: 6379
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 3
+        volumeMounts:
+        - name: haproxy-config
+          mountPath: /usr/local/etc/haproxy
+          readOnly: true
+      volumes:
+      - name: haproxy-config
+        configMap:
+          name: udp-redis-proxy-config
+
+---
+# HAProxy configuration for Redis proxy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: udp-redis-proxy-config
+  namespace: udp
+  labels:
+    app: udp
+    component: redis-proxy
+data:
+  haproxy.cfg: |
+    global
+        daemon
+        log stdout local0 info
+        chroot /var/lib/haproxy
+        stats socket /run/haproxy/admin.sock mode 660 level admin
+        stats timeout 30s
+        user haproxy
+        group haproxy
+
+    defaults
+        mode tcp
+        log global
+        option tcplog
+        option dontlognull
+        option tcp-check
+        timeout connect 5000ms
+        timeout client 30000ms
+        timeout server 30000ms
+        retries 3
+
+    frontend redis_frontend
+        bind *:6379
+        default_backend redis_backend
+
+    backend redis_backend
+        balance roundrobin
+        tcp-check connect
+        # This will be updated by deployment script with actual Redis endpoint
+        server redis1 REDIS_IP:6379 check
+
+---
+# Service for Redis proxy
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-redis
+  namespace: udp
+  labels:
+    app: udp
+    component: redis-proxy
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  selector:
+    app: udp
+    component: redis-proxy
+
+---
+# Redis connection test job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: udp-redis-test
+  namespace: udp
+  labels:
+    app: udp
+    component: redis-test
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    metadata:
+      labels:
+        app: udp
+        component: redis-test
+    spec:
+      serviceAccountName: udp-api
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: redis-test
+        image: redis:7-alpine
+        command:
+        - sh
+        - -c
+        - |
+          echo "Testing Redis connection..."
+          until redis-cli -h udp-redis -p 6379 ping; do
+            echo "Waiting for Redis..."
+            sleep 2
+          done
+          echo "Redis connection successful"
+          redis-cli -h udp-redis -p 6379 set test "UDP Redis Test"
+          redis-cli -h udp-redis -p 6379 get test
+          redis-cli -h udp-redis -p 6379 del test
+          echo "Redis test completed successfully"
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "10m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+  backoffLimit: 3
+
+---
+# Redis monitoring service
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-redis-monitor
+  namespace: udp
+  labels:
+    app: udp
+    component: redis-monitor
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9121
+    targetPort: 9121
+    protocol: TCP
+    name: metrics
+  selector:
+    app: udp
+    component: redis-exporter
+
+---
+# Redis exporter for monitoring
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udp-redis-exporter
+  namespace: udp
+  labels:
+    app: udp
+    component: redis-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: udp
+      component: redis-exporter
+  template:
+    metadata:
+      labels:
+        app: udp
+        component: redis-exporter
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9121"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: udp-monitoring
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: redis-exporter
+        image: oliver006/redis_exporter:v1.55.0
+        ports:
+        - containerPort: 9121
+          name: metrics
+        env:
+        - name: REDIS_ADDR
+          value: "redis://udp-redis:6379"
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "10m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 9121
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: 9121
+          initialDelaySeconds: 5
+          periodSeconds: 5

@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: udp-config
+  namespace: udp-system
+  labels:
+    app.kubernetes.io/name: universal-dependency-platform
+    app.kubernetes.io/component: config
+data:
+  APP_NAME: "Universal Dependency Platform"
+  APP_VERSION: "0.1.0"
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+
+  # Database settings
+  DATABASE_POOL_SIZE: "10"
+  DATABASE_MAX_OVERFLOW: "20"
+  DATABASE_POOL_TIMEOUT: "30"
+  DATABASE_POOL_RECYCLE: "3600"
+
+  # Redis settings
+  REDIS_MAX_CONNECTIONS: "20"
+  REDIS_SOCKET_TIMEOUT: "5.0"
+  REDIS_RETRY_ON_TIMEOUT: "true"
+
+  # Security settings
+  JWT_ALGORITHM: "RS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  PASSWORD_BCRYPT_ROUNDS: "12"
+
+  # CORS settings
+  CORS_CREDENTIALS: "true"
+  CORS_METHODS: '["GET", "POST", "PUT", "DELETE", "OPTIONS"]'
+  CORS_HEADERS: '["*"]'
+
+  # Monitoring settings
+  ENABLE_PROMETHEUS: "true"
+  ENABLE_TRACING: "true"
+  METRICS_PORT: "8001"
+  HEALTH_CHECK_INTERVAL: "30"
+
+  # Package registry settings
+  NPM_REGISTRY_URL: "https://registry.npmjs.org"
+  PYPI_REGISTRY_URL: "https://pypi.org/simple"
+  MAVEN_CENTRAL_URL: "https://repo1.maven.org/maven2"
+  CRATES_IO_URL: "https://crates.io/api/v1"
+  REGISTRY_REQUEST_TIMEOUT: "30"
+  REGISTRY_MAX_RETRIES: "3"
+  REGISTRY_RATE_LIMIT_PER_SECOND: "10"
+
+  # Workflow settings
+  WORKFLOW_MAX_ITERATIONS: "50"
+  WORKFLOW_TIMEOUT_SECONDS: "300"
+  WORKFLOW_CHECKPOINT_STORAGE: "database"
+  WORKFLOW_ENABLE_HUMAN_IN_LOOP: "true"
+  WORKFLOW_APPROVAL_TIMEOUT_HOURS: "24"
+
+  # Celery settings
+  CELERY_TASK_SERIALIZER: "json"
+  CELERY_RESULT_SERIALIZER: "json"
+  CELERY_ACCEPT_CONTENT: '["json"]'
+  CELERY_TIMEZONE: "UTC"
+  CELERY_ENABLE_UTC: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: udp-nginx-config
+  namespace: udp-system
+  labels:
+    app.kubernetes.io/name: universal-dependency-platform
+    app.kubernetes.io/component: nginx-config
+data:
+  nginx.conf: |
+    upstream udp_api {
+        least_conn;
+        server udp-api-service:8000;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+
+        # Security headers
+        add_header X-Frame-Options DENY;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-XSS-Protection "1; mode=block";
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
+
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+        location / {
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass http://udp_api;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_connect_timeout 30s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+        }
+
+        location /health {
+            proxy_pass http://udp_api/health;
+            access_log off;
+        }
+
+        location /metrics {
+            proxy_pass http://udp_api/metrics;
+            allow 10.0.0.0/8;
+            allow 172.16.0.0/12;
+            allow 192.168.0.0/16;
+            deny all;
+        }
+    }
