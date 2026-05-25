@@ -15,6 +15,7 @@ import { Hono } from "hono";
 import { buildAuthMiddleware, getBrainAuth } from "./auth.js";
 import { BrainAuditEmitter } from "./audit.js";
 import { HealthBuilder } from "./health.js";
+import { buildSearchHandler } from "./search/search-handler.js";
 import type { BrainApiConfig } from "./types.js";
 
 export interface BrainApp {
@@ -78,6 +79,21 @@ export const createBrainApp = (config: BrainApiConfig): BrainApp => {
     }
     return c.json({ ok: true, ts: result.record.ts });
   });
+
+  // -------- Search (append-only; mounted when configured) --------
+  if (config.search !== undefined) {
+    const searchHandler = buildSearchHandler({
+      adapter: config.search.adapter,
+      audit,
+      ...(config.search.defaultTopK !== undefined
+        ? { defaultTopK: config.search.defaultTopK }
+        : {}),
+      ...(config.search.maxTopK !== undefined
+        ? { maxTopK: config.search.maxTopK }
+        : {}),
+    });
+    guarded.post("/search", searchHandler);
+  }
 
   app.route("/v1", guarded);
 

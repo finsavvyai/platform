@@ -1,0 +1,78 @@
+---
+import Default from '../layouts/Default.astro';
+import SearchInput from '../components/SearchInput.astro';
+import ResultCard from '../components/ResultCard.astro';
+import { runSearch } from '../lib/search-client.ts';
+import type { SearchApiResponse } from '../lib/types.ts';
+
+const url = new URL(Astro.request.url);
+const q = (url.searchParams.get('q') ?? '').slice(0, 200);
+
+const env =
+  typeof process !== 'undefined' ? process.env : ({} as NodeJS.ProcessEnv);
+const apiUrl = env['BRAIN_API_URL'];
+const token = env['BRAIN_JWT'];
+const tenantId = env['BRAIN_TENANT_ID'] ?? 'demo-tenant';
+const showBanner = !apiUrl;
+
+let response: SearchApiResponse | null = null;
+if (q.trim().length > 0) {
+  response = await runSearch(q, {
+    tenantId,
+    ...(apiUrl ? { baseUrl: apiUrl } : {}),
+    ...(token ? { token } : {}),
+  });
+}
+const hasResults =
+  response !== null && response.ok && response.results.length > 0;
+const errorCode =
+  response !== null && response.ok === false ? response.error : null;
+---
+
+<Default
+  title={q ? `Search: ${q} — AMLIQ Brain` : 'AMLIQ Brain — Search'}
+  showAuthBanner={showBanner}
+>
+  <SearchInput value={q} />
+  {q.trim().length === 0 && (
+    <p
+      class="mx-auto mt-10 max-w-2xl text-center text-sm text-ink-500
+             dark:text-ink-400"
+    >
+      Enter a query above to search the compliance corpus.
+    </p>
+  )}
+  {errorCode && (
+    <div
+      role="alert"
+      class="mx-auto mt-8 max-w-2xl rounded-xl border
+             border-red-500/30 bg-red-500/5 p-4 text-sm
+             text-red-700 dark:text-red-300"
+    >
+      Search failed: <code>{errorCode}</code>
+    </div>
+  )}
+  {response !== null && response.ok && (
+    <section class="mx-auto mt-8 max-w-2xl space-y-3">
+      <p
+        class="text-xs uppercase tracking-widest text-ink-400"
+        aria-live="polite"
+      >
+        {`${response.results.length} result${
+          response.results.length === 1 ? '' : 's'
+        } · ${response.latencyMs}ms`}
+      </p>
+      {hasResults ? (
+        response.results.map((r) => <ResultCard result={r} />)
+      ) : (
+        <p
+          class="rounded-xl border border-ink-100 bg-white p-5
+                 text-sm text-ink-500
+                 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-400"
+        >
+          No matches for <strong>{q}</strong>.
+        </p>
+      )}
+    </section>
+  )}
+</Default>

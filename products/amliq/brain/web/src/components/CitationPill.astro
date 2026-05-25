@@ -1,0 +1,42 @@
+---
+import { sourceLabel } from '../lib/search-client.ts';
+import type { Citation } from '../lib/types.ts';
+
+interface Props {
+  citation: Citation;
+}
+const { citation } = Astro.props;
+const label = sourceLabel(citation.source);
+// Source URL synthesis: in scaffold we link to a doc-id-anchored
+// placeholder. A real deploy will pass a `source_uri` per-citation.
+const href = `#${citation.doc_id}`;
+---
+
+<a
+  href={href}
+  rel="noopener"
+  aria-label={`Citation in ${label} document ${citation.doc_id}`}
+  class="inline-flex items-center gap-1 rounded-full
+         border border-accent-500/30 bg-accent-50 px-2.5 py-0.5
+         text-[11px] font-medium text-accent-500
+         transition-colors hover:bg-accent-500 hover:text-white
+         focus:outline-none focus:ring-2 focus:ring-accent-500/40
+         dark:bg-transparent dark:text-accent-500"
+>
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 12 12"
+    width="10"
+    height="10"
+    class="opacity-70"
+  >
+    <path
+      fill="currentColor"
+      d="M3 1h4v2H3zM1 3h2v8H1zM9 3h2v8H9zM3 9h4v2H3z"
+    ></path>
+  </svg>
+  <span>{label}</span>
+  <span class="text-accent-500/60">
+    {`${citation.span_start}–${citation.span_end}`}
+  </span>
+</a>

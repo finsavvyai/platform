@@ -119,4 +119,13 @@ export interface BrainApiConfig {
   readonly probes?: readonly HealthProbe[];
   readonly requiredRole?: string;
   readonly clock?: () => Date;
+  /**
+   * Optional search configuration. When provided, `POST /v1/search` is
+   * mounted under the authenticated subtree. Owned by SEARCH-UI agent.
+   */
+  readonly search?: {
+    readonly adapter: import("./search/types.js").SearchAdapter;
+    readonly defaultTopK?: number;
+    readonly maxTopK?: number;
+  };
 }

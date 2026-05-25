@@ -24,6 +24,23 @@ export type { AuditEmitterOptions, EmitResult } from "./audit.js";
 export { HealthBuilder } from "./health.js";
 export type { HealthBuilderOptions } from "./health.js";
 
+export {
+  buildSearchHandler,
+  linkCitations,
+} from "./search/index.js";
+export type {
+  Citation,
+  SearchAdapter,
+  SearchAdapterHit,
+  SearchAdapterQuery,
+  SearchAdapterResult,
+  SearchErrorCode,
+  SearchHandlerOptions,
+  SearchRequest,
+  SearchResponse,
+  SearchResult,
+} from "./search/index.js";
+
 export type {
   AuthClaims,
   AuthErrorCode,
