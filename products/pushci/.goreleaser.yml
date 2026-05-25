@@ -1,0 +1,119 @@
+version: 2
+
+project_name: pushci
+
+before:
+  hooks:
+    - go mod tidy
+    - go vet ./...
+
+builds:
+  - id: pushci
+    binary: pushci
+    main: ./cmd/pushci
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+# --- Supply-chain: cosign + CycloneDX SBOM ---------------------------------
+# Closes enterprise gap "Signed releases + SBOM per build" from
+# audit/report/ENTERPRISE_CAPABILITIES.md §3 Tier A item 4.
+#
+# cosign signs the checksums file with a keyless (OIDC → Sigstore
+# Fulcio → Rekor transparency log) flow when run in CI. Locally,
+# set COSIGN_PASSWORD and COSIGN_KEY=cosign.key to sign with a file
+# key; goreleaser falls back to skipping signatures if cosign isn't
+# installed (so the dev build keeps working).
+#
+# Syft produces a CycloneDX SBOM per archive plus one aggregated
+# source SBOM. Buyers in the healthcare / defense segments ask for
+# CycloneDX specifically (SPDX is a nice-to-have follow-up).
+signs:
+  - id: cosign-checksums
+    cmd: cosign
+    args:
+      - "sign-blob"
+      - "--yes"
+      - "--output-signature=${artifact}.sig"
+      - "--output-certificate=${artifact}.pem"
+      - "${artifact}"
+    artifacts: checksum
+    output: true
+
+sboms:
+  - id: archive-sboms
+    artifacts: archive
+    documents:
+      - "${artifact}.cdx.sbom.json"
+    cmd: syft
+    args: ["$artifact", "--output", "cyclonedx-json=$document"]
+  - id: source-sbom
+    artifacts: source
+    documents:
+      - "{{ .ProjectName }}_{{ .Version }}.cdx.sbom.json"
+    cmd: syft
+    args: [".", "--output", "cyclonedx-json=$document"]
+
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}_{{ .Version }}_source"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+brews:
+  - repository:
+      owner: finsavvyai
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://pushci.dev"
+    description: "AI-native CI/CD — zero config, runs on your machine, free forever"
+    license: "MIT"
+    install: |
+      bin.install "pushci"
+    test: |
+      assert_match "pushci", shell_output("#{bin}/pushci version")
+
+release:
+  # Binaries are published to the PUBLIC release mirror repo
+  # `finsavvyai/pushci-cli`. The product source lives in the
+  # private `finsavvyai/pushci` repo (this directory). Splitting
+  # the two lets Homebrew / curl / npm shim fallback pull
+  # tarballs anonymously without exposing product source.
+  #
+  # The git tag (e.g. v1.4.4) is pushed to this private source
+  # repo for internal tracking; goreleaser then creates a
+  # matching release in pushci-cli with the same tag name. Tags
+  # in the two repos are kept in lockstep by the release flow.
+  github:
+    owner: finsavvyai
+    name: pushci-cli
+  draft: false
+  prerelease: auto
+  name_template: "v{{ .Version }}"

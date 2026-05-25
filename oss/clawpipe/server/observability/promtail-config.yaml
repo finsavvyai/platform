@@ -1,0 +1,102 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://localhost:3100/loki/api/v1/push
+
+scrape_configs:
+  # FinSavvyAI service logs (JSON structured)
+  - job_name: finsavvyai
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: finsavvyai
+          __path__: /var/log/finsavvyai/*.log
+
+    pipeline_stages:
+      # Parse JSON-structured log lines
+      - json:
+          expressions:
+            level: level
+            service: service
+            correlation_id: correlation_id
+            message: message
+            module: module
+            timestamp: timestamp
+
+      # Map parsed fields to labels for efficient querying
+      - labels:
+          level:
+          service:
+          module:
+
+      # Use the log timestamp instead of ingestion time
+      - timestamp:
+          source: timestamp
+          format: "2006-01-02T15:04:05.000000+00:00"
+          fallback_formats:
+            - "2006-01-02T15:04:05Z"
+            - "2006-01-02T15:04:05"
+
+      # Set correlation_id as a structured metadata field
+      - structured_metadata:
+          correlation_id:
+
+  # Master server logs
+  - job_name: finsavvyai-master
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: finsavvyai
+          service: master
+          __path__: /var/log/finsavvyai/master.log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            correlation_id: correlation_id
+      - labels:
+          level:
+
+  # Gateway logs
+  - job_name: finsavvyai-gateway
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: finsavvyai
+          service: gateway
+          __path__: /var/log/finsavvyai/gateway.log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            correlation_id: correlation_id
+      - labels:
+          level:
+
+  # Worker logs
+  - job_name: finsavvyai-worker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: finsavvyai
+          service: worker
+          __path__: /var/log/finsavvyai/worker-*.log
+
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            correlation_id: correlation_id
+      - labels:
+          level:

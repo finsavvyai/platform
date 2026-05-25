@@ -1,0 +1,204 @@
+# Postgres now hosted on Crunchy Bridge (postgresbridge.com).
+# DATABASE_URL is set per-service via the Render dashboard (sync: false)
+# so the connection string never lands in the repo.
+# Old Render Postgres (amliq-db) was removed after migration on 2026-04-26.
+
+services:
+  # Redis — optional, add when scaling to multiple API nodes
+  # Uncomment when ready ($10/mo, gives cross-node cache sharing)
+  # - type: redis
+  #   name: amliq-redis
+  #   plan: starter
+  #   maxmemoryPolicy: allkeys-lru
+
+  - type: web
+    name: amliq-api
+    runtime: docker
+    # 2GB pod — required until streaming lands for every parser
+    # (see sync_stream.go). Was OOM-killed on starter/512MB.
+    plan: standard
+    region: oregon
+    dockerfilePath: ./deploy/docker/Dockerfile
+    dockerContext: .
+    scaling:
+      minInstances: 1
+      maxInstances: 10
+      targetCPUPercent: 70
+      targetMemoryPercent: 80
+    envVars:
+      # Database (primary — reads + writes)
+      - key: DATABASE_URL
+        sync: false  # set in Render dashboard → Environment (Crunchy Bridge URI)
+      # Redis — leave empty until Redis service is enabled
+      # When enabled, use: fromService: { type: redis, name: amliq-redis, property: connectionString }
+      - key: REDIS_URL
+        value: ""
+      # Server
+      - key: PORT
+        value: "8080"
+      - key: ENVIRONMENT
+        value: production
+      - key: ENV
+        value: production
+      # Scaling — tuned for starter plan (512MB RAM)
+      - key: WORKERS
+        value: "50"
+      - key: QUEUE_DEPTH
+        value: "5000"
+      - key: PG_MAX_CONNS
+        value: "25"
+      - key: PG_MIN_CONNS
+        value: "5"
+      # URLs
+      - key: API_URL
+        value: https://api.amliq.finance
+      - key: FRONTEND_URL
+        value: https://amliq.finance
+      - key: ALLOWED_ORIGINS
+        value: https://amliq.finance,https://www.amliq.finance,https://app.amliq.finance
+      # Auth
+      - key: TOKEN_SECRET
+        generateValue: true
+      # Secrets (set in Render Dashboard → Environment)
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: LS_API_KEY
+        sync: false
+      - key: LS_STORE_ID
+        sync: false
+      - key: LS_WEBHOOK_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: EMBEDDING_API_KEY
+        sync: false
+      # LLM providers (priority: DeepSeek → Groq → Gemini → OpenRouter)
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      # Email (Resend) — for automation email actions + transactional
+      - key: RESEND_API_KEY
+        sync: false
+      # From address (must be verified domain in Resend)
+      - key: EMAIL_FROM
+        sync: false
+      # SMS (Twilio) — for automation SMS actions
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      # Twilio Verify (WhatsApp/SMS OTP)
+      - key: TWILIO_VERIFICATION_SID
+        sync: false
+      # WhatsApp-enabled from number for alert messaging (e.g. whatsapp:+14155238886)
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true
+
+  - type: worker
+    name: amliq-worker
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/docker/Dockerfile.worker
+    dockerContext: .
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # set in Render dashboard → Environment (Crunchy Bridge URI)
+      - key: ENVIRONMENT
+        value: production
+      - key: PG_MAX_CONNS
+        value: "10"
+    autoDeploy: true
+
+  # One-off job: refresh the rich JSONB columns (addresses, identifiers,
+  # aliases) for every list in AllListConfigs(). Independent of web
+  # service lifecycle — a web deploy will NOT kill a running job.
+  #
+  # Trigger from Render dashboard ("Run Job") or CLI:
+  #   render jobs create amliq-backfill-rich
+  #
+  # Override args by setting startCommand at trigger time, e.g.
+  #   --list opensanctions_peps --batch 8000
+  - type: job
+    name: amliq-backfill-rich
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./deploy/docker/Dockerfile.backfill
+    dockerContext: .
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # set in Render dashboard → Environment (Crunchy Bridge URI)
+      - key: ENVIRONMENT
+        value: production
+      - key: PG_MAX_CONNS
+        value: "10"
+    autoDeploy: false
+
+  # On-demand GLEIF LEI registry ingest. GLEIF publishes 3.28M LEIs
+  # only via the paginated api.gleif.org JSON API (no bulk dump in
+  # OpenSanctions), so ingest runs page-by-page. Trigger from the
+  # Render dashboard or CLI with --start-page / --max-pages to
+  # resume or window the run:
+  #
+  #   render jobs create amliq-reingest-gleif \
+  #     --start-command "./reingest-gleif --start-page 1 --max-pages 500"
+  - type: cron
+    name: amliq-reingest-gleif
+    runtime: docker
+    plan: starter
+    region: oregon
+    # Dormant schedule — never-fire; intended for manual jobs only.
+    schedule: "0 0 1 1 *"
+    dockerfilePath: ./deploy/docker/Dockerfile.reingest-gleif
+    dockerContext: .
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # set in Render dashboard → Environment (Crunchy Bridge URI)
+      - key: ENVIRONMENT
+        value: production
+      - key: PG_MAX_CONNS
+        value: "10"
+    autoDeploy: false
+
+  # Weekly Israeli Treasury (Ministry of Finance) sanctions reingest.
+  # The daily worker refresh covers every list globally, but
+  # gov.il needs the browser-bypass fetcher and occasionally fails
+  # under the shared worker schedule — this dedicated cron gives it
+  # its own retry slot. Schedule matches all_lists.go:38 (Mon 09:00).
+  - type: cron
+    name: amliq-reingest-israeli-treasury
+    runtime: docker
+    plan: starter
+    region: oregon
+    schedule: "0 9 * * 1"
+    dockerfilePath: ./deploy/docker/Dockerfile.reingest-global
+    dockerContext: .
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # set in Render dashboard → Environment (Crunchy Bridge URI)
+      - key: ENVIRONMENT
+        value: production
+      - key: PG_MAX_CONNS
+        value: "10"
+    autoDeploy: false

@@ -1,0 +1,48 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: sdlc-cc
+
+      # sdlc-core is a private sibling module. Clone it next to sdlc-cc
+      # so the `replace ../sdlc-core` directive in sdlc-cc/go.mod
+      # resolves. Requires SDLC_CORE_TOKEN secret with read access to
+      # finsavvyai/sdlc-core (a fine-grained PAT scoped to that repo).
+      - name: Checkout sdlc-core (private sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: finsavvyai/sdlc-core
+          token: ${{ secrets.SDLC_CORE_TOKEN }}
+          path: sdlc-core
+          ref: main
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+          cache-dependency-path: sdlc-cc/go.sum
+
+      - name: build
+        working-directory: sdlc-cc
+        run: go build ./...
+
+      - name: vet
+        working-directory: sdlc-cc
+        run: go vet ./...
+
+      - name: test
+        working-directory: sdlc-cc
+        run: go test -count=1 -cover ./...
+
+      - name: race
+        working-directory: sdlc-cc
+        run: go test -count=1 -race ./...

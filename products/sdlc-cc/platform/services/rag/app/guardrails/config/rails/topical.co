@@ -1,0 +1,35 @@
+# Topical rails for the SDLC Platform assistant.
+#
+# Keep the bot on secure-software-delivery topics: RAG, compliance,
+# LLM gateway, DLP, policies, observability, and the customer's own
+# ingested documents. Refuse everything else politely.
+
+define user ask off topic
+  "who will win the election"
+  "what's the weather like"
+  "tell me a joke about <anything not related to software>"
+  "recommend a restaurant"
+  "medical advice"
+  "legal advice"
+  "write me a poem"
+
+define user ask sdlc question
+  "how do I enforce row level security for tenant documents"
+  "what's the gateway middleware order"
+  "how does the RAG pipeline handle PDFs"
+  "show me the audit log schema"
+  "explain the LLM gateway failover"
+
+define bot refuse off topic
+  "I can only help with secure software delivery topics — RAG, compliance, LLM gateways, DLP, policies, observability, and your organization's ingested documents. Could you rephrase the question in that context?"
+
+define flow check topical input
+  user ask off topic
+  bot refuse off topic
+  stop
+
+define flow check topical output
+  $allowed = execute check_output_topical(response=$bot_message)
+  if not $allowed
+    bot refuse off topic
+    stop

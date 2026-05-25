@@ -1,0 +1,377 @@
+# Questro AI-Powered Testing Automation Platform
+# Alertmanager Configuration
+#
+# Comprehensive alert routing, grouping, and notification configuration
+# for the Questro platform monitoring system.
+
+global:
+  smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
+  smtp_from: 'alerts@qestro.ai'
+  smtp_auth_username: '${SMTP_USER}'
+  smtp_auth_password: '${SMTP_PASS}'
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  resolve_timeout: 5m
+
+# Route configuration
+route:
+  # Default receiver
+  receiver: 'default'
+
+  # Grouping configuration
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+
+  # Routing rules
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 5m
+      routes:
+        # Database critical alerts
+        - match:
+            service: database
+          receiver: 'database-critical'
+        # API critical alerts
+        - match:
+            service: api
+          receiver: 'api-critical'
+        # Infrastructure critical alerts
+        - match:
+            service: infrastructure
+          receiver: 'infrastructure-critical'
+
+    # Warning alerts - standard notification
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      repeat_interval: 2h
+      routes:
+        # Performance warnings
+        - match:
+            alertname: HighResponseTime
+          receiver: 'performance-alerts'
+        # AI service warnings
+        - match:
+            service: ai
+          receiver: 'ai-alerts'
+
+    # Info alerts - low priority
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+      group_wait: 5m
+      repeat_interval: 24h
+
+    # Business metric alerts
+    - match:
+        category: business
+      receiver: 'business-alerts'
+      group_wait: 1m
+      repeat_interval: 1h
+
+    # Security alerts
+    - match:
+        category: security
+      receiver: 'security-alerts'
+      group_wait: 0s
+      repeat_interval: 30m
+
+# Inhibit rules
+inhibit_rules:
+  # Inhibit warning alerts if critical alert is firing
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['alertname', 'instance']
+
+  # Inhibit info alerts if warning alert is firing
+  - source_match:
+      severity: warning
+    target_match:
+      severity: info
+    equal: ['alertname', 'instance']
+
+# Receivers configuration
+receivers:
+  # Default receiver
+  - name: 'default'
+    email_configs:
+      - to: 'devops@qestro.ai'
+        subject: '[Questro] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+          {{ end }}
+
+  # Critical alerts receiver
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@qestro.ai,devops@qestro.ai'
+        subject: '[CRITICAL] Questro Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          🚨 CRITICAL ALERT 🚨
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+
+          Immediate action required!
+    slack_configs:
+      - channel: '#alerts-critical'
+        title: '🚨 Critical Questro Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Instance:* {{ .Labels.instance }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        color: 'danger'
+        send_resolved: true
+
+  # Database critical alerts
+  - name: 'database-critical'
+    email_configs:
+      - to: 'dba@qestro.ai,oncall@qestro.ai'
+        subject: '[CRITICAL][DB] Questro Database Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          🚨 CRITICAL DATABASE ALERT 🚨
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Database: {{ .Labels.database }}
+          Query: {{ .Labels.query | default "N/A" }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+    slack_configs:
+      - channel: '#alerts-database'
+        title: '🚨 Critical Database Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Database:* {{ .Labels.database }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        color: 'danger'
+
+  # API critical alerts
+  - name: 'api-critical'
+    email_configs:
+      - to: 'api-team@qestro.ai,oncall@qestro.ai'
+        subject: '[CRITICAL][API] Questro API Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          🚨 CRITICAL API ALERT 🚨
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Endpoint: {{ .Labels.endpoint }}
+          Status Code: {{ .Labels.status_code }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+    slack_configs:
+      - channel: '#alerts-api'
+        title: '🚨 Critical API Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Endpoint:* {{ .Labels.endpoint }}
+          *Status:* {{ .Labels.status_code }}
+          {{ end }}
+        color: 'danger'
+
+  # Infrastructure critical alerts
+  - name: 'infrastructure-critical'
+    email_configs:
+      - to: 'infrastructure@qestro.ai,oncall@qestro.ai'
+        subject: '[CRITICAL][INFRA] Questro Infrastructure Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          🚨 CRITICAL INFRASTRUCTURE ALERT 🚨
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Host: {{ .Labels.instance }}
+          Service: {{ .Labels.service }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+    slack_configs:
+      - channel: '#alerts-infrastructure'
+        title: '🚨 Critical Infrastructure Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Host:* {{ .Labels.instance }}
+          *Service:* {{ .Labels.service }}
+          {{ end }}
+        color: 'danger'
+
+  # Warning alerts receiver
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'devops@qestro.ai'
+        subject: '[WARNING] Questro Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          ⚠️ WARNING ALERT ⚠️
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+    slack_configs:
+      - channel: '#alerts-warning'
+        title: '⚠️ Questro Warning'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        color: 'warning'
+        send_resolved: true
+
+  # Performance alerts
+  - name: 'performance-alerts'
+    email_configs:
+      - to: 'performance@qestro.ai'
+        subject: '[PERFORMANCE] Questro Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          📊 PERFORMANCE ALERT 📊
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Current Value: {{ .Labels.current_value }}
+          Threshold: {{ .Labels.threshold }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+    slack_configs:
+      - channel: '#alerts-performance'
+        title: '📊 Performance Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Current:* {{ .Labels.current_value }}
+          *Threshold:* {{ .Labels.threshold }}
+          {{ end }}
+        color: 'warning'
+
+  # AI service alerts
+  - name: 'ai-alerts'
+    email_configs:
+      - to: 'ai-team@qestro.ai'
+        subject: '[AI] Questro AI Service Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          🤖 AI SERVICE ALERT 🤖
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Provider: {{ .Labels.provider }}
+          Model: {{ .Labels.model }}
+          Error Rate: {{ .Labels.error_rate }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+    slack_configs:
+      - channel: '#alerts-ai'
+        title: '🤖 AI Service Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Provider:* {{ .Labels.provider }}
+          *Model:* {{ .Labels.model }}
+          {{ end }}
+        color: 'warning'
+
+  # Info alerts receiver
+  - name: 'info-alerts'
+    slack_configs:
+      - channel: '#alerts-info'
+        title: 'ℹ️ Questro Info'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+        color: 'good'
+
+  # Business alerts receiver
+  - name: 'business-alerts'
+    email_configs:
+      - to: 'business@qestro.ai,product@qestro.ai'
+        subject: '[BUSINESS] Questro Business Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          📈 BUSINESS METRIC ALERT 📈
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Metric: {{ .Labels.metric }}
+          Current Value: {{ .Labels.current_value }}
+          Target: {{ .Labels.target }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+          {{ end }}
+    slack_configs:
+      - channel: '#alerts-business'
+        title: '📈 Business Metric Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Metric:* {{ .Labels.metric }}
+          *Current:* {{ .Labels.current_value }}
+          *Target:* {{ .Labels.target }}
+          {{ end }}
+        color: 'good'
+
+  # Security alerts receiver
+  - name: 'security-alerts'
+    email_configs:
+      - to: 'security@qestro.ai,devops@qestro.ai'
+        subject: '[SECURITY] Questro Security Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          🔒 SECURITY ALERT 🔒
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Source IP: {{ .Labels.source_ip }}
+          User: {{ .Labels.user | default "N/A" }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+
+          Immediate investigation required!
+          {{ end }}
+    slack_configs:
+      - channel: '#alerts-security'
+        title: '🔒 Security Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Source IP:* {{ .Labels.source_ip }}
+          {{ end }}
+        color: 'danger'
+
+# Templates for custom alert formatting
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

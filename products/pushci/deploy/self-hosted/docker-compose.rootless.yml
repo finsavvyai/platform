@@ -1,0 +1,91 @@
+version: "3.9"
+
+# PushCI self-hosted runner — rootless hardened profile (PREVIEW)
+#
+# ┌──────────────────────────────────────────────────────────────┐
+# │ STATUS: scaffolded, NOT yet production-ready.                │
+# │ TODO: full dind bootstrap, TLS between runner and dind,      │
+# │ image signing, hardened AppArmor/seccomp profile.            │
+# │ Tracking: https://github.com/finsavvyai/pushci-cli/issues/TBD│
+# └──────────────────────────────────────────────────────────────┘
+#
+# Why this exists
+# ---------------
+# The default docker-compose.yml mounts the host docker.sock into
+# the runner container so `docker build` and service containers
+# work out of the box. That's the industry norm (Jenkins, GitLab
+# runner, BuildKite agent) but it means a malicious pipeline can
+# escape to host root. See README.md "Security" section.
+#
+# This profile splits the runner into two containers:
+#   1. `runner` — runs the PushCI agent as UID `nobody`, no
+#      docker socket, no privileged caps.
+#   2. `dind`   — runs Docker-in-Docker in a dedicated namespace.
+#      Runner talks to it over a private network via
+#      DOCKER_HOST=tcp://dind:2375.
+#
+# If `dind` is compromised the attacker gets access to dind's own
+# namespace — NOT the host. The cost is higher memory (you're
+# running a second Docker daemon) and slightly slower builds.
+#
+# Usage (once stabilized):
+#   docker compose -f docker-compose.rootless.yml up -d
+#
+# Not yet supported:
+#   - Volumes that reach into the host filesystem (none needed —
+#     caches live in `runner-work`).
+#   - Binding to host network. All outbound through Docker NAT.
+
+services:
+  runner:
+    image: pushci/runner:latest
+    container_name: pushci-runner-rootless
+    restart: unless-stopped
+    user: "65534:65534"  # `nobody` — no root inside the container
+    read_only: true      # / is read-only; /tmp and /var/lib/pushci are tmpfs/volumes
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PUSHCI_TOKEN: ${PUSHCI_TOKEN:?set PUSHCI_TOKEN}
+      PUSHCI_API_URL: ${PUSHCI_API_URL:-https://api.pushci.dev}
+      PUSHCI_RUNNER_NAME: ${PUSHCI_RUNNER_NAME:-runner-rootless-1}
+      PUSHCI_RUNNER_TAGS: ${PUSHCI_RUNNER_TAGS:-linux,rootless,self-hosted}
+      PUSHCI_RUNNER_CONCURRENCY: ${PUSHCI_RUNNER_CONCURRENCY:-2}
+      # TODO: switch to tcp with TLS + client certs before GA.
+      DOCKER_HOST: tcp://dind:2375
+    volumes:
+      - runner-work:/var/lib/pushci/work
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    depends_on:
+      dind:
+        condition: service_healthy
+    networks: [runner-net]
+
+  dind:
+    image: docker:27-dind
+    container_name: pushci-dind
+    restart: unless-stopped
+    privileged: true  # dind needs this; contained inside its own net ns
+    environment:
+      # TODO: DOCKER_TLS_CERTDIR and mTLS between runner and dind.
+      DOCKER_TLS_CERTDIR: ""
+    command: ["dockerd", "--host=tcp://0.0.0.0:2375", "--host=unix:///var/run/docker.sock"]
+    healthcheck:
+      test: ["CMD", "docker", "info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - dind-data:/var/lib/docker
+    networks: [runner-net]
+
+networks:
+  runner-net:
+    driver: bridge
+    internal: false  # dind needs outbound to pull images
+
+volumes:
+  runner-work:
+  dind-data:

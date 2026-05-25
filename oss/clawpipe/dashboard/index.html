@@ -1,0 +1,2345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawPipe Dashboard</title>
+  <meta name="color-scheme" content="dark light">
+  <style>
+    /* === HeyGen Dark UI Foundation === */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #0d0d0d;
+      --bg-secondary: #141414;
+      --bg-tertiary: #1a1a1a;
+      --bg-elevated: #141414;
+      --bg-hover: #222222;
+      --fill-tertiary: rgba(120, 120, 128, 0.16);
+      --separator: #2a2a2a;
+      --separator-em: #333333;
+      --label-primary: #f0f0f0;
+      --label-secondary: #a0a0a0;
+      --label-tertiary: #666666;
+      --accent: #8b5cf6;
+      --accent-hover: #7c3aed;
+      --accent-glow: rgba(139, 92, 246, 0.15);
+      --green: #22c55e;
+      --orange: #f97316;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --tint: rgba(139, 92, 246, 0.15);
+      --font-mono: 'SF Mono', SFMono-Regular, 'Fira Code', Menlo, monospace;
+      --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 20px;
+      --t-fast: all 0.15s ease;
+      --t-spring: all 0.2s cubic-bezier(0.34, 1.3, 0.7, 1);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-primary: #f5f5f7; --bg-secondary: #ffffff; --bg-tertiary: #f0f0f2;
+        --bg-elevated: #ffffff; --bg-hover: #e8e8ec;
+        --fill-tertiary: rgba(120, 120, 128, 0.08);
+        --separator: #d4d4d8; --separator-em: #c0c0c4;
+        --label-primary: #1a1a1a; --label-secondary: #6b6b6b;
+        --label-tertiary: #a0a0a0;
+        --accent: #7c3aed; --accent-hover: #6d28d9;
+        --accent-glow: rgba(124, 58, 237, 0.08);
+        --green: #22c55e; --orange: #f97316; --red: #ef4444; --blue: #3b82f6;
+        --tint: rgba(124, 58, 237, 0.06);
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+      background: var(--bg-primary); color: var(--label-primary);
+      line-height: 1.47; -webkit-font-smoothing: antialiased;
+    }
+
+    /* === Header === */
+    .header {
+      padding: 14px 24px; border-bottom: 1px solid var(--separator);
+      display: flex; align-items: center; gap: 12px;
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+      position: sticky; top: 0; z-index: 10; background: rgba(13,13,13,0.85);
+    }
+    @media (prefers-color-scheme: light) { .header { background: rgba(245,245,247,0.85); } }
+    .header h1 { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; }
+    .header .logo-mark { color: var(--accent); }
+    .header .status { font-size: 12px; font-weight: 500; }
+    .header .status.ok { color: var(--green); }
+    .header .status.err { color: var(--red); }
+    .header .status.pending { color: var(--label-tertiary); }
+    .header .spacer { flex: 1; }
+    .header .disconnect {
+      font-size: 13px; color: var(--accent); cursor: pointer; background: none;
+      border: none; font-weight: 500; padding: 6px 12px; border-radius: 8px;
+    }
+    .header .disconnect:hover { background: var(--tint); }
+
+    /* === Setup form — HIG grouped form === */
+    .setup { max-width: 420px; margin: 100px auto; padding: 0 24px; }
+    .setup-card {
+      background: var(--bg-secondary); border-radius: 16px; padding: 32px;
+      border: 0.5px solid var(--separator);
+    }
+    .setup-card h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; text-align: center; margin-bottom: 4px; }
+    .setup-card .subtitle { font-size: 13px; color: var(--label-secondary); text-align: center; margin-bottom: 24px; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 13px; font-weight: 500; color: var(--label-secondary); margin-bottom: 4px; padding-left: 2px; }
+    .field input {
+      width: 100%; padding: 11px 14px; background: var(--bg-tertiary);
+      border: 0.5px solid var(--separator); border-radius: 10px;
+      color: var(--label-primary); font-size: 15px;
+      font-family: inherit; outline: none; transition: border-color 0.2s;
+    }
+    .field input:focus { border-color: var(--accent); }
+    .field input::placeholder { color: var(--label-tertiary); }
+    .setup-btn {
+      width: 100%; padding: 12px; background: var(--accent); color: #fff;
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+      cursor: pointer; margin-top: 8px; min-height: 44px;
+      font-family: inherit; transition: background 0.2s;
+    }
+    .setup-btn:hover { background: var(--accent-hover); }
+    .setup-btn:active { transform: scale(0.98); }
+
+    /* === Overview grid — HIG metric cards === */
+    .metrics {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px; padding: 20px 24px;
+    }
+    .metric-card {
+      background: var(--bg-secondary); border: 0.5px solid var(--separator);
+      border-radius: 14px; padding: 16px 18px;
+      transition: transform 0.2s ease;
+    }
+    .metric-card:hover { transform: translateY(-1px); }
+    .metric-card .label { font-size: 11px; font-weight: 600; color: var(--label-tertiary); text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+    .metric-card .sub { font-size: 11px; color: var(--label-tertiary); margin-top: 2px; }
+
+    /* === Chart cards === */
+    .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 24px 24px; }
+    .chart-card {
+      background: var(--bg-secondary); border: 0.5px solid var(--separator);
+      border-radius: 14px; padding: 18px 20px;
+    }
+    .chart-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 14px; color: var(--label-secondary); }
+
+    /* === Bar chart === */
+    .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+    .bar-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .bar-row .name { width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--label-secondary); font-variant-numeric: tabular-nums; }
+    .bar-row .bar { flex: 1; height: 22px; background: var(--fill-tertiary); border-radius: 6px; overflow: hidden; }
+    .bar-row .fill { height: 100%; border-radius: 6px; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+    .bar-row .fill.purple { background: var(--accent); }
+    .bar-row .fill.green { background: var(--green); }
+    .bar-row .val { width: 56px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; font-size: 12px; }
+
+    /* === Daily volume chart === */
+    .daily-row { display: flex; align-items: flex-end; gap: 3px; height: 110px; padding-top: 8px; }
+    .daily-bar {
+      flex: 1; background: var(--accent); border-radius: 3px 3px 0 0;
+      opacity: 0.6; min-height: 2px;
+      transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+    }
+    .daily-bar:hover { opacity: 1; }
+    .daily-labels { display: flex; gap: 3px; font-size: 9px; color: var(--label-tertiary); margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .daily-labels span { flex: 1; text-align: center; overflow: hidden; }
+
+    /* === Table === */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: var(--label-tertiary); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 0; border-bottom: 0.5px solid var(--separator); }
+    td { padding: 8px 0; border-bottom: 0.5px solid var(--separator); font-variant-numeric: tabular-nums; }
+    tr:last-child td { border-bottom: none; }
+
+    .hidden { display: none; }
+    .empty { color: var(--label-tertiary); font-size: 13px; text-align: center; padding: 32px 0; }
+
+    /* === Auth page === */
+    .auth-page { max-width: 380px; margin: 80px auto; padding: 0 24px; }
+    .auth-card {
+      background: var(--bg-secondary); border-radius: 16px; padding: 32px;
+      border: 0.5px solid var(--separator);
+    }
+    .auth-card h2 { font-size: 22px; font-weight: 700; text-align: center; letter-spacing: -0.3px; margin-bottom: 4px; }
+    .auth-card .subtitle { font-size: 13px; color: var(--label-secondary); text-align: center; margin-bottom: 24px; }
+    .auth-divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; font-size: 12px; color: var(--label-tertiary); }
+    .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 0.5px; background: var(--separator); }
+    .oauth-btns { display: flex; flex-direction: column; gap: 10px; }
+    .oauth-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 11px; background: var(--bg-tertiary); border: 0.5px solid var(--separator);
+      border-radius: 10px; font-size: 14px; font-weight: 500; color: var(--label-primary);
+      cursor: pointer; font-family: inherit; transition: background 0.2s; min-height: 44px;
+    }
+    .oauth-btn:hover { background: var(--fill-tertiary); }
+    .oauth-btn svg { width: 18px; height: 18px; }
+    .auth-toggle { text-align: center; margin-top: 16px; font-size: 13px; color: var(--label-secondary); }
+    .auth-toggle a { color: var(--accent); cursor: pointer; }
+    .auth-error { background: rgba(255,69,58,0.12); color: var(--red); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: none; }
+
+    /* === Project picker === */
+    .project-list { max-width: 480px; margin: 40px auto; padding: 0 24px; }
+    .project-list h2 { font-size: 22px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.3px; }
+    .project-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg-secondary); border: 0.5px solid var(--separator);
+      border-radius: 12px; padding: 16px 18px; margin-bottom: 8px; cursor: pointer;
+      transition: background 0.2s;
+    }
+    .project-item:hover { background: var(--tint); }
+    .project-item .pname { font-size: 15px; font-weight: 600; }
+    .project-item .pmeta { font-size: 12px; color: var(--label-tertiary); }
+    .create-project-btn {
+      width: 100%; padding: 12px; background: var(--accent); color: #fff; border: none;
+      border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
+      font-family: inherit; min-height: 44px; margin-top: 12px; transition: background 0.2s;
+    }
+    .create-project-btn:hover { background: var(--accent-hover); }
+
+    /* === Tab nav === */
+    .tab-nav {
+      display: flex; gap: 4px; padding: 0 24px; border-bottom: 0.5px solid var(--separator);
+      background: var(--bg-primary);
+    }
+    .tab-btn {
+      background: none; border: none; color: var(--label-secondary);
+      font-family: inherit; font-size: 13px; font-weight: 500;
+      padding: 12px 14px; cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -0.5px; transition: color 0.2s, border-color 0.2s;
+    }
+    .tab-btn:hover { color: var(--label-primary); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* === Logs view === */
+    .logs-toolbar {
+      display: flex; gap: 8px; align-items: center; padding: 16px 24px 8px;
+      flex-wrap: wrap;
+    }
+    .logs-toolbar select, .logs-toolbar button {
+      background: var(--bg-tertiary); color: var(--label-primary);
+      border: 0.5px solid var(--separator); border-radius: 8px;
+      font-family: inherit; font-size: 13px; padding: 7px 12px; cursor: pointer;
+      min-height: 32px;
+    }
+    .logs-toolbar button:hover { background: var(--fill-tertiary); }
+    .logs-toolbar .spacer { flex: 1; }
+    .logs-meta { font-size: 12px; color: var(--label-tertiary); font-variant-numeric: tabular-nums; }
+    .logs-table-wrap { padding: 0 24px 24px; }
+    .logs-table-wrap table { background: var(--bg-secondary); border-radius: 12px; padding: 4px 16px; border: 0.5px solid var(--separator); }
+    .logs-table-wrap th { padding: 12px 8px 10px; }
+    .logs-table-wrap td { padding: 10px 8px; }
+    .logs-table-wrap tr.log-row { cursor: pointer; transition: background 0.15s; }
+    .logs-table-wrap tr.log-row:hover { background: var(--tint); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px;
+      font-weight: 600; letter-spacing: 0.02em;
+    }
+    .badge.cached { background: rgba(48,209,88,0.15); color: var(--green); }
+    .badge.boosted { background: rgba(10,132,255,0.15); color: var(--blue); }
+    .badge.normal { background: var(--fill-tertiary); color: var(--label-secondary); }
+    .log-detail {
+      background: var(--bg-tertiary); border-radius: 8px; padding: 12px 14px;
+      margin: 4px 0; font-size: 12px; color: var(--label-secondary);
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      white-space: pre-wrap; word-break: break-all;
+    }
+    .log-detail .k { color: var(--label-tertiary); }
+    .pager { display: flex; gap: 8px; justify-content: center; padding: 16px 0 4px; }
+
+    @media (max-width: 768px) { .charts { grid-template-columns: 1fr; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--fill-tertiary); border-radius: 3px; }
+
+    /* === First-call tutorial modal === */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; z-index: 100; backdrop-filter: blur(6px);
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal-card {
+      background: var(--bg-secondary); border-radius: 16px; padding: 32px;
+      max-width: 580px; width: 100%; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+      border: 0.5px solid var(--separator);
+    }
+    .modal-card h2 { font-size: 22px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.3px; }
+    .modal-card h3 {
+      font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px;
+      color: var(--label-secondary); margin: 24px 0 8px; font-weight: 600;
+    }
+    .modal-actions {
+      display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px;
+    }
+    .setup-btn-secondary {
+      background: transparent; border: 0.5px solid var(--separator);
+      color: var(--label-primary); padding: 12px 20px; border-radius: 10px;
+      cursor: pointer; font-size: 15px; font-weight: 500;
+      font-family: inherit; min-height: 44px;
+    }
+    .setup-btn-secondary:hover { background: var(--fill-tertiary); }
+    .api-key-box {
+      display: flex; align-items: center; gap: 8px; margin-top: 10px;
+      background: var(--bg-primary); border: 0.5px solid var(--separator);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .api-key-box code {
+      flex: 1; font-family: var(--font-mono); font-size: 13px;
+      color: var(--label-primary); word-break: break-all;
+    }
+    .copy-btn {
+      background: var(--accent); color: #fff; border: none;
+      padding: 8px 14px; border-radius: 8px; cursor: pointer;
+      font-size: 13px; font-weight: 600; font-family: inherit;
+      white-space: nowrap; min-height: 32px;
+    }
+    .copy-btn:hover { background: var(--accent-hover); }
+    .snippet-tabs { display: flex; gap: 2px; margin-bottom: 0; }
+    .snip-tab {
+      background: transparent; border: none; padding: 8px 14px;
+      color: var(--label-secondary); cursor: pointer; font-family: inherit;
+      font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent;
+    }
+    .snip-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .snip-tab:hover { color: var(--label-primary); }
+    .snippet {
+      background: var(--bg-primary); border-radius: 10px; padding: 14px 16px;
+      font-family: var(--font-mono); font-size: 12px; color: var(--label-primary);
+      overflow-x: auto; white-space: pre; line-height: 1.55;
+      border: 0.5px solid var(--separator);
+    }
+    .first-call-status {
+      margin-top: 14px; padding: 12px 14px; background: var(--tint);
+      border-radius: 10px; font-size: 13px; color: var(--label-primary);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .first-call-status.done {
+      background: rgba(52,199,89,0.15); color: var(--green);
+    }
+    .pulse {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+      animation: fc-pulse 1.4s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes fc-pulse {
+      0%, 100% { opacity: 0.4; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); }
+    }
+
+    /* === Empty state card === */
+    .empty-state {
+      background: var(--bg-secondary); border: 0.5px solid var(--separator);
+      border-radius: 16px; padding: 28px 32px; margin-bottom: 24px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .empty-state h2 {
+      font-size: 20px; font-weight: 700; margin-bottom: 6px; letter-spacing: -0.3px;
+    }
+    .empty-state .subtitle {
+      font-size: 14px; color: var(--label-secondary); margin-bottom: 18px;
+    }
+    .empty-state .snippet-tabs { margin-top: 8px; }
+    .empty-state .rotate-prompt {
+      margin-top: 14px; padding: 14px 16px; background: var(--tint);
+      border-radius: 10px; font-size: 13px; color: var(--label-primary);
+    }
+    .empty-state .rotate-prompt button {
+      margin-top: 10px; background: var(--accent); color: #fff; border: none;
+      padding: 10px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 13px; font-weight: 600; font-family: inherit; min-height: 36px;
+    }
+    .empty-state .rotate-prompt button:hover { background: var(--accent-hover); }
+
+    /* === Usage banner (warn at >=80%) === */
+    .usage-banner {
+      background: rgba(255,159,10,0.12); border: 0.5px solid rgba(255,159,10,0.4);
+      border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 12px; font-size: 13px;
+      color: var(--label-primary);
+    }
+    .usage-banner.hit { background: rgba(255,69,58,0.12); border-color: rgba(255,69,58,0.4); }
+    .usage-banner strong { font-weight: 600; }
+    .usage-banner a {
+      margin-left: auto; color: var(--accent); text-decoration: none; font-weight: 600;
+    }
+    .usage-banner a:hover { text-decoration: underline; }
+
+    /* === Page header (prompts / weights tabs) === */
+    .page-head {
+      padding: 20px 24px 0; display: flex; align-items: flex-start;
+      justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+    }
+    .page-head h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .page-head p.subtitle { font-size: 13px; color: var(--label-secondary); margin-top: 2px; }
+    .page-head .setup-btn { flex-shrink: 0; padding: 9px 18px; font-size: 13px; min-height: 36px; }
+
+    /* === Generic content card === */
+    .card {
+      background: var(--bg-secondary); border: 0.5px solid var(--separator);
+      border-radius: 14px; padding: 16px 20px; margin: 0 24px 24px;
+    }
+    .card label { display: block; font-size: 13px; font-weight: 500; color: var(--label-secondary); margin-bottom: 6px; }
+    .card input, .card textarea {
+      width: 100%; padding: 9px 12px; background: var(--bg-tertiary);
+      border: 0.5px solid var(--separator); border-radius: 8px;
+      color: var(--label-primary); font-size: 14px; font-family: inherit;
+      outline: none; transition: border-color 0.2s; resize: vertical;
+    }
+    .card input:focus, .card textarea:focus { border-color: var(--accent); }
+    .card > div { margin-bottom: 10px; }
+    .card > div:last-child { margin-bottom: 0; }
+
+    /* === Dialog (HIG-aligned) === */
+    dialog {
+      border-radius: 14px;
+      border: 0.5px solid var(--separator);
+      background: var(--bg-secondary);
+      color: var(--label-primary);
+      padding: 24px;
+      min-width: 420px;
+      max-width: 600px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.45); backdrop-filter: blur(6px); }
+    dialog h3 { font-size: 17px; font-weight: 600; margin: 0 0 16px; letter-spacing: -0.2px; }
+    dialog .dialog-body { display: flex; flex-direction: column; gap: 12px; }
+    dialog label { font-size: 13px; color: var(--label-secondary); font-weight: 500; display: block; margin-bottom: 4px; }
+    dialog input, dialog textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-tertiary);
+      border: 0.5px solid var(--separator);
+      border-radius: 10px;
+      color: var(--label-primary);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    dialog textarea { font-family: var(--font-mono); resize: vertical; }
+    dialog input:focus, dialog textarea:focus { border-color: var(--accent); }
+    dialog .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    /* === Logs pager buttons === */
+    .pager button {
+      background: var(--bg-tertiary); color: var(--label-primary);
+      border: 0.5px solid var(--separator); border-radius: 8px;
+      font-family: inherit; font-size: 13px; padding: 7px 16px;
+      cursor: pointer; min-height: 32px; transition: background 0.15s;
+    }
+    .pager button:hover:not(:disabled) { background: var(--fill-tertiary); }
+    .pager button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* HIG accessibility: visible focus rings (overrides outline:none on inputs/buttons). */
+    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible,
+    [role="tab"]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 6px;
+    }
+    /* Skip-to-content link for keyboard users. */
+    .skip-link {
+      position: absolute; top: -100px; left: 0; padding: 8px 16px;
+      background: var(--accent); color: #fff; font-weight: 600; z-index: 9999;
+      border-radius: 0 0 8px 0;
+    }
+    .skip-link:focus { top: 0; }
+    /* Forced-colors mode for high-contrast displays. */
+    @media (forced-colors: active) {
+      .tab-btn[aria-selected="true"] { border: 2px solid CanvasText; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="header" role="banner">
+    <h1><span class="logo-mark">ClawPipe</span> Dashboard</h1>
+    <span class="status pending" id="status">Connecting...</span>
+    <div class="spacer"></div>
+    <button class="disconnect hidden" id="disconnect-btn" onclick="disconnect()">Disconnect</button>
+  </header>
+
+  <div id="main-content" tabindex="-1" style="outline:none;"></div>
+
+  <!-- Auth Screen -->
+  <div id="auth-page" class="auth-page" role="main">
+    <div class="auth-card">
+      <h2 id="auth-title">Sign In</h2>
+      <p class="subtitle" id="auth-subtitle">Access your ClawPipe dashboard</p>
+      <div class="auth-error" id="auth-error"></div>
+      <div class="oauth-btns hidden" id="oauth-btns">
+        <button class="oauth-btn hidden" id="oauth-btn-google" onclick="oauthLogin('google')">
+          <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Continue with Google
+        </button>
+        <button class="oauth-btn hidden" id="oauth-btn-github" onclick="oauthLogin('github')">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+          Continue with GitHub
+        </button>
+        <button class="oauth-btn hidden" id="oauth-btn-oidc" onclick="oauthLogin('oidc')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2l9 4v6c0 5-4 9-9 10-5-1-9-5-9-10V6l9-4z"/></svg>
+          Continue with SSO
+        </button>
+      </div>
+      <div class="auth-divider hidden" id="auth-divider">or</div>
+      <form id="auth-form" onsubmit="handleAuth(event)">
+        <div class="field" id="name-field" class="hidden">
+          <label for="auth-name">Name</label>
+          <input id="auth-name" placeholder="Your name">
+        </div>
+        <div class="field">
+          <label for="auth-email">Email</label>
+          <input id="auth-email" type="email" placeholder="you@example.com" required>
+        </div>
+        <div class="field">
+          <label for="auth-password">Password</label>
+          <input id="auth-password" type="password" placeholder="Min 8 characters" required minlength="8">
+        </div>
+        <button type="submit" class="setup-btn" id="auth-submit-btn">Sign In</button>
+      </form>
+      <div class="auth-toggle">
+        <span id="auth-toggle-text">No account?</span> <a onclick="toggleAuthMode()" id="auth-toggle-link">Sign up</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Project Picker -->
+  <div id="project-page" class="project-list hidden" role="main">
+    <h2>Your Projects</h2>
+    <div id="finops-summary" class="hidden" style="background:var(--bg-secondary);border:0.5px solid var(--separator);border-radius:12px;padding:16px 18px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--label-tertiary);text-transform:uppercase;letter-spacing:0.04em;">Total spend this month</div>
+          <div id="finops-total" style="font-size:24px;font-weight:700;letter-spacing:-0.3px;font-variant-numeric:tabular-nums;">$0.00</div>
+        </div>
+        <div style="flex:1;min-width:200px;">
+          <div id="finops-meta" style="font-size:13px;color:var(--label-secondary);"></div>
+        </div>
+        <button type="button" class="setup-btn-secondary" onclick="$('finops-details').classList.toggle('hidden')">Toggle breakdown</button>
+      </div>
+      <div id="finops-details" class="hidden" style="margin-top:14px;border-top:0.5px solid var(--separator);padding-top:14px;">
+        <table id="finops-table" style="width:100%;font-size:13px"></table>
+      </div>
+    </div>
+    <div id="project-list"></div>
+    <button class="create-project-btn" onclick="createProject()">Create New Project</button>
+  </div>
+
+  <!-- First-call tutorial modal -->
+  <div id="first-call-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="fc-title">
+    <div class="modal-card">
+      <div id="fc-stage-name">
+        <h2 id="fc-title">Create your project</h2>
+        <p class="subtitle">Give it a name. You can rename it later.</p>
+        <div class="field">
+          <label for="fc-name">Project name</label>
+          <input id="fc-name" type="text" placeholder="my-app" autocomplete="off">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="setup-btn-secondary" onclick="closeFirstCallModal()">Cancel</button>
+          <button type="button" class="setup-btn" onclick="submitFirstCallName()">Create</button>
+        </div>
+      </div>
+      <div id="fc-stage-key" class="hidden">
+        <h2>Project created ✓</h2>
+        <p class="subtitle">Copy your API key now. <strong>This is the only time it will be shown in full.</strong></p>
+        <h3>Your API key</h3>
+        <div class="api-key-box">
+          <code id="fc-api-key"></code>
+          <button type="button" class="copy-btn" onclick="copyFirstCallKey()">Copy</button>
+        </div>
+        <h3>Your first call</h3>
+        <div class="snippet-tabs">
+          <button type="button" class="snip-tab active" onclick="switchSnippet('curl')">curl</button>
+          <button type="button" class="snip-tab" onclick="switchSnippet('node')">Node.js</button>
+          <button type="button" class="snip-tab" onclick="switchSnippet('python')">Python</button>
+        </div>
+        <pre class="snippet" id="fc-snippet"></pre>
+        <div class="first-call-status" id="fc-waiting">
+          <span class="pulse"></span> Waiting for your first call...
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="setup-btn" onclick="closeFirstCallModal()">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rate-limit upgrade modal -->
+  <div id="rate-limit-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="rl-title">
+    <div class="modal-card">
+      <h2 id="rl-title">Daily limit reached</h2>
+      <p class="subtitle" id="rl-body">You've used all requests on your plan today. Upgrade to keep shipping.</p>
+      <h3>What happens now</h3>
+      <p class="subtitle">Further calls from your app will be blocked until midnight UTC. Upgrade unlocks your project immediately — no downtime.</p>
+      <div class="modal-actions">
+        <button type="button" class="setup-btn-secondary" onclick="closeRateLimitModal()">Dismiss</button>
+        <button type="button" class="setup-btn" onclick="openUpgrade()">See upgrade options</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="dashboard" class="hidden" role="main">
+    <nav class="tab-nav" role="tablist" aria-label="Dashboard sections">
+      <button class="tab-btn active" role="tab" aria-selected="true" id="tab-analytics" onclick="switchTab('analytics')">Analytics</button>
+      <button class="tab-btn" role="tab" aria-selected="false" id="tab-weights" onclick="switchTab('weights')">Router Weights</button>
+      <button class="tab-btn" role="tab" aria-selected="false" id="tab-prompts" onclick="switchTab('prompts')">Prompts</button>
+      <button class="tab-btn" role="tab" aria-selected="false" id="tab-logs" onclick="switchTab('logs')">Request Logs</button>
+      <button class="tab-btn" role="tab" aria-selected="false" id="tab-quality" onclick="switchTab('quality')">Quality</button>
+      <button class="tab-btn" role="tab" aria-selected="false" id="tab-finops-user" onclick="switchTab('finops-user')">FinOps by User</button>
+      <button class="tab-btn" role="tab" aria-selected="false" id="tab-settings" onclick="switchTab('settings')">Settings</button>
+    </nav>
+    <div id="view-prompts" class="hidden" role="tabpanel" aria-labelledby="tab-prompts">
+      <div class="page-head">
+        <h2>Prompt store</h2>
+        <p class="subtitle">Named templates with {{variables}}. Click a row to see version history.</p>
+        <button type="button" class="setup-btn" onclick="$('dialog-new-prompt').showModal()">New prompt</button>
+      </div>
+      <div id="prompts-list" class="card"></div>
+    </div>
+
+    <dialog id="dialog-new-prompt">
+      <h3>New prompt</h3>
+      <div class="dialog-body">
+        <div><label for="np-name">Name</label><input id="np-name" type="text" placeholder="customer-reply"></div>
+        <div><label for="np-desc">Description</label><input id="np-desc" type="text" placeholder="optional"></div>
+        <div><label for="np-tpl">Template</label><textarea id="np-tpl" rows="6" placeholder="Hello {{name}}, your order {{order_id}} ships tomorrow."></textarea></div>
+        <div><label for="np-sys">System (optional)</label><textarea id="np-sys" rows="2"></textarea></div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="setup-btn-secondary" onclick="$('dialog-new-prompt').close()">Cancel</button>
+        <button type="button" class="setup-btn" onclick="createPromptSubmit()">Create</button>
+      </div>
+    </dialog>
+
+    <dialog id="dialog-new-version">
+      <h3>New version</h3>
+      <input type="hidden" id="nv-prompt-id">
+      <div class="dialog-body">
+        <div><label for="nv-tpl">Template</label><textarea id="nv-tpl" rows="8"></textarea></div>
+        <div><label for="nv-notes">Notes</label><input id="nv-notes" type="text" placeholder="What changed?"></div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="setup-btn-secondary" onclick="$('dialog-new-version').close()">Cancel</button>
+        <button type="button" class="setup-btn" onclick="createVersionSubmit()">Save version</button>
+      </div>
+    </dialog>
+    <div id="view-weights" class="hidden" role="tabpanel" aria-labelledby="tab-weights">
+      <div class="page-head">
+        <h2>Learned router weights</h2>
+        <p class="subtitle">Updated from real request outcomes. Higher score = router prefers this provider for the task.</p>
+      </div>
+      <div id="weights-table" class="card"></div>
+    </div>
+
+    <div id="view-analytics" role="tabpanel" aria-labelledby="tab-analytics">
+      <div class="usage-banner hidden" id="usage-banner" role="status" aria-live="polite"></div>
+      <div class="empty-state hidden" id="empty-state" aria-live="polite">
+        <h2>Make your first call</h2>
+        <p class="subtitle">Your dashboard lights up the moment a request lands. Here's how to send one.</p>
+        <div class="snippet-tabs">
+          <button type="button" class="snip-tab active" data-es-tab onclick="switchEmptySnippet('curl')">curl</button>
+          <button type="button" class="snip-tab" data-es-tab onclick="switchEmptySnippet('node')">Node.js</button>
+          <button type="button" class="snip-tab" data-es-tab onclick="switchEmptySnippet('python')">Python</button>
+        </div>
+        <pre class="snippet" id="es-snippet"></pre>
+        <div class="rotate-prompt hidden" id="es-rotate">
+          Need a fresh API key? Rotating generates a new key and invalidates the old one.
+          <div><button type="button" onclick="rotateEmptyStateKey()">Rotate API key</button></div>
+        </div>
+      </div>
+      <div class="metrics" id="overview-grid"></div>
+      <div class="charts">
+        <div class="chart-card">
+          <h3>Provider Breakdown</h3>
+          <div id="provider-chart" class="bar-chart"></div>
+        </div>
+        <div class="chart-card">
+          <h3>Daily Request Volume</h3>
+          <div id="daily-chart"></div>
+        </div>
+        <div class="chart-card">
+          <h3>Cache Performance</h3>
+          <div id="cache-chart" class="bar-chart"></div>
+        </div>
+        <div class="chart-card">
+          <h3>Routing Decisions</h3>
+          <div id="route-table"></div>
+        </div>
+        <div class="chart-card">
+          <h3>Cost Trend (last 30 days)</h3>
+          <div id="cost-trend"></div>
+        </div>
+        <div class="chart-card">
+          <h3>Savings by Bucket</h3>
+          <div id="savings-table"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-logs" class="hidden" role="tabpanel" aria-labelledby="tab-logs">
+      <div class="logs-toolbar">
+        <select id="logs-filter" onchange="loadLogs(0)" aria-label="Filter logs">
+          <option value="all">All requests</option>
+          <option value="cached">Cached only</option>
+          <option value="boosted">Boosted only</option>
+          <option value="normal">Normal only</option>
+        </select>
+        <button type="button" onclick="loadLogs(logsState.offset)" aria-label="Refresh logs">Refresh</button>
+        <div class="spacer"></div>
+        <span class="logs-meta" id="logs-meta"></span>
+      </div>
+      <div class="logs-table-wrap">
+        <div id="logs-table"></div>
+        <div class="pager" id="logs-pager"></div>
+      </div>
+    </div>
+
+    <div id="view-quality" class="hidden" role="tabpanel" aria-labelledby="tab-quality">
+      <div class="page-head">
+        <h2>Quality Trends</h2>
+        <p class="subtitle">LLM-as-judge scores per model — 30-day rolling window.</p>
+      </div>
+      <div class="charts">
+        <div class="chart-card" style="grid-column:1/-1">
+          <h3>Avg Quality Score by Model</h3>
+          <div id="quality-chart" style="height:200px"></div>
+        </div>
+      </div>
+      <div style="padding:0 24px 24px">
+        <table id="quality-table" style="width:100%;border-collapse:collapse;font-size:13px"></table>
+      </div>
+    </div>
+
+    <div id="view-finops-user" class="hidden" role="tabpanel" aria-labelledby="tab-finops-user">
+      <div class="page-head">
+        <h2>FinOps by User</h2>
+        <p class="subtitle">Cost attribution for API keys bound to project members. Keys not bound to a member appear as Unattributed.</p>
+      </div>
+      <div style="padding:0 24px 8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <label for="finops-user-from" style="font-size:13px;color:var(--label-secondary);">From</label>
+        <input id="finops-user-from" type="date" style="font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--separator);background:var(--bg-secondary);color:var(--label-primary);">
+        <label for="finops-user-to" style="font-size:13px;color:var(--label-secondary);">To</label>
+        <input id="finops-user-to" type="date" style="font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--separator);background:var(--bg-secondary);color:var(--label-primary);">
+        <button type="button" class="setup-btn-secondary" onclick="loadFinopsByUser()">Refresh</button>
+      </div>
+      <div class="logs-table-wrap">
+        <table id="finops-user-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr>
+            <th style="text-align:left;padding:10px 8px;">User</th>
+            <th style="text-align:left;padding:10px 8px;">Email</th>
+            <th style="text-align:right;padding:10px 8px;">Requests</th>
+            <th style="text-align:right;padding:10px 8px;">Total cost</th>
+            <th style="text-align:left;padding:10px 8px;">Top models</th>
+          </tr></thead>
+          <tbody id="finops-user-tbody"></tbody>
+        </table>
+        <p id="finops-user-empty" class="hidden" style="padding:16px 8px;color:var(--label-tertiary);font-size:13px;">No data for this range.</p>
+      </div>
+    </div>
+
+    <div id="view-settings" class="hidden" role="tabpanel" aria-labelledby="tab-settings">
+      <div class="page-head">
+        <h2>Project settings</h2>
+        <p class="subtitle">Slack digests and monthly budget caps for this project.</p>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <h3 style="font-size:15px;font-weight:600;">Slack weekly digest</h3>
+          <span id="slack-status-chip" class="badge normal" style="font-size:11px;">Not configured</span>
+        </div>
+        <p class="subtitle" style="margin-bottom:12px;">Post a weekly cost summary to your Slack channel every Monday at 09:00 UTC.</p>
+        <label for="slack-webhook-input">Webhook URL</label>
+        <input id="slack-webhook-input" type="url" placeholder="https://hooks.slack.com/services/T.../B.../..." autocomplete="off">
+        <p class="subtitle" style="margin:6px 0 12px;font-size:12px;">Create in Slack: <em>Incoming Webhooks</em> app → pick channel → paste URL above.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="setup-btn" style="flex:1;min-width:140px;" onclick="saveSlackWebhook()">Save</button>
+          <button type="button" class="setup-btn-secondary" onclick="clearSlackWebhook()">Remove</button>
+          <button type="button" class="setup-btn-secondary" onclick="sendTestDigest()">Send test digest</button>
+        </div>
+        <div id="slack-feedback" class="subtitle" style="margin-top:10px;min-height:18px;"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <h3 style="font-size:15px;font-weight:600;">Microsoft Teams digest</h3>
+          <span id="teams-status-chip" class="badge normal" style="font-size:11px;">Not configured</span>
+        </div>
+        <p class="subtitle" style="margin-bottom:12px;">Post a weekly cost summary to a Teams channel every Monday at 09:00 UTC.</p>
+        <label for="teams-webhook-input">Incoming Webhook URL</label>
+        <input id="teams-webhook-input" type="url" placeholder="https://contoso.webhook.office.com/webhookb2/..." autocomplete="off">
+        <p class="subtitle" style="margin:6px 0 12px;font-size:12px;">In Teams: channel → Connectors → Incoming Webhook → paste URL above.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="setup-btn" style="flex:1;min-width:140px;" onclick="saveTeamsWebhook()">Save</button>
+          <button type="button" class="setup-btn-secondary" onclick="clearTeamsWebhook()">Remove</button>
+          <button type="button" class="setup-btn-secondary" onclick="sendTestTeamsDigest()">Send test digest</button>
+        </div>
+        <div id="teams-feedback" class="subtitle" style="margin-top:10px;min-height:18px;"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <h3 style="font-size:15px;font-weight:600;">Email digest</h3>
+          <span id="email-status-chip" class="badge normal" style="font-size:11px;">Not configured</span>
+        </div>
+        <p class="subtitle" style="margin-bottom:6px;">Weekly HTML summary delivered to a single address. Same schedule as Slack.</p>
+        <p class="subtitle" id="email-domain-line" style="margin-bottom:12px;font-size:12px;color:var(--label-tertiary);"></p>
+        <label for="digest-email-input">Recipient email</label>
+        <input id="digest-email-input" type="email" placeholder="finance@acme.com" autocomplete="off">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+          <button type="button" class="setup-btn" style="flex:1;min-width:140px;" onclick="saveDigestEmail()">Save</button>
+          <button type="button" class="setup-btn-secondary" onclick="clearDigestEmail()">Remove</button>
+          <button type="button" class="setup-btn-secondary" onclick="sendTestEmail()">Send test email</button>
+        </div>
+        <div id="email-feedback" class="subtitle" style="margin-top:10px;min-height:18px;"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <h3 style="font-size:15px;font-weight:600;">Monthly budget cap</h3>
+          <span id="budget-status-chip" class="badge normal" style="font-size:11px;">No cap set</span>
+        </div>
+        <p class="subtitle" style="margin-bottom:12px;">Hard-stop requests when spend exceeds the cap. Alerts fire to Slack + email at 50%, 80%, 100%.</p>
+        <label for="budget-input">Cap (USD / month)</label>
+        <input id="budget-input" type="number" min="0" step="1" placeholder="e.g. 500">
+        <p class="subtitle" style="margin:6px 0 12px;font-size:12px;">Leave blank to remove the cap.</p>
+        <button type="button" class="setup-btn" style="min-width:140px;" onclick="saveBudget()">Save cap</button>
+        <div id="budget-feedback" class="subtitle" style="margin-top:10px;min-height:18px;"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <h3 style="font-size:15px;font-weight:600;">Team</h3>
+          <span id="team-status-chip" class="badge normal" style="font-size:11px;">Unlinked</span>
+        </div>
+        <p class="subtitle" style="margin-bottom:12px;">Link this project to a team to enforce a shared budget across all team projects.</p>
+        <label for="team-select">Linked team</label>
+        <select id="team-select"><option value="">— None —</option></select>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+          <button type="button" class="setup-btn" style="flex:1;min-width:140px;" onclick="linkProjectToTeam()">Link</button>
+          <button type="button" class="setup-btn-secondary" onclick="openCreateTeam()">Create new team</button>
+        </div>
+        <div id="team-budget-controls" class="hidden" style="margin-top:14px;padding-top:14px;border-top:0.5px solid var(--separator);">
+          <label for="team-budget-input">Team monthly cap (USD)</label>
+          <input id="team-budget-input" type="number" min="0" step="1" placeholder="e.g. 5000">
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button type="button" class="setup-btn" onclick="saveTeamBudget()">Save team cap</button>
+          </div>
+          <div id="team-budget-status" class="subtitle" style="margin-top:8px;font-size:12px;"></div>
+          <div style="margin-top:14px;padding-top:14px;border-top:0.5px solid var(--separator);">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <div style="font-size:12px;font-weight:600;color:var(--label-tertiary);text-transform:uppercase;letter-spacing:0.04em;">Team members</div>
+            </div>
+            <div id="team-members-list" class="subtitle" style="font-size:13px;"></div>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <input id="team-add-email" type="email" placeholder="teammate@acme.com" style="flex:1;">
+              <select id="team-add-role" style="padding:8px 10px;background:var(--bg-tertiary);border:0.5px solid var(--separator);border-radius:8px;color:var(--label-primary);font-size:13px;">
+                <option value="member">member</option><option value="admin">admin</option>
+              </select>
+              <button type="button" class="setup-btn-secondary" onclick="addTeamMember()">Add</button>
+            </div>
+          </div>
+        </div>
+        <div id="team-feedback" class="subtitle" style="margin-top:10px;min-height:18px;"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <h3 style="font-size:15px;font-weight:600;">Project members</h3>
+        </div>
+        <p class="subtitle" style="margin-bottom:12px;">Current access. Admins can change roles and remove members.</p>
+        <div id="members-list" class="subtitle" style="font-size:13px;"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <h3 style="font-size:15px;font-weight:600;">Invite teammates</h3>
+        </div>
+        <p class="subtitle" style="margin-bottom:12px;">Invite finance or engineering teammates to this project. They receive an email with an accept link.</p>
+        <label for="invite-email">Email</label>
+        <input id="invite-email" type="email" placeholder="teammate@acme.com">
+        <label for="invite-role" style="margin-top:10px;">Role</label>
+        <select id="invite-role"><option value="member">Member (view)</option><option value="admin">Admin (manage)</option></select>
+        <button type="button" class="setup-btn" style="margin-top:12px;" onclick="sendInvite()">Send invite</button>
+        <div id="invite-feedback" class="subtitle" style="margin-top:10px;min-height:18px;"></div>
+        <div id="invite-list" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <h3 style="font-size:15px;font-weight:600;">Provider API keys</h3>
+        </div>
+        <p class="subtitle" style="margin-bottom:12px;">Paste your OpenAI / Anthropic / DeepSeek keys. ClawPipe encrypts them at rest with AES-256-GCM and uses them for every request from this project.</p>
+        <div id="provider-keys-list" style="margin-bottom:12px;font-size:13px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;">
+            <label for="pk-provider-select" style="font-size:12px;color:var(--label-secondary);">Provider</label>
+            <select id="pk-provider-select" style="padding:8px 10px;background:var(--bg-tertiary);border:0.5px solid var(--separator);border-radius:8px;color:var(--label-primary);font-size:13px;">
+              <option value="openai">openai</option>
+              <option value="anthropic">anthropic</option>
+              <option value="deepseek">deepseek</option>
+              <option value="groq">groq</option>
+              <option value="gemini">gemini</option>
+              <option value="mistral">mistral</option>
+              <option value="together">together</option>
+              <option value="fireworks">fireworks</option>
+              <option value="openrouter">openrouter</option>
+              <option value="perplexity">perplexity</option>
+              <option value="cohere">cohere</option>
+              <option value="ai21">ai21</option>
+              <option value="cerebras">cerebras</option>
+              <option value="replicate">replicate</option>
+              <option value="huggingface">huggingface</option>
+              <option value="writer">writer</option>
+              <option value="databricks">databricks</option>
+              <option value="azure-openai">azure-openai</option>
+              <option value="xai">xai</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px;flex:2;min-width:180px;">
+            <label for="pk-value-input" style="font-size:12px;color:var(--label-secondary);">API key</label>
+            <input id="pk-value-input" type="password" placeholder="sk-…" autocomplete="off" style="font-family:monospace;">
+          </div>
+          <button type="button" class="setup-btn" onclick="saveProviderKey()">Save</button>
+        </div>
+        <div id="pk-feedback" class="subtitle" style="margin-top:10px;min-height:18px;"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <h3 style="font-size:15px;font-weight:600;">Export request data</h3>
+        </div>
+        <p class="subtitle" style="margin-bottom:12px;">Download a CSV of the last 30 days for finance systems.</p>
+        <button type="button" class="setup-btn-secondary" onclick="downloadCsvExport()">Download CSV (last 30 days)</button>
+      </div>
+
+      <!-- T09: Audit log — Enterprise tier.
+           TODO(follow-up): hard-gate this section behind tier check once
+           the project tier field is surfaced from GET /v1/projects/:id/settings.
+           For now the section is always visible with an "Enterprise" pill as copy. -->
+      <div class="card" id="audit-log-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+          <h3 style="font-size:15px;font-weight:600;">Audit log</h3>
+          <span class="badge" style="background:rgba(139,92,246,0.18);color:#a78bfa;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;">Enterprise</span>
+        </div>
+        <p class="subtitle" style="margin-bottom:12px;">Available on Enterprise. Full tamper-evident history of admin actions: logins, key rotations, budget changes, and member joins.</p>
+        <div id="audit-table-wrap">
+          <table style="width:100%;font-size:12px;">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding-bottom:6px;color:var(--label-tertiary);font-weight:500;">Time</th>
+                <th style="text-align:left;padding-bottom:6px;color:var(--label-tertiary);font-weight:500;">Action</th>
+                <th style="text-align:left;padding-bottom:6px;color:var(--label-tertiary);font-weight:500;">Actor</th>
+                <th style="text-align:left;padding-bottom:6px;color:var(--label-tertiary);font-weight:500;">Target</th>
+              </tr>
+            </thead>
+            <tbody id="audit-events-tbody">
+              <tr><td colspan="4" style="color:var(--label-tertiary);padding:12px 0;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center;">
+          <button type="button" class="setup-btn-secondary" onclick="loadAuditEvents()">Refresh</button>
+          <button type="button" class="setup-btn-secondary" id="audit-next-btn" style="display:none;" onclick="loadAuditEventsNext()">Load more</button>
+          <span id="audit-feedback" class="subtitle" style="font-size:12px;"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="invite-page" class="auth-page hidden" role="main">
+    <div class="auth-card">
+      <h2>You've been invited</h2>
+      <p class="subtitle" id="invite-project-line">Loading invitation…</p>
+      <div class="auth-error" id="invite-error"></div>
+      <button type="button" class="setup-btn" id="invite-accept-btn" style="margin-top:16px;display:none;" onclick="acceptInvite()">Accept invite</button>
+      <p class="subtitle" id="invite-login-hint" style="margin-top:12px;display:none;">You need to be signed in as the invited email to accept. <a id="invite-goto-login" style="color:var(--accent);cursor:pointer">Go to sign in</a>.</p>
+    </div>
+  </div>
+
+  <dialog id="dialog-new-team">
+    <h3>Create team</h3>
+    <div class="dialog-body">
+      <div><label for="nt-name">Team name</label><input id="nt-name" type="text" placeholder="Growth team"></div>
+    </div>
+    <div class="dialog-actions">
+      <button type="button" class="setup-btn-secondary" onclick="$('dialog-new-team').close()">Cancel</button>
+      <button type="button" class="setup-btn" onclick="createTeamSubmit()">Create</button>
+    </div>
+  </dialog>
+
+  <script>
+    const API_URL = 'https://api.clawpipe.ai';
+    let config = { url: API_URL, apiKey: '', projectId: '' };
+    let authMode = 'login';
+    const $ = (id) => document.getElementById(id);
+
+    function authHeaders() { return { 'Content-Type': 'application/json' }; }
+    function apiHeaders() { return { 'Authorization': `Bearer ${config.apiKey}`, 'X-Project-Id': config.projectId }; }
+    async function api(path) {
+      const res = await fetch(`${config.url}${path}`, { headers: apiHeaders() });
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      return res.json();
+    }
+    async function authApi(path, body) {
+      const res = await fetch(`${API_URL}${path}`, {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify(body), credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Auth failed');
+      return data;
+    }
+    function setStatus(text, cls) { const el = $('status'); el.textContent = text; el.className = 'status ' + cls; }
+    function showView(view) {
+      ['auth-page', 'project-page', 'dashboard', 'invite-page'].forEach(v => $(v).classList.add('hidden'));
+      $(view).classList.remove('hidden');
+      $('disconnect-btn').classList.toggle('hidden', view === 'auth-page' || view === 'invite-page');
+    }
+
+    // Auth
+    function toggleAuthMode() {
+      authMode = authMode === 'login' ? 'register' : 'login';
+      $('auth-title').textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
+      $('auth-subtitle').textContent = authMode === 'login' ? 'Access your ClawPipe dashboard' : 'Start optimizing your AI costs';
+      $('auth-submit-btn').textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
+      $('auth-toggle-text').textContent = authMode === 'login' ? 'No account?' : 'Already have an account?';
+      $('auth-toggle-link').textContent = authMode === 'login' ? 'Sign up' : 'Sign in';
+      $('name-field').style.display = authMode === 'register' ? 'block' : 'none';
+      $('auth-error').style.display = 'none';
+    }
+    async function handleAuth(e) {
+      e.preventDefault();
+      const email = $('auth-email').value;
+      const password = $('auth-password').value;
+      const name = $('auth-name').value;
+      try {
+        $('auth-error').style.display = 'none';
+        const endpoint = authMode === 'login' ? '/auth/login' : '/auth/register';
+        const body = authMode === 'login' ? { email, password } : { email, password, name };
+        const data = await authApi(endpoint, body);
+        localStorage.setItem('clawpipe-user', JSON.stringify(data.user));
+        setStatus(data.user.name || data.user.email, 'ok');
+        await loadProjects();
+      } catch (err) {
+        $('auth-error').textContent = err.message;
+        $('auth-error').style.display = 'block';
+      }
+    }
+    function oauthLogin(provider) { window.location.href = `${API_URL}/auth/${provider}`; }
+    async function logout() {
+      await fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
+      localStorage.removeItem('clawpipe-user');
+      localStorage.removeItem('clawpipe-config');
+      config = { url: API_URL, apiKey: '', projectId: '' };
+      showView('auth-page');
+      setStatus('Signed out', 'pending');
+    }
+    function disconnect() { logout(); }
+
+    // Projects
+    async function loadProjects() {
+      try {
+        const res = await fetch(`${API_URL}/v1/projects`, { credentials: 'include' });
+        if (!res.ok) { showView('auth-page'); return; }
+        const data = await res.json();
+        renderProjects(data.projects || []);
+        showView('project-page');
+        loadFinopsSummary();
+      } catch { showView('auth-page'); }
+    }
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function renderProjects(projects) {
+      if (!projects.length) {
+        $('project-list').innerHTML = '<p class="empty">No projects yet. Create your first one.</p>';
+        return;
+      }
+      $('project-list').innerHTML = projects.map(p =>
+        `<div class="project-item" onclick="selectProject('${esc(p.id)}','${esc(p.name)}')">
+          <div><div class="pname">${esc(p.name)}</div><div class="pmeta">${esc(p.tier)} &middot; ${esc(p.role)}</div></div>
+        </div>`
+      ).join('');
+    }
+    async function selectProject(id, name) {
+      config.projectId = id;
+      // Restore previously stored plaintext key (first-call flow or prior rotate).
+      config.apiKey = localStorage.getItem(`clawpipe-key-${id}`) || '';
+      logsState.loaded = false;
+      logsState.offset = 0;
+      try {
+        const res = await fetch(`${API_URL}/v1/projects/${id}/keys`, { credentials: 'include' });
+        if (res.ok) {
+          setStatus(`${name}`, 'ok');
+          await loadDashboard();
+          switchTab('analytics');
+          showView('dashboard');
+        }
+      } catch { setStatus('Error loading project', 'err'); }
+    }
+    // First-call tutorial modal state
+    let firstCallState = { apiKey: '', projectId: '', pollTimer: null };
+
+    function createProject() { openFirstCallModal(); }
+
+    function openFirstCallModal() {
+      $('first-call-modal').classList.remove('hidden');
+      $('fc-stage-name').classList.remove('hidden');
+      $('fc-stage-key').classList.add('hidden');
+      $('fc-name').value = '';
+      setTimeout(() => $('fc-name').focus(), 50);
+    }
+
+    function closeFirstCallModal() {
+      $('first-call-modal').classList.add('hidden');
+      if (firstCallState.pollTimer) {
+        clearInterval(firstCallState.pollTimer);
+        firstCallState.pollTimer = null;
+      }
+    }
+
+    async function submitFirstCallName() {
+      const name = $('fc-name').value.trim();
+      if (!name) { $('fc-name').focus(); return; }
+      try {
+        const res = await fetch(`${API_URL}/v1/projects`, {
+          method: 'POST', headers: authHeaders(),
+          body: JSON.stringify({ name }), credentials: 'include',
+        });
+        const data = await res.json();
+        if (!res.ok) { alert('Error: ' + (data.error || 'Create failed')); return; }
+        firstCallState.apiKey = data.apiKey;
+        firstCallState.projectId = data.project.id;
+        config.apiKey = data.apiKey;
+        config.projectId = data.project.id;
+        try { localStorage.setItem(`clawpipe-key-${data.project.id}`, data.apiKey); } catch {}
+        $('fc-api-key').textContent = data.apiKey;
+        renderSnippet('curl');
+        $('fc-stage-name').classList.add('hidden');
+        $('fc-stage-key').classList.remove('hidden');
+        $('fc-waiting').classList.remove('done');
+        $('fc-waiting').innerHTML = '<span class="pulse"></span> Waiting for your first call...';
+        startFirstCallPolling();
+        await loadProjects();
+      } catch (e) { alert('Error: ' + e.message); }
+    }
+
+    function renderSnippet(lang) {
+      const key = firstCallState.apiKey;
+      const pid = firstCallState.projectId;
+      const snippets = {
+        curl: `curl -X POST https://api.clawpipe.ai/v1/prompt \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "X-Project-Id: ${pid}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt":"hello","provider":"groq","model":"llama-3.1-8b-instant"}'`,
+        node: `npm install clawpipe-ai\n\nimport { ClawPipe } from 'clawpipe-ai';\n\nconst pipe = new ClawPipe({\n  apiKey: '${key}',\n  projectId: '${pid}',\n});\n\nconst { text } = await pipe.prompt('hello');\nconsole.log(text);`,
+        python: `pip install clawpipe-ai\n\nfrom clawpipe import ClawPipe\n\npipe = ClawPipe(\n    api_key="${key}",\n    project_id="${pid}",\n)\n\nresult = pipe.prompt("hello")\nprint(result.text)`,
+      };
+      $('fc-snippet').textContent = snippets[lang] || snippets.curl;
+      document.querySelectorAll('.snip-tab').forEach(b => {
+        b.classList.toggle('active', b.textContent.toLowerCase().startsWith(lang));
+      });
+    }
+
+    function switchSnippet(lang) { renderSnippet(lang); }
+
+    async function copyFirstCallKey() {
+      try {
+        await navigator.clipboard.writeText(firstCallState.apiKey);
+        const btn = document.querySelector('#fc-stage-key .copy-btn');
+        const orig = btn.textContent;
+        btn.textContent = 'Copied ✓';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      } catch {}
+    }
+
+    function startFirstCallPolling() {
+      const startAt = Date.now();
+      if (firstCallState.pollTimer) clearInterval(firstCallState.pollTimer);
+      firstCallState.pollTimer = setInterval(async () => {
+        if (Date.now() - startAt > 300_000) {
+          clearInterval(firstCallState.pollTimer);
+          firstCallState.pollTimer = null;
+          return;
+        }
+        try {
+          const res = await fetch(`${API_URL}/v1/analytics/overview`, {
+            headers: {
+              'Authorization': `Bearer ${firstCallState.apiKey}`,
+              'X-Project-Id': firstCallState.projectId,
+            },
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.totalRequests && data.totalRequests > 0) {
+            const el = $('fc-waiting');
+            el.classList.add('done');
+            el.innerHTML = '<span>✓</span> First call received — you are live!';
+            clearInterval(firstCallState.pollTimer);
+            firstCallState.pollTimer = null;
+          }
+        } catch {}
+      }, 3000);
+    }
+
+    // Dashboard
+    async function loadDashboard() {
+      const [overview, providers, cache, routes, trend, savings] = await Promise.all([
+        api('/v1/analytics/overview'), api('/v1/analytics/providers'),
+        api('/v1/analytics/cache'), api('/v1/analytics/routes'),
+        api('/v1/analytics/cost-trend').catch(() => ({ days: [] })),
+        api('/v1/analytics/savings-by-task').catch(() => ({ buckets: [] })),
+      ]);
+      renderOverview(overview); renderProviders(providers.providers);
+      renderDaily(cache.daily); renderCache(cache.daily); renderRoutes(routes.routes);
+      renderCostTrend(trend.days || []);
+      renderSavings(savings.buckets || []);
+    }
+    function renderCostTrend(days) {
+      if (!days.length) { $('cost-trend').innerHTML = '<p class="empty">No data yet</p>'; return; }
+      const rev = [...days].reverse();
+      const max = Math.max(...rev.map(d => d.baseline || d.cost), 0.0001);
+      $('cost-trend').innerHTML = rev.map(d => {
+        const costPct = (d.cost / max) * 100;
+        const savedPct = (d.saved / max) * 100;
+        return `<div class="bar-row"><span class="name">${d.day.slice(5)}</span><div class="bar"><div class="fill purple" style="width:${costPct.toFixed(1)}%"></div><div class="fill green" style="width:${savedPct.toFixed(1)}%;opacity:.6"></div></div><span class="val">$${d.cost.toFixed(4)} (saved $${d.saved.toFixed(4)})</span></div>`;
+      }).join('');
+    }
+    function renderSavings(buckets) {
+      if (!buckets.length) { $('savings-table').innerHTML = '<p class="empty">No data yet</p>'; return; }
+      $('savings-table').innerHTML =
+        `<table><thead><tr><th>Bucket</th><th>Requests</th><th>Cost</th><th>Avg Latency</th></tr></thead><tbody>` +
+        buckets.map(b => {
+          const badge = b.bucket === 'boosted' ? '<span class="badge boosted">$0</span>' : b.bucket === 'cached' ? '<span class="badge cached">$0</span>' : '';
+          return `<tr><td>${esc(b.bucket)} ${badge}</td><td>${fmt(b.count)}</td><td>$${b.cost.toFixed(4)}</td><td>${b.avgLatencyMs}ms</td></tr>`;
+        }).join('') +
+        `</tbody></table>`;
+    }
+    function renderOverview(d) {
+      updateEmptyState(d);
+      updateUsageBanner(d);
+      const cards = [
+        { label: 'Total Requests', value: fmt(d.totalRequests) },
+        { label: 'Total Cost', value: '$' + d.totalCost.toFixed(4) },
+        { label: 'Avg Latency', value: d.avgLatencyMs + 'ms' },
+        { label: 'Cache Hit Rate', value: d.cacheHitRate, sub: `${d.cachedCount} cached` },
+        { label: 'Boost Rate', value: d.boostRate || '0.0%', sub: `${d.boostedCount} resolved without LLM` },
+        { label: 'Tokens In', value: fmt(d.totalTokensIn) },
+        { label: 'Tokens Out', value: fmt(d.totalTokensOut) },
+      ];
+      $('overview-grid').innerHTML = cards.map(c =>
+        `<div class="metric-card"><div class="label">${c.label}</div><div class="value">${c.value}</div>${c.sub ? `<div class="sub">${c.sub}</div>` : ''}</div>`
+      ).join('');
+    }
+
+    // === Empty state for zero-request projects ===
+    let emptyStateLang = 'curl';
+    let emptyStatePoll = null;
+
+    function updateEmptyState(d) {
+      const el = $('empty-state');
+      if (d.totalRequests && d.totalRequests > 0) {
+        el.classList.add('hidden');
+        if (emptyStatePoll) { clearInterval(emptyStatePoll); emptyStatePoll = null; }
+        return;
+      }
+      el.classList.remove('hidden');
+      renderEmptySnippet();
+      startEmptyStatePolling();
+    }
+
+    function renderEmptySnippet() {
+      const key = config.apiKey;
+      const pid = config.projectId;
+      if (!key) {
+        $('es-snippet').textContent = '# Rotate an API key to get started.';
+        $('es-rotate').classList.remove('hidden');
+        return;
+      }
+      $('es-rotate').classList.add('hidden');
+      const snippets = {
+        curl: `curl -X POST https://api.clawpipe.ai/v1/prompt \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "X-Project-Id: ${pid}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"prompt":"hello","provider":"groq","model":"llama-3.1-8b-instant"}'`,
+        node: `npm install clawpipe-ai\n\nimport { ClawPipe } from 'clawpipe-ai';\n\nconst pipe = new ClawPipe({\n  apiKey: '${key}',\n  projectId: '${pid}',\n});\n\nconst { text } = await pipe.prompt('hello');\nconsole.log(text);`,
+        python: `pip install clawpipe-ai\n\nfrom clawpipe import ClawPipe\n\npipe = ClawPipe(\n    api_key="${key}",\n    project_id="${pid}",\n)\n\nresult = pipe.prompt("hello")\nprint(result.text)`,
+      };
+      $('es-snippet').textContent = snippets[emptyStateLang] || snippets.curl;
+      document.querySelectorAll('[data-es-tab]').forEach(b => {
+        b.classList.toggle('active', b.textContent.toLowerCase().startsWith(emptyStateLang));
+      });
+    }
+
+    function switchEmptySnippet(lang) { emptyStateLang = lang; renderEmptySnippet(); }
+
+    async function rotateEmptyStateKey() {
+      if (!config.projectId) return;
+      try {
+        const res = await fetch(`${API_URL}/v1/projects/${config.projectId}/keys/rotate`, {
+          method: 'POST', credentials: 'include',
+        });
+        const data = await res.json();
+        if (!res.ok) { alert('Rotate failed: ' + (data.error || res.status)); return; }
+        config.apiKey = data.apiKey;
+        try { localStorage.setItem(`clawpipe-key-${config.projectId}`, data.apiKey); } catch {}
+        renderEmptySnippet();
+      } catch (e) { alert('Rotate failed: ' + e.message); }
+    }
+
+    function startEmptyStatePolling() {
+      if (emptyStatePoll) return;
+      const startAt = Date.now();
+      emptyStatePoll = setInterval(async () => {
+        if (Date.now() - startAt > 300_000) {
+          clearInterval(emptyStatePoll); emptyStatePoll = null; return;
+        }
+        try {
+          const d = await api('/v1/analytics/overview');
+          if (d.totalRequests && d.totalRequests > 0) { await loadDashboard(); }
+        } catch {}
+      }, 3000);
+    }
+
+    // === Usage banner + rate-limit modal ===
+    let rateLimitShown = false;
+
+    function updateUsageBanner(d) {
+      const el = $('usage-banner');
+      const limit = d.dailyLimit;
+      const used = d.dailyUsed || 0;
+      if (!limit || limit === -1) { el.classList.add('hidden'); return; }
+      const pct = limit > 0 ? used / limit : 0;
+      if (pct >= 1) {
+        el.classList.remove('hidden');
+        el.classList.add('hit');
+        el.innerHTML = `<strong>Daily limit reached.</strong> ${fmt(used)} / ${fmt(limit)} calls used on the ${esc(d.tier || 'free')} plan. <a href="#" onclick="openUpgrade();return false;">Upgrade →</a>`;
+        if (!rateLimitShown) { rateLimitShown = true; openRateLimitModal(d); }
+      } else if (pct >= 0.8) {
+        el.classList.remove('hidden');
+        el.classList.remove('hit');
+        el.innerHTML = `<strong>${(pct * 100).toFixed(0)}% of daily calls used</strong> (${fmt(used)} / ${fmt(limit)}). <a href="#" onclick="openUpgrade();return false;">Upgrade →</a>`;
+      } else {
+        el.classList.add('hidden');
+      }
+    }
+
+    function openRateLimitModal(d) {
+      $('rl-body').textContent = `You've used ${fmt(d.dailyUsed)} of ${fmt(d.dailyLimit)} calls on the ${d.tier || 'free'} plan today. Upgrade to keep shipping.`;
+      $('rate-limit-modal').classList.remove('hidden');
+    }
+    function closeRateLimitModal() { $('rate-limit-modal').classList.add('hidden'); }
+    function openUpgrade() { window.open('https://clawpipe.ai/#pricing', '_blank', 'noopener'); }
+    function renderProviders(ps) {
+      if (!ps.length) { $('provider-chart').innerHTML = '<p class="empty">No data yet</p>'; return; }
+      const max = Math.max(...ps.map(p => p.requestCount));
+      $('provider-chart').innerHTML = ps.slice(0, 8).map(p =>
+        `<div class="bar-row"><span class="name">${esc(p.provider)}/${esc(p.model)}</span><div class="bar"><div class="fill purple" style="width:${(p.requestCount/max*100).toFixed(1)}%"></div></div><span class="val">${fmt(p.requestCount)}</span></div>`
+      ).join('');
+    }
+    function renderDaily(days) {
+      if (!days.length) { $('daily-chart').innerHTML = '<p class="empty">No data yet</p>'; return; }
+      const rev = [...days].reverse();
+      const max = Math.max(...rev.map(d => d.total), 1);
+      $('daily-chart').innerHTML =
+        `<div class="daily-row">${rev.map(d => `<div class="daily-bar" style="height:${(d.total/max*100).toFixed(1)}%" title="${d.day}: ${d.total} requests"></div>`).join('')}</div>` +
+        `<div class="daily-labels">${rev.map(d => `<span>${d.day.slice(5)}</span>`).join('')}</div>`;
+    }
+    function renderCache(days) {
+      if (!days.length) { $('cache-chart').innerHTML = '<p class="empty">No data yet</p>'; return; }
+      $('cache-chart').innerHTML = days.slice(0, 7).map(d =>
+        `<div class="bar-row"><span class="name">${d.day}</span><div class="bar"><div class="fill green" style="width:${parseFloat(d.hitRate).toFixed(1)}%"></div></div><span class="val">${d.hitRate}</span></div>`
+      ).join('');
+    }
+    function renderRoutes(rs) {
+      if (!rs.length) { $('route-table').innerHTML = '<p class="empty">No data yet</p>'; return; }
+      $('route-table').innerHTML =
+        `<table><thead><tr><th>Date</th><th>Provider</th><th>Model</th><th>Reqs</th><th>Latency</th></tr></thead><tbody>` +
+        rs.slice(0, 10).map(r => `<tr><td>${esc(r.day)}</td><td>${esc(r.provider)}</td><td>${esc(r.model)}</td><td>${r.requestCount}</td><td>${r.avgLatencyMs}ms</td></tr>`).join('') +
+        `</tbody></table>`;
+    }
+    function fmt(n) { return n >= 1_000_000 ? (n/1_000_000).toFixed(1) + 'M' : n >= 1000 ? (n/1000).toFixed(1) + 'K' : String(n); }
+
+    // === Tabs ===
+    function switchTab(tab) {
+      const tabs = ['analytics', 'weights', 'prompts', 'logs', 'quality', 'finops-user', 'settings'];
+      tabs.forEach(t => {
+        const btn = $('tab-' + t);
+        const view = $('view-' + t);
+        const active = t === tab;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', String(active));
+        view.classList.toggle('hidden', !active);
+      });
+      if (tab === 'logs' && !logsState.loaded) loadLogs(0);
+      if (tab === 'weights') loadWeights();
+      if (tab === 'prompts') loadPrompts();
+      if (tab === 'quality') loadQuality();
+      if (tab === 'settings') { loadSettings(); loadInvitations(); loadMembers(); loadProviderKeys(); loadAuditEvents(); }
+      if (tab === 'finops-user') loadFinopsByUser();
+    }
+
+    // === FinOps overview (multi-project summary on project picker) ===
+    async function loadFinopsSummary() {
+      try {
+        const res = await fetch(`${config.url}/v1/finops/overview`, { credentials: 'include' });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (!d.totals.projects) return;
+        $('finops-summary').classList.remove('hidden');
+        $('finops-total').textContent = `$${d.totals.usedMtd.toFixed(2)}`;
+        const bits = [`${d.totals.projects} projects`];
+        if (d.totals.cappedProjects > 0) bits.push(`${d.totals.cappedProjects} with cap`);
+        if (d.totals.overBudget > 0) bits.push(`${d.totals.overBudget} over budget`);
+        $('finops-meta').textContent = bits.join(' · ');
+
+        const rows = d.projects.map(p => {
+          const cap = p.budget.monthlyCap != null ? `$${p.budget.monthlyCap.toFixed(2)}` : '—';
+          const pct = p.budget.monthlyCap != null ? `${p.budget.pct}%` : '';
+          const team = p.team ? esc(p.team.name) : '—';
+          const overCls = p.budget.over ? 'style="color:var(--red);font-weight:600"' : '';
+          const forecast = p.budget.forecastEomUsd != null ? p.budget.forecastEomUsd : 0;
+          const forecastOverCap = p.budget.monthlyCap != null && forecast >= p.budget.monthlyCap;
+          const forecastColor = forecastOverCap ? 'color:var(--red);font-weight:600' : 'color:var(--label-secondary)';
+          const forecastPct = p.budget.pctOfCapForecast != null && p.budget.monthlyCap != null
+            ? ` (${p.budget.pctOfCapForecast}%)` : '';
+          return `<tr>
+            <td style="padding:8px 4px">${esc(p.name)}</td>
+            <td style="padding:8px 4px;color:var(--label-secondary)">${team}</td>
+            <td style="padding:8px 4px;text-align:right;font-variant-numeric:tabular-nums" ${overCls}>$${p.budget.usedMtd.toFixed(2)}</td>
+            <td style="padding:8px 4px;text-align:right;color:var(--label-secondary);font-variant-numeric:tabular-nums">${cap}</td>
+            <td style="padding:8px 4px;text-align:right;color:var(--label-secondary);font-variant-numeric:tabular-nums">${pct}</td>
+            <td style="padding:8px 4px;text-align:right;font-variant-numeric:tabular-nums;${forecastColor}">$${forecast.toFixed(2)}${forecastPct}</td>
+          </tr>`;
+        }).join('');
+        $('finops-table').innerHTML = `<thead><tr>
+          <th style="text-align:left;padding:8px 4px">Project</th>
+          <th style="text-align:left;padding:8px 4px">Team</th>
+          <th style="text-align:right;padding:8px 4px">MTD</th>
+          <th style="text-align:right;padding:8px 4px">Cap</th>
+          <th style="text-align:right;padding:8px 4px">%</th>
+          <th style="text-align:right;padding:8px 4px">EOM forecast</th>
+        </tr></thead><tbody>${rows}</tbody>`;
+      } catch {}
+    }
+    // === FinOps by User ===
+    async function loadFinopsByUser() {
+      if (!config.projectId) return;
+      const fromEl = $('finops-user-from'), toEl = $('finops-user-to');
+      const today = new Date().toISOString().slice(0, 10);
+      const d30 = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      if (!fromEl.value) fromEl.value = d30;
+      if (!toEl.value) toEl.value = today;
+      const qs = new URLSearchParams({ projectId: config.projectId, from: fromEl.value, to: toEl.value });
+      try {
+        const res = await fetch(`${config.url}/v1/finops/by-user?${qs}`, { credentials: 'include' });
+        if (!res.ok) { $('finops-user-tbody').innerHTML = `<tr><td colspan="5" style="padding:12px;color:var(--red)">Error ${res.status}</td></tr>`; return; }
+        const d = await res.json();
+        $('finops-user-empty').classList.toggle('hidden', d.rows.length > 0);
+        $('finops-user-tbody').innerHTML = d.rows.map(r => {
+          const topM = (r.top_models || []).map(m => `${esc(m.model)} $${(m.cost||0).toFixed(4)}`).join(', ');
+          return `<tr>
+            <td style="padding:10px 8px">${r.user_id ? esc(r.user_id.slice(0,8) + '…') : '<em style="color:var(--label-tertiary)">Unattributed</em>'}</td>
+            <td style="padding:10px 8px">${esc(r.email)}</td>
+            <td style="padding:10px 8px;text-align:right;font-variant-numeric:tabular-nums">${r.total_requests}</td>
+            <td style="padding:10px 8px;text-align:right;font-variant-numeric:tabular-nums">$${(r.total_cost||0).toFixed(4)}</td>
+            <td style="padding:10px 8px;font-size:12px;color:var(--label-secondary)">${topM || '—'}</td>
+          </tr>`;
+        }).join('');
+      } catch { $('finops-user-tbody').innerHTML = `<tr><td colspan="5" style="padding:12px;color:var(--red)">Failed to load</td></tr>`; }
+    }
+
+    // === Settings (Slack digest + Teams digest + monthly budget) ===
+    async function loadSettings() {
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/settings`, { credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const s = await res.json();
+        _settingsCache = s;
+        const chip = $('slack-status-chip');
+        if (s.slack?.configured) { chip.textContent = 'Active'; chip.className = 'badge cached'; }
+        else { chip.textContent = 'Not configured'; chip.className = 'badge normal'; }
+        const tchip = $('teams-status-chip');
+        if (s.teams?.configured) { tchip.textContent = 'Active'; tchip.className = 'badge cached'; }
+        else { tchip.textContent = 'Not configured'; tchip.className = 'badge normal'; }
+        const echip = $('email-status-chip');
+        if (s.email?.configured) {
+          echip.textContent = s.email.address || 'Active';
+          echip.className = 'badge cached';
+          $('digest-email-input').value = s.email.address || '';
+        } else {
+          echip.textContent = 'Not configured'; echip.className = 'badge normal';
+          $('digest-email-input').value = '';
+        }
+        const bchip = $('budget-status-chip');
+        if (s.budget?.monthlyCap != null) {
+          bchip.textContent = `$${s.budget.usedMtd.toFixed(2)} / $${s.budget.monthlyCap.toFixed(2)} (${s.budget.pct}%)`;
+          bchip.className = s.budget.over ? 'badge' : 'badge cached';
+          if (s.budget.over) bchip.style.background = 'rgba(239,68,68,0.15)', bchip.style.color = 'var(--red)';
+          else bchip.style.background = '', bchip.style.color = '';
+          $('budget-input').value = String(s.budget.monthlyCap);
+        } else {
+          bchip.textContent = 'No cap set'; bchip.className = 'badge normal';
+          $('budget-input').value = '';
+        }
+        loadTeams();
+        loadDomainStatus();
+      } catch (e) {
+        $('slack-feedback').textContent = 'Failed to load settings: ' + e.message;
+      }
+    }
+
+    async function loadDomainStatus() {
+      try {
+        const res = await fetch(`${config.url}/v1/email/domain-status`);
+        if (!res.ok) return;
+        const d = await res.json();
+        const line = $('email-domain-line');
+        if (!d.configured) line.textContent = 'Email delivery is not configured on this gateway.';
+        else if (d.verified) line.textContent = `Sender domain ${d.domain} is verified.`;
+        else if (d.status === 'not_added') line.textContent = `Sender domain ${d.domain} is not added to Resend yet.`;
+        else line.textContent = `Sender domain ${d.domain} status: ${d.status}.`;
+      } catch {}
+    }
+
+    async function saveSlackWebhook() {
+      const url = $('slack-webhook-input').value.trim();
+      $('slack-feedback').textContent = 'Saving…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/slack-webhook`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('slack-feedback').textContent = 'Saved.';
+        $('slack-webhook-input').value = '';
+        loadSettings();
+      } catch (e) { $('slack-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function clearSlackWebhook() {
+      if (!confirm('Remove Slack digest for this project?')) return;
+      $('slack-feedback').textContent = 'Clearing…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/slack-webhook`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: null }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        $('slack-feedback').textContent = 'Removed.';
+        loadSettings();
+      } catch (e) { $('slack-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function sendTestDigest() {
+      $('slack-feedback').textContent = 'Sending…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/slack-digest/test`, {
+          method: 'POST', credentials: 'include',
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('slack-feedback').textContent = d.ok ? 'Sent — check your Slack channel.' : 'Slack rejected the payload.';
+      } catch (e) { $('slack-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function saveTeamsWebhook() {
+      const url = $('teams-webhook-input').value.trim();
+      $('teams-feedback').textContent = 'Saving…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/teams-webhook`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('teams-feedback').textContent = 'Saved.';
+        $('teams-webhook-input').value = '';
+        loadSettings();
+      } catch (e) { $('teams-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function clearTeamsWebhook() {
+      if (!confirm('Remove Teams digest for this project?')) return;
+      $('teams-feedback').textContent = 'Clearing…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/teams-webhook`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: null }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        $('teams-feedback').textContent = 'Removed.';
+        loadSettings();
+      } catch (e) { $('teams-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function sendTestTeamsDigest() {
+      $('teams-feedback').textContent = 'Sending…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/teams-digest/test`, {
+          method: 'POST', credentials: 'include',
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('teams-feedback').textContent = d.ok ? 'Sent — check your Teams channel.' : 'Teams rejected the payload.';
+      } catch (e) { $('teams-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function saveDigestEmail() {
+      const email = $('digest-email-input').value.trim();
+      if (!email) { $('email-feedback').textContent = 'Enter an email or hit Remove.'; return; }
+      $('email-feedback').textContent = 'Saving…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/digest-email`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('email-feedback').textContent = 'Saved.';
+        loadSettings();
+      } catch (e) { $('email-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function clearDigestEmail() {
+      if (!confirm('Remove email digest for this project?')) return;
+      $('email-feedback').textContent = 'Clearing…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/digest-email`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: null }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        $('email-feedback').textContent = 'Removed.';
+        loadSettings();
+      } catch (e) { $('email-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function sendTestEmail() {
+      $('email-feedback').textContent = 'Sending…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/digest-email/test`, {
+          method: 'POST', credentials: 'include',
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('email-feedback').textContent = d.ok ? `Sent to ${d.to} — check your inbox.` : 'Resend rejected the send (check sender domain verification).';
+      } catch (e) { $('email-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    function downloadCsvExport() {
+      const url = `${config.url}/v1/projects/${config.projectId}/export.csv`;
+      window.open(url, '_blank');
+    }
+
+    // === Provider keys ===
+    async function loadProviderKeys() {
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/provider-keys`, { credentials: 'include' });
+        if (!res.ok) { $('provider-keys-list').innerHTML = ''; return; }
+        const d = await res.json();
+        const items = d.providers || [];
+        if (!items.length) { $('provider-keys-list').innerHTML = '<span style="color:var(--label-tertiary);font-size:13px;">No keys stored yet.</span>'; return; }
+        $('provider-keys-list').innerHTML = '<table style="width:100%;font-size:13px;border-collapse:collapse;">'
+          + '<thead><tr><th style="text-align:left;padding:4px 6px;color:var(--label-secondary);font-weight:500;">Provider</th>'
+          + '<th style="text-align:left;padding:4px 6px;color:var(--label-secondary);font-weight:500;">Key</th>'
+          + '<th style="padding:4px 6px;"></th></tr></thead><tbody>'
+          + items.map(k => `<tr>
+              <td style="padding:4px 6px;">${esc(k.provider)}</td>
+              <td style="padding:4px 6px;font-family:monospace;color:var(--label-secondary);">••••••••••••••••</td>
+              <td style="padding:4px 6px;text-align:right;"><a onclick="deleteProviderKey('${esc(k.provider)}')" style="color:var(--red);cursor:pointer;font-size:12px;">Remove</a></td>
+            </tr>`).join('')
+          + '</tbody></table>';
+      } catch {}
+    }
+    async function saveProviderKey() {
+      const provider = $('pk-provider-select').value;
+      const value = $('pk-value-input').value.trim();
+      if (!value) { $('pk-feedback').textContent = 'Enter a key value.'; return; }
+      $('pk-feedback').textContent = 'Saving…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/provider-keys/${encodeURIComponent(provider)}`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('pk-value-input').value = '';
+        $('pk-feedback').textContent = 'Key saved.';
+        loadProviderKeys();
+      } catch (e) { $('pk-feedback').textContent = 'Error: ' + e.message; }
+    }
+    async function deleteProviderKey(provider) {
+      if (!confirm(`Remove ${provider} key?`)) return;
+      try {
+        await fetch(`${config.url}/v1/projects/${config.projectId}/provider-keys/${encodeURIComponent(provider)}`, {
+          method: 'DELETE', credentials: 'include',
+        });
+        loadProviderKeys();
+      } catch {}
+    }
+
+    // === Audit log ===
+    let _auditNextCursor = null;
+
+    async function loadAuditEvents(cursor) {
+      const tb = $('audit-events-tbody');
+      const fb = $('audit-feedback');
+      if (!cursor) { tb.innerHTML = '<tr><td colspan="4" style="color:var(--label-tertiary);padding:12px 0;">Loading…</td></tr>'; }
+      try {
+        const qs = cursor ? `?since=${encodeURIComponent(cursor)}` : '';
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/audit/events${qs}`, { credentials: 'include' });
+        if (res.status === 403) { tb.innerHTML = '<tr><td colspan="4" style="color:var(--label-tertiary);padding:12px 0;">Admin access required.</td></tr>'; return; }
+        if (!res.ok) { fb.textContent = 'Failed to load audit events.'; return; }
+        const data = await res.json();
+        const rows = (data.events || []);
+        if (!rows.length && !cursor) { tb.innerHTML = '<tr><td colspan="4" style="color:var(--label-tertiary);padding:12px 0;">No audit events yet.</td></tr>'; return; }
+        const html = rows.map(e => `<tr>
+          <td style="color:var(--label-secondary);white-space:nowrap;">${esc(e.created_at?.slice(0,19).replace('T',' ') || '')}</td>
+          <td><code style="font-size:11px;background:var(--bg-tertiary);padding:1px 5px;border-radius:4px;">${esc(e.action)}</code></td>
+          <td style="color:var(--label-secondary);">${esc(e.actor_user_id || '—')}</td>
+          <td style="color:var(--label-secondary);">${esc(e.target || '—')}</td>
+        </tr>`).join('');
+        if (cursor) { tb.innerHTML += html; } else { tb.innerHTML = html; }
+        _auditNextCursor = data.nextCursor || null;
+        const btn = $('audit-next-btn');
+        if (btn) btn.style.display = _auditNextCursor ? 'inline-flex' : 'none';
+      } catch { fb.textContent = 'Error loading audit events.'; }
+    }
+
+    function loadAuditEventsNext() { loadAuditEvents(_auditNextCursor); }
+
+    // === Members ===
+    async function loadMembers() {
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/members`, { credentials: 'include' });
+        if (!res.ok) return;
+        const d = await res.json();
+        const rows = (d.members || []).map(m => {
+          const roleCtl = m.role === 'owner'
+            ? '<span style="color:var(--label-tertiary)">owner</span>'
+            : `<select onchange="changeMemberRole('${esc(m.user_id)}', this.value)" style="padding:2px 6px;background:var(--bg-tertiary);border:0.5px solid var(--separator);border-radius:6px;color:var(--label-primary);font-size:12px;">
+                 <option value="member" ${m.role==='member'?'selected':''}>member</option>
+                 <option value="admin" ${m.role==='admin'?'selected':''}>admin</option>
+               </select>`;
+          const removeBtn = m.role !== 'owner'
+            ? `<a onclick="removeMember('${esc(m.user_id)}', '${esc(m.email)}')" style="color:var(--red);cursor:pointer;font-size:12px;margin-left:10px;">Remove</a>`
+            : '';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:0.5px solid var(--separator);">
+            <span>${esc(m.name || m.email)} <span style="color:var(--label-tertiary);font-size:12px;">${esc(m.email)}</span></span>
+            <span>${roleCtl}${removeBtn}</span>
+          </div>`;
+        }).join('');
+        $('members-list').innerHTML = rows || '<em>No members.</em>';
+      } catch {}
+    }
+
+    async function changeMemberRole(userId, role) {
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/members/${userId}`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role }),
+        });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed'); }
+        loadMembers();
+      } catch (e) { alert(e.message); }
+    }
+
+    async function removeMember(userId, email) {
+      if (!confirm(`Remove ${email} from this project?`)) return;
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/members/${userId}`, {
+          method: 'DELETE', credentials: 'include',
+        });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed'); }
+        loadMembers();
+      } catch (e) { alert(e.message); }
+    }
+
+    // === Invitations ===
+    async function sendInvite() {
+      const email = $('invite-email').value.trim();
+      const role = $('invite-role').value;
+      if (!email) { $('invite-feedback').textContent = 'Enter an email.'; return; }
+      $('invite-feedback').textContent = 'Sending…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/invitations`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, role }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('invite-feedback').textContent = `Invite sent to ${email}.`;
+        $('invite-email').value = '';
+        loadInvitations();
+      } catch (e) { $('invite-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function loadInvitations() {
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/invitations`, { credentials: 'include' });
+        if (!res.ok) return;
+        const d = await res.json();
+        const pending = (d.invitations || []).filter(i => !i.accepted_at && !i.revoked_at);
+        if (!pending.length) { $('invite-list').innerHTML = ''; return; }
+        $('invite-list').innerHTML = '<div style="font-size:12px;font-weight:600;color:var(--label-tertiary);margin-bottom:8px;">PENDING INVITES</div>' +
+          pending.map(i => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;">
+            <span>${esc(i.email)} <span style="color:var(--label-tertiary)">(${esc(i.role)})</span></span>
+            <a style="color:var(--red);cursor:pointer;font-size:12px;" onclick="revokeInvite('${esc(i.id)}')">Revoke</a>
+          </div>`).join('');
+      } catch {}
+    }
+
+    async function revokeInvite(id) {
+      if (!confirm('Revoke this invite?')) return;
+      try {
+        await fetch(`${config.url}/v1/projects/${config.projectId}/invitations/${id}`, { method: 'DELETE', credentials: 'include' });
+        loadInvitations();
+      } catch {}
+    }
+
+    // Invite accept flow
+    let _inviteToken = null;
+    async function bootInvitePage() {
+      const m = window.location.pathname.match(/^\/invite\/([^/]+)/);
+      if (!m) return false;
+      _inviteToken = m[1];
+      showView('invite-page');
+      try {
+        const res = await fetch(`${API_URL}/v1/invitations/${_inviteToken}`);
+        const d = await res.json();
+        if (!res.ok) { $('invite-project-line').textContent = d.error; return true; }
+        $('invite-project-line').textContent = `You've been invited to join "${d.projectName}" as ${d.role}. Sent to ${d.email}.`;
+        const savedUser = localStorage.getItem('clawpipe-user');
+        if (savedUser) $('invite-accept-btn').style.display = 'inline-flex';
+        else {
+          $('invite-login-hint').style.display = 'block';
+          $('invite-goto-login').onclick = () => { window.location.href = '/'; };
+        }
+      } catch (e) { $('invite-project-line').textContent = 'Failed to load invitation.'; }
+      return true;
+    }
+
+    async function acceptInvite() {
+      $('invite-error').style.display = 'none';
+      try {
+        const res = await fetch(`${API_URL}/v1/invitations/${_inviteToken}/accept`, {
+          method: 'POST', credentials: 'include',
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error);
+        window.location.href = '/';
+      } catch (e) {
+        $('invite-error').style.display = 'block';
+        $('invite-error').textContent = e.message;
+      }
+    }
+
+    // === Teams ===
+    let _settingsCache = null;
+
+    async function loadTeams() {
+      try {
+        const res = await fetch(`${config.url}/v1/teams`, { credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const d = await res.json();
+        const sel = $('team-select');
+        const currentTeamId = _settingsCache?.team?.id || '';
+        sel.innerHTML = '<option value="">— None —</option>' +
+          (d.teams || []).map(t => `<option value="${t.id}" ${t.id === currentTeamId ? 'selected' : ''}>${t.name}</option>`).join('');
+
+        const chip = $('team-status-chip');
+        const ctrls = $('team-budget-controls');
+        if (currentTeamId && _settingsCache?.team?.budget) {
+          const b = _settingsCache.team.budget;
+          chip.textContent = b.monthlyCap != null
+            ? `$${b.usedMtd.toFixed(2)} / $${b.monthlyCap.toFixed(2)} (${b.pct}%)`
+            : 'Linked, no cap';
+          chip.className = 'badge cached';
+          ctrls.classList.remove('hidden');
+          $('team-budget-input').value = b.monthlyCap != null ? String(b.monthlyCap) : '';
+          $('team-budget-status').textContent = b.monthlyCap != null
+            ? `Month-to-date across team: $${b.usedMtd.toFixed(2)}`
+            : '';
+          loadTeamMembers();
+        } else {
+          chip.textContent = 'Unlinked';
+          chip.className = 'badge normal';
+          ctrls.classList.add('hidden');
+        }
+      } catch (e) { $('team-feedback').textContent = 'Failed to load teams: ' + e.message; }
+    }
+
+    async function linkProjectToTeam() {
+      const teamId = $('team-select').value || null;
+      $('team-feedback').textContent = 'Saving…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/team`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ teamId }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('team-feedback').textContent = teamId ? 'Linked.' : 'Unlinked.';
+        loadSettings();
+      } catch (e) { $('team-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    function openCreateTeam() { $('dialog-new-team').showModal(); }
+
+    async function createTeamSubmit() {
+      const name = $('nt-name').value.trim();
+      if (!name) return;
+      try {
+        const res = await fetch(`${config.url}/v1/teams`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('dialog-new-team').close();
+        $('nt-name').value = '';
+        await loadTeams();
+        $('team-select').value = d.team.id;
+        $('team-feedback').textContent = `Team "${d.team.name}" created. Click Link to attach this project.`;
+      } catch (e) { $('team-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function loadTeamMembers() {
+      const teamId = _settingsCache?.team?.id;
+      if (!teamId) { $('team-members-list').innerHTML = ''; return; }
+      try {
+        const res = await fetch(`${config.url}/v1/teams/${teamId}/members`, { credentials: 'include' });
+        if (!res.ok) return;
+        const d = await res.json();
+        const rows = (d.members || []).map(m => {
+          const roleCtl = m.role === 'owner'
+            ? '<span style="color:var(--label-tertiary)">owner</span>'
+            : `<select onchange="changeTeamRole('${esc(m.user_id)}', this.value)" style="padding:2px 6px;background:var(--bg-tertiary);border:0.5px solid var(--separator);border-radius:6px;color:var(--label-primary);font-size:12px;">
+                 <option value="member" ${m.role==='member'?'selected':''}>member</option>
+                 <option value="admin" ${m.role==='admin'?'selected':''}>admin</option>
+               </select>`;
+          const removeBtn = m.role !== 'owner'
+            ? `<a onclick="removeTeamMember('${esc(m.user_id)}', '${esc(m.email)}')" style="color:var(--red);cursor:pointer;font-size:12px;margin-left:10px;">Remove</a>`
+            : '';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+            <span>${esc(m.name || m.email)} <span style="color:var(--label-tertiary);font-size:12px;">${esc(m.email)}</span></span>
+            <span>${roleCtl}${removeBtn}</span>
+          </div>`;
+        }).join('');
+        $('team-members-list').innerHTML = rows || '<em>No members.</em>';
+      } catch {}
+    }
+
+    async function addTeamMember() {
+      const teamId = _settingsCache?.team?.id;
+      if (!teamId) return;
+      const email = $('team-add-email').value.trim();
+      const role = $('team-add-role').value;
+      if (!email) return;
+      try {
+        const res = await fetch(`${config.url}/v1/teams/${teamId}/members`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, role }),
+        });
+        const d = await res.json();
+        if (!res.ok) { alert(d.error || 'Failed'); return; }
+        $('team-add-email').value = '';
+        loadTeamMembers();
+      } catch (e) { alert(e.message); }
+    }
+
+    async function changeTeamRole(userId, role) {
+      const teamId = _settingsCache?.team?.id;
+      try {
+        const res = await fetch(`${config.url}/v1/teams/${teamId}/members/${userId}`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role }),
+        });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed'); }
+        loadTeamMembers();
+      } catch (e) { alert(e.message); }
+    }
+
+    async function removeTeamMember(userId, email) {
+      const teamId = _settingsCache?.team?.id;
+      if (!confirm(`Remove ${email} from the team?`)) return;
+      try {
+        const res = await fetch(`${config.url}/v1/teams/${teamId}/members/${userId}`, {
+          method: 'DELETE', credentials: 'include',
+        });
+        if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed'); }
+        loadTeamMembers();
+      } catch (e) { alert(e.message); }
+    }
+
+    async function saveTeamBudget() {
+      const teamId = _settingsCache?.team?.id;
+      if (!teamId) { $('team-feedback').textContent = 'Link the project to a team first.'; return; }
+      const raw = $('team-budget-input').value.trim();
+      const cap = raw === '' ? null : Number(raw);
+      if (raw !== '' && (isNaN(cap) || cap < 0)) {
+        $('team-feedback').textContent = 'Enter a non-negative number, or leave blank to remove.';
+        return;
+      }
+      $('team-feedback').textContent = 'Saving team cap…';
+      try {
+        const res = await fetch(`${config.url}/v1/teams/${teamId}/budget`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ monthlyCap: cap }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('team-feedback').textContent = cap == null ? 'Team cap removed.' : `Team cap set to $${cap.toFixed(2)}.`;
+        loadSettings();
+      } catch (e) { $('team-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    async function saveBudget() {
+      const raw = $('budget-input').value.trim();
+      const cap = raw === '' ? null : Number(raw);
+      if (raw !== '' && (isNaN(cap) || cap < 0)) {
+        $('budget-feedback').textContent = 'Enter a non-negative number, or leave blank to remove.';
+        return;
+      }
+      $('budget-feedback').textContent = 'Saving…';
+      try {
+        const res = await fetch(`${config.url}/v1/projects/${config.projectId}/budget`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ monthlyCap: cap }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+        $('budget-feedback').textContent = cap == null ? 'Cap removed.' : `Cap set to $${cap.toFixed(2)}.`;
+        loadSettings();
+      } catch (e) { $('budget-feedback').textContent = 'Error: ' + e.message; }
+    }
+
+    // === Prompt store ===
+    let promptsData = [];
+    async function loadPrompts() {
+      try {
+        const d = await api('/v1/prompts');
+        promptsData = d.prompts || [];
+        const list = $('prompts-list');
+        list.innerHTML = '';
+        if (!promptsData.length) {
+          const p = document.createElement('p'); p.className = 'empty';
+          p.textContent = 'No prompts yet. Click "New prompt" to create one.'; list.appendChild(p); return;
+        }
+        const table = document.createElement('table');
+        table.style.width = '100%'; table.style.borderCollapse = 'collapse';
+        const thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th style="text-align:left;padding:8px 6px">Name</th><th style="text-align:left;padding:8px 6px">Description</th><th style="padding:8px 6px">Version</th><th style="padding:8px 6px">Updated</th><th style="padding:8px 6px"></th></tr>';
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        promptsData.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.style.borderTop = '1px solid #f3f4f6'; tr.style.cursor = 'pointer';
+          const nameTd = document.createElement('td'); nameTd.style.padding = '10px 6px';
+          const code = document.createElement('code'); code.textContent = r.name; nameTd.appendChild(code);
+          const descTd = document.createElement('td'); descTd.style.padding = '10px 6px'; descTd.style.color = '#6b7280';
+          descTd.textContent = r.description || '';
+          const verTd = document.createElement('td'); verTd.style.padding = '10px 6px'; verTd.style.textAlign = 'center';
+          verTd.textContent = r.latest_version != null ? `v${r.latest_version}` : 'v1';
+          const dateTd = document.createElement('td'); dateTd.style.padding = '10px 6px'; dateTd.style.textAlign = 'center'; dateTd.style.color = '#9ca3af'; dateTd.style.fontSize = '12px';
+          dateTd.textContent = fmtTime(r.updated_at || r.created_at);
+          const btnTd = document.createElement('td'); btnTd.style.padding = '10px 6px'; btnTd.style.textAlign = 'right';
+          const nvBtn = document.createElement('button'); nvBtn.className = 'setup-btn-secondary'; nvBtn.textContent = 'New version';
+          nvBtn.style.fontSize = '12px'; nvBtn.style.padding = '4px 10px';
+          nvBtn.onclick = (e) => { e.stopPropagation(); openNewVersionDialog(r.id, r.template || ''); };
+          btnTd.appendChild(nvBtn);
+          [nameTd, descTd, verTd, dateTd, btnTd].forEach(td => tr.appendChild(td));
+          // Expand row for version history
+          const expandTr = document.createElement('tr');
+          expandTr.style.display = 'none'; expandTr.dataset.expandFor = r.id;
+          const expandTd = document.createElement('td'); expandTd.colSpan = 5; expandTd.style.padding = '0 6px 12px 24px';
+          expandTd.innerHTML = '<span style="color:var(--label-tertiary);font-size:12px">Loading versions…</span>';
+          expandTr.appendChild(expandTd);
+          tr.onclick = () => toggleVersionHistory(r.id, expandTr, expandTd);
+          tbody.appendChild(tr); tbody.appendChild(expandTr);
+        });
+        table.appendChild(tbody); list.appendChild(table);
+      } catch (e) { $('prompts-list').textContent = 'Failed to load prompts: ' + e.message; }
+    }
+    async function toggleVersionHistory(promptId, expandTr, expandTd) {
+      const shown = expandTr.style.display !== 'none';
+      expandTr.style.display = shown ? 'none' : '';
+      if (shown) return;
+      try {
+        const d = await api(`/v1/prompts/${promptId}/versions`);
+        const versions = d.versions || [];
+        if (!versions.length) { expandTd.textContent = 'No versions found.'; return; }
+        expandTd.innerHTML = '';
+        const tbl = document.createElement('table'); tbl.style.fontSize = '12px'; tbl.style.width = '100%';
+        versions.forEach(v => {
+          const tr = document.createElement('tr');
+          const vTd = document.createElement('td'); vTd.style.padding = '4px 8px'; vTd.textContent = `v${v.version}`;
+          const noteTd = document.createElement('td'); noteTd.style.padding = '4px 8px'; noteTd.style.color = '#6b7280'; noteTd.textContent = v.notes || '';
+          const dateTd = document.createElement('td'); dateTd.style.padding = '4px 8px'; dateTd.style.color = '#9ca3af'; dateTd.textContent = fmtTime(v.created_at);
+          [vTd, noteTd, dateTd].forEach(td => tr.appendChild(td)); tbl.appendChild(tr);
+        });
+        expandTd.appendChild(tbl);
+      } catch { expandTd.textContent = 'Failed to load versions.'; }
+    }
+    function openNewVersionDialog(promptId, latestTemplate) {
+      $('nv-prompt-id').value = promptId;
+      $('nv-tpl').value = latestTemplate;
+      $('nv-notes').value = '';
+      $('dialog-new-version').showModal();
+    }
+    async function createPromptSubmit() {
+      const name = $('np-name').value.trim();
+      const template = $('np-tpl').value;
+      if (!name || !template) { alert('name and template required'); return; }
+      try {
+        const res = await fetch(`${config.url}/v1/prompts`, {
+          method: 'POST', headers: apiHeaders(),
+          body: JSON.stringify({ name, description: $('np-desc').value, template, system: $('np-sys').value }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        $('dialog-new-prompt').close();
+        ['np-name','np-desc','np-tpl','np-sys'].forEach(id => $(id).value = '');
+        loadPrompts();
+      } catch (e) { alert('Create failed: ' + e.message); }
+    }
+    async function createVersionSubmit() {
+      const promptId = $('nv-prompt-id').value;
+      const template = $('nv-tpl').value;
+      if (!template) { alert('template required'); return; }
+      try {
+        const res = await fetch(`${config.url}/v1/prompts/${promptId}/versions`, {
+          method: 'POST', headers: apiHeaders(),
+          body: JSON.stringify({ template, notes: $('nv-notes').value }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        $('dialog-new-version').close();
+        loadPrompts();
+      } catch (e) { alert('Create version failed: ' + e.message); }
+    }
+
+    // === Router Weights ===
+    let weightsLoaded = false;
+    async function loadWeights() {
+      if (weightsLoaded) return;
+      try {
+        const d = await api('/v1/weights');
+        const rows = d.weights || [];
+        if (!rows.length) {
+          $('weights-table').innerHTML = '<p class="empty">No learned weights yet. Send some requests and the router will start learning.</p>';
+        } else {
+          const sorted = rows.slice().sort((a, b) => (b.score || 0) - (a.score || 0));
+          $('weights-table').innerHTML =
+            `<table><thead><tr><th>Task</th><th>Provider</th><th>Model</th><th>Score</th><th>Updated</th></tr></thead><tbody>` +
+            sorted.map(r => `<tr><td>${esc(r.taskType || r.task_type || '—')}</td><td>${esc(r.provider)}</td><td>${esc(r.model)}</td><td><strong>${(r.score ?? 0).toFixed(3)}</strong></td><td>${fmtTime(r.updatedAt || r.updated_at)}</td></tr>`).join('') +
+            `</tbody></table>`;
+        }
+        weightsLoaded = true;
+      } catch (e) {
+        $('weights-table').innerHTML = `<p class="empty">Failed to load weights: ${esc(e.message || String(e))}</p>`;
+      }
+    }
+
+    // === Request Logs ===
+    const LOGS_LIMIT = 25;
+    const logsState = { offset: 0, total: 0, loaded: false, expanded: new Set() };
+    function fmtTime(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso.includes('Z') || iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z');
+      return isNaN(d.getTime()) ? iso : d.toLocaleString();
+    }
+    function statusBadge(log) {
+      if (log.cached) return '<span class="badge cached">cached</span>';
+      if (log.boosted) return '<span class="badge boosted">boosted</span>';
+      return '<span class="badge normal">normal</span>';
+    }
+    // === Quality panel ===
+    const QUALITY_PALETTE = ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#a855f7','#ec4899'];
+    async function loadQuality() {
+      let rows;
+      try { rows = await api('/v1/analytics/quality'); } catch { rows = []; }
+      if (!Array.isArray(rows) || !rows.length) {
+        $('quality-chart').innerHTML = '<p class="empty">No quality data yet. Quality scoring starts automatically once scoring is configured.</p>';
+        $('quality-table').innerHTML = '';
+        return;
+      }
+      // Group by model
+      const byModel = {};
+      for (const r of rows) {
+        if (!byModel[r.model]) byModel[r.model] = [];
+        byModel[r.model].push({ date: r.date, avg_score: r.avg_score });
+      }
+      const models = Object.keys(byModel);
+      // Draw multi-series SVG line chart
+      const allDates = [...new Set(rows.map(r => r.date))].sort();
+      const W = $('quality-chart').offsetWidth || 600, H = 200, padL = 36, padB = 28, padT = 8, padR = 12;
+      const chartW = W - padL - padR, chartH = H - padT - padB;
+      let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="font-family:system-ui;font-size:11px">`;
+      // Axes
+      for (const v of [0, 0.25, 0.5, 0.75, 1]) {
+        const y = padT + chartH - v * chartH;
+        svg += `<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="#e5e7eb" stroke-width="1"/>`;
+        svg += `<text x="${padL-4}" y="${y+4}" text-anchor="end" fill="#9ca3af">${v.toFixed(2)}</text>`;
+      }
+      // Series
+      models.forEach((model, mi) => {
+        const color = QUALITY_PALETTE[mi % QUALITY_PALETTE.length];
+        const pts = allDates.map((d, di) => {
+          const row = byModel[model].find(r => r.date === d);
+          const x = padL + (allDates.length < 2 ? chartW / 2 : (di / (allDates.length - 1)) * chartW);
+          const y = padT + chartH - (row ? row.avg_score : 0) * chartH;
+          return { x, y, hasData: !!row };
+        });
+        const path = pts.filter(p => p.hasData).map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+        if (path) svg += `<path d="${path}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>`;
+        pts.filter(p => p.hasData).forEach(p => {
+          svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${color}"/>`;
+        });
+      });
+      svg += '</svg>';
+      $('quality-chart').innerHTML = svg;
+      // Summary table
+      const now = new Date(); const msDay = 86400000;
+      const last7 = allDates.filter(d => (now - new Date(d)) / msDay <= 7);
+      const prior7 = allDates.filter(d => { const age = (now - new Date(d)) / msDay; return age > 7 && age <= 14; });
+      const avg = (model, dates) => {
+        const pts = dates.map(d => byModel[model]?.find(r => r.date === d)?.avg_score).filter(v => v != null);
+        return pts.length ? pts.reduce((a, b) => a + b, 0) / pts.length : null;
+      };
+      let html = '<thead><tr><th style="text-align:left;padding:8px 4px">Model</th><th style="padding:8px 4px">Provider</th><th style="padding:8px 4px">Avg (7d)</th><th style="padding:8px 4px">Trend</th></tr></thead><tbody>';
+      models.forEach((model, mi) => {
+        const color = QUALITY_PALETTE[mi % QUALITY_PALETTE.length];
+        const providers = [...new Set(rows.filter(r => r.model === model).map(r => r.provider))].join(', ');
+        const a = avg(model, last7), b = avg(model, prior7);
+        const scoreStr = a != null ? a.toFixed(3) : '—';
+        let trend = '→', tColor = 'var(--label-tertiary)';
+        if (a != null && b != null) {
+          if (a - b > 0.02) { trend = '↑'; tColor = 'var(--green)'; }
+          else if (b - a > 0.02) { trend = '↓'; tColor = 'var(--red)'; }
+        }
+        html += `<tr>
+          <td style="padding:8px 4px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px"></span>${model}</td>
+          <td style="padding:8px 4px;text-align:center;color:var(--label-secondary)">${providers}</td>
+          <td style="padding:8px 4px;text-align:center;font-weight:600">${scoreStr}</td>
+          <td style="padding:8px 4px;text-align:center;font-size:16px;color:${tColor}">${trend}</td>
+        </tr>`;
+      });
+      $('quality-table').innerHTML = html + '</tbody>';
+    }
+
+    async function loadLogs(offset) {
+      const filter = $('logs-filter').value;
+      const params = new URLSearchParams({ limit: String(LOGS_LIMIT), offset: String(offset) });
+      if (filter === 'cached') params.set('cached', 'true');
+      else if (filter === 'boosted') params.set('boosted', 'true');
+      else if (filter === 'normal') { params.set('cached', 'false'); params.set('boosted', 'false'); }
+      try {
+        const data = await api('/v1/logs?' + params.toString());
+        logsState.offset = offset;
+        logsState.total = data.total;
+        logsState.loaded = true;
+        logsState.expanded.clear();
+        renderLogs(data.logs || []);
+        const start = data.total === 0 ? 0 : offset + 1;
+        const end = offset + (data.logs || []).length;
+        $('logs-meta').textContent = `${start}-${end} of ${fmt(data.total)}`;
+        renderLogsPager(data.hasMore);
+      } catch (e) {
+        $('logs-table').innerHTML = `<p class="empty">Failed to load logs: ${esc(e.message || String(e))}</p>`;
+        $('logs-pager').innerHTML = '';
+        $('logs-meta').textContent = '';
+      }
+    }
+    function renderLogs(logs) {
+      if (!logs.length) { $('logs-table').innerHTML = '<p class="empty">No logs match the current filter.</p>'; return; }
+      const rows = logs.map(l => {
+        const cost = '$' + (l.cost || 0).toFixed(4);
+        const tokens = `${fmt(l.tokens_in)}/${fmt(l.tokens_out)}`;
+        const main = `<tr class="log-row" data-id="${esc(l.id)}" onclick="toggleLogDetail('${esc(l.id)}')">
+          <td>${esc(fmtTime(l.timestamp))}</td>
+          <td>${esc(l.provider)}/${esc(l.model)}</td>
+          <td>${tokens}</td>
+          <td>${cost}</td>
+          <td>${l.latency_ms}ms</td>
+          <td>${statusBadge(l)}</td>
+        </tr>`;
+        const detail = `<tr id="det-${esc(l.id)}" class="hidden"><td colspan="6">
+          <div class="log-detail"><span class="k">id:</span> ${esc(l.id)}
+<span class="k">prompt_hash:</span> ${esc(l.prompt_hash || '-')}
+<span class="k">timing:</span> latency ${l.latency_ms}ms
+<span class="k">tokens:</span> in=${l.tokens_in}, out=${l.tokens_out}
+<span class="k">cost:</span> ${cost}
+<span class="k">status:</span> cached=${l.cached}, boosted=${l.boosted}</div>
+        </td></tr>`;
+        return main + detail;
+      }).join('');
+      $('logs-table').innerHTML =
+        `<table><thead><tr><th>Time</th><th>Provider/Model</th><th>Tokens In/Out</th><th>Cost</th><th>Latency</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+    function toggleLogDetail(id) {
+      const row = document.getElementById('det-' + id);
+      if (!row) return;
+      row.classList.toggle('hidden');
+    }
+    function renderLogsPager(hasMore) {
+      const prevDisabled = logsState.offset === 0 ? 'disabled' : '';
+      const nextDisabled = hasMore ? '' : 'disabled';
+      $('logs-pager').innerHTML =
+        `<button type="button" ${prevDisabled} onclick="loadLogs(Math.max(0, logsState.offset - ${LOGS_LIMIT}))">Previous</button>
+         <button type="button" ${nextDisabled} onclick="loadLogs(logsState.offset + ${LOGS_LIMIT})">Next</button>`;
+    }
+
+    // Progressive OAuth disclosure — only show buttons for providers with configured creds.
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/providers`);
+        if (!res.ok) return;
+        const providers = await res.json();
+        let anyShown = false;
+        if (providers.google) { $('oauth-btn-google').classList.remove('hidden'); anyShown = true; }
+        if (providers.github) { $('oauth-btn-github').classList.remove('hidden'); anyShown = true; }
+        if (providers.oidc) { $('oauth-btn-oidc').classList.remove('hidden'); anyShown = true; }
+        if (anyShown) {
+          $('oauth-btns').classList.remove('hidden');
+          $('auth-divider').classList.remove('hidden');
+        }
+      } catch {}
+    })();
+
+    // Init: invite page takes over if path matches; else regular auth flow.
+    if (!bootInvitePage()) {
+      const savedUser = localStorage.getItem('clawpipe-user');
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          setStatus(user.name || user.email, 'ok');
+          loadProjects();
+        } catch { showView('auth-page'); }
+      } else {
+        const qp = new URLSearchParams(location.search);
+        const wantsSignup =
+          location.pathname.replace(/\/$/, '').endsWith('/signup') ||
+          qp.has('signup') ||
+          qp.has('plan');
+        if (wantsSignup) toggleAuthMode();
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,352 @@
+# Documentation Auto-Updater Configuration
+
+# Source Configuration
+source:
+  # Directories to watch for changes
+  directories:
+    - internal/interfaces/http/routes
+    - internal/interfaces/http/swagger
+    - internal/infrastructure/middleware
+    - internal/domain/services
+    - cmd/server
+
+  # File patterns to watch
+  patterns:
+    - "*.go"
+    - "*.yaml"
+    - "*.yml"
+    - "*.json"
+    - "*.md"
+
+  # Patterns to exclude
+  exclude_patterns:
+    - "*_test.go"
+    - "*.tmp"
+    - "*.bak"
+    - ".git/*"
+    - "vendor/*"
+
+# Output Configuration
+output:
+  # Directory for generated documentation
+  directory: ./docs
+
+  # Subdirectories for different doc types
+  subdirectories:
+    html: .
+    openapi: ./specs
+    sdk: ./sdks
+    examples: ./examples
+    postman: ./postman
+
+# OpenAPI Specification
+openapi:
+  # Path to the main OpenAPI specification file
+  spec_file: ./api/openapi.yaml
+
+  # Output formats
+  formats:
+    - yaml
+    - json
+
+  # Validation settings
+  validation:
+    enabled: true
+    strict_mode: true
+    lint_rules:
+      - no-empty-descriptions
+      - operation-id-required
+      - summary-required
+      - tag-required
+      - no-ambiguous-paths
+
+  # Code generation
+  codegen:
+    enabled: true
+    languages:
+      - go
+      - python
+      - typescript
+      - javascript
+      - java
+      - csharp
+      - ruby
+      - php
+    output_dir: ./sdks
+
+# HTML Documentation
+html:
+  # Template configuration
+  template:
+    # Path to custom templates
+    directory: ./templates
+
+    # Custom CSS file
+    css_file: ./assets/css/docs.css
+
+    # Custom JavaScript file
+    js_file: ./assets/js/docs.js
+
+  # Swagger UI configuration
+  swagger_ui:
+    version: "5.11.0"
+    try_it_out: true
+    deep_linking: true
+    display_operation_id: false
+    display_request_duration: true
+    doc_expansion: "none"
+    filter: true
+    show_extensions: true
+
+    # Custom plugins
+    plugins:
+      - name: "swagger-ui-plugin-download-url"
+        url: "https://unpkg.com/swagger-ui-dist@5.11.0/plugins/download-url.js"
+
+  # Features
+  features:
+    # Enable dark mode toggle
+    dark_mode: true
+
+    # Enable search functionality
+    search: true
+
+    # Enable multi-language support
+    i18n: true
+
+    # Enable API console
+    api_console: true
+
+    # Enable code examples
+    code_examples: true
+
+    # Enable interactive tutorials
+    tutorials: true
+
+# Versioning
+versioning:
+  # Enable version management
+  enabled: true
+
+  # Current version
+  current_version: v1.0.0
+
+  # Version format
+  format: "v{major}.{minor}.{patch}"
+
+  # Version history
+  history:
+    - version: v1.0.0
+      date: "2024-01-01"
+      description: "Initial release"
+
+    - version: v0.9.0
+      date: "2023-12-15"
+      description: "Beta release"
+
+  # Version URLs
+  urls:
+    - url: "https://api.sdlc.cc/v1"
+      description: "Production API v1"
+    - url: "https://staging-api.sdlc.cc/v1"
+      description: "Staging API v1"
+    - url: "http://localhost:8080/v1"
+      description: "Development API v1"
+
+# Watch Mode
+watch:
+  # Enable file watching
+  enabled: true
+
+  # Polling interval
+  interval: 30s
+
+  # Debounce delay (to avoid too frequent updates)
+  debounce: 5s
+
+  # Watch subdirectories
+  recursive: true
+
+  # Ignore dotfiles
+  ignore_dotfiles: true
+
+# Git Integration
+git:
+  # Enable Git integration
+  enabled: true
+
+  # Git repository path
+  repo_path: .
+
+  # Auto-commit changes
+  auto_commit: true
+
+  # Commit message template
+  commit_template: |
+    docs: auto-update API documentation
+
+    - Updated OpenAPI specification
+    - Regenerated HTML documentation
+    - Updated examples and SDKs
+    - Timestamp: {timestamp}
+    - Commit: {commit_hash}
+
+  # Create PR for changes
+  create_pr: false
+
+  # PR template
+  pr_template: |
+    ## 📚 API Documentation Update
+
+    This PR contains automated documentation updates.
+
+    ### Changes:
+    - [x] Updated OpenAPI specification
+    - [x] Regenerated documentation
+    - [x] Updated examples
+
+    ### Checklist:
+    - [ ] Documentation is accurate
+    - [ ] Examples are correct
+    - [ ] No breaking changes without proper documentation
+
+# Notifications
+notifications:
+  # Enable notifications
+  enabled: true
+
+  # Channels
+  channels:
+    slack:
+      enabled: false
+      webhook_url: ${SLACK_WEBHOOK_URL}
+      channel: "#api-updates"
+      username: "Docs Bot"
+      icon_emoji: ":books:"
+
+    email:
+      enabled: false
+      smtp_server: ${SMTP_SERVER}
+      smtp_port: 587
+      username: ${SMTP_USERNAME}
+      password: ${SMTP_PASSWORD}
+      from: "docs@sdlc.cc"
+      to:
+        - dev-team@sdlc.cc
+        - api-team@sdlc.cc
+
+    teams:
+      enabled: false
+      webhook_url: ${TEAMS_WEBHOOK_URL}
+
+  # Events to notify on
+  events:
+    - update_success
+    - update_failure
+    - validation_error
+    - breaking_change
+
+# Caching
+cache:
+  # Enable caching
+  enabled: true
+
+  # Cache directory
+  directory: ./.docs_cache
+
+  # Cache TTL
+  ttl: 24h
+
+  # Max cache size
+  max_size: 100MB
+
+  # Cache keys
+  keys:
+    spec_hash: "openapi_spec_hash"
+    generated_docs: "generated_docs_timestamp"
+    file_hashes: "source_file_hashes"
+
+# Performance
+performance:
+  # Number of workers for parallel processing
+  workers: 4
+
+  # Timeout for operations
+  timeout: 30s
+
+  # Enable compression
+  compress_output: true
+
+  # Minify HTML/CSS/JS
+  minify: true
+
+  # Enable CDN links for assets
+  use_cdn: true
+
+# Security
+security:
+  # Sanitize HTML output
+  sanitize_html: true
+
+  # Hide sensitive information
+  hide_sensitive_data: true
+
+  # Rate limit documentation generation
+  rate_limit: 10/minute
+
+  # Allowed origins for CORS
+  cors_origins:
+    - "https://sdlc.cc"
+    - "https://docs.sdlc.cc"
+    - "https://api.sdlc.cc"
+
+# Logging
+logging:
+  # Log level (debug, info, warn, error)
+  level: info
+
+  # Log format (json, console)
+  format: console
+
+  # Log file
+  file: ./docs-updater.log
+
+  # Enable structured logging
+  structured: true
+
+  # Include timestamps
+  timestamps: true
+
+  # Include caller information
+  include_caller: false
+
+# Analytics
+analytics:
+  # Enable analytics
+  enabled: false
+
+  # Google Analytics
+  google_analytics:
+    tracking_id: ${GA_TRACKING_ID}
+
+  # Plausible Analytics
+  plausible:
+    domain: "docs.sdlc.cc"
+    script_url: "https://plausible.io/js/script.js"
+
+# Development
+development:
+  # Enable debug mode
+  debug: false
+
+  # Enable hot reload
+  hot_reload: true
+
+  # Serve documentation locally
+  serve_locally: true
+
+  # Local server configuration
+  server:
+    host: "localhost"
+    port: 8080
+    auto_open: true

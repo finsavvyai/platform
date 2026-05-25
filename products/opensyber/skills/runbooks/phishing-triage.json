@@ -1,0 +1,40 @@
+{
+  "id": "phishing-triage",
+  "name": "Phishing Report Triage",
+  "description": "Triage a user-reported phishing alert: classify with AI, fetch full alert context, then notify the security channel.",
+  "trigger": {
+    "type": "phishing_report",
+    "severity": "high"
+  },
+  "steps": [
+    {
+      "id": "ai-triage",
+      "action": "call_skill",
+      "params": {
+        "skill": "ai-triage",
+        "input": "$.params.alert"
+      },
+      "on_error": { "mode": "continue" }
+    },
+    {
+      "id": "fetch-alert-detail",
+      "action": "http_request",
+      "params": {
+        "url": "https://api.opensyber.cloud/internal/alerts/lookup",
+        "method": "GET",
+        "headers": { "x-internal": "1" },
+        "timeout_ms": 8000
+      },
+      "on_error": { "mode": "continue" }
+    },
+    {
+      "id": "notify-soc",
+      "action": "notify",
+      "params": {
+        "channel": "soc-incidents",
+        "message": "Phishing report triaged — see runbook run for AI risk score and headers."
+      },
+      "on_error": { "mode": "fail" }
+    }
+  ]
+}

@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDLC Compliance Platform - Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        .animate-pulse-slow { animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">SDLC Compliance Platform</h1>
+                        <p class="text-sm text-gray-500">Enterprise AI Compliance Gateway</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <div class="w-2 h-2 bg-green-400 rounded-full mr-1.5 animate-pulse"></div>
+                        Demo Mode
+                    </span>
+                    <button onclick="showComplianceDashboard()" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        View Dashboard →
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Hero Section -->
+        <section class="text-center mb-12">
+            <h2 class="text-3xl font-bold text-gray-900 mb-4">
+                Experience Enterprise AI Compliance
+            </h2>
+            <p class="text-lg text-gray-600 max-w-3xl mx-auto">
+                See how SDLC enforces compliance policies in real-time as you interact with AI providers.
+                Watch PII detection, audit trails, and regulatory enforcement in action.
+            </p>
+        </section>
+
+        <!-- Demo Interface -->
+        <section class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div class="mb-6">
+                <h3 class="text-xl font-semibold text-gray-900 mb-2">🤖 AI Provider Test</h3>
+                <p class="text-gray-600">
+                    Send a request to any AI provider and watch SDLC enforce compliance policies in real-time.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Request Configuration -->
+                <div>
+                    <h4 class="text-lg font-medium text-gray-900 mb-4">Configure Request</h4>
+
+                    <!-- Provider Selection -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">AI Provider</label>
+                        <select id="provider" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="openai">OpenAI (GPT-4)</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="bedrock">AWS Bedrock</option>
+                            <option value="gemini">Google Gemini</option>
+                        </select>
+                    </div>
+
+                    <!-- Data Classification -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Classification</label>
+                        <select id="dataClassification" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="public">Public Data</option>
+                            <option value="internal">Internal Company Data</option>
+                            <option value="confidential">Confidential Data</option>
+                            <option value="pii">PII (Personal Information)</option>
+                            <option value="phi">PHI (Protected Health Info)</option>
+                            <option value="financial">Financial Data</option>
+                        </select>
+                    </div>
+
+                    <!-- User Context -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">User Role</label>
+                        <select id="userRole" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <option value="anonymous">Anonymous User</option>
+                            <option value="employee">Regular Employee</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">System Administrator</option>
+                            <option value="doctor">Medical Doctor</option>
+                            <option value="lawyer">Attorney</option>
+                            <option value="financial_advisor">Financial Advisor</option>
+                        </select>
+                    </div>
+
+                    <!-- Message Input -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Message to AI</label>
+                        <textarea id="message" rows="4" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Enter your message here. Try including sensitive information to see PII detection in action...">Patient John Smith (SSN: 123-45-6789) needs a prescription review. His email is john.smith@email.com and phone is 555-123-4567. Account #ACC-789456. Credit card: 4111-1111-1111-1111. Medical ID: MR789456.</textarea>
+                    </div>
+
+                    <!-- Send Button -->
+                    <button onclick="sendRequest()" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        <span id="sendButtonText">🚀 Send Request with Compliance Check</span>
+                    </button>
+                </div>
+
+                <!-- Results Display -->
+                <div>
+                    <h4 class="text-lg font-medium text-gray-900 mb-4">Compliance Results</h4>
+
+                    <div id="compliancePanel" class="space-y-4">
+                        <!-- Initial State -->
+                        <div id="initialState" class="text-center py-12 bg-gray-50 rounded-lg">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <h3 class="mt-2 text-sm font-medium text-gray-900">No compliance data yet</h3>
+                            <p class="mt-1 text-sm text-gray-500">Send a request to see SDLC compliance enforcement in action.</p>
+                        </div>
+
+                        <!-- Processing State -->
+                        <div id="processingState" class="hidden">
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <div class="flex items-center">
+                                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+                                    <span class="text-blue-800">Running compliance checks...</span>
+                                </div>
+                                <div class="mt-3 space-y-2 text-sm text-blue-700">
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 bg-blue-400 rounded-full mr-2 animate-pulse"></div>
+                                        Evaluating data classification
+                                    </div>
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 bg-blue-400 rounded-full mr-2 animate-pulse"></div>
+                                        Checking user authorization
+                                    </div>
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 bg-blue-400 rounded-full mr-2 animate-pulse"></div>
+                                        Applying compliance policies
+                                    </div>
+                                    <div class="flex items-center">
+                                        <div class="w-2 h-2 bg-blue-400 rounded-full mr-2 animate-pulse"></div>
+                                        Creating audit trail
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Results State -->
+                        <div id="resultsState" class="hidden space-y-4">
+                            <!-- Compliance Score -->
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h4 class="text-sm font-medium text-green-800">Compliance Score</h4>
+                                        <p class="text-2xl font-bold text-green-600" id="complianceScore">95.8%</p>
+                                    </div>
+                                    <svg class="h-8 w-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+
+                            <!-- Applied Policies -->
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-gray-800 mb-2">Applied Policies</h4>
+                                <div id="appliedPolicies" class="space-y-1 text-sm text-gray-600">
+                                    <!-- Policies will be inserted here -->
+                                </div>
+                            </div>
+
+                            <!-- Transformations -->
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-yellow-800 mb-2">Data Transformations</h4>
+                                <div id="transformations" class="space-y-1 text-sm text-yellow-700">
+                                    <!-- Transformations will be inserted here -->
+                                </div>
+                            </div>
+
+                            <!-- AI Response -->
+                            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-gray-800 mb-2">AI Response (Compliance-Filtered)</h4>
+                                <div id="aiResponse" class="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                                    <!-- AI response will be inserted here -->
+                                </div>
+                            </div>
+
+                            <!-- Audit Trail -->
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-blue-800 mb-2">Audit Information</h4>
+                                <div class="grid grid-cols-2 gap-4 text-sm text-blue-700">
+                                    <div>
+                                        <span class="font-medium">Request ID:</span>
+                                        <div id="requestId" class="font-mono text-xs">--</div>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium">Audit Index:</span>
+                                        <div id="auditIndex" class="font-mono text-xs">--</div>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium">Processing Time:</span>
+                                        <div id="processingTime" class="font-mono text-xs">--</div>
+                                    </div>
+                                    <div>
+                                        <span class="font-medium">Merkle Root:</span>
+                                        <div id="merkleRoot" class="font-mono text-xs">--</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Policy Information -->
+        <section class="bg-white rounded-lg shadow-lg p-6">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">📋 Active Compliance Frameworks</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                    </div>
+                    <h4 class="font-medium text-gray-900">HIPAA</h4>
+                    <p class="text-sm text-gray-600 mt-1">Protected Health Information compliance for healthcare organizations</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <h4 class="font-medium text-gray-900">GDPR</h4>
+                    <p class="text-sm text-gray-600 mt-1">EU data protection and privacy compliance for European operations</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h4 class="font-medium text-gray-900">FINRA</h4>
+                    <p class="text-sm text-gray-600 mt-1">Financial industry compliance and securities regulation enforcement</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Demo functionality
+        async function sendRequest() {
+            const provider = document.getElementById('provider').value;
+            const dataClassification = document.getElementById('dataClassification').value;
+            const userRole = document.getElementById('userRole').value;
+            const message = document.getElementById('message').value;
+
+            // Update UI states
+            document.getElementById('initialState').classList.add('hidden');
+            document.getElementById('resultsState').classList.add('hidden');
+            document.getElementById('processingState').classList.remove('hidden');
+            document.getElementById('sendButtonText').textContent = '⏳ Processing...';
+            document.querySelector('button[onclick="sendRequest()"]').disabled = true;
+
+            // Simulate processing delay
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Simulate compliance evaluation
+            const complianceResult = evaluateCompliance(provider, dataClassification, userRole, message);
+
+            // Display results
+            displayResults(complianceResult);
+
+            // Reset button
+            document.getElementById('sendButtonText').textContent = '🚀 Send Another Request';
+            document.querySelector('button[onclick="sendRequest()"]').disabled = false;
+        }
+
+        function evaluateCompliance(provider, dataClassification, userRole, message) {
+            // Simulate compliance evaluation logic
+            const policies = [];
+            const transformations = [];
+            let complianceScore = 100;
+
+            // Base policies
+            policies.push('base-security-policy', 'data-classification-policy');
+
+            // Data classification specific policies
+            if (dataClassification === 'phi') {
+                policies.push('hipaa-policy', 'phi-protection-policy');
+                if (userRole !== 'doctor' && userRole !== 'admin') {
+                    complianceScore -= 30;
+                    policies.push('unauthorized_phi_access');
+                } else {
+                    transformations.push('redact_ssn', 'redact_medical_ids', 'audit_high_retention');
+                }
+            }
+
+            if (dataClassification === 'pii') {
+                policies.push('pii-protection-policy');
+                transformations.push('redact_email', 'redact_phone', 'redact_ssn');
+            }
+
+            if (dataClassification === 'financial') {
+                policies.push('finra-policy', 'pci-dss-policy');
+                transformations.push('audit_critical_retention', 'supervision_required');
+            }
+
+            if (dataClassification === 'confidential') {
+                if (userRole === 'anonymous') {
+                    complianceScore -= 50;
+                    policies.push('authentication_required');
+                } else {
+                    transformations.push('audit_high_retention');
+                }
+            }
+
+            // Check for PII patterns in message
+            const piiPatterns = [
+                { pattern: /\b\d{3}-\d{2}-\d{4}\b/g, type: 'SSN' },
+                { pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, type: 'Email' },
+                { pattern: /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, type: 'Phone' },
+                { pattern: /\b(?:Account|Acc|#?\s*#?)\s*:?\s*[A-Z0-9-]+/gi, type: 'Account' },
+                { pattern: /\b[A-Z]{2,4}\d{6,8}\b/g, type: 'Medical_ID' },
+                { pattern: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g, type: 'Credit_Card' }
+            ];
+
+            piiPatterns.forEach(({ pattern, type }) => {
+                if (pattern.test(message)) {
+                    if (!transformations.includes(`redact_${type.toLowerCase()}`)) {
+                        transformations.push(`redact_${type.toLowerCase()}`);
+                    }
+                }
+            });
+
+            return {
+                complianceScore: Math.max(complianceScore, 70),
+                policies,
+                transformations,
+                processingTime: Math.floor(Math.random() * 100) + 50,
+                requestId: 'req_' + Math.random().toString(36).substring(2, 15),
+                auditIndex: Math.floor(Math.random() * 100000),
+                merkleRoot: '0x' + Math.random().toString(36).substring(2, 15),
+                filteredResponse: filterMessage(message, transformations)
+            };
+        }
+
+        function filterMessage(message, transformations) {
+            let filtered = message;
+
+            // Apply each transformation with proper regex patterns
+            if (transformations.includes('redact_ssn')) {
+                filtered = filtered.replace(/\b\d{3}-\d{2}-\d{4}\b/g, '[REDACTED SSN]');
+            }
+            if (transformations.includes('redact_email')) {
+                filtered = filtered.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[REDACTED EMAIL]');
+            }
+            if (transformations.includes('redact_phone')) {
+                filtered = filtered.replace(/\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, '[REDACTED PHONE]');
+            }
+            if (transformations.includes('redact_account')) {
+                filtered = filtered.replace(/\b(?:Account|Acc|#?\s*#?)\s*:?\s*[A-Z0-9-]+/gi, '[REDACTED ACCOUNT]');
+            }
+            if (transformations.includes('redact_medical_id')) {
+                filtered = filtered.replace(/\b[A-Z]{2,4}\d{6,8}\b/g, '[REDACTED MEDICAL ID]');
+            }
+            if (transformations.includes('redact_credit_card')) {
+                filtered = filtered.replace(/\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g, '[REDACTED CREDIT CARD]');
+            }
+
+            return `I understand you're asking about: "${filtered}". This request has been processed through SDLC's compliance gateway with all applicable policies enforced. PII has been automatically detected and redacted for security.`;
+        }
+
+        function displayResults(result) {
+            document.getElementById('processingState').classList.add('hidden');
+            document.getElementById('resultsState').classList.remove('hidden');
+
+            // Update compliance score
+            document.getElementById('complianceScore').textContent = result.complianceScore + '%';
+
+            // Update applied policies
+            const policiesHtml = result.policies.map(policy =>
+                `<div class="flex items-center">
+                    <svg class="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    ${policy.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </div>`
+            ).join('');
+            document.getElementById('appliedPolicies').innerHTML = policiesHtml;
+
+            // Update transformations
+            const transformationsHtml = result.transformations.map(transform => {
+                const [action, target] = transform.split('_');
+                return `<div class="flex items-center">
+                    <svg class="w-4 h-4 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    ${action.charAt(0).toUpperCase() + action.slice(1)} ${target.replace(/_/g, ' ')}
+                </div>`;
+            }).join('');
+            document.getElementById('transformations').innerHTML = transformationsHtml;
+
+            // Update AI response
+            document.getElementById('aiResponse').textContent = result.filteredResponse;
+
+            // Update audit information
+            document.getElementById('requestId').textContent = result.requestId;
+            document.getElementById('auditIndex').textContent = '#' + result.auditIndex.toLocaleString();
+            document.getElementById('processingTime').textContent = result.processingTime + 'ms';
+            document.getElementById('merkleRoot').textContent = result.merkleRoot;
+        }
+
+        function showComplianceDashboard() {
+            // In a real implementation, this would open the dashboard
+            alert('Compliance Dashboard would open here. This would show real-time metrics, audit trails, and compliance reporting.');
+        }
+    </script>
+</body>
+</html>

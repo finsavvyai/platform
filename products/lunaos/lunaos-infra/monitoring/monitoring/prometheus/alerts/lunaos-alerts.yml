@@ -1,0 +1,213 @@
+groups:
+  - name: lunaos_api_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          rate(lunaos_http_requests_total{status_code=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High API error rate detected"
+          description: "API error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # High latency
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95, rate(lunaos_http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile latency is {{ $value }}s (threshold: 1s)"
+
+      # API down
+      - alert: APIDown
+        expr: |
+          up{job="lunaos-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "Luna OS API is down"
+          description: "Luna OS API has been down for more than 2 minutes"
+
+  - name: lunaos_llm_alerts
+    interval: 30s
+    rules:
+      # High LLM costs
+      - alert: HighLLMCosts
+        expr: |
+          rate(lunaos_llm_cost_usd_total[1h]) > 100
+        for: 15m
+        labels:
+          severity: warning
+          component: llm
+        annotations:
+          summary: "High LLM costs detected"
+          description: "LLM costs are ${{ $value }}/hour (threshold: $100/hour)"
+
+      # LLM request failures
+      - alert: HighLLMFailureRate
+        expr: |
+          rate(lunaos_llm_requests_total{status="failed"}[5m]) / rate(lunaos_llm_requests_total[5m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          component: llm
+        annotations:
+          summary: "High LLM failure rate"
+          description: "LLM failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Slow LLM requests
+      - alert: SlowLLMRequests
+        expr: |
+          histogram_quantile(0.95, rate(lunaos_llm_request_duration_seconds_bucket[10m])) > 30
+        for: 15m
+        labels:
+          severity: warning
+          component: llm
+        annotations:
+          summary: "Slow LLM requests detected"
+          description: "95th percentile LLM latency is {{ $value }}s (threshold: 30s)"
+
+  - name: lunaos_database_alerts
+    interval: 30s
+    rules:
+      # Database down
+      - alert: DatabaseDown
+        expr: |
+          up{job="postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL has been down for more than 2 minutes"
+
+      # High connection usage
+      - alert: HighDatabaseConnections
+        expr: |
+          lunaos_db_connections_active / 100 > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection usage is {{ $value | humanizePercentage }} (threshold: 80%)"
+
+      # Slow queries
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95, rate(lunaos_db_query_duration_seconds_bucket[5m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query latency is {{ $value }}s (threshold: 500ms)"
+
+  - name: lunaos_cache_alerts
+    interval: 30s
+    rules:
+      # Redis down
+      - alert: RedisDown
+        expr: |
+          up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Redis cache is down"
+          description: "Redis has been down for more than 2 minutes"
+
+      # Low cache hit rate
+      - alert: LowCacheHitRate
+        expr: |
+          rate(lunaos_cache_hits_total[5m]) / (rate(lunaos_cache_hits_total[5m]) + rate(lunaos_cache_misses_total[5m])) < 0.5
+        for: 15m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }} (threshold: 50%)"
+
+  - name: lunaos_system_alerts
+    interval: 30s
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: |
+          lunaos_system_cpu_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% (threshold: 80%)"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          (lunaos_system_memory_usage_bytes / (lunaos_system_memory_usage_bytes + lunaos_system_memory_available_bytes)) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} (threshold: 85%)"
+
+      # Low disk space
+      - alert: LowDiskSpace
+        expr: |
+          (lunaos_system_disk_usage_bytes / (lunaos_system_disk_usage_bytes + node_filesystem_avail_bytes)) > 0.85
+        for: 15m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage is {{ $value | humanizePercentage }} on {{ $labels.mountpoint }} (threshold: 85%)"
+
+  - name: lunaos_billing_alerts
+    interval: 1h
+    rules:
+      # Tenant over budget
+      - alert: TenantOverBudget
+        expr: |
+          rate(lunaos_billing_usage_usd_total[24h]) > 1000
+        for: 1h
+        labels:
+          severity: info
+          component: billing
+        annotations:
+          summary: "Tenant exceeding budget"
+          description: "Tenant {{ $labels.tenant_id }} usage is ${{ $value }}/day (budget: $1000/day)"
+
+  - name: lunaos_sla_alerts
+    interval: 1m
+    rules:
+      # SLA violation - 99.9% uptime
+      - alert: SLAViolation
+        expr: |
+          (1 - (rate(lunaos_http_requests_total{status_code=~"5.."}[30m]) / rate(lunaos_http_requests_total[30m]))) < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          component: sla
+        annotations:
+          summary: "SLA violation detected"
+          description: "API availability is {{ $value | humanizePercentage }} (SLA: 99.9%)"

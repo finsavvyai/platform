@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Forgot password — PipeWarden</title>
+<meta name="robots" content="noindex,nofollow" />
+<link rel="stylesheet" href="/auth.css" />
+<link rel="icon" href="/favicon.svg" />
+</head>
+<body>
+<main class="auth-shell">
+  <section class="auth-card">
+    <a href="/" class="auth-brand"><span class="dot"></span>PipeWarden</a>
+    <h1 class="auth-title">Forgot your password?</h1>
+    <p class="auth-sub">Enter your email and we'll send a reset link. The link is one-shot and expires in an hour.</p>
+
+    <div class="error" id="err"></div>
+
+    <form id="forgot-form" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" autocomplete="email" required placeholder="you@company.com" />
+      </div>
+      <button type="submit" class="btn-primary" id="submit-btn">Send reset link</button>
+    </form>
+
+    <div id="success" hidden style="margin-top: var(--s-4); font-size: var(--fs-13); color: var(--text-secondary);">
+      If that email is registered, a reset link is on its way. Check your inbox.
+    </div>
+
+    <div class="auth-footer">
+      Remembered it? <a href="/login/">Sign in</a> · <a href="/signup/">Create account</a>
+    </div>
+  </section>
+</main>
+
+<script>
+const API_BASE = window.location.hostname === 'pipewarden.com' || window.location.hostname === 'pipewarden.io'
+  ? 'https://api.pipewarden.io'
+  : '';
+
+document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const err = document.getElementById('err');
+  err.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const res = await fetch(API_BASE + '/api/v1/auth/password/reset/begin', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ email: document.getElementById('email').value }),
+    });
+    if (!res.ok && res.status !== 200) throw new Error(`HTTP ${res.status}`);
+    document.getElementById('forgot-form').hidden = true;
+    document.getElementById('success').hidden = false;
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('visible');
+    btn.disabled = false;
+    btn.textContent = 'Send reset link';
+  }
+});
+</script>
+</body>
+</html>

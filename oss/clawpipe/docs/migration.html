@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Migration Guides - ClawPipe Docs</title>
+  <meta name="description" content="Migrate to ClawPipe from direct OpenAI calls, LiteLLM, and Portkey.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="docs-layout">
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Documentation">
+    <a href="/" class="logo">ClawPipe</a>
+    <nav>
+      <a href="index.html">Getting Started</a>
+      <a href="concepts.html">How It Works</a>
+      <div class="sep"></div>
+      <a href="typescript.html">TypeScript SDK</a>
+      <a href="python.html">Python SDK</a>
+      <a href="go.html">Go SDK</a>
+      <div class="sep"></div>
+      <a href="integrations.html">Integrations</a>
+      <a href="api.html">Gateway API</a>
+      <a href="oauth-setup.html">OAuth Setup</a>
+      <a href="migration.html" class="active">Migration</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="doc-header">
+      <div>
+        <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Toggle menu">&#9776;</button>
+        <span class="breadcrumb">Docs / Migration</span>
+      </div>
+      <div class="links">
+        <a href="https://github.com/finsavvyai/clawpipe">GitHub</a>
+        <a href="https://clawpipe.ai">Home</a>
+      </div>
+    </header>
+    <main id="main-content" class="content">
+      <h1><span>Migration</span> Guides</h1>
+      <p>Switch to ClawPipe from your current LLM setup. Most migrations take under 10 minutes.</p>
+
+      <h2>From Direct OpenAI Calls</h2>
+      <p>The most common migration. Replace the OpenAI client with ClawPipe's OpenAI-compatible wrapper or use the native SDK.</p>
+
+      <h3>Option A: Drop-in Replacement (Zero Code Changes)</h3>
+      <p>Use <code>OpenAICompat</code> to keep your existing OpenAI code unchanged.</p>
+<pre><code><span class="code-dim">// Before: direct OpenAI</span>
+<span class="code-accent">import</span> OpenAI <span class="code-accent">from</span> <span class="code-green">'openai'</span>;
+<span class="code-accent">const</span> openai = <span class="code-accent">new</span> OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+<span class="code-dim">// After: ClawPipe drop-in (same API)</span>
+<span class="code-accent">import</span> { OpenAICompat } <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>;
+<span class="code-accent">const</span> openai = <span class="code-accent">new</span> OpenAICompat({
+  apiKey: <span class="code-green">'cp_xxx'</span>,
+  projectId: <span class="code-green">'my-app'</span>,
+});
+
+<span class="code-dim">// Your existing code stays exactly the same</span>
+<span class="code-accent">const</span> completion = <span class="code-accent">await</span> openai.chat.completions.create({
+  model: <span class="code-green">'gpt-4o'</span>,
+  messages: [{ role: <span class="code-green">'user'</span>, content: <span class="code-green">'Hello'</span> }],
+});</code></pre>
+
+      <h3>Option B: Native SDK (Full Pipeline Access)</h3>
+      <p>Use the ClawPipe SDK directly for full control over the pipeline.</p>
+<pre><code><span class="code-dim">// Before</span>
+<span class="code-accent">const</span> completion = <span class="code-accent">await</span> openai.chat.completions.create({
+  model: <span class="code-green">'gpt-4o'</span>,
+  messages: [
+    { role: <span class="code-green">'system'</span>, content: <span class="code-green">'You are helpful.'</span> },
+    { role: <span class="code-green">'user'</span>, content: <span class="code-green">'Explain recursion'</span> },
+  ],
+  max_tokens: 2000,
+});
+<span class="code-accent">const</span> text = completion.choices[0].message.content;
+
+<span class="code-dim">// After</span>
+<span class="code-accent">import</span> { ClawPipe } <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>;
+<span class="code-accent">const</span> pipe = <span class="code-accent">new</span> ClawPipe({ apiKey: <span class="code-green">'cp_xxx'</span>, projectId: <span class="code-green">'my-app'</span> });
+
+<span class="code-accent">const</span> result = <span class="code-accent">await</span> pipe.prompt(<span class="code-green">'Explain recursion'</span>, {
+  system: <span class="code-green">'You are helpful.'</span>,
+  maxTokens: 2000,
+});
+<span class="code-accent">const</span> text = result.text;
+<span class="code-dim">// Bonus: result.meta shows cost savings, routing, cache hits</span></code></pre>
+
+      <h2>From LiteLLM</h2>
+      <p>LiteLLM provides multi-provider access but lacks optimization stages. ClawPipe adds Booster, Packer, Cache, and self-learning routing.</p>
+
+      <h3>Key Differences</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Feature</th><th>LiteLLM</th><th>ClawPipe</th></tr></thead>
+          <tbody>
+            <tr><td>Multi-provider</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>Cost optimization</td><td>Manual model selection</td><td>Automatic routing + caching + packing</td></tr>
+            <tr><td>Caching</td><td>Hash-only</td><td>Hash + semantic similarity</td></tr>
+            <tr><td>Smart routing</td><td>No</td><td>Self-learning, improves over time</td></tr>
+            <tr><td>Context compression</td><td>No</td><td>20-60% token reduction</td></tr>
+            <tr><td>Deterministic booster</td><td>No</td><td>Skips LLM for math, dates, JSON</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+<pre><code><span class="code-dim"># Before: LiteLLM</span>
+<span class="code-accent">from</span> litellm <span class="code-accent">import</span> completion
+
+response = completion(
+    model=<span class="code-green">"gpt-4o"</span>,
+    messages=[{<span class="code-green">"role"</span>: <span class="code-green">"user"</span>, <span class="code-green">"content"</span>: <span class="code-green">"Hello"</span>}],
+)
+
+<span class="code-dim"># After: ClawPipe</span>
+<span class="code-accent">from</span> clawpipe <span class="code-accent">import</span> ClawPipe
+
+pipe = ClawPipe(api_key=<span class="code-green">"cp_xxx"</span>, project_id=<span class="code-green">"my-app"</span>)
+result = <span class="code-accent">await</span> pipe.prompt(<span class="code-green">"Hello"</span>)
+<span class="code-dim"># Automatic routing, caching, packing — no manual model selection</span></code></pre>
+
+      <h2>From Portkey</h2>
+      <p>Portkey focuses on observability and gateway routing. ClawPipe adds client-side optimization stages (Booster, Packer, Cache) that reduce tokens before they reach the gateway.</p>
+
+      <h3>Key Differences</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Feature</th><th>Portkey</th><th>ClawPipe</th></tr></thead>
+          <tbody>
+            <tr><td>Gateway routing</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>Observability</td><td>Dashboard-focused</td><td>SDK-level telemetry + dashboard</td></tr>
+            <tr><td>Client-side optimization</td><td>No</td><td>Booster + Packer + Cache</td></tr>
+            <tr><td>Self-learning routing</td><td>No</td><td>Weights update from every call</td></tr>
+            <tr><td>Swarm orchestration</td><td>No</td><td>Fan out to N models</td></tr>
+            <tr><td>Offline fallback</td><td>No</td><td>Local LLM auto-detection</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+<pre><code><span class="code-dim">// Before: Portkey</span>
+<span class="code-accent">import</span> Portkey <span class="code-accent">from</span> <span class="code-green">'portkey-ai'</span>;
+<span class="code-accent">const</span> portkey = <span class="code-accent">new</span> Portkey({ apiKey: <span class="code-green">'pk_xxx'</span> });
+<span class="code-accent">const</span> response = <span class="code-accent">await</span> portkey.chat.completions.create({
+  messages: [{ role: <span class="code-green">'user'</span>, content: <span class="code-green">'Hello'</span> }],
+  model: <span class="code-green">'gpt-4o'</span>,
+});
+
+<span class="code-dim">// After: ClawPipe</span>
+<span class="code-accent">import</span> { ClawPipe } <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>;
+<span class="code-accent">const</span> pipe = <span class="code-accent">new</span> ClawPipe({ apiKey: <span class="code-green">'cp_xxx'</span>, projectId: <span class="code-green">'my-app'</span> });
+<span class="code-accent">const</span> result = <span class="code-accent">await</span> pipe.prompt(<span class="code-green">'Hello'</span>);
+<span class="code-dim">// Automatic: booster check, context packing, cache lookup,
+// smart routing, then gateway call with circuit breaker</span></code></pre>
+
+      <h2>Migration Checklist</h2>
+      <ol>
+        <li>Sign up at <a href="https://app.clawpipe.ai">app.clawpipe.ai</a> and create a project</li>
+        <li>Install the SDK: <code>npm install clawpipe-ai</code></li>
+        <li>Replace your LLM client initialization (see examples above)</li>
+        <li>Set your ClawPipe API key in environment variables</li>
+        <li>Run your existing test suite to verify compatibility</li>
+        <li>Monitor savings via <code>pipe.stats()</code> or the analytics dashboard</li>
+      </ol>
+    </main>
+  </div>
+</div>
+</body>
+</html>

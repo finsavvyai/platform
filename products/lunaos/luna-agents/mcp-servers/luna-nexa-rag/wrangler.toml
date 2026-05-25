@@ -1,0 +1,68 @@
+# Cloudflare Workers configuration for Luna Nexa RAG
+# Deploy UI/UX testing to the edge for global, fast, serverless testing
+
+name = "luna-nexa-rag"
+main = "index.js"
+compatibility_date = "2024-01-01"
+node_compat = true
+
+# Account ID (replace with your Cloudflare account ID)
+account_id = "YOUR_ACCOUNT_ID"
+
+# Workers configuration
+[build]
+command = ""
+watch_dirs = ["."]
+
+# Environment variables
+[vars]
+NEXA_ENDPOINT = "http://127.0.0.1:8080"
+CHROMA_HOST = "localhost"
+CHROMA_PORT = "8000"
+
+# Production environment
+[env.production]
+name = "luna-nexa-rag-production"
+workers_dev = false
+routes = [
+  { pattern = "ui-testing.yourdomain.com/*", zone_name = "yourdomain.com" }
+]
+
+# Staging environment
+[env.staging]
+name = "luna-nexa-rag-staging"
+workers_dev = true
+
+# Resource limits
+[limits]
+cpu_ms = 50000  # 50 seconds CPU time
+
+# Browser rendering (for screenshots)
+[browser]
+binding = "BROWSER"
+
+# KV namespace for caching (optional)
+[[kv_namespaces]]
+binding = "CACHE"
+id = "YOUR_KV_ID"
+
+# D1 database (optional - for storing test results)
+[[d1_databases]]
+binding = "DB"
+database_name = "luna_test_results"
+database_id = "YOUR_D1_ID"
+
+# R2 bucket for screenshot storage (optional)
+[[r2_buckets]]
+binding = "SCREENSHOTS"
+bucket_name = "luna-screenshots"
+
+# Durable Objects for stateful testing (optional)
+#[[durable_objects.bindings]]
+#name = "TEST_RUNNER"
+#class_name = "TestRunner"
+#script_name = "luna-nexa-rag"
+
+# Compatibility flags
+[compatibility_flags]
+nodejs_compat = true

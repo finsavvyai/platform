@@ -1,0 +1,116 @@
+# version: '3.8'  # removed obsolete version line
+
+services:
+  # PostgreSQL with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: lunaos-postgres
+    environment:
+      POSTGRES_DB: lunaos
+      POSTGRES_USER: lunaos
+      POSTGRES_PASSWORD: lunaos
+    ports:
+      - "5439:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U lunaos -d lunaos" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lunaos-network
+
+  # Redis for caching and task queues
+  redis:
+    image: redis:7-alpine
+    container_name: lunaos-redis
+    ports:
+      - "6385:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lunaos-network
+
+  # LunaOS API Server
+  lunaos-api:
+    build:
+      context: ../../
+      dockerfile: infra/docker/Dockerfile
+    container_name: lunaos-api
+    environment:
+      - DATABASE_URL=postgresql://lunaos:lunaos@postgres:5432/lunaos
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+    ports:
+      - "8006:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../../plugins:/app/plugins:ro
+      - ../../logs:/app/logs
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - lunaos-network
+    restart: unless-stopped
+
+  # LunaOS Dashboard (optional)
+  lunaos-dashboard:
+    build:
+      context: ../../apps/dashboard-ui
+      dockerfile: Dockerfile
+    container_name: lunaos-dashboard
+    environment:
+      - REACT_APP_API_URL=http://lunaos-api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - lunaos-api
+    networks:
+      - lunaos-network
+    restart: unless-stopped
+    profiles:
+      - dashboard
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: lunaos-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - lunaos-api
+    networks:
+      - lunaos-network
+    restart: unless-stopped
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  lunaos-network:
+    driver: bridge

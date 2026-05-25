@@ -1,0 +1,73 @@
+version: "3.8"
+
+x-common: &common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  env_file:
+    - path: .env
+      required: false
+  restart: unless-stopped
+  volumes:
+    - ./logs:/app/logs
+
+services:
+  master:
+    <<: *common
+    command: python3 -m src.core.start_master
+    ports:
+      - "8000:8000"
+    environment:
+      FINSAVVYAI_MASTER_HOST: "0.0.0.0"
+      FINSAVVYAI_MASTER_PORT: "8000"
+      FINSAVVYAI_LOG_LEVEL: "${FINSAVVYAI_LOG_LEVEL:-INFO}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  worker:
+    <<: *common
+    command: python3 -m src.workers.worker_node --master master
+    depends_on:
+      master:
+        condition: service_healthy
+    environment:
+      FINSAVVYAI_MASTER_HOST: "master"
+      FINSAVVYAI_MASTER_PORT: "8000"
+      FINSAVVYAI_LOG_LEVEL: "${FINSAVVYAI_LOG_LEVEL:-INFO}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  gateway:
+    <<: *common
+    command: python3 -m src.api.gateway --master-host master
+    ports:
+      - "${FINSAVVYAI_GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      master:
+        condition: service_healthy
+    environment:
+      FINSAVVYAI_MASTER_HOST: "master"
+      FINSAVVYAI_MASTER_PORT: "8000"
+      FINSAVVYAI_GATEWAY_HOST: "0.0.0.0"
+      FINSAVVYAI_GATEWAY_PORT: "8080"
+      FINSAVVYAI_LOG_LEVEL: "${FINSAVVYAI_LOG_LEVEL:-INFO}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OLLAMA_BASE_URL: "${OLLAMA_BASE_URL:-}"
+      FINSAVVYAI_AUTH_ENABLED: "${FINSAVVYAI_AUTH_ENABLED:-false}"
+      FINSAVVYAI_API_KEY: "${FINSAVVYAI_API_KEY:-}"
+      FINSAVVYAI_RATE_LIMIT_REQUESTS: "${FINSAVVYAI_RATE_LIMIT_REQUESTS:-100}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

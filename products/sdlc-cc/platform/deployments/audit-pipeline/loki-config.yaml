@@ -1,0 +1,81 @@
+# SDLC Platform — Loki config for append-only audit logs.
+# Dev: filesystem storage. Prod: override with R2/S3 (see README).
+#
+# Retention: 90 days in Loki (hot). Long-term (7y) cold storage
+# is handled separately by Vector → R2 (see vector-config.toml).
+
+auth_enabled: false  # Dev only. Prod: set true + X-Scope-OrgID per tenant.
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: info
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+query_range:
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: boltdb-shipper
+      object_store: filesystem  # PROD: change to "s3" (R2-compatible)
+      schema: v13
+      index:
+        prefix: audit_index_
+        period: 24h
+
+# ---------------------------------------------------------------
+# Production storage (commented — enable via config overlay)
+# ---------------------------------------------------------------
+# storage_config:
+#   aws:
+#     endpoint: ${R2_ENDPOINT}      # e.g. https://<acct>.r2.cloudflarestorage.com
+#     bucketnames: sdlc-loki-chunks
+#     access_key_id: ${R2_ACCESS_KEY_ID}
+#     secret_access_key: ${R2_SECRET_ACCESS_KEY}
+#     s3forcepathstyle: true
+#     insecure: false
+#   boltdb_shipper:
+#     active_index_directory: /loki/index
+#     cache_location: /loki/index_cache
+#     shared_store: s3
+
+limits_config:
+  retention_period: 2160h      # 90 days
+  max_query_length: 721h
+  max_query_parallelism: 32
+  ingestion_rate_mb: 16
+  ingestion_burst_size_mb: 32
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  split_queries_by_interval: 15m
+
+compactor:
+  working_directory: /loki/compactor
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+  delete_request_store: filesystem
+
+ruler:
+  alertmanager_url: http://localhost:9093
+
+analytics:
+  reporting_enabled: false

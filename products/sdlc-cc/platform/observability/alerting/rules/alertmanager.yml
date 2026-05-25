@@ -1,0 +1,175 @@
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@sdlc.cc'
+  smtp_require_tls: true
+
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'web.hook'
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 5m
+      continue: true
+
+    # Service downtime alerts
+    - match:
+        alertname: 'ServiceDown'
+      receiver: 'service-alerts'
+      group_wait: 0s
+      repeat_interval: 2m
+
+    # High error rate alerts
+    - match:
+        alertname: 'HighErrorRate'
+      receiver: 'error-alerts'
+      group_wait: 1m
+      repeat_interval: 10m
+
+    # Performance alerts
+    - match:
+        alertname: 'HighLatency'
+      receiver: 'performance-alerts'
+      group_wait: 2m
+      repeat_interval: 15m
+
+    # Resource usage alerts
+    - match:
+        alertname: 'HighResourceUsage'
+      receiver: 'resource-alerts'
+      group_wait: 5m
+      repeat_interval: 30m
+
+    # Security alerts
+    - match:
+        severity: security
+      receiver: 'security-alerts'
+      group_wait: 0s
+      repeat_interval: 15m
+
+    # Business metric alerts
+    - match:
+        alertname: 'BusinessMetricAnomaly'
+      receiver: 'business-alerts'
+      group_wait: 10m
+      repeat_interval: 1h
+
+receivers:
+  # Default webhook receiver
+  - name: 'web.hook'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+
+  # Critical alerts - multiple channels
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@sdlc.cc,devops@sdlc.cc'
+        subject: '[CRITICAL] SDLC Platform Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+          {{ end }}
+    slack_configs:
+      - api_url: 'SLACK_WEBHOOK_URL'
+        channel: '#alerts-critical'
+        title: '🚨 CRITICAL ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+    webhook_configs:
+      - url: 'http://localhost:5001/critical-alerts'
+        send_resolved: true
+
+  # Service alerts
+  - name: 'service-alerts'
+    email_configs:
+      - to: 'devops@sdlc.cc'
+        subject: '[SERVICE] SDLC Service Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Service: {{ .Labels.service }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          {{ end }}
+    slack_configs:
+      - api_url: 'SLACK_WEBHOOK_URL'
+        channel: '#alerts-services'
+        title: '🔧 SERVICE ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Service:* {{ .Labels.service }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          {{ end }}
+
+  # Error alerts
+  - name: 'error-alerts'
+    email_configs:
+      - to: 'dev-team@sdlc.cc'
+        subject: '[ERROR] SDLC Error Alert: {{ .GroupLabels.alertname }}'
+    slack_configs:
+      - api_url: 'SLACK_WEBHOOK_URL'
+        channel: '#alerts-errors'
+
+  # Performance alerts
+  - name: 'performance-alerts'
+    email_configs:
+      - to: 'performance-team@sdlc.cc'
+        subject: '[PERFORMANCE] SDLC Performance Alert: {{ .GroupLabels.alertname }}'
+
+  # Resource alerts
+  - name: 'resource-alerts'
+    email_configs:
+      - to: 'devops@sdlc.cc'
+        subject: '[RESOURCE] SDLC Resource Alert: {{ .GroupLabels.alertname }}'
+
+  # Security alerts
+  - name: 'security-alerts'
+    email_configs:
+      - to: 'security-team@sdlc.cc'
+        subject: '[SECURITY] SDLC Security Alert: {{ .GroupLabels.alertname }}'
+    slack_configs:
+      - api_url: 'SLACK_WEBHOOK_URL'
+        channel: '#security-alerts'
+        title: '🔒 SECURITY ALERT: {{ .GroupLabels.alertname }}'
+        color: 'danger'
+
+  # Business alerts
+  - name: 'business-alerts'
+    email_configs:
+      - to: 'business-team@sdlc.cc,product-team@sdlc.cc'
+        subject: '[BUSINESS] SDLC Business Alert: {{ .GroupLabels.alertname }}'
+
+inhibit_rules:
+  # Inhibit non-critical alerts if service is down
+  - source_match:
+      alertname: 'ServiceDown'
+    target_match_re:
+      alertname: '(HighErrorRate|HighLatency|BusinessMetricAnomaly)'
+    equal: ['service']
+
+  # Inhibit warning alerts if critical alerts are firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname']
+
+  # Inhibit node alerts if entire cluster is down
+  - source_match:
+      alertname: 'ClusterDown'
+    target_match:
+      alertname: 'NodeDown'
+    equal: ['cluster']

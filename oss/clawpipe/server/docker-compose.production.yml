@@ -1,0 +1,264 @@
+version: "3.8"
+
+# FinSavvyAI Production Stack
+# Includes all services, observability, and Cloudflare Tunnel
+#
+# Usage:
+#   cp scripts/config/production.env.example .env
+#   # Edit .env with your production values
+#   docker-compose -f docker-compose.production.yml up -d
+#
+# Services:
+#   master    - Cluster master server         -> :8000
+#   worker    - AI worker node                -> :8001
+#   gateway   - API gateway                   -> :8080
+#   tunnel    - Cloudflare Tunnel             -> exposes to internet
+#   prometheus - Metrics collection           -> :9090
+#   loki      - Log aggregation              -> :3100
+#   promtail  - Log shipper                  -> :9080
+#   grafana   - Dashboards & alerts          -> :3000
+
+services:
+  # ===========================================================================
+  # APPLICATION SERVICES
+  # ===========================================================================
+  master:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finsavvyai-master
+    command: python3 -m src.core.start_master
+    ports:
+      - "8000:8000"
+    environment:
+      - FINSAVVYAI_MASTER_HOST=0.0.0.0
+      - FINSAVVYAI_MASTER_PORT=8000
+      - FINSAVVYAI_CLUSTER_ID=${FINSAVVYAI_CLUSTER_ID:-finsavvy-production-cluster}
+      - FINSAVVYAI_AUTH_ENABLED=${FINSAVVYAI_AUTH_ENABLED:-true}
+      - FINSAVVYAI_LOG_LEVEL=${FINSAVVYAI_LOG_LEVEL:-INFO}
+      - FINSAVVYAI_LOG_FORMAT=json
+    volumes:
+      - ./logs:/app/logs
+      - api_keys:/home/finsavvyai/.finsavvyai
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: ${MASTER_MEMORY_LIMIT:-1G}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finsavvyai-worker
+    command: python3 -m src.workers.worker_node --master master
+    depends_on:
+      master:
+        condition: service_healthy
+    environment:
+      - FINSAVVYAI_MASTER_HOST=master
+      - FINSAVVYAI_MASTER_PORT=8000
+      - FINSAVVYAI_LOG_LEVEL=${FINSAVVYAI_LOG_LEVEL:-INFO}
+      - FINSAVVYAI_LOG_FORMAT=json
+    volumes:
+      - ./logs:/app/logs
+      - ${FINSAVVYAI_MODELS_DIR:-./models}:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: ${WORKER_MEMORY_LIMIT:-16G}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finsavvyai-gateway
+    command: python3 -m src.api.gateway --master-host master
+    ports:
+      - "8080:8080"
+    depends_on:
+      master:
+        condition: service_healthy
+    environment:
+      - FINSAVVYAI_MASTER_HOST=master
+      - FINSAVVYAI_MASTER_PORT=8000
+      - FINSAVVYAI_AUTH_ENABLED=${FINSAVVYAI_AUTH_ENABLED:-true}
+      - FINSAVVYAI_RATE_LIMIT_ENABLED=${FINSAVVYAI_RATE_LIMIT_ENABLED:-true}
+      - FINSAVVYAI_RATE_LIMIT_REQUESTS=${FINSAVVYAI_RATE_LIMIT_REQUESTS:-100}
+      - FINSAVVYAI_RATE_LIMIT_WINDOW=${FINSAVVYAI_RATE_LIMIT_WINDOW:-60}
+      - FINSAVVYAI_CORS_ORIGINS=${FINSAVVYAI_CORS_ORIGINS:-https://llm.finsavvyai.com}
+      - FINSAVVYAI_LOG_LEVEL=${FINSAVVYAI_LOG_LEVEL:-INFO}
+      - FINSAVVYAI_LOG_FORMAT=json
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ./logs:/app/logs
+      - api_keys:/home/finsavvyai/.finsavvyai
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: ${GATEWAY_MEMORY_LIMIT:-2G}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  control-hub:
+    build:
+      context: ./packages/control-hub-node
+      dockerfile: ../../Dockerfile.control-hub
+    container_name: finsavvyai-control-hub
+    command: node server.js
+    ports:
+      - "9100:9090"
+    depends_on:
+      gateway:
+        condition: service_healthy
+      master:
+        condition: service_healthy
+    environment:
+      - GATEWAY_URL=http://gateway:8080
+      - MASTER_URL=http://master:8000
+      - PORT=9090
+      - BASE_PATH=/hub
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:9090/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # CLOUDFLARE TUNNEL (secure remote access without exposing ports)
+  # ===========================================================================
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: finsavvyai-tunnel
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflare-tunnel/config.yml:/etc/cloudflared/config.yml:ro
+      - ./cloudflare-tunnel/credentials:/etc/cloudflared/credentials:ro
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # OBSERVABILITY STACK
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: finsavvyai-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alert-rules.yaml:/etc/prometheus/alert-rules.yaml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_DAYS:-30}d"
+      - "--web.enable-lifecycle"
+    depends_on:
+      - alertmanager
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: finsavvyai-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:latest
+    container_name: finsavvyai-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: finsavvyai-promtail
+    volumes:
+      - ./observability/promtail-config.yaml:/etc/promtail/config.yml:ro
+      - ./logs:/var/log/finsavvyai:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: finsavvyai-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+volumes:
+  api_keys:
+  prometheus_data:
+  loki_data:
+  grafana_data:

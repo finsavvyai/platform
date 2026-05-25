@@ -1,0 +1,44 @@
+# SLO alert rules (NFR: p95 < 100ms, error rate < 0.1%). Route to on-call per Day 5.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gateway-slo-alerts
+  namespace: sdlc-platform
+  labels:
+    app: gateway
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: gateway_slo
+    interval: 30s
+    rules:
+    - alert: GatewaySLOLatencyBreach
+      expr: |
+        histogram_quantile(0.95,
+          sum(rate(sdlc_gateway_http_request_duration_seconds_bucket{namespace="sdlc-platform"}[5m])) by (le)
+        ) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: gateway
+        slo: latency
+      annotations:
+        summary: Gateway SLO latency breach (p95 > 100ms)
+        description: "95th percentile latency is {{ $value | humanize }}s (SLO: 100ms)"
+
+    - alert: GatewaySLOErrorRateBreach
+      expr: |
+        (
+          sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform",status_code=~"5.."}[5m]))
+          /
+          sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform"}[5m]))
+        ) > 0.001
+      for: 5m
+      labels:
+        severity: warning
+        component: gateway
+        slo: error_rate
+      annotations:
+        summary: Gateway SLO error rate breach (> 0.1%)
+        description: "Error rate is {{ $value | humanizePercentage }} (SLO: 0.1%)"

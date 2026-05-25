@@ -1,0 +1,29 @@
+# Real iOS Safari test of TenantIQ PWA — landing page renders + key elements visible.
+#
+# Run:
+#   xcrun simctl boot "iPhone 16"
+#   maestro test apps/web/maestro/01-pwa-landing.yaml
+#
+# Verifies on a real iOS WebKit (NOT Playwright simulation):
+#   - Landing page loads
+#   - Sign-in card renders with all auth buttons
+#   - "Sign in with passkey" button shows (WebAuthn supported on iOS Safari)
+#   - iOS install hint appears (after 2.5s delay)
+
+appId: com.apple.mobilesafari
+---
+- launchApp
+- openLink: https://app.tenantiq.app
+- assertVisible:
+    text: "M365 security"
+- assertVisible:
+    text: "Sign in"
+- assertVisible:
+    text: "Sign in with Microsoft"
+- assertVisible:
+    text: "Sign in with passkey"
+# iOS install hint appears after 2.5s delay
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    text: "Install TenantIQ for a better experience"

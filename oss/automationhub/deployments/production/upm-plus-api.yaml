@@ -1,0 +1,484 @@
+---
+# UPM.Plus API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: upm-plus-api
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: api
+    tier: application
+    version: v2.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: upm-plus
+      component: api
+  template:
+    metadata:
+      labels:
+        app: upm-plus
+        component: api
+        tier: application
+        version: v2.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+        prometheus.io/scheme: "http"
+    spec:
+      serviceAccountName: upm-plus-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: api
+        image: upm-plus/api:v2.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: APP_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: APP_ENV
+        - name: DEBUG
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: DEBUG
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: LOG_LEVEL
+
+        # Database Configuration
+        - name: DATABASE_URL
+          value: "postgresql://upm_plus:$(DATABASE_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: DB_PORT
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: DB_NAME
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: upm-plus-secrets
+              key: database-password
+
+        # Redis Configuration
+        - name: REDIS_URL
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)/$(REDIS_DB)"
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: REDIS_PORT
+        - name: REDIS_DB
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: REDIS_DB
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: upm-plus-secrets
+              key: redis-password
+
+        # Security Configuration
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: upm-plus-secrets
+              key: jwt-secret
+        - name: JWT_ALGORITHM
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: JWT_ALGORITHM
+        - name: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+
+        # AI Services Configuration
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: upm-plus-secrets
+              key: openai-api-key
+        - name: OPENAI_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: OPENAI_MODEL
+        - name: OPENAI_MAX_TOKENS
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: OPENAI_MAX_TOKENS
+        - name: OPENAI_TEMPERATURE
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: OPENAI_TEMPERATURE
+
+        # Monitoring Configuration
+        - name: METRICS_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: METRICS_ENABLED
+        - name: METRICS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: METRICS_PORT
+
+        # Advanced Features Configuration
+        - name: VISUAL_TESTING_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: VISUAL_TESTING_ENABLED
+        - name: CAPTCHA_SOLVING_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: CAPTCHA_SOLVING_ENABLED
+        - name: NETWORK_SIMULATION_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: NETWORK_SIMULATION_ENABLED
+        - name: HUMAN_BEHAVIOR_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: HUMAN_BEHAVIOR_ENABLED
+
+        # Performance Configuration
+        - name: WORKER_PROCESSES
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: WORKER_PROCESSES
+        - name: MAX_WORKER_CONNECTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: upm-plus-config
+              key: MAX_WORKER_CONNECTIONS
+
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 9090
+          name: metrics
+          protocol: TCP
+
+        volumeMounts:
+        - name: uploads
+          mountPath: /app/uploads
+        - name: temp
+          mountPath: /app/temp
+        - name: logs
+          mountPath: /app/logs
+
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          runAsUser: 1000
+
+      volumes:
+      - name: uploads
+        persistentVolumeClaim:
+          claimName: upm-plus-uploads-pvc
+      - name: temp
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: logs
+        emptyDir:
+          sizeLimit: 500Mi
+
+      nodeSelector:
+        kubernetes.io/os: linux
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - upm-plus
+                - key: component
+                  operator: In
+                  values:
+                  - api
+              topologyKey: kubernetes.io/hostname
+
+      tolerations:
+      - key: "workload"
+        operator: "Equal"
+        value: "upm-plus"
+        effect: "NoSchedule"
+
+---
+# UPM.Plus API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: upm-plus-api
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: api
+    tier: application
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-target-group-healthcheck-path: "/health"
+    service.beta.kubernetes.io/aws-load-balancer-target-group-healthcheck-interval: "30"
+    service.beta.kubernetes.io/aws-load-balancer-target-group-healthcheck-timeout: "5"
+    service.beta.kubernetes.io/aws-load-balancer-target-group-healthcheck-healthy-threshold: "3"
+    service.beta.kubernetes.io/aws-load-balancer-target-group-healthcheck-unhealthy-threshold: "3"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 8000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: upm-plus
+    component: api
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: upm-plus-api-hpa
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: upm-plus-api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: upm-plus-api-pdb
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: api
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: upm-plus
+      component: api
+
+---
+# Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: upm-plus-api-netpol
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: api
+spec:
+  podSelector:
+    matchLabels:
+      app: upm-plus
+      component: api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-prod
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-prod
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 53    # DNS
+    - protocol: UDP
+      port: 53    # DNS
+    - protocol: TCP
+      port: 443   # HTTPS
+    - protocol: TCP
+      port: 80    # HTTP
+
+---
+# Persistent Volume Claims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: upm-plus-uploads-pvc
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: api
+    tier: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: "shared-storage"
+  resources:
+    requests:
+      storage: "100Gi"

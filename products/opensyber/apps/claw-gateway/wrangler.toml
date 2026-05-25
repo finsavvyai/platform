@@ -1,0 +1,39 @@
+name = "claw-gateway"
+main = "src/index.ts"
+compatibility_date = "2025-02-18"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+routes = [
+  { pattern = "claw.opensyber.cloud/*", zone_name = "opensyber.cloud" },
+]
+
+# KV — project API keys + usage metering
+[[kv_namespaces]]
+binding = "PROJECT_KEYS"
+id = "f1b64fb4d02a47ff9a9f82dda0af73d1"
+
+[[kv_namespaces]]
+binding = "USAGE"
+id = "68b561482503452db3da7c349332d1f4"
+
+# Durable Objects — conversation sessions
+[durable_objects]
+bindings = [
+  { name = "CLAW_SESSION", class_name = "ClawSessionDO" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["ClawSessionDO"]
+
+# Secrets (set via wrangler secret put):
+# ANTHROPIC_API_KEY
+# OPENAI_API_KEY
+# AI_GATEWAY_ENDPOINT — Cloudflare AI Gateway URL
+
+[vars]
+ENVIRONMENT = "production"
+DEFAULT_PROVIDER = "anthropic"
+DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MAX_TOKENS = "8192"

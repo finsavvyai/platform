@@ -1,0 +1,54 @@
+[Unit]
+Description=FinSavvyAI API Gateway
+Documentation=https://github.com/finsavvyai/llm
+After=network-online.target finsavvyai-master.service
+Wants=network-online.target
+Requires=finsavvyai-master.service
+
+[Service]
+Type=simple
+User=finsavvyai
+Group=finsavvyai
+WorkingDirectory=/opt/finsavvyai
+EnvironmentFile=-/opt/finsavvyai/.env
+
+ExecStart=/opt/finsavvyai/venv/bin/python -m src.api.gateway \
+    --master-host localhost \
+    --master-port 8000 \
+    --host 0.0.0.0 \
+    --port 8080
+
+# Graceful shutdown
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Restart policy
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=finsavvyai-gateway
+
+# Resource limits
+MemoryMax=2G
+MemoryHigh=1536M
+CPUQuota=400%
+TasksMax=512
+LimitNOFILE=65536
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/finsavvyai/logs /var/log/finsavvyai
+ReadOnlyPaths=/opt/finsavvyai
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,46 @@
+name: Luna Security — Build
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'Image ref to seal'
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write          # OIDC for cosign keyless
+  attestations: write
+
+jobs:
+  luna-sec-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - name: Install luna-agents
+        run: npm install -g luna-agents
+
+      - name: Resolve image ref
+        id: img
+        run: echo "ref=${{ github.event.inputs.image || format('ghcr.io/{0}:{1}', github.repository, github.ref_name) }}" >> $GITHUB_OUTPUT
+
+      - name: Run build security bundle
+        run: npx luna-agents ll-sec-build --artifact ${{ steps.img.outputs.ref }} --slsa_level 3
+
+      - name: Upload SBOM + signatures + provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: luna-sec-build-bundle
+          path: |
+            .luna/*/security/sbom/
+            .luna/*/security/signatures/
+            .luna/*/security/provenance/
+          retention-days: 90

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinSavvyAI - Enterprise AI Infrastructure</title>
+  <style>
+    :root {
+      --color-bg: #0a0a0a;
+      --color-fg: #ffffff;
+      --color-secondary: #737373;
+      --color-accent: #0ea5e9;
+      --color-border: #262626;
+      --color-surface: #1a1a1a;
+      --font-stack: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+      --grid-unit: 8px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.15);
+      --shadow-lg: 0 20px 25px rgba(0,0,0,0.15);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --color-bg: #ffffff;
+        --color-fg: #0a0a0a;
+        --color-secondary: #737373;
+        --color-accent: #0284c7;
+        --color-border: #e5e7eb;
+        --color-surface: #f9fafb;
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-stack);
+      background-color: var(--color-bg);
+      color: var(--color-fg);
+      line-height: 1.6;
+      font-size: 16px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    a {
+      color: var(--color-accent);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    a:hover {
+      color: var(--color-fg);
+    }
+
+    a:focus {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+
+    button {
+      font-family: var(--font-stack);
+      font-size: 16px;
+      padding: calc(var(--grid-unit) * 2.5) calc(var(--grid-unit) * 3);
+      border: none;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+
+    button:focus {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+
+    .btn-primary {
+      background-color: var(--color-accent);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      color: var(--color-accent);
+      border: 1px solid var(--color-border);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--color-surface);
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background-color: rgba(10, 10, 10, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    @media (prefers-color-scheme: light) {
+      header {
+        background-color: rgba(255, 255, 255, 0.95);
+      }
+    }
+
+    header nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: calc(var(--grid-unit) * 2) calc(var(--grid-unit) * 4);
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .logo {
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: -0.5px;
+    }
+
+    nav ul {
+      display: flex;
+      gap: calc(var(--grid-unit) * 3);
+      list-style: none;
+    }
+
+    nav a {
+      font-size: 14px;
+      color: var(--color-secondary);
+    }
+
+    @media (max-width: 768px) {
+      nav ul {
+        display: none;
+      }
+    }
+
+    .hero {
+      padding: calc(var(--grid-unit) * 12) calc(var(--grid-unit) * 4);
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .hero h1 {
+      font-size: clamp(32px, 8vw, 56px);
+      font-weight: 600;
+      line-height: 1.2;
+      margin-bottom: calc(var(--grid-unit) * 2);
+      letter-spacing: -1px;
+    }
+
+    .hero p {
+      font-size: 18px;
+      color: var(--color-secondary);
+      margin-bottom: calc(var(--grid-unit) * 4);
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: calc(var(--grid-unit) * 2);
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: calc(var(--grid-unit) * 6);
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: calc(var(--grid-unit) * 4);
+      padding: calc(var(--grid-unit) * 12) calc(var(--grid-unit) * 4);
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      padding: calc(var(--grid-unit) * 4);
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      transition: all 0.3s;
+    }
+
+    .feature-card:hover {
+      border-color: var(--color-accent);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .feature-icon {
+      font-size: 32px;
+      margin-bottom: calc(var(--grid-unit) * 2);
+    }
+
+    .feature-card h3 {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: calc(var(--grid-unit) * 1.5);
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      color: var(--color-secondary);
+      line-height: 1.6;
+    }
+
+    .pricing {
+      background-color: var(--color-surface);
+      padding: calc(var(--grid-unit) * 12) calc(var(--grid-unit) * 4);
+    }
+
+    .pricing-header {
+      text-align: center;
+      margin-bottom: calc(var(--grid-unit) * 8);
+    }
+
+    .pricing-header h2 {
+      font-size: 36px;
+      font-weight: 600;
+      margin-bottom: calc(var(--grid-unit) * 2);
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: calc(var(--grid-unit) * 4);
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .pricing-card {
+      padding: calc(var(--grid-unit) * 4);
+      background-color: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      text-align: center;
+    }
+
+    .pricing-card.featured {
+      border-color: var(--color-accent);
+      box-shadow: var(--shadow-lg);
+      transform: scale(1.05);
+    }
+
+    .pricing-tier {
+      font-size: 20px;
+      font-weight: 500;
+      margin-bottom: calc(var(--grid-unit) * 1);
+    }
+
+    .pricing-value {
+      font-size: 42px;
+      font-weight: 600;
+      margin: calc(var(--grid-unit) * 2) 0;
+    }
+
+    .pricing-value span {
+      font-size: 18px;
+      color: var(--color-secondary);
+    }
+
+    .pricing-features {
+      text-align: left;
+      margin: calc(var(--grid-unit) * 4) 0;
+    }
+
+    .pricing-features li {
+      list-style: none;
+      padding: calc(var(--grid-unit) * 1.5) 0;
+      font-size: 14px;
+      color: var(--color-secondary);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .pricing-features li:before {
+      content: "✓ ";
+      color: var(--color-accent);
+      font-weight: 600;
+      margin-right: calc(var(--grid-unit) * 1);
+    }
+
+    .testimonials {
+      padding: calc(var(--grid-unit) * 12) calc(var(--grid-unit) * 4);
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .testimonials h2 {
+      text-align: center;
+      font-size: 36px;
+      font-weight: 600;
+      margin-bottom: calc(var(--grid-unit) * 8);
+    }
+
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: calc(var(--grid-unit) * 4);
+    }
+
+    .testimonial-card {
+      padding: calc(var(--grid-unit) * 4);
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+    }
+
+    .testimonial-text {
+      font-size: 14px;
+      font-style: italic;
+      margin-bottom: calc(var(--grid-unit) * 3);
+      color: var(--color-secondary);
+    }
+
+    .testimonial-author {
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .testimonial-role {
+      font-size: 12px;
+      color: var(--color-secondary);
+    }
+
+    footer {
+      background-color: var(--color-surface);
+      padding: calc(var(--grid-unit) * 6) calc(var(--grid-unit) * 4);
+      border-top: 1px solid var(--color-border);
+      text-align: center;
+      font-size: 14px;
+      color: var(--color-secondary);
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 768px) {
+      .pricing-card.featured {
+        transform: scale(1);
+      }
+
+      .hero {
+        padding: calc(var(--grid-unit) * 8) calc(var(--grid-unit) * 2);
+      }
+
+      nav {
+        padding: calc(var(--grid-unit) * 2) !important;
+      }
+
+      .hero h1 {
+        font-size: 32px;
+      }
+
+      .pricing-header h2 {
+        font-size: 28px;
+      }
+
+      .testimonials h2 {
+        font-size: 28px;
+      }
+    }
+
+    .hidden-skip-link {
+      position: absolute;
+      left: -10000px;
+      z-index: -1000;
+    }
+
+    .hidden-skip-link:focus {
+      position: static;
+      z-index: auto;
+      background: var(--color-accent);
+      color: white;
+      padding: calc(var(--grid-unit) * 2) calc(var(--grid-unit) * 3);
+      margin-bottom: calc(var(--grid-unit) * 2);
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="hidden-skip-link">Skip to main content</a>
+
+  <header role="banner">
+    <nav role="navigation" aria-label="Main navigation">
+      <div class="logo">FinSavvyAI</div>
+      <ul>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+        <li><a href="#testimonials">Testimonials</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main-content">
+    <section class="hero" role="region" aria-labelledby="hero-title">
+      <h1 id="hero-title">Run Your Own AI Infrastructure</h1>
+      <p>Enterprise-grade distributed AI cluster management with multi-provider routing, intelligent governance, and production-ready monitoring.</p>
+      <div class="hero-cta">
+        <button class="btn-primary" aria-label="Start free trial">Get Started Free</button>
+        <button class="btn-secondary" aria-label="View documentation">Learn More</button>
+      </div>
+    </section>
+
+    <section id="features" class="features" role="region" aria-labelledby="features-title">
+      <h2 id="features-title" style="display: none;">Features</h2>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔀</div>
+        <h3>Multi-Provider Routing</h3>
+        <p>Seamlessly route requests across OpenAI, Anthropic, Ollama, and LM Studio. Optimize costs and availability with automatic failover.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h3>Agent Governance</h3>
+        <p>Policy-driven control over AI agents. Rate limiting, cost tracking, and compliance enforcement built-in.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>Master-Worker Clustering</h3>
+        <p>Distributed architecture with mDNS auto-discovery. Scale horizontally across your infrastructure.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Production Monitoring</h3>
+        <p>Prometheus metrics and Grafana dashboards. Real-time visibility into cluster health and API performance.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚙️</div>
+        <h3>OpenAI-Compatible API</h3>
+        <p>Drop-in replacement for OpenAI API. Use existing integrations without code changes.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🌍</div>
+        <h3>Multi-Language Support</h3>
+        <p>SDKs for Python, JavaScript, and Go. Deploy alongside your existing tech stack.</p>
+      </div>
+    </section>
+
+    <section id="pricing" class="pricing" role="region" aria-labelledby="pricing-title">
+      <div class="pricing-header">
+        <h2 id="pricing-title">Simple, Transparent Pricing</h2>
+        <p>Choose the plan that fits your needs. All plans include 99.99% uptime SLA.</p>
+      </div>
+
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="pricing-tier">Free</div>
+          <div class="pricing-value">$0<span>/month</span></div>
+          <ul class="pricing-features">
+            <li>Up to 100 requests/day</li>
+            <li>Single provider routing</li>
+            <li>Community support</li>
+            <li>Basic monitoring</li>
+          </ul>
+          <button class="btn-secondary">Get Started</button>
+        </div>
+
+        <div class="pricing-card featured">
+          <div class="pricing-tier">Pro</div>
+          <div class="pricing-value">$49<span>/month</span></div>
+          <ul class="pricing-features">
+            <li>Unlimited requests</li>
+            <li>Multi-provider routing</li>
+            <li>Priority support</li>
+            <li>Advanced analytics</li>
+            <li>Cost optimization</li>
+          </ul>
+          <button class="btn-primary">Start Trial</button>
+        </div>
+
+        <div class="pricing-card">
+          <div class="pricing-tier">Enterprise</div>
+          <div class="pricing-value">$299<span>/month</span></div>
+          <ul class="pricing-features">
+            <li>Everything in Pro</li>
+            <li>Custom clustering</li>
+            <li>Dedicated support</li>
+            <li>SSO & compliance</li>
+            <li>Custom governance</li>
+          </ul>
+          <button class="btn-secondary">Contact Sales</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="testimonials" class="testimonials" role="region" aria-labelledby="testimonials-title">
+      <h2 id="testimonials-title">Trusted by Teams</h2>
+
+      <div class="testimonials-grid">
+        <div class="testimonial-card">
+          <p class="testimonial-text">"FinSavvyAI reduced our AI infrastructure costs by 40% while improving reliability across our ML pipeline."</p>
+          <div class="testimonial-author">Jordan Smith</div>
+          <div class="testimonial-role">VP Engineering, TechCorp</div>
+        </div>
+
+        <div class="testimonial-card">
+          <p class="testimonial-text">"The multi-provider routing automatically handles provider outages. We haven't experienced a single failure since migration."</p>
+          <div class="testimonial-author">Alex Chen</div>
+          <div class="testimonial-role">CTO, DataFlow Inc</div>
+        </div>
+
+        <div class="testimonial-card">
+          <p class="testimonial-text">"Deploying our own cluster was simpler than expected. The documentation and support team were exceptional."</p>
+          <div class="testimonial-author">Riley Johnson</div>
+          <div class="testimonial-role">Platform Lead, CloudMeta</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer role="contentinfo">
+    <p>&copy; 2026 FinSavvyAI. All rights reserved.</p>
+  </footer>
+</body>
+</html>

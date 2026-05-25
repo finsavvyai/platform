@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qestro Recording Playback Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #2d3748;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: #f7fafc;
+        }
+        
+        button {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #3182ce;
+        }
+        
+        button:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        
+        .status.success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+        
+        .status.error {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #fc8181;
+        }
+        
+        .status.info {
+            background: #bee3f8;
+            color: #2a4365;
+            border: 1px solid #90cdf4;
+        }
+        
+        input, select {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            margin: 5px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin: 15px 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .session-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        
+        .session-item {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .session-item:hover {
+            background: #f7fafc;
+        }
+        
+        .session-item.selected {
+            background: #ebf8ff;
+            border-color: #4299e1;
+        }
+        
+        .session-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Qestro Recording Playback Test</h1>
+        
+        <!-- Server Connection -->
+        <div class="section">
+            <h2>🔗 Server Connection</h2>
+            <div class="form-group">
+                <label for="serverUrl">Server URL:</label>
+                <input type="text" id="serverUrl" value="http://localhost:9003" style="width: 300px;">
+            </div>
+            <button onclick="testConnection()">Test Connection</button>
+            <div id="connectionStatus" class="status" style="display: none;"></div>
+        </div>
+        
+        <!-- Session List -->
+        <div class="section">
+            <h2>📋 Available Sessions</h2>
+            <button onclick="loadSessions()">Load Sessions</button>
+            <div id="sessionsList" class="session-list" style="display: none;"></div>
+            <div id="sessionsStatus" class="status" style="display: none;"></div>
+        </div>
+        
+        <!-- Playback Controls -->
+        <div class="section">
+            <h2>🎬 Playback Controls</h2>
+            <div class="form-group">
+                <label for="selectedSession">Selected Session ID:</label>
+                <input type="text" id="selectedSession" placeholder="Select a session from the list above" style="width: 300px;" readonly>
+            </div>
+            <div class="form-group">
+                <label for="playbackSpeed">Playback Speed:</label>
+                <select id="playbackSpeed">
+                    <option value="0.5">0.5x (Slow)</option>
+                    <option value="1" selected>1x (Normal)</option>
+                    <option value="1.5">1.5x (Fast)</option>
+                    <option value="2">2x (Very Fast)</option>
+                </select>
+            </div>
+            <button onclick="startPlayback()" id="playbackBtn" disabled>🎬 Start Playback</button>
+            <button onclick="getSessionDetails()" id="detailsBtn" disabled>📊 Get Session Details</button>
+            <div id="playbackStatus" class="status" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        let selectedSessionId = '';
+        
+        function showStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status ${type}`;
+            element.style.display = 'block';
+        }
+        
+        function getServerUrl() {
+            return document.getElementById('serverUrl').value;
+        }
+        
+        async function testConnection() {
+            try {
+                showStatus('connectionStatus', 'Testing connection...', 'info');
+                
+                const response = await fetch(`${getServerUrl()}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('connectionStatus', 
+                        `✅ Connected successfully!\n` +
+                        `Status: ${data.status}\n` +
+                        `Active Sessions: ${data.activeSessions}\n` +
+                        `Timestamp: ${data.timestamp}`, 
+                        'success'
+                    );
+                } else {
+                    showStatus('connectionStatus', `❌ Connection failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showStatus('connectionStatus', `❌ Connection error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function loadSessions() {
+            try {
+                showStatus('sessionsStatus', 'Loading sessions...', 'info');
+                
+                const response = await fetch(`${getServerUrl()}/api/recording/sessions`);
+                const sessions = await response.json();
+                
+                if (response.ok) {
+                    const sessionsList = document.getElementById('sessionsList');
+                    sessionsList.innerHTML = '';
+                    
+                    if (sessions.length === 0) {
+                        sessionsList.innerHTML = '<div style="text-align: center; color: #666;">No sessions found</div>';
+                    } else {
+                        sessions.forEach(session => {
+                            const sessionDiv = document.createElement('div');
+                            sessionDiv.className = 'session-item';
+                            sessionDiv.onclick = () => selectSession(session.id);
+                            
+                            sessionDiv.innerHTML = `
+                                <strong>ID:</strong> ${session.id}<br>
+                                <strong>Status:</strong> ${session.status}<br>
+                                <strong>Actions:</strong> ${session.actionsRecorded}<br>
+                                <strong>Duration:</strong> ${session.duration || 'N/A'}s<br>
+                                <strong>URL:</strong> ${session.metadata?.url || 'N/A'}
+                            `;
+                            
+                            sessionsList.appendChild(sessionDiv);
+                        });
+                    }
+                    
+                    sessionsList.style.display = 'block';
+                    showStatus('sessionsStatus', `✅ Loaded ${sessions.length} sessions`, 'success');
+                } else {
+                    showStatus('sessionsStatus', `❌ Failed to load sessions: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showStatus('sessionsStatus', `❌ Error loading sessions: ${error.message}`, 'error');
+            }
+        }
+        
+        function selectSession(sessionId) {
+            selectedSessionId = sessionId;
+            document.getElementById('selectedSession').value = sessionId;
+            
+            // Update UI
+            document.querySelectorAll('.session-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+            
+            // Enable buttons
+            document.getElementById('playbackBtn').disabled = false;
+            document.getElementById('detailsBtn').disabled = false;
+            
+            showStatus('sessionsStatus', `✅ Selected session: ${sessionId}`, 'success');
+        }
+        
+        async function getSessionDetails() {
+            if (!selectedSessionId) {
+                showStatus('playbackStatus', '❌ No session selected', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('playbackStatus', 'Loading session details...', 'info');
+                
+                const response = await fetch(`${getServerUrl()}/api/recording/sessions/${selectedSessionId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('playbackStatus', 
+                        `📊 Session Details:\n` +
+                        `ID: ${data.session.id}\n` +
+                        `Type: ${data.session.type}\n` +
+                        `Platform: ${data.session.platform}\n` +
+                        `Status: ${data.session.status}\n` +
+                        `Actions: ${data.session.actionsRecorded}\n` +
+                        `Screenshots: ${data.session.screenshots}\n` +
+                        `Duration: ${data.session.duration || 'N/A'}s\n` +
+                        `URL: ${data.session.metadata?.url || 'N/A'}\n\n` +
+                        `First 5 actions:\n` +
+                        data.actions.slice(0, 5).map((action, i) => 
+                            `${i + 1}. ${action.type} ${action.selector || action.url || ''}`
+                        ).join('\n'),
+                        'success'
+                    );
+                } else {
+                    showStatus('playbackStatus', `❌ Failed to get session details: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('playbackStatus', `❌ Error getting session details: ${error.message}`, 'error');
+            }
+        }
+        
+        async function startPlayback() {
+            if (!selectedSessionId) {
+                showStatus('playbackStatus', '❌ No session selected', 'error');
+                return;
+            }
+            
+            const speed = parseFloat(document.getElementById('playbackSpeed').value);
+            
+            try {
+                showStatus('playbackStatus', `🎬 Starting playback at ${speed}x speed...\nThis will open a new browser window!`, 'info');
+                
+                const response = await fetch(`${getServerUrl()}/api/recording/playback/${selectedSessionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ speed })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showStatus('playbackStatus', 
+                        `✅ Playback completed!\n\n` +
+                        `📊 Results:\n` +
+                        `• Total actions: ${data.totalActions}\n` +
+                        `• Successful: ${data.successfulActions}\n` +
+                        `• Failed: ${data.failedActions}\n` +
+                        `• Skipped: ${data.skippedActions}\n` +
+                        `• Speed: ${data.speed}x\n\n` +
+                        `${data.message}\n\n` +
+                        `Detailed results:\n` +
+                        data.results.slice(0, 10).map(result => 
+                            `${result.step}. ${result.action} - ${result.status} ${result.message || ''}`
+                        ).join('\n'),
+                        'success'
+                    );
+                } else {
+                    showStatus('playbackStatus', `❌ Playback failed: ${data.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showStatus('playbackStatus', `❌ Playback error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-load on page load
+        window.onload = function() {
+            testConnection();
+        };
+    </script>
+</body>
+</html>

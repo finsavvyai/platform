@@ -1,0 +1,57 @@
+name: Mirror OSS subtree
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "sdlc-gateway-oss/**"
+      - ".github/workflows/oss-mirror.yml"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Optional tag to push to mirror (fires release.yml if set)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    if: github.repository == 'finsavvyai/sdlc-platform'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "sdlc-oss-bot"
+          git config user.email "bot@sdlc.cc"
+
+      - name: Subtree split
+        run: |
+          git subtree split --prefix sdlc-gateway-oss -b oss-mirror
+
+      - name: Push to mirror repo
+        env:
+          OSS_MIRROR_PAT: ${{ secrets.OSS_MIRROR_PAT }}
+        run: |
+          if [ -z "$OSS_MIRROR_PAT" ]; then
+            echo "::warning::OSS_MIRROR_PAT secret not set; skipping push."
+            exit 0
+          fi
+          git push --force \
+            "https://x-access-token:${OSS_MIRROR_PAT}@github.com/finsavvyai/sdlc-gateway.git" \
+            oss-mirror:main
+
+      - name: Push tag (workflow_dispatch only)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.tag != '' }}
+        env:
+          OSS_MIRROR_PAT: ${{ secrets.OSS_MIRROR_PAT }}
+        run: |
+          git tag "${{ inputs.tag }}" oss-mirror
+          git push \
+            "https://x-access-token:${OSS_MIRROR_PAT}@github.com/finsavvyai/sdlc-gateway.git" \
+            "${{ inputs.tag }}"

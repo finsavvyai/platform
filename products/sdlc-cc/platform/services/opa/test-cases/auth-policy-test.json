@@ -1,0 +1,374 @@
+{
+  "name": "Authentication Policy Tests",
+  "description": "Comprehensive test suite for authentication policies",
+  "version": "1.0",
+  "policy_path": "sdlc.auth.policy",
+  "test_cases": [
+    {
+      "name": "Valid JWT Token Test",
+      "description": "Test authentication with valid JWT token",
+      "input": {
+        "authentication": {
+          "user_id": "user-123",
+          "tenant_id": "tenant-456",
+          "token_id": "token-789",
+          "token_signature_valid": true,
+          "expires_at": 1893456000000000000,
+          "issuer": "sdlc-auth",
+          "role": "user",
+          "permissions": ["documents:read", "documents:write"],
+          "ip_address": "192.168.1.100",
+          "user_agent": "Mozilla/5.0 Test Agent"
+        },
+        "action": "read",
+        "resource": "documents:doc-123"
+      },
+      "expected": {
+        "decision": true,
+        "reason_contains": "Token is valid"
+      },
+      "tags": ["happy_path", "jwt", "authentication"]
+    },
+    {
+      "name": "Expired Token Test",
+      "description": "Test authentication with expired JWT token",
+      "input": {
+        "authentication": {
+          "user_id": "user-123",
+          "tenant_id": "tenant-456",
+          "token_id": "token-789",
+          "token_signature_valid": true,
+          "expires_at": 1640995200000000000,
+          "issuer": "sdlc-auth",
+          "role": "user",
+          "permissions": ["documents:read"],
+          "ip_address": "192.168.1.100"
+        },
+        "action": "read",
+        "resource": "documents:doc-123"
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Token is invalid, expired, or revoked"
+      },
+      "tags": ["negative", "jwt", "expired"]
+    },
+    {
+      "name": "Invalid Token Signature Test",
+      "description": "Test authentication with invalid token signature",
+      "input": {
+        "authentication": {
+          "user_id": "user-123",
+          "tenant_id": "tenant-456",
+          "token_id": "token-789",
+          "token_signature_valid": false,
+          "expires_at": 1893456000000000000,
+          "issuer": "sdlc-auth",
+          "role": "user",
+          "permissions": ["documents:read"],
+          "ip_address": "192.168.1.100"
+        },
+        "action": "read",
+        "resource": "documents:doc-123"
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Token is invalid, expired, or revoked"
+      },
+      "tags": ["negative", "jwt", "signature"]
+    },
+    {
+      "name": "Super Admin Access Test",
+      "description": "Test super admin can access any resource",
+      "input": {
+        "authentication": {
+          "user_id": "admin-123",
+          "tenant_id": "tenant-456",
+          "token_id": "token-789",
+          "token_signature_valid": true,
+          "expires_at": 1893456000000000000,
+          "issuer": "sdlc-auth",
+          "role": "super_admin",
+          "permissions": ["*"],
+          "ip_address": "192.168.1.100"
+        },
+        "action": "delete",
+        "resource": "documents:doc-123"
+      },
+      "expected": {
+        "decision": true,
+        "reason_contains": "User has required permissions"
+      },
+      "tags": ["admin", "privileges", "happy_path"]
+    },
+    {
+      "name": "Insufficient Permissions Test",
+      "description": "Test user cannot access resource without proper permissions",
+      "input": {
+        "authentication": {
+          "user_id": "user-123",
+          "tenant_id": "tenant-456",
+          "token_id": "token-789",
+          "token_signature_valid": true,
+          "expires_at": 1893456000000000000,
+          "issuer": "sdlc-auth",
+          "role": "user",
+          "permissions": ["documents:read"],
+          "ip_address": "192.168.1.100"
+        },
+        "action": "delete",
+        "resource": "documents:doc-123"
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "User lacks required permissions"
+      },
+      "tags": ["negative", "permissions", "authorization"]
+    },
+    {
+      "name": "Blacklisted IP Test",
+      "description": "Test authentication from blacklisted IP address",
+      "input": {
+        "authentication": {
+          "user_id": "user-123",
+          "tenant_id": "tenant-456",
+          "token_id": "token-789",
+          "token_signature_valid": true,
+          "expires_at": 1893456000000000000,
+          "issuer": "sdlc-auth",
+          "role": "user",
+          "permissions": ["documents:read"],
+          "ip_address": "192.168.1.200"
+        },
+        "action": "read",
+        "resource": "documents:doc-123"
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "IP address is blocked"
+      },
+      "tags": ["negative", "security", "ip_blocking"]
+    },
+    {
+      "name": "Device Fingerprint Mismatch Test",
+      "description": "Test authentication with device fingerprint mismatch",
+      "input": {
+        "authentication": {
+          "user_id": "user-123",
+          "tenant_id": "tenant-456",
+          "token_id": "token-789",
+          "token_signature_valid": true,
+          "expires_at": 1893456000000000000,
+          "issuer": "sdlc-auth",
+          "role": "user",
+          "permissions": ["documents:read"],
+          "ip_address": "192.168.1.100",
+          "device_fingerprint": "fp-abc123",
+          "device_id": "device-456"
+        },
+        "action": "read",
+        "resource": "documents:doc-123"
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Device fingerprint mismatch"
+      },
+      "tags": ["negative", "security", "device_fingerprint"]
+    },
+    {
+      "name": "Rate Limit Exceeded Test",
+      "description": "Test authentication when rate limits are exceeded",
+      "input": {
+        "authentication": {
+          "user_id": "user-123",
+          "tenant_id": "tenant-456",
+          "token_id": "token-789",
+          "token_signature_valid": true,
+          "expires_at": 1893456000000000000,
+          "issuer": "sdlc-auth",
+          "role": "user",
+          "permissions": ["documents:read"],
+          "ip_address": "192.168.1.100"
+        },
+        "action": "read",
+        "resource": "documents:doc-123"
+      },
+      "mock_data": {
+        "rate_limits": {
+          "users": {
+            "user-123": {
+              "requests_per_hour": 100
+            }
+          },
+          "metrics": {
+            "user_requests": {
+              "user-123": {
+                "10": 150  // Hour 10 has 150 requests (over limit)
+              }
+            }
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Rate limits have been exceeded"
+      },
+      "tags": ["negative", "rate_limit", "throttling"]
+    },
+    {
+      "name": "Geographic Compliance Test",
+      "description": "Test geographic compliance for user access",
+      "input": {
+        "authentication": {
+          "user_id": "user-123",
+          "tenant_id": "tenant-456",
+          "token_id": "token-789",
+          "token_signature_valid": true,
+          "expires_at": 1893456000000000000,
+          "issuer": "sdlc-auth",
+          "role": "user",
+          "permissions": ["documents:read"],
+          "ip_address": "192.168.1.100"
+        },
+        "action": "read",
+        "resource": "documents:doc-123"
+      },
+      "mock_data": {
+        "tenants": {
+          "tenant-456": {
+            "allowed_countries": ["US", "CA", "UK"]
+          }
+        },
+        "geoip": {
+          "192.168.1.100": "US"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason_contains": "Geographic compliance requirements are met"
+      },
+      "tags": ["compliance", "geographic", "happy_path"]
+    },
+    {
+      "name": "Geographic Compliance Violation Test",
+      "description": "Test geographic compliance violation",
+      "input": {
+        "authentication": {
+          "user_id": "user-123",
+          "tenant_id": "tenant-456",
+          "token_id": "token-789",
+          "token_signature_valid": true,
+          "expires_at": 1893456000000000000,
+          "issuer": "sdlc-auth",
+          "role": "user",
+          "permissions": ["documents:read"],
+          "ip_address": "192.168.1.100"
+        },
+        "action": "read",
+        "resource": "documents:doc-123"
+      },
+      "mock_data": {
+        "tenants": {
+          "tenant-456": {
+            "allowed_countries": ["US", "CA", "UK"]
+          }
+        },
+        "geoip": {
+          "192.168.1.100": "CN"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Geographic compliance requirements are not met"
+      },
+      "tags": ["negative", "compliance", "geographic"]
+    }
+  ],
+  "setup_data": {
+    "users": {
+      "user-123": {
+        "status": "active",
+        "email_verified": true,
+        "locked": false,
+        "suspended": false,
+        "role": "user",
+        "specific_permissions": [],
+        "field_restrictions": [],
+        "geo_restrictions": null
+      },
+      "admin-123": {
+        "status": "active",
+        "email_verified": true,
+        "locked": false,
+        "suspended": false,
+        "role": "super_admin",
+        "specific_permissions": [],
+        "field_restrictions": [],
+        "geo_restrictions": null
+      }
+    },
+    "tenants": {
+      "tenant-456": {
+        "status": "active",
+        "suspended": false,
+        "subscription_status": "active",
+        "compliance_status": "good"
+      }
+    },
+    "sessions": {
+      "session-123": {
+        "status": "active",
+        "expires_at": 1893456000000000000,
+        "revoked": false
+      }
+    },
+    "security": {
+      "blacklisted_ips": ["192.168.1.200"],
+      "whitelisted_ips": [],
+      "malicious_patterns": ["drop table", "union select", "<script>"],
+      "revoked_tokens": [],
+      "mfa_required_endpoints": []
+    },
+    "rate_limits": {
+      "users": {
+        "user-123": {
+          "requests_per_hour": 1000
+        },
+        "admin-123": {
+          "requests_per_hour": 5000
+        }
+      },
+      "tenants": {
+        "tenant-456": {
+          "requests_per_hour": 10000
+        }
+      }
+    },
+    "valid_issuers": ["sdlc-auth", "sdlc-platform"],
+    "role_permissions": {
+      "super_admin": ["*"],
+      "tenant_admin": ["tenants:read", "tenants:write", "users:read", "users:write"],
+      "user": ["documents:read", "documents:write", "profile:read", "profile:write"]
+    },
+    "role_endpoint_permissions": {
+      "super_admin": ["*"],
+      "tenant_admin": [
+        "tenants:GET", "tenants:PUT", "users:GET", "users:PUT", "users:POST", "policies:GET", "policies:POST"
+      ],
+      "user": [
+        "documents:GET", "documents:POST", "documents:PUT", "profile:GET", "profile:PUT"
+      ]
+    }
+  },
+  "teardown_data": {
+    "cleanup_temp_data": true,
+    "reset_mock_data": true
+  },
+  "execution_config": {
+    "timeout": 30,
+    "parallel": false,
+    "continue_on_failure": true,
+    "capture_logs": true,
+    "capture_metrics": true
+  }
+}

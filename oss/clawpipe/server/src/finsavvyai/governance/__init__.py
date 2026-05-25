@@ -1,0 +1,1 @@
+"""Legacy governance compatibility package."""

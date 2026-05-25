@@ -1,0 +1,1 @@
+# FinSavvyAI Skills Bridge

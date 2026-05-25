@@ -1,0 +1,253 @@
+openapi: 3.0.3
+info:
+  title: SDLC Platform — Compliance API (read-only)
+  version: 1.0.0
+  description: |
+    Read-only endpoints for SOC officers, auditors, and compliance
+    automation. Every endpoint requires the `compliance:read` permission
+    and is rate-limited separately from the rest of the admin API.
+
+    Schema is versioned via the `X-Schema-Version` response header
+    (currently `v1`). Retired fields are marked via the standard
+    `Deprecation` header (RFC 8594) plus a `Link; rel="deprecation"`.
+
+    Day 32 of the production-ready roadmap.
+
+servers:
+  - url: https://api.sdlc.cc
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API token with the `compliance:read` permission.
+
+  parameters:
+    TenantID:
+      name: tenant_id
+      in: query
+      required: true
+      schema: { type: string, format: uuid }
+    From:
+      name: from
+      in: query
+      schema: { type: string, format: date-time }
+    To:
+      name: to
+      in: query
+      schema: { type: string, format: date-time }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+
+  schemas:
+    AuditEventRow:
+      type: object
+      required: [id, tenant_id, actor_type, action, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        tenant_id: { type: string, format: uuid }
+        actor_id: { type: string, format: uuid, nullable: true }
+        actor_type: { type: string, enum: [user, service, api_key] }
+        action: { type: string }
+        target: { type: string }
+        ip: { type: string }
+        created_at: { type: string, format: date-time }
+    AuditEventPage:
+      type: object
+      properties:
+        rows:
+          type: array
+          items: { $ref: '#/components/schemas/AuditEventRow' }
+        next_cursor: { type: string }
+
+    Role:
+      type: object
+      required: [name, permissions]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+    Assignment:
+      type: object
+      required: [user_id, role_name]
+      properties:
+        user_id: { type: string, format: uuid }
+        role_name: { type: string }
+        scope: { type: string }
+    RBACSnapshot:
+      type: object
+      required: [tenant_id, generated_at, roles]
+      properties:
+        tenant_id: { type: string, format: uuid }
+        generated_at: { type: string, format: date-time }
+        roles:
+          type: array
+          items: { $ref: '#/components/schemas/Role' }
+        assignments:
+          type: array
+          items: { $ref: '#/components/schemas/Assignment' }
+
+    DataStage:
+      type: object
+      required: [name, description, inputs, outputs]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        inputs: { type: array, items: { type: string } }
+        outputs: { type: array, items: { type: string } }
+        storage: { type: string }
+        encryption: { type: string }
+        retention: { type: string }
+    DataFlow:
+      type: object
+      required: [version, generated_at, stages]
+      properties:
+        version: { type: string }
+        generated_at: { type: string, format: date-time }
+        stages:
+          type: array
+          items: { $ref: '#/components/schemas/DataStage' }
+
+    RetentionStatus:
+      type: object
+      required: [data_type, retention_days]
+      properties:
+        data_type: { type: string }
+        retention_days: { type: integer, minimum: 0 }
+        last_sweep_at: { type: string, format: date-time, nullable: true }
+        oldest_row_at: { type: string, format: date-time, nullable: true }
+        legal_hold_until: { type: string, format: date-time, nullable: true }
+    RetentionReport:
+      type: object
+      required: [tenant_id, generated_at, items]
+      properties:
+        tenant_id: { type: string, format: uuid }
+        generated_at: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RetentionStatus' }
+
+    DLPEventRow:
+      type: object
+      required: [id, tenant_id, detector, direction, action, occurred_at]
+      properties:
+        id: { type: string, format: uuid }
+        tenant_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid, nullable: true }
+        detector: { type: string, enum: [ssn, cc, account, itin, mrn, custom] }
+        direction: { type: string, enum: [inbound, outbound] }
+        action: { type: string, enum: [mask, redact, block] }
+        match_count: { type: integer }
+        occurred_at: { type: string, format: date-time }
+    DLPEventPage:
+      type: object
+      properties:
+        rows:
+          type: array
+          items: { $ref: '#/components/schemas/DLPEventRow' }
+        next_cursor: { type: string }
+
+security:
+  - BearerAuth: []
+
+paths:
+  /compliance/audit-events:
+    get:
+      summary: List audit events
+      tags: [Compliance]
+      parameters:
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
+        - in: query
+          name: actor_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: action
+          schema: { type: string }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Page of audit events.
+          headers:
+            X-Schema-Version: { schema: { type: string, default: v1 } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditEventPage' }
+        '400': { description: Invalid query }
+        '403': { description: Permission denied (compliance:read required) }
+
+  /compliance/access-controls:
+    get:
+      summary: RBAC matrix snapshot for a tenant
+      tags: [Compliance]
+      parameters:
+        - { $ref: '#/components/parameters/TenantID' }
+      responses:
+        '200':
+          description: Snapshot of roles + assignments.
+          headers:
+            X-Schema-Version: { schema: { type: string, default: v1 } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RBACSnapshot' }
+
+  /compliance/data-flow:
+    get:
+      summary: Static, versioned description of data flow stages
+      tags: [Compliance]
+      responses:
+        '200':
+          description: Data flow descriptor.
+          headers:
+            X-Data-Flow-Sha: { schema: { type: string }, description: SHA-256 over the canonical body. }
+            X-Schema-Version: { schema: { type: string, default: v1 } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DataFlow' }
+
+  /compliance/retention-status:
+    get:
+      summary: Per-data-type retention policy + last sweep timestamp
+      tags: [Compliance]
+      parameters:
+        - { $ref: '#/components/parameters/TenantID' }
+      responses:
+        '200':
+          description: Retention report.
+          headers:
+            X-Schema-Version: { schema: { type: string, default: v1 } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RetentionReport' }
+
+  /compliance/dlp-events:
+    get:
+      summary: Paginated DLP detection events
+      tags: [Compliance]
+      parameters:
+        - { $ref: '#/components/parameters/TenantID' }
+        - in: query
+          name: action
+          schema: { type: string, enum: [mask, redact, block] }
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Page of DLP events.
+          headers:
+            X-Schema-Version: { schema: { type: string, default: v1 } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DLPEventPage' }

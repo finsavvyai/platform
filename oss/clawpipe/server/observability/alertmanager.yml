@@ -1,0 +1,70 @@
+# Alertmanager Configuration for FinSavvyAI Production
+#
+# Configures alert routing, grouping, and notification channels.
+# Set SLACK_WEBHOOK_URL and EMAIL via environment or edit directly.
+
+global:
+  resolve_timeout: 5m
+  smtp_from: 'alerts@finsavvyai.com'
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_auth_username: ''        # Set via env or edit
+  smtp_auth_password: ''        # Set via env or edit
+
+route:
+  receiver: 'default'
+  group_by: ['alertname', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+  routes:
+    # Critical alerts -> immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # Warning alerts -> batched
+    - match:
+        severity: warning
+      receiver: 'warning'
+      group_wait: 1m
+      repeat_interval: 8h
+
+receivers:
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://localhost:9095/webhook'
+        send_resolved: true
+
+  - name: 'critical'
+    slack_configs:
+      - api_url: ''              # Set SLACK_WEBHOOK_URL
+        channel: '#finsavvyai-alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: >-
+          *Status:* {{ .Status | toUpper }}
+          *Alert:* {{ .GroupLabels.alertname }}
+          *Service:* {{ .CommonLabels.service }}
+          *Details:*
+          {{ range .Alerts }}
+            - {{ .Annotations.summary }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'warning'
+    slack_configs:
+      - api_url: ''              # Set SLACK_WEBHOOK_URL
+        channel: '#finsavvyai-alerts'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        send_resolved: true
+
+inhibit_rules:
+  # If a critical alert fires, suppress warnings for the same service
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['alertname', 'service']

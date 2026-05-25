@@ -1,0 +1,289 @@
+# .cursorrules — Cursor AI Project Rules
+
+This file instructs Cursor AI on project-specific patterns and constraints.
+
+## File Size Constraint (CRITICAL)
+
+**EVERY file must be ≤100 lines** (including blank lines and comments).
+
+- Split files approaching 100 lines
+- Move helpers/utilities to separate files
+- Extract tests into separate _test.go files
+- Use files as focused units
+
+## Language-Specific Rules
+
+### Go
+
+**File Naming**:
+```
+package.go        → Main implementation
+package_test.go   → Tests
+```
+
+**Pattern: Table-Driven Tests**
+```go
+func TestSomething(t *testing.T) {
+    tests := []struct {
+        name     string
+        input    string
+        expected string
+    }{
+        {"case1", "in1", "exp1"},
+        {"case2", "in2", "exp2"},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Test logic
+        })
+    }
+}
+```
+
+**Constructors validate on construction**:
+```go
+func NewXxx(val string) (Xxx, error) {
+    if val == "" {
+        return Xxx{}, errors.New(errors.ErrInvalidInput, "required")
+    }
+    return Xxx{Value: val}, nil
+}
+```
+
+**No panic() in production code** — Always return (T, error).
+
+**Interfaces ≤3 methods** — Small, composable interfaces.
+
+**Naming**:
+- Packages: lowercase, 1-2 words (domain, screening, storage)
+- Types: PascalCase (ExactMatcher, ScreenRequest)
+- Functions: camelCase (Match, Score, NewXxx)
+- Constants: UPPER_SNAKE_CASE (MAX_SCREENINGS)
+
+### React/TypeScript
+
+**File Naming**:
+```
+MyComponent.tsx        → Functional component
+MyComponent.test.tsx   → Tests
+hooks/useFeature.ts    → Custom hooks
+pages/my-page.tsx      → Page components (kebab-case filenames)
+```
+
+**Component Structure**:
+```tsx
+interface Props {
+  prop1: string;
+  onAction?: () => void;
+}
+
+export function MyComponent({ prop1, onAction }: Props) {
+  const [state, setState] = useState<Type>(initial);
+
+  useEffect(() => {
+    // Side effects
+  }, [dependency]);
+
+  return <div>...</div>;
+}
+```
+
+**No class components** — Use functional components + hooks.
+
+**Custom hooks naming** — Start with "use" (useScreening, useAlerts).
+
+**Apple HIG Styling** — Use Tailwind + Apple color palette:
+```tsx
+// Primary: gray-900 dark:white
+// Secondary: gray-600 dark:gray-400
+// Accents: blue-600 dark:blue-500
+```
+
+**Testing with RTL + Vitest**:
+```tsx
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+
+test('user can click button', async () => {
+  render(<MyComponent />);
+  fireEvent.click(screen.getByRole('button', { name: /click/i }));
+  await waitFor(() => {
+    expect(screen.getByText(/result/i)).toBeInTheDocument();
+  });
+});
+```
+
+## Database Rules
+
+**Table naming**: snake_case, plural (screenings, alerts, audit_entries).
+
+**Always include**:
+```sql
+created_at TIMESTAMP NOT NULL DEFAULT NOW()
+updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+```
+
+**Migration naming**: `NNN_description.sql` (N = sequential digit).
+
+**Never modify migrations** — Create new migrations for changes.
+
+## API Endpoint Rules
+
+**Naming**: `/resource/action` pattern
+- `POST /screen` — Screen entity
+- `GET /alerts` — List alerts
+- `PUT /alerts/{id}/resolve` — Update alert
+
+**Authentication**: `X-API-Key` or `Authorization: Bearer`
+
+**Response format**: Always JSON with status code in header.
+
+**Error response**:
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable message",
+    "details": {...}
+  }
+}
+```
+
+## Git Commit Rules
+
+**Format**: `<type>: <subject>`
+
+**Types**: feat, fix, docs, refactor, test, chore
+
+**Example**:
+```
+feat: add embedding layer to screening engine
+
+Implements cosine similarity matching using pgvector.
+Disabled by default, enabled per-tenant in config.
+
+Fixes: #456
+```
+
+## Domain Modeling Rules
+
+**Value Objects**:
+- Validate on construction
+- Immutable (no setters)
+- Use value receivers
+
+**Entities**:
+- Has ID (EntityID, TenantID, etc with prefix)
+- Can be mutable
+- Repository-managed
+
+**Enums**:
+- Use string constants
+- Validation in constructor
+- Example: `ListSource` = "OFAC", "UN", "EU"
+
+## Testing Rules
+
+**Go**:
+- Table-driven tests (non-negotiable)
+- No testify/assert — use stdlib testing only
+- >80% coverage target per package
+- Mock repositories in unit tests
+
+**React**:
+- Test behavior, not implementation
+- Use React Testing Library
+- Mock API calls with vi.fn()
+- Test at multiple viewport sizes
+
+## API Key Prefixes
+
+Identify product instantly from key prefix:
+
+```
+api_sk_...       → API product
+dash_sk_...      → Dashboard product
+sdk_sk_...       → SDK product
+iframe_sk_...    → iFrame product
+dataset_sk_...   → Dataset product
+```
+
+Use in rate limit checks, tier verification.
+
+## Import Organization
+
+**Go**:
+```go
+import (
+    "context"                           // stdlib
+    "encoding/json"
+
+    "github.com/aegis-aml/aegis/api"   // internal
+    "github.com/aegis-aml/aegis/internal/domain"
+)
+```
+
+**TypeScript**:
+```tsx
+import { useState } from 'react';           // external
+import { something } from '@testing-library/react';
+
+import { MyComponent } from './MyComponent'; // internal
+import { useScreening } from '../hooks';
+```
+
+## No Anti-Patterns
+
+**Never**:
+- Store plaintext passwords
+- Log API keys or secrets
+- Use `panic()` in production
+- Commit `.env` files
+- Have `TODO` comments without issue link
+- Create files >100 lines
+- Use `assert` library (use stdlib errors)
+- Store unencrypted PII
+- Skip RBAC checks
+- Allow untrusted input to queries
+
+## Performance Targets
+
+- **Screening latency**: <50ms p95
+- **API response**: <100ms p99
+- **Test suite**: <30s total
+- **Build time**: <2m
+
+## Code Review Checklist
+
+Before committing, verify:
+- [ ] All files ≤100 lines
+- [ ] Tests are table-driven (Go)
+- [ ] No magic numbers (use constants)
+- [ ] Naming follows convention
+- [ ] Value objects validate
+- [ ] No plaintext secrets
+- [ ] Comments explain "why" not "what"
+- [ ] Tests pass locally
+
+## Documentation
+
+- Update docs/ when changing architecture
+- API_REFERENCE.md for endpoints
+- EXTENDING.md for adding features
+- CONVENTIONS.md for coding standards
+- Docstrings for exported types/functions
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| CLAUDE.md | AI instructions (read first) |
+| docs/VISION.md | Product vision |
+| docs/ARCHITECTURE.md | System design |
+| docs/CODE_MAP.md | File locations |
+| docs/SCREENING_ENGINE.md | 6-layer matching |
+| docs/CONVENTIONS.md | Coding standards |
+| EXTENDING.md | How to add features |
+
+---
+
+**Remember**: Small files, well-tested, thoroughly documented, security-first.

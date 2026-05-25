@@ -1,0 +1,47 @@
+{
+  "$schema": "https://sdlc.cc/schemas/encryption-manifest-v1.json",
+  "description": "Phase 2 Day 36 — every storage resource that MUST be encrypted at rest. The CI workflow at .github/workflows/encryption-check.yml fails closed on any miss.",
+  "generated_for": "production",
+  "owners": ["security@sdlc.cc"],
+  "s3_buckets": [
+    {
+      "name": "sdlc-prod-documents",
+      "region": "us-east-1",
+      "expected_sse": "aws:kms",
+      "expected_kms_key_alias": "alias/sdlc-prod-s3-documents",
+      "rotation_days": 90
+    },
+    {
+      "name": "sdlc-prod-exports",
+      "region": "us-east-1",
+      "expected_sse": "aws:kms",
+      "expected_kms_key_alias": "alias/sdlc-prod-s3-exports",
+      "rotation_days": 90
+    },
+    {
+      "name": "sdlc-prod-backups",
+      "region": "us-west-2",
+      "expected_sse": "aws:kms",
+      "expected_kms_key_alias": "alias/sdlc-prod-s3-backups",
+      "rotation_days": 90
+    }
+  ],
+  "rds_instances": [
+    {
+      "id": "sdlc-prod-postgres-primary",
+      "region": "us-east-1",
+      "storage_encrypted": true,
+      "expected_kms_key_alias": "alias/sdlc-prod-rds"
+    },
+    {
+      "id": "sdlc-prod-postgres-replica",
+      "region": "us-east-1",
+      "storage_encrypted": true,
+      "expected_kms_key_alias": "alias/sdlc-prod-rds"
+    }
+  ],
+  "ebs_volumes_by_tag": [
+    { "tag": "Service", "value": "redis", "must_be_encrypted": true },
+    { "tag": "Service", "value": "vault",  "must_be_encrypted": true }
+  ]
+}

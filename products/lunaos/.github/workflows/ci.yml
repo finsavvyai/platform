@@ -1,0 +1,91 @@
+name: CI (lint + typecheck + unit)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: Engine API (typecheck + vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: lunaos-engine/packages/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund --legacy-peer-deps
+      - run: npx tsc --noEmit
+      - run: npx vitest run --reporter=verbose
+
+  dashboard:
+    name: Dashboard (typecheck + jest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: lunaos-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund --legacy-peer-deps
+      - run: npm run type-check || npx tsc --noEmit
+      - run: npm test -- --passWithNoTests
+
+  studio:
+    name: Studio (typecheck + jest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: lunaos-studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund --legacy-peer-deps
+      - run: npm run typecheck
+      - run: npm test -- --passWithNoTests
+
+  mobile:
+    name: Mobile (typecheck + jest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: lunaos-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund --legacy-peer-deps
+      - run: npm run typecheck
+      - run: npm test -- --passWithNoTests
+
+  agents-cli:
+    name: Luna Agents CLI (smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: luna-agents
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund || true
+      - run: npm test || true

@@ -1,0 +1,68 @@
+version: 0.2
+
+env:
+  secrets-manager:
+    DOCKERHUB_USERNAME: docker-hub:username
+    DOCKERHUB_PASSWORD: docker-hub:password
+  variables:
+    AWS_DEFAULT_REGION: eu-north-1
+phases:
+  install:
+    commands:
+      - echo Nothing to do in the install phase...
+  pre_build:
+    commands:
+      - echo "* Logging into ECR"
+      - aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin 909388531021.dkr.ecr.eu-north-1.amazonaws.com
+      - echo "* Logging into ECR successful"
+  build:
+    commands:
+      - echo TEDDK Server build started on `date`
+      - AWS_SECRET_KEY=$(aws ssm get-parameter --with-decryption --name /mavenRepository/secretKey --query Parameter.Value --output text)
+      - AWS_ACCESS_KEY_ID=$(aws ssm get-parameter --with-decryption --name /mavenRepository/accessKeyId --query Parameter.Value --output text)
+      - echo Deploying artifact to maven repository
+      - echo "Checking retrieved AWS credentials..."
+      - echo "AWS_ACCESS_KEY_ID $AWS_ACCESS_KEY_ID"
+      - mvn deploy -P deploy-to-s3 -DskipTests -X
+
+  post_build:
+    commands:
+      - echo Storing component version in version.txt file for use in next build stage
+      - mvn -Dexec.executable='echo' -Dexec.args='${project.version}' --non-recursive exec:exec -q > version.txt
+      - echo Component version is `cat version.txt`
+      - ls -lrt
+      - echo Removing artifact from .m2 to avoid cache growth
+      - rm -rfv ~/.m2/repository/com/teliacompany/teddk
+      - echo maven build completed on `date`
+      - echo " -------------------------"
+      - echo "* Building docker image"
+      - name=teddk
+      - v=`cat version.txt`
+      - r=909388531021.dkr.ecr.eu-north-1.amazonaws.com/$name
+      - echo Dockerizing project ${name}, version ${v}, result will be pushed to ECR ${r}
+      - ls -lah
+      - cd pipeline/docker
+      - ls -lah ../../teddk-app/target
+      - cp ../../teddk-app/target/teddk-app-resource.zip ./teddk-app-resource.zip
+      - unzip ./teddk-app-resource.zip
+      - cp teddk-app/repo/teddk-app-$v.jar ./teddk-app.jar
+      - echo "* Logging into DockerHub"
+      - echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USERNAME --password-stdin
+      - docker build -t $name:$v .
+      - docker logout https://index.docker.io/v1/
+      - echo "* Tagging"
+      - docker tag $name:$v $r:$v
+      - echo "* Pushing"
+      - docker push $r:$v
+      - echo "* Preparing imagedefinitions.json for deployment step"
+      - printf '[{"name":"teddk","imageUri":"%s"}]' $r:$v > imagedefinitions.json
+      - echo "Docker build completed on `date`"
+
+artifacts:
+  files:
+    - version.txt
+    - pipeline/**/*
+    - pipeline/docker/imagedefinitions.json
+cache:
+  paths:
+    - '/root/.m2/**/*'

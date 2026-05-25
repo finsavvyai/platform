@@ -1,0 +1,69 @@
+# ClawPipe Helm Chart — Default values
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/finsavvyai/clawpipe-gateway
+  tag: "2.0.0"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8787
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+  hosts:
+    - host: api.clawpipe.ai
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: clawpipe-tls
+      hosts:
+        - api.clawpipe.ai
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+config:
+  nodeEnv: production
+  port: "8787"
+  logLevel: info
+
+# Reference existing Kubernetes secret by name
+existingSecret: clawpipe-secrets
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10

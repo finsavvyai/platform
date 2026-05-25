@@ -1,0 +1,97 @@
+[
+  {
+    "name": "High-confidence OFAC match → email compliance team",
+    "enabled": true,
+    "trigger": "alert.created",
+    "conditions": [
+      {"field": "score", "operator": "gte", "value": "0.85"},
+      {"field": "list", "operator": "eq", "value": "OFAC"}
+    ],
+    "actions": [
+      {
+        "type": "email",
+        "config": {
+          "to": "compliance@yourbank.com"
+        }
+      }
+    ]
+  },
+  {
+    "name": "Critical match → WhatsApp + email + open case",
+    "enabled": true,
+    "trigger": "match.high_risk",
+    "conditions": [
+      {"field": "score", "operator": "gte", "value": "0.90"}
+    ],
+    "actions": [
+      {
+        "type": "whatsapp",
+        "config": {"to": "+972501234567"}
+      },
+      {
+        "type": "email",
+        "config": {"to": "head-of-compliance@yourbank.com"}
+      },
+      {
+        "type": "open_case",
+        "config": {"priority": "high"}
+      }
+    ]
+  },
+  {
+    "name": "PEP match → SMS analyst on call",
+    "enabled": true,
+    "trigger": "alert.created",
+    "conditions": [
+      {"field": "list", "operator": "in", "value": "PEP,PEP_DATABASE,OPENSANCTIONS_PEP"}
+    ],
+    "actions": [
+      {
+        "type": "sms",
+        "config": {"to": "+972501234567"}
+      }
+    ]
+  },
+  {
+    "name": "Sanctioned country entity → webhook to SIEM",
+    "enabled": true,
+    "trigger": "alert.created",
+    "conditions": [
+      {"field": "list", "operator": "in", "value": "OFAC,UN,EU,UK_OFSI"}
+    ],
+    "actions": [
+      {
+        "type": "webhook",
+        "config": {"url": "https://your-siem.example.com/webhooks/amliq"}
+      }
+    ]
+  },
+  {
+    "name": "Alert escalated → notify manager",
+    "enabled": true,
+    "trigger": "alert.escalated",
+    "conditions": [],
+    "actions": [
+      {
+        "type": "email",
+        "config": {"to": "manager@yourbank.com"}
+      },
+      {
+        "type": "whatsapp",
+        "config": {"to": "+972501234567"}
+      }
+    ]
+  },
+  {
+    "name": "Daily screening complete → digest email",
+    "enabled": false,
+    "trigger": "screen.complete",
+    "conditions": [],
+    "actions": [
+      {
+        "type": "email",
+        "config": {"to": "ops@yourbank.com"}
+      }
+    ]
+  }
+]

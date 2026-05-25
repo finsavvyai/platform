@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PipeWarden - AI-Powered CI/CD Security Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-light: #ffffff;
+            --bg-dark: #1a1a1a;
+            --text-light: #333333;
+            --text-dark: #f5f5f5;
+            --accent: #007aff;
+            --accent-light: #e8f4ff;
+            --border: #e0e0e0;
+            --border-dark: #333333;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: var(--bg-dark);
+                color: var(--text-dark);
+            }
+
+            .navbar {
+                background: var(--bg-dark);
+                border-bottom: 1px solid var(--border-dark);
+            }
+
+            .hero, .features, .pricing {
+                background: var(--bg-dark);
+            }
+
+            .cta-button {
+                background: var(--accent);
+                color: white;
+            }
+
+            .pricing-card {
+                background: #2a2a2a;
+                border: 1px solid var(--border-dark);
+            }
+
+            .feature-card {
+                background: #2a2a2a;
+            }
+        }
+
+        @media (prefers-color-scheme: light) {
+            body {
+                background: var(--bg-light);
+                color: var(--text-light);
+            }
+
+            .navbar {
+                background: var(--bg-light);
+                border-bottom: 1px solid var(--border);
+            }
+
+            .hero, .features, .pricing {
+                background: var(--bg-light);
+            }
+
+            .pricing-card {
+                background: white;
+                border: 1px solid var(--border);
+            }
+
+            .feature-card {
+                background: var(--accent-light);
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+        }
+
+        .navbar {
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .navbar-brand {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .navbar-nav {
+            display: flex;
+            gap: 32px;
+            list-style: none;
+        }
+
+        .navbar-nav a {
+            text-decoration: none;
+            color: inherit;
+            font-size: 15px;
+        }
+
+        .hero {
+            padding: 80px 32px;
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            letter-spacing: -1px;
+        }
+
+        .hero p {
+            font-size: 18px;
+            margin-bottom: 32px;
+            opacity: 0.8;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .cta-button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .cta-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .cta-secondary {
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+
+        .features {
+            padding: 80px 32px;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 48px;
+            letter-spacing: -0.5px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 32px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            padding: 32px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-icon {
+            font-size: 28px;
+            margin-bottom: 12px;
+        }
+
+        .feature-card h3 {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .feature-card p {
+            font-size: 15px;
+            opacity: 0.7;
+        }
+
+        .pricing {
+            padding: 80px 32px;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .pricing-card {
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .pricing-card h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .price {
+            font-size: 36px;
+            font-weight: 700;
+            margin: 16px 0;
+        }
+
+        .price-period {
+            font-size: 15px;
+            opacity: 0.6;
+        }
+
+        .pricing-features {
+            list-style: none;
+            margin: 32px 0;
+        }
+
+        .pricing-features li {
+            padding: 8px 0;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+        }
+
+        .pricing-features li:before {
+            content: "✓";
+            margin-right: 8px;
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .pricing-button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 16px;
+            background: var(--accent);
+            color: white;
+        }
+
+        footer {
+            padding: 48px 32px;
+            text-align: center;
+            font-size: 14px;
+            opacity: 0.6;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 32px;
+            }
+
+            .hero p {
+                font-size: 16px;
+            }
+
+            .navbar-nav {
+                gap: 16px;
+            }
+
+            .section-title {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">🛡️ PipeWarden</div>
+        <ul class="navbar-nav">
+            <li><a href="#features">Features</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="/quick-start/">Contact</a></li>
+        </ul>
+    </nav>
+
+    <section class="hero">
+        <h1>AI-Powered CI/CD Security Analysis</h1>
+        <p>Detect vulnerabilities and security risks in your CI/CD pipelines with Claude AI. Integrated with GitHub, GitLab, Jenkins, CircleCI, and Azure DevOps.</p>
+        <div class="hero-buttons">
+            <button class="cta-button cta-primary" onclick="window.location.href='/quick-start/'">Get Started Free</button>
+            <button class="cta-button cta-secondary" onclick="window.location.href='#features'">Learn More</button>
+        </div>
+    </section>
+
+    <section class="features" id="features">
+        <h2 class="section-title">Features</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h3>Multi-Provider Support</h3>
+                <p>Connect to GitHub Actions, GitLab CI, Jenkins, CircleCI, and Azure Pipelines from a single dashboard.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>Claude AI Analysis</h3>
+                <p>Leverage Claude's advanced understanding to identify complex security patterns and provide remediation guidance.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Risk Scoring</h3>
+                <p>Get intelligent risk scores and severity rankings for each finding with contextual recommendations.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <h3>Trend Analysis</h3>
+                <p>Track security trends over time and see how your pipeline security posture improves.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💾</div>
+                <h3>SARIF Export</h3>
+                <p>Export findings in SARIF 2.1.0 format for integration with your security tools and SIEM.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔐</div>
+                <h3>Enterprise Security</h3>
+                <p>JWT authentication, SSO/LDAP support, comprehensive audit logging for compliance.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="pricing" id="pricing">
+        <h2 class="section-title">Pricing</h2>
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <h3>Free</h3>
+                <div class="price">$0</div>
+                <div class="price-period">forever</div>
+                <ul class="pricing-features">
+                    <li>5 analyses/month</li>
+                    <li>1 provider connection</li>
+                    <li>Heuristic scanning</li>
+                    <li>Community support</li>
+                </ul>
+                <button class="pricing-button" onclick="window.location.href='/quick-start/#trial'">Get Started</button>
+            </div>
+            <div class="pricing-card">
+                <h3>Pro</h3>
+                <div class="price">$29</div>
+                <div class="price-period">per month</div>
+                <ul class="pricing-features">
+                    <li>Unlimited analyses</li>
+                    <li>5 provider connections</li>
+                    <li>Claude AI analysis</li>
+                    <li>SARIF export</li>
+                    <li>Priority support</li>
+                </ul>
+                <button class="pricing-button" onclick="window.location.href='mailto:info@finsavvyai.com?subject=PipeWarden%20Pro%20Trial'">Start Free Trial</button>
+            </div>
+            <div class="pricing-card">
+                <h3>Enterprise</h3>
+                <div class="price">Custom</div>
+                <div class="price-period">contact sales</div>
+                <ul class="pricing-features">
+                    <li>Unlimited everything</li>
+                    <li>Dedicated support</li>
+                    <li>Custom integrations</li>
+                    <li>SSO/LDAP</li>
+                    <li>SLA guaranteed</li>
+                </ul>
+                <button class="pricing-button" onclick="window.location.href='mailto:info@finsavvyai.com?subject=PipeWarden%20Enterprise%20Inquiry'">Contact Sales</button>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 PipeWarden. All rights reserved. | <a href="/quick-start/#privacy">Privacy</a> | <a href="/quick-start/#terms">Terms</a></p>
+    </footer>
+</body>
+</html>

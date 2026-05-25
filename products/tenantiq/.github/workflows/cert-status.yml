@@ -1,0 +1,85 @@
+# Daily M365-Certification status verification.
+# Runs the live cert-prep smoke suite against production and fails on regression.
+# Optional: manual trigger via workflow_dispatch.
+
+name: Cert Status
+
+on:
+  schedule:
+    - cron: "23 6 * * *"  # 06:23 UTC daily — staggered off the security workflow
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tests/e2e/cert-prep-smoke.spec.ts"
+      - "docs/MS_CERTIFICATION.md"
+      - ".github/workflows/cert-status.yml"
+
+concurrency:
+  group: cert-status-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-prod:
+    name: Live cert-prep smoke (prod)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "9.15.0"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install chromium firefox webkit --with-deps
+      - name: Run cert-prep-smoke against production
+        env:
+          BASE_URL: https://app.tenantiq.app
+          API_URL: https://api.tenantiq.app
+        run: pnpm exec playwright test cert-prep-smoke --reporter=list
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cert-status-report
+          path: playwright-report/
+          retention-days: 30
+
+  drift-check:
+    name: Cert drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "9.15.0"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify SUB_PROCESSORS + GRAPH_PERMISSIONS in sync with code
+        run: pnpm tsx scripts/check-cert-drift.ts
+
+  notify-on-fail:
+    name: Notify on failure
+    needs: [smoke-prod, drift-check]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open issue on failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date().toISOString().slice(0, 10);
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `cert-status FAIL ${today}`,
+              labels: ['cert', 'production', 'P1'],
+              body: `Daily cert-status workflow failed.\n\nRun: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n- Smoke against prod: see job output\n- Drift check: see job output\n\nThis is a release-blocking signal — investigate before further deploys.`,
+            });

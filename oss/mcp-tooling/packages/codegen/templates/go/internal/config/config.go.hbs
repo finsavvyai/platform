@@ -1,0 +1,116 @@
+package config
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/spf13/viper"
+)
+
+type Config struct {
+	Server   ServerConfig   `mapstructure:"server"`
+	API      APIConfig      `mapstructure:"api"`
+	Logging  LoggingConfig  `mapstructure:"logging"`
+	AgentKit AgentKitConfig `mapstructure:"agentkit"`
+}
+
+type ServerConfig struct {
+	Port         string `mapstructure:"port"`
+	Host         string `mapstructure:"host"`
+	ReadTimeout  int    `mapstructure:"read_timeout"`
+	WriteTimeout int    `mapstructure:"write_timeout"`
+	IdleTimeout  int    `mapstructure:"idle_timeout"`
+}
+
+type APIConfig struct {
+	BaseURL string            `mapstructure:"base_url"`
+	Headers map[string]string `mapstructure:"headers"`
+	Timeout int               `mapstructure:"timeout"`
+}
+
+type LoggingConfig struct {
+	Level  string `mapstructure:"level"`
+	Format string `mapstructure:"format"`
+	Output string `mapstructure:"output"`
+}
+
+type AgentKitConfig struct {
+	Enabled   bool   `mapstructure:"enabled"`
+	BaseURL   string `mapstructure:"base_url"`
+	APIKey    string `mapstructure:"api_key"`
+	AutoSync  bool   `mapstructure:"auto_sync"`
+	SyncInterval int `mapstructure:"sync_interval"`
+}
+
+func Load(configFile string) (*Config, error) {
+	// Set default values
+	viper.SetDefault("server.port", "8080")
+	viper.SetDefault("server.host", "0.0.0.0")
+	viper.SetDefault("server.read_timeout", 30)
+	viper.SetDefault("server.write_timeout", 30)
+	viper.SetDefault("server.idle_timeout", 120)
+
+	viper.SetDefault("api.timeout", 30)
+	viper.SetDefault("api.headers", map[string]string{
+		"User-Agent": "{{config.serviceName}}/{{config.serviceVersion}}",
+		"Accept": "application/json",
+		"Content-Type": "application/json",
+	})
+
+	viper.SetDefault("logging.level", "info")
+	viper.SetDefault("logging.format", "json")
+	viper.SetDefault("logging.output", "stdout")
+
+	// AgentKit defaults
+	viper.SetDefault("agentkit.enabled", false)
+	viper.SetDefault("agentkit.base_url", "https://api.openai.com")
+	viper.SetDefault("agentkit.auto_sync", true)
+	viper.SetDefault("agentkit.sync_interval", 300) // 5 minutes
+
+	// Read config file if provided
+	if configFile != "" {
+		viper.SetConfigFile(configFile)
+	} else {
+		// Look for config in home directory
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get home directory: %v", err)
+		}
+		viper.AddConfigPath(home)
+		viper.AddConfigPath(".")
+		viper.SetConfigName(".{{config.serviceName}}")
+		viper.SetConfigType("yaml")
+	}
+
+	// Enable environment variable support
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("{{uppercase config.serviceName}}")
+
+	// Read config file if it exists
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// Config file not found, use defaults
+		} else {
+			return nil, fmt.Errorf("failed to read config file: %v", err)
+		}
+	}
+
+	var config Config
+	if err := viper.Unmarshal(&config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
+	}
+
+	return &config, nil
+}
+
+func (c *Config) Validate() error {
+	if c.Server.Port == "" {
+		return fmt.Errorf("server.port is required")
+	}
+
+	if c.API.Timeout <= 0 {
+		return fmt.Errorf("api.timeout must be positive")
+	}
+
+	return nil
+}

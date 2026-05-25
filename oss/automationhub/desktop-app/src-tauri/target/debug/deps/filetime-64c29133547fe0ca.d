@@ -1,0 +1,10 @@
+/Users/shaharsolomon/dev/projects/github/upm.plus/desktop-app/src-tauri/target/debug/deps/libfiletime-64c29133547fe0ca.rmeta: /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/lib.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/mod.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/utimes.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/macos.rs
+
+/Users/shaharsolomon/dev/projects/github/upm.plus/desktop-app/src-tauri/target/debug/deps/libfiletime-64c29133547fe0ca.rlib: /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/lib.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/mod.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/utimes.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/macos.rs
+
+/Users/shaharsolomon/dev/projects/github/upm.plus/desktop-app/src-tauri/target/debug/deps/filetime-64c29133547fe0ca.d: /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/lib.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/mod.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/utimes.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/macos.rs
+
+/Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/lib.rs:
+/Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/mod.rs:
+/Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/utimes.rs:
+/Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/filetime-0.2.26/src/unix/macos.rs:

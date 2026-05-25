@@ -1,0 +1,197 @@
+{
+  "dashboard": {
+    "title": "FinSavvyAI LM Studio Cluster",
+    "description": "Monitor LM Studio cluster health, performance, and metrics",
+    "tags": ["finsavvyai", "lmstudio", "cluster", "llm"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 0,
+    "refresh": "5s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Cluster Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "finsavvyai_cluster_nodes_online",
+            "legendFormat": "Online Nodes"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Total Requests",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(finsavvyai_cluster_requests_total)",
+            "legendFormat": "Total Requests"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Cluster Health",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "finsavvyai_cluster_nodes_online",
+            "legendFormat": "Online"
+          },
+          {
+            "expr": "finsavvyai_cluster_nodes_offline",
+            "legendFormat": "Offline"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+        "options": {
+          "pieType": "pie",
+          "tooltip": {
+            "mode": "single",
+            "sort": "desc"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Request Rate (RPS)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(finsavvyai_cluster_requests_total[1m]))",
+            "legendFormat": "Requests/sec"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "options": {
+          "legend": {"showLegend": true},
+          "tooltip": {"mode": "single"}
+        }
+      },
+      {
+        "id": 5,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(finsavvyai_cluster_errors_total[1m]))",
+            "legendFormat": "Errors/sec"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "options": {
+          "legend": {"showLegend": true},
+          "tooltip": {"mode": "single"}
+        }
+      },
+      {
+        "id": 6,
+        "title": "Node Performance",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "finsavvyai_cluster_requests_total",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"__name__": true, "job": true},
+              "indexByName": {"instance": 0},
+              "renameByName": {
+                "instance": "Node"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Model Availability",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(finsavvyai_cluster_models_available)",
+            "legendFormat": "Total Models"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 12},
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": {
+            "calcs": ["lastNotNull"],
+            "fields": "",
+            "values": false
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Load Balancing Distribution",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "finsavvyai_cluster_requests_total",
+            "legendFormat": "{{node_id}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "maxVizHeight": 300
+        }
+      },
+      {
+        "id": 9,
+        "title": "Response Time Percentiles",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(finsavvyai_cluster_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(finsavvyai_cluster_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(finsavvyai_cluster_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "options": {
+          "legend": {"showLegend": true},
+          "tooltip": {"mode": "multi"}
+        }
+      }
+    ]
+  }
+}

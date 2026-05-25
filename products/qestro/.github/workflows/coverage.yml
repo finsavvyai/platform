@@ -1,0 +1,317 @@
+name: 📊 Coverage Analysis
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run coverage analysis daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  NODE_VERSION: '18'
+  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+jobs:
+  coverage-analysis:
+    name: 🧪 Coverage Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        component: [backend, frontend, combined]
+      fail-fast: false
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+      
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 🔧 Install Dependencies
+        run: |
+          npm ci
+          cd backend && npm ci
+          cd ../frontend && npm ci
+      
+      - name: 🧪 Run Backend Tests with Coverage
+        if: matrix.component == 'backend' || matrix.component == 'combined'
+        run: |
+          cd backend
+          npm run test:ci:nyc
+        env:
+          NODE_ENV: test
+          
+      - name: 🔧 Istanbul Coverage Integration
+        if: matrix.component == 'backend'
+        run: |
+          cd backend
+          node ../scripts/coverage/istanbul-integration.js --verbose
+        env:
+          NODE_ENV: test
+      
+      - name: 🎨 Run Frontend Tests with Coverage
+        if: matrix.component == 'frontend' || matrix.component == 'combined'
+        run: |
+          cd frontend
+          npm run test:ci
+        env:
+          NODE_ENV: test
+      
+      - name: 🔗 Merge Coverage Reports
+        if: matrix.component == 'combined'
+        run: |
+          npm run coverage:merge
+          npm run coverage:report
+          npm run coverage:istanbul-integration
+      
+      - name: 🎯 Run Coverage Quality Gate
+        if: matrix.component == 'combined'
+        run: |
+          npm run coverage:quality-gate
+        continue-on-error: false
+      
+      - name: 📊 Generate Coverage Badges
+        if: matrix.component == 'combined'
+        run: |
+          npm run coverage:badges
+      
+      - name: ☁️ Upload to External Services
+        if: matrix.component == 'combined' && github.event_name == 'push'
+        run: |
+          npm run coverage:ci-integration
+        env:
+          CI: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 📤 Upload Coverage to Codecov
+        if: matrix.component == 'combined'
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/combined/lcov.info
+          flags: ${{ matrix.component }}
+          name: codecov-${{ matrix.component }}
+          fail_ci_if_error: false
+          verbose: true
+      
+      - name: 📤 Upload Coverage to Coveralls
+        if: matrix.component == 'combined'
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./coverage/combined/lcov.info
+          flag-name: ${{ matrix.component }}
+          parallel: false
+      
+      - name: 📋 Generate Coverage Summary
+        if: matrix.component == 'combined'
+        run: |
+          echo "## 📊 Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Extract coverage percentages
+          LINES=$(cat coverage/combined/coverage-summary.json | jq -r '.total.lines.pct // 0')
+          FUNCTIONS=$(cat coverage/combined/coverage-summary.json | jq -r '.total.functions.pct // 0')
+          BRANCHES=$(cat coverage/combined/coverage-summary.json | jq -r '.total.branches.pct // 0')
+          STATEMENTS=$(cat coverage/combined/coverage-summary.json | jq -r '.total.statements.pct // 0')
+          
+          echo "| Metric | Coverage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lines | ${LINES}% | $([ $(echo "$LINES >= 85" | bc) -eq 1 ] && echo "✅" || echo "❌") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Functions | ${FUNCTIONS}% | $([ $(echo "$FUNCTIONS >= 85" | bc) -eq 1 ] && echo "✅" || echo "❌") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branches | ${BRANCHES}% | $([ $(echo "$BRANCHES >= 85" | bc) -eq 1 ] && echo "✅" || echo "❌") |" >> $GITHUB_STEP_SUMMARY
+          echo "| Statements | ${STATEMENTS}% | $([ $(echo "$STATEMENTS >= 85" | bc) -eq 1 ] && echo "✅" || echo "❌") |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add links to reports
+          echo "### 📁 Coverage Reports" >> $GITHUB_STEP_SUMMARY
+          echo "- [HTML Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Codecov Report](https://codecov.io/gh/${{ github.repository }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Coveralls Report](https://coveralls.io/github/${{ github.repository }})" >> $GITHUB_STEP_SUMMARY
+      
+      - name: 📊 Set Coverage Outputs
+        if: matrix.component == 'combined'
+        id: coverage
+        run: |
+          LINES=$(cat coverage/combined/coverage-summary.json | jq -r '.total.lines.pct // 0')
+          FUNCTIONS=$(cat coverage/combined/coverage-summary.json | jq -r '.total.functions.pct // 0')
+          BRANCHES=$(cat coverage/combined/coverage-summary.json | jq -r '.total.branches.pct // 0')
+          STATEMENTS=$(cat coverage/combined/coverage-summary.json | jq -r '.total.statements.pct // 0')
+          OVERALL=$(echo "scale=2; ($LINES + $FUNCTIONS + $BRANCHES + $STATEMENTS) / 4" | bc)
+          
+          echo "lines=$LINES" >> $GITHUB_OUTPUT
+          echo "functions=$FUNCTIONS" >> $GITHUB_OUTPUT
+          echo "branches=$BRANCHES" >> $GITHUB_OUTPUT
+          echo "statements=$STATEMENTS" >> $GITHUB_OUTPUT
+          echo "overall=$OVERALL" >> $GITHUB_OUTPUT
+          echo "status=$([ $(echo "$OVERALL >= 85" | bc) -eq 1 ] && echo "success" || echo "failure")" >> $GITHUB_OUTPUT
+      
+      - name: 📁 Upload Coverage Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-${{ matrix.component }}-${{ github.run_id }}
+          path: |
+            coverage/
+            !coverage/node_modules/
+          retention-days: 30
+      
+      - name: 💬 Comment Coverage on PR
+        if: matrix.component == 'combined' && github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read coverage data
+            const coverageData = JSON.parse(fs.readFileSync('coverage/combined/coverage-summary.json', 'utf8'));
+            const total = coverageData.total;
+            
+            const lines = total.lines?.pct || 0;
+            const functions = total.functions?.pct || 0;
+            const branches = total.branches?.pct || 0;
+            const statements = total.statements?.pct || 0;
+            const overall = Math.round((lines + functions + branches + statements) / 4);
+            
+            const getStatusIcon = (pct) => pct >= 85 ? '✅' : pct >= 70 ? '⚠️' : '❌';
+            
+            const comment = `## 📊 Coverage Report
+            
+            | Metric | Coverage | Status |
+            |--------|----------|--------|
+            | Lines | ${lines}% | ${getStatusIcon(lines)} |
+            | Functions | ${functions}% | ${getStatusIcon(functions)} |
+            | Branches | ${branches}% | ${getStatusIcon(branches)} |
+            | Statements | ${statements}% | ${getStatusIcon(statements)} |
+            | **Overall** | **${overall}%** | **${getStatusIcon(overall)}** |
+            
+            ### 📈 Coverage Trend
+            ${overall >= 85 ? '🎉 Excellent coverage!' : overall >= 70 ? '👍 Good coverage, room for improvement.' : '⚠️ Coverage needs improvement.'}
+            
+            ### 📁 Reports
+            - [Detailed HTML Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - [Codecov](https://codecov.io/gh/${{ github.repository }}/pull/${{ github.event.number }})
+            
+            ---
+            *Coverage report generated by GitHub Actions*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  coverage-comparison:
+    name: 📈 Coverage Comparison
+    runs-on: ubuntu-latest
+    needs: coverage-analysis
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: 📥 Download Coverage Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-combined-${{ github.run_id }}
+          path: coverage/
+      
+      - name: 🔍 Compare Coverage with Base Branch
+        run: |
+          # Get base branch coverage (if available)
+          git checkout ${{ github.base_ref }}
+          
+          # Install dependencies and run coverage on base branch
+          npm ci
+          cd backend && npm ci && cd ..
+          cd frontend && npm ci && cd ..
+          
+          # Run coverage on base branch
+          npm run test:coverage:ci || true
+          
+          # Save base coverage
+          cp coverage/combined/coverage-summary.json coverage/base-coverage.json || echo '{}' > coverage/base-coverage.json
+          
+          # Switch back to PR branch
+          git checkout ${{ github.head_ref }}
+          
+          # Compare coverages
+          node -e "
+            const fs = require('fs');
+            const base = JSON.parse(fs.readFileSync('coverage/base-coverage.json', 'utf8'));
+            const current = JSON.parse(fs.readFileSync('coverage/combined/coverage-summary.json', 'utf8'));
+            
+            const basePct = base.total?.lines?.pct || 0;
+            const currentPct = current.total?.lines?.pct || 0;
+            const diff = currentPct - basePct;
+            
+            console.log(\`Coverage change: \${diff > 0 ? '+' : ''}\${diff.toFixed(2)}%\`);
+            
+            if (diff < -2) {
+              console.log('❌ Coverage decreased significantly');
+              process.exit(1);
+            } else if (diff > 0) {
+              console.log('✅ Coverage improved');
+            } else {
+              console.log('➡️ Coverage unchanged');
+            }
+          "
+
+  coverage-report-publish:
+    name: 📢 Publish Coverage Report
+    runs-on: ubuntu-latest
+    needs: coverage-analysis
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: 📥 Download Coverage Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-combined-${{ github.run_id }}
+          path: coverage/
+      
+      - name: 🚀 Deploy Coverage Report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./coverage/combined
+          destination_dir: coverage
+          keep_files: false
+          commit_message: 'Deploy coverage report'
+      
+      - name: 📊 Update Coverage Badge
+        run: |
+          # Generate coverage badge
+          COVERAGE=$(cat coverage/combined/coverage-summary.json | jq -r '.total.lines.pct // 0')
+          COLOR=$([ $(echo "$COVERAGE >= 90" | bc) -eq 1 ] && echo "brightgreen" || [ $(echo "$COVERAGE >= 80" | bc) -eq 1 ] && echo "green" || [ $(echo "$COVERAGE >= 70" | bc) -eq 1 ] && echo "yellow" || echo "red")
+          
+          # Create badge URL
+          BADGE_URL="https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}"
+          echo "Coverage badge: $BADGE_URL"
+          
+          # Update README if needed (optional)
+          # sed -i "s|https://img.shields.io/badge/coverage-[0-9]*%25-[a-z]*|$BADGE_URL|g" README.md || true

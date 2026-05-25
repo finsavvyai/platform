@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Go ${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ["1.23", "1.24"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+      - run: go mod download
+      - run: go vet ./...
+      # cmd/server is the wiring binary; it's smoke-tested by boot, not
+      # unit-tested, so it drags total coverage down. Gate on internal/
+      # packages only — those carry the reusable logic.
+      - run: go test -race -coverprofile=coverage.out -covermode=atomic ./internal/...
+      - name: Coverage gate
+        run: |
+          pct=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
+          echo "coverage: $pct%"
+          awk -v p="$pct" 'BEGIN { exit (p+0 < 80) }' || { echo "coverage below 80%"; exit 1; }
+      # Full-tree build sanity check (tests excluded from coverage).
+      - run: go build ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.62
+
+  build-image:
+    name: Build container
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: sdlc-gateway:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

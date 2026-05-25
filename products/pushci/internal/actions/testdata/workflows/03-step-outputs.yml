@@ -1,0 +1,23 @@
+name: Step Outputs Across Jobs
+on: [push]
+jobs:
+  produce:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.gen.outputs.version }}
+      build_id: ${{ steps.gen.outputs.build_id }}
+    steps:
+      - name: Generate version
+        id: gen
+        run: |
+          echo "version=1.2.3" >> $GITHUB_OUTPUT
+          echo "build_id=$(date +%s)" >> $GITHUB_OUTPUT
+  consume:
+    needs: produce
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read upstream outputs
+        run: |
+          echo "version=${{ needs.produce.outputs.version }}"
+          echo "build_id=${{ needs.produce.outputs.build_id }}"
+          test "${{ needs.produce.outputs.version }}" = "1.2.3"

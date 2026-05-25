@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark light">
+  <title>PipeWarden — Pipeline Security Dashboard</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.iife.min.js" defer></script>
+</head>
+<body>
+  <header class="header" role="banner">
+    <div class="header-left">
+      <a href="/" aria-label="PipeWarden home" style="text-decoration:none;color:inherit;"><h1><span>Pipe</span>Warden</h1></a>
+      <div class="header-status" role="status" aria-live="polite"><div class="dot" aria-hidden="true"></div><span id="last-refresh">Ready</span></div>
+    </div>
+    <div class="header-actions" role="toolbar" aria-label="Primary actions">
+      <input type="search" class="search-bar" id="global-search" placeholder="Search... (Ctrl+K)" aria-label="Search dashboard" autocomplete="off">
+      <button class="btn btn-outline" onclick="showBrowseModal()">Pipelines</button>
+      <button class="btn btn-outline" onclick="showQuickScanModal()">Quick Scan</button>
+      <button class="btn btn-outline" onclick="showAnalyzeModal()">AI Analyze</button>
+      <button class="btn btn-outline" onclick="testAll()">Test All</button>
+      <button class="btn btn-primary" onclick="showAddModal()" aria-label="Add connection">+ Add</button>
+    </div>
+  </header>
+  <main class="container" id="main" role="main">
+    <div class="stats" id="stats">
+      <div class="stat-card"><div class="value" id="stat-total">-</div><div class="label">Connections</div></div>
+      <div class="stat-card"><div class="value" id="stat-github">-</div><div class="label">GitHub</div></div>
+      <div class="stat-card"><div class="value" id="stat-gitlab">-</div><div class="label">GitLab</div></div>
+      <div class="stat-card"><div class="value" id="stat-bitbucket">-</div><div class="label">Bitbucket</div></div>
+      <div class="stat-card"><div class="value" id="stat-jenkins">-</div><div class="label">Jenkins</div></div>
+      <div class="stat-card"><div class="value" id="stat-azure">-</div><div class="label">Azure</div></div>
+      <div class="stat-card"><div class="value" id="stat-circleci">-</div><div class="label">CircleCI</div></div>
+      <div class="stat-card"><div class="value red" id="stat-critical">-</div><div class="label">Critical</div></div>
+      <div class="stat-card"><div class="value orange" id="stat-high">-</div><div class="label">High</div></div>
+      <div class="stat-card"><div class="value yellow" id="stat-open">-</div><div class="label">Open</div></div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Dashboard sections">
+      <div class="tab active" role="tab" tabindex="0" aria-selected="true" aria-controls="tab-overview" data-tab="overview">Overview</div>
+      <div class="tab" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-connections" data-tab="connections">Connections <span class="badge" id="badge-conn">0</span></div>
+      <div class="tab" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-findings" data-tab="findings">Findings <span class="badge" id="badge-findings">0</span></div>
+      <div class="tab" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-history" data-tab="history">History <span class="badge" id="badge-history">0</span></div>
+      <div class="tab" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-integrations" data-tab="integrations">Integrations</div>
+      <div class="tab" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-analytics" data-tab="analytics">Analytics</div>
+      <div class="tab" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-policies" data-tab="policies">Policies</div>
+      <div class="tab" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-secrets" data-tab="secrets">Secrets</div>
+    </nav>
+    <div id="tab-overview" class="tab-content active" role="tabpanel" aria-label="Overview">
+      <div class="overview-grid" id="overview-content">
+        <div class="overview-card">
+          <h3>Security Score</h3>
+          <div class="score-display" id="score-display">
+            <div class="score-circle good" id="score-circle">--</div>
+            <div class="score-label"><strong id="score-grade">Loading...</strong><span id="score-desc">Calculating security posture</span></div>
+          </div>
+        </div>
+        <div class="overview-card">
+          <h3>Finding Summary</h3>
+          <div id="finding-summary-chart" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"></div>
+        </div>
+        <div class="overview-card">
+          <h3>Risk Trend (Last 10 Analyses)</h3>
+          <div class="trend-chart" id="trend-chart"></div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px"><span>Older</span><span>Recent</span></div>
+        </div>
+        <div class="overview-card">
+          <h3>Quick Stats</h3>
+          <div id="quick-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+        </div>
+        <div class="overview-card overview-full">
+          <h3>Recommendations</h3>
+          <div class="rec-list" id="recommendations-list"></div>
+        </div>
+      </div>
+    </div>
+    <div id="tab-connections" class="tab-content" role="tabpanel" aria-label="Connections">
+      <div class="section-header">
+        <h2>Connections</h2>
+        <div class="filter-bar">
+          <button class="filter-chip active" data-filter="all" onclick="filterConnections('all')">All</button>
+          <button class="filter-chip" data-filter="github" onclick="filterConnections('github')">GitHub</button>
+          <button class="filter-chip" data-filter="gitlab" onclick="filterConnections('gitlab')">GitLab</button>
+          <button class="filter-chip" data-filter="bitbucket" onclick="filterConnections('bitbucket')">Bitbucket</button>
+          <button class="filter-chip" data-filter="jenkins" onclick="filterConnections('jenkins')">Jenkins</button>
+          <button class="filter-chip" data-filter="azure_devops" onclick="filterConnections('azure_devops')">Azure</button>
+          <button class="filter-chip" data-filter="circleci" onclick="filterConnections('circleci')">CircleCI</button>
+        </div>
+      </div>
+      <div id="connections-list" class="connections-list"></div>
+    </div>
+    <div id="tab-findings" class="tab-content" role="tabpanel" aria-label="Security Findings">
+      <div class="section-header">
+        <h2>Security Findings</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="filter-bar">
+            <button class="filter-chip active" data-sev="all" onclick="filterFindings('all')">All</button>
+            <button class="filter-chip" data-sev="critical" onclick="filterFindings('critical')">Critical</button>
+            <button class="filter-chip" data-sev="high" onclick="filterFindings('high')">High</button>
+            <button class="filter-chip" data-sev="medium" onclick="filterFindings('medium')">Medium</button>
+            <button class="filter-chip" data-sev="low" onclick="filterFindings('low')">Low</button>
+            <button class="filter-chip" data-sev="open" onclick="filterFindings('open')">Open Only</button>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="exportFindings('csv')">Export CSV</button>
+          <button class="btn btn-outline btn-sm" onclick="exportFindings('json')">Export JSON</button>
+        </div>
+      </div>
+      <div id="findings-list"></div>
+    </div>
+    <div id="tab-history" class="tab-content" role="tabpanel" aria-label="Analysis History">
+      <div class="section-header"><h2>Analysis History</h2></div>
+      <div id="history-list"></div>
+    </div>
+    <div id="tab-integrations" class="tab-content" role="tabpanel" aria-label="Integrations">
+      <div class="section-header"><h2>Integrations</h2></div>
+      <div style="max-width:760px">
+        <div class="overview-card" style="margin-bottom:20px">
+          <h3 style="margin-bottom:14px">Inbound Webhooks</h3>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Set up these webhook URLs in your CI/CD platforms to automatically trigger PipeWarden scans on push and pull request events.</p>
+          <div id="integrations-webhooks"></div>
+        </div>
+        <div class="overview-card">
+          <h3 style="margin-bottom:14px">API Keys</h3>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Generate per-connection API keys for programmatic access. Keys are shown once — store them securely.</p>
+          <div id="integrations-apikeys"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Analytics -->
+    <div id="tab-analytics" class="tab-content" role="tabpanel" aria-label="Analytics">
+      <div class="section-header">
+        <h2>Analytics</h2>
+        <button class="btn btn-outline btn-sm" onclick="loadAnalytics()">Refresh</button>
+      </div>
+      <!-- Summary cards -->
+      <div class="stats" id="analytics-summary" style="margin-bottom:20px"></div>
+      <!-- Trend chart -->
+      <div class="overview-card" style="margin-bottom:20px">
+        <h3 style="margin-bottom:12px">Finding Trends (Last 30 Days)</h3>
+        <div id="analytics-trend-chart" style="overflow-x:auto"></div>
+      </div>
+      <!-- Top categories bar chart -->
+      <div class="overview-card">
+        <h3 style="margin-bottom:12px">Top Finding Categories</h3>
+        <div id="analytics-top-findings"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Policies -->
+    <div id="tab-policies" class="tab-content" role="tabpanel" aria-label="Policies">
+      <div class="section-header">
+        <h2>Policies</h2>
+        <button class="btn btn-primary btn-sm" onclick="showAddPolicyForm()">+ Add Policy</button>
+      </div>
+      <!-- Built-in policies -->
+      <div class="overview-card" style="margin-bottom:20px">
+        <h3 style="margin-bottom:12px">Built-in Policies</h3>
+        <div id="builtin-policies-table"></div>
+      </div>
+      <!-- Custom policies -->
+      <div class="overview-card">
+        <h3 style="margin-bottom:12px">Custom Policies</h3>
+        <div id="custom-policies-list"></div>
+        <!-- Add/Edit policy form -->
+        <div id="add-policy-form" style="display:none;margin-top:16px;padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)">
+          <h4 style="margin-bottom:12px" id="policy-form-title">New Custom Policy</h4>
+          <input type="hidden" id="policy-edit-id">
+          <div class="form-row">
+            <div class="form-group"><label>ID (slug)</label><input type="text" id="policy-id" placeholder="no-plain-passwords"></div>
+            <div class="form-group"><label>Name</label><input type="text" id="policy-name" placeholder="No Plain Passwords"></div>
+          </div>
+          <div class="form-group"><label>Description</label><input type="text" id="policy-desc" placeholder="Prevent plain-text passwords in pipeline env vars"></div>
+          <div class="form-row">
+            <div class="form-group"><label>Pattern (regex)</label><input type="text" id="policy-pattern" placeholder="(?i)password\s*=\s*\S+"></div>
+            <div class="form-group"><label>Severity</label>
+              <select id="policy-severity">
+                <option value="critical">Critical</option>
+                <option value="high" selected>High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group"><label>Message</label><input type="text" id="policy-message" placeholder="Plain-text password detected in pipeline configuration"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-primary btn-sm" onclick="saveCustomPolicy()">Save Policy</button>
+            <button class="btn btn-outline btn-sm" onclick="hideAddPolicyForm()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Secrets -->
+    <div id="tab-secrets" class="tab-content" role="tabpanel" aria-label="Detected Secrets">
+      <div class="section-header">
+        <h2>Detected Secrets</h2>
+        <div class="filter-bar">
+          <button class="filter-chip active" data-secret-filter="all" onclick="filterSecrets('all')">All</button>
+          <button class="filter-chip" data-secret-filter="active" onclick="filterSecrets('active')">Active</button>
+          <button class="filter-chip" data-secret-filter="revoked" onclick="filterSecrets('revoked')">Revoked</button>
+        </div>
+      </div>
+      <!-- Summary bar -->
+      <div id="secrets-summary-bar" style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap"></div>
+      <!-- Secrets table -->
+      <div id="secrets-table-wrap"></div>
+    </div>
+
+  </main>
+  <div class="toast-container" id="toast-container" role="status" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Policy Test Modal -->
+  <div class="modal-overlay hidden" id="policy-test-modal" role="dialog" aria-modal="true" aria-labelledby="policy-test-modal-title"><div class="modal">
+    <h2>Test Policy: <span id="policy-test-name"></span></h2>
+    <input type="hidden" id="policy-test-id">
+    <div class="form-group">
+      <label>Pipeline YAML / Log snippet</label>
+      <textarea id="policy-test-yaml" rows="10" style="width:100%;font-family:monospace;font-size:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px;resize:vertical" placeholder="Paste pipeline YAML or log content here..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeModal('policy-test-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="runPolicyTest()">Run Test</button>
+    </div>
+    <div id="policy-test-result" style="display:none;margin-top:16px;padding:12px;border-radius:var(--radius);font-size:13px"></div>
+  </div></div>
+
+  <!-- Revoke Secret Modal -->
+  <div class="modal-overlay hidden" id="revoke-secret-modal" role="dialog" aria-modal="true"><div class="modal">
+    <h2>Revoke Secret</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Finding ID: <strong id="revoke-secret-id"></strong></p>
+    <div class="form-group">
+      <label>Notes (optional)</label>
+      <textarea id="revoke-secret-notes" rows="4" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-size:13px;resize:vertical" placeholder="Describe why this secret is being revoked..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="closeModal('revoke-secret-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmRevokeSecret()">Revoke Secret</button>
+    </div>
+  </div></div>
+
+  <!-- Add Connection Modal -->
+  <div class="modal-overlay hidden" id="add-modal" role="dialog" aria-modal="true" aria-labelledby="add-modal-title"><div class="modal">
+    <h2 id="add-modal-title">Add Connection</h2>
+    <form id="add-form" onsubmit="saveConnection(event)">
+      <input type="hidden" id="edit-mode" value="">
+      <div class="form-group"><label>Connection Name</label><input type="text" id="conn-name" placeholder="e.g. github-main" required></div>
+      <div class="form-group"><label>Platform</label>
+        <select id="conn-platform" onchange="togglePlatformFields()">
+          <option value="github">GitHub Actions</option>
+          <option value="gitlab">GitLab CI/CD</option>
+          <option value="bitbucket">Bitbucket Pipelines</option>
+          <option value="jenkins">Jenkins</option>
+          <option value="azure_devops">Azure DevOps</option>
+          <option value="circleci">CircleCI</option>
+        </select>
+      </div>
+      <div id="fields-github" class="platform-fields active">
+        <div class="form-group"><label>Personal Access Token</label>
+          <input type="password" id="gh-token" placeholder="paste your GitHub PAT (starts with ghp_)">
+          <div class="help">Required scopes: <strong>repo</strong> (full access) and <strong>workflow</strong> (Actions read)</div>
+          <a class="token-help-link" href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=PipeWarden" target="_blank" rel="noopener">Create a GitHub token with correct scopes &rarr;</a>
+          <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px" onclick="startGitHubAppInstall()">Install with GitHub App Instead</button>
+          <div class="field-error" id="gh-token-error">Token is required. It should start with "ghp_" or "github_pat_"</div>
+        </div>
+        <div class="form-group"><label>Base URL (optional)</label>
+          <input type="text" id="gh-base-url" placeholder="https://api.github.com">
+          <div class="help">Leave empty for github.com. Only set for GitHub Enterprise (e.g. https://github.yourcompany.com/api/v3)</div>
+        </div>
+      </div>
+      <div id="fields-gitlab" class="platform-fields">
+        <div class="form-group"><label>Access Token</label>
+          <input type="password" id="gl-token" placeholder="paste your GitLab token (starts with glpat-)">
+          <div class="help">Required scope: <strong>api</strong> (full API access) — either Personal or Project token</div>
+          <a class="token-help-link" href="https://gitlab.com/-/user_settings/personal_access_tokens?name=PipeWarden&scopes=api" target="_blank" rel="noopener">Create a GitLab Personal Access Token &rarr;</a>
+          <div class="field-error" id="gl-token-error">Token is required. GitLab tokens typically start with "glpat-"</div>
+        </div>
+        <div class="form-group"><label>Base URL (optional)</label>
+          <input type="text" id="gl-base-url" placeholder="https://gitlab.com/api/v4">
+          <div class="help">Leave empty for gitlab.com. For self-hosted: https://your-gitlab.com/api/v4</div>
+        </div>
+      </div>
+      <div id="fields-jenkins" class="platform-fields">
+        <div class="form-group"><label>Base URL</label><input type="text" id="jenkins-base-url" placeholder="https://jenkins.yourcompany.com"><div class="help">Jenkins server base URL (e.g. https://jenkins.example.com)</div></div>
+        <div class="form-group"><label>Username</label><input type="text" id="jenkins-username" placeholder="your-jenkins-username"><div class="help">Jenkins username</div></div>
+        <div class="form-group"><label>API Token</label>
+          <input type="password" id="jenkins-token" placeholder="xxxxxxxxxxxxxxxxxxxx">
+          <div class="help">Required permission: <strong>Job: Read</strong></div>
+          <a class="token-help-link" href="https://docs.cloudbees.com/docs/cloudbees-ci/latest/user-guide/authenticating-cli-clients" target="_blank" rel="noopener">Create a Jenkins API Token &rarr;</a>
+          <div class="field-error" id="jenkins-token-error">API Token is required</div>
+        </div>
+      </div>
+      <div id="fields-azure_devops" class="platform-fields">
+        <div class="form-group"><label>Base URL</label><input type="text" id="azure-base-url" placeholder="https://dev.azure.com/yourorg"><div class="help">Azure DevOps organization URL (e.g. https://dev.azure.com/myorg)</div></div>
+        <div class="form-group"><label>Personal Access Token (PAT)</label>
+          <input type="password" id="azure-token" placeholder="xxxxxxxxxxxxxxxxxxxx">
+          <div class="help">Required scopes: <strong>Build: Read</strong>, <strong>Pipeline Resources: Read</strong></div>
+          <a class="token-help-link" href="https://docs.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate" target="_blank" rel="noopener">Create an Azure DevOps PAT &rarr;</a>
+          <div class="field-error" id="azure-token-error">Personal Access Token is required</div>
+        </div>
+      </div>
+      <div id="fields-circleci" class="platform-fields">
+        <div class="form-group"><label>Organization Slug</label><input type="text" id="circleci-org-slug" placeholder="gh/your-org or bb/your-org"><div class="help">CircleCI organization slug (e.g. gh/finsavvyai or bb/myteam)</div></div>
+        <div class="form-group"><label>API Token</label>
+          <input type="password" id="circleci-token" placeholder="xxxxxxxxxxxxxxxxxxxx">
+          <div class="help">Required permission: <strong>All</strong> (CircleCI API tokens have full access)</div>
+          <a class="token-help-link" href="https://app.circleci.com/settings/user/tokens" target="_blank" rel="noopener">Create a CircleCI API Token &rarr;</a>
+          <div class="field-error" id="circleci-token-error">API Token is required</div>
+        </div>
+      </div>
+      <div id="fields-bitbucket" class="platform-fields">
+        <div class="form-group"><label>Username</label><input type="text" id="bb-username" placeholder="your-atlassian-username"><div class="help">Your Atlassian/Bitbucket username (not email)</div><div class="field-error" id="bb-username-error">Username is required</div></div>
+        <div class="form-group"><label>App Password</label>
+          <input type="password" id="bb-app-password" placeholder="xxxxxxxxxxxxxxxxxxxx">
+          <div class="help">Required permission: <strong>Pipelines: Read</strong></div>
+          <a class="token-help-link" href="https://bitbucket.org/account/settings/app-passwords/new" target="_blank" rel="noopener">Create a Bitbucket App Password &rarr;</a>
+          <div class="field-error" id="bb-password-error">App password is required</div>
+        </div>
+        <div class="form-group"><label>Base URL (optional)</label><input type="text" id="bb-base-url" placeholder="https://api.bitbucket.org/2.0"><div class="help">Leave empty for bitbucket.org. Only set for Bitbucket Server/Data Center.</div></div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-outline" onclick="closeModal('add-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="save-conn-btn">Add Connection</button>
+      </div>
+    </form>
+  </div></div>
+
+  <!-- Analyze Modal -->
+  <div class="modal-overlay hidden" id="analyze-modal" role="dialog" aria-modal="true"><div class="modal">
+    <h2>Analyze Pipeline Run</h2>
+    <form id="analyze-form" onsubmit="runAnalysis(event)">
+      <div class="form-group"><label>Connection</label><select id="analyze-conn" onchange="onAnalyzeConnChange()"></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>Owner / Organization</label><input type="text" id="analyze-owner" placeholder="e.g. my-org" required></div>
+        <div class="form-group"><label>Repository</label><input type="text" id="analyze-repo" placeholder="e.g. my-repo" required></div>
+      </div>
+      <div class="form-group"><label>Run ID</label>
+        <div style="display:flex;gap:8px"><input type="text" id="analyze-run-id" placeholder="e.g. 12345" required style="flex:1"><button type="button" class="btn btn-outline btn-sm" onclick="browseRuns()">Browse</button></div>
+        <div class="help">Enter a run ID or click Browse to select from recent runs</div>
+      </div>
+      <div id="recent-runs-container" style="display:none;margin-bottom:12px">
+        <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Recent Runs</label>
+        <div id="recent-runs-list" class="pipeline-runs"></div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-outline" onclick="closeModal('analyze-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="analyze-submit-btn">Analyze</button>
+      </div>
+    </form>
+    <div id="analysis-progress" style="display:none">
+      <div style="text-align:center;padding:16px 0">
+        <div style="font-size:14px;margin-bottom:8px">Analyzing pipeline run...</div>
+        <div style="font-size:12px;color:var(--muted)">Claude is reviewing the pipeline for security issues</div>
+        <div class="progress-bar"><div class="fill"></div></div>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- Pipeline Browser Modal -->
+  <div class="modal-overlay hidden" id="browse-modal" role="dialog" aria-modal="true"><div class="modal modal-wide">
+    <h2>Pipeline Browser</h2>
+    <div class="form-group"><label>Connection</label><select id="browse-conn"></select></div>
+    <div class="form-row">
+      <div class="form-group"><label>Owner / Organization</label><input type="text" id="browse-owner" placeholder="e.g. my-org"></div>
+      <div class="form-group"><label>Repository</label><input type="text" id="browse-repo" placeholder="e.g. my-repo"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn btn-primary btn-sm" onclick="fetchPipelineRuns()">Load Runs</button>
+      <button class="btn btn-outline btn-sm" onclick="fetchPipelines()">List Pipelines</button>
+    </div>
+    <div id="browse-results"></div>
+    <div class="form-actions"><button class="btn btn-outline" onclick="closeModal('browse-modal')">Close</button></div>
+  </div></div>
+
+  <!-- Quick Scan Modal -->
+  <div class="modal-overlay hidden" id="quick-scan-modal" role="dialog" aria-modal="true"><div class="modal">
+    <h2>Quick Security Scan</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Rule-based heuristic analysis. No AI API key needed. Instant results.</p>
+    <form id="quick-scan-form" onsubmit="runQuickScan(event)">
+      <div class="form-group"><label>Connection</label><select id="quick-conn"></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>Owner / Organization</label><input type="text" id="quick-owner" placeholder="e.g. my-org" required></div>
+        <div class="form-group"><label>Repository</label><input type="text" id="quick-repo" placeholder="e.g. my-repo" required></div>
+      </div>
+      <div class="form-group"><label>Run ID</label>
+        <div style="display:flex;gap:8px"><input type="text" id="quick-run-id" placeholder="e.g. 12345" required style="flex:1"><button type="button" class="btn btn-outline btn-sm" onclick="browseRunsQuick()">Browse</button></div>
+      </div>
+      <div id="quick-runs-container" style="display:none;margin-bottom:12px">
+        <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600">Recent Runs</label>
+        <div id="quick-runs-list" class="pipeline-runs"></div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-outline" onclick="closeModal('quick-scan-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="quick-submit-btn">Run Quick Scan</button>
+      </div>
+    </form>
+  </div></div>
+
+  <!-- Onboarding Wizard -->
+  <div class="onboarding-overlay hidden" id="onboarding-overlay" role="dialog" aria-modal="true" aria-labelledby="onboarding-title"><div class="onboarding">
+    <h2 id="onboarding-title">Welcome to <span style="color:var(--accent)">Pipe</span>Warden</h2>
+    <div class="subtitle">CI/CD Pipeline Security Monitoring</div>
+    <div id="onboarding-step-1">
+      <div class="onboarding-steps">
+        <div class="onboarding-step"><div class="step-num">1</div><div><h4>Connect your CI/CD platform</h4><p>Link a GitHub, GitLab, Bitbucket, Jenkins, Azure DevOps, or CircleCI account so PipeWarden can monitor your pipelines.</p></div></div>
+        <div class="onboarding-step"><div class="step-num">2</div><div><h4>Scan a pipeline run</h4><p>Use Quick Scan (instant, rule-based) or AI Analysis (deep, Claude-powered) to check for security issues.</p></div></div>
+        <div class="onboarding-step"><div class="step-num">3</div><div><h4>Review and remediate findings</h4><p>Triage security findings, track your security posture, and export reports for your team.</p></div></div>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Choose your platform to get started:</p>
+      <div class="platform-cards">
+        <div class="platform-card" data-platform="github" onclick="onboardingAddPlatform('github')"><div class="p-icon" style="color:#f9fafb">GH</div><div class="p-name">GitHub</div></div>
+        <div class="platform-card" data-platform="gitlab" onclick="onboardingAddPlatform('gitlab')"><div class="p-icon" style="color:#fc6d26">GL</div><div class="p-name">GitLab</div></div>
+        <div class="platform-card" data-platform="bitbucket" onclick="onboardingAddPlatform('bitbucket')"><div class="p-icon" style="color:#2684ff">BB</div><div class="p-name">Bitbucket</div></div>
+        <div class="platform-card" data-platform="jenkins" onclick="onboardingAddPlatform('jenkins')"><div class="p-icon" style="color:#d24939">J</div><div class="p-name">Jenkins</div></div>
+        <div class="platform-card" data-platform="azure_devops" onclick="onboardingAddPlatform('azure_devops')"><div class="p-icon" style="color:#0078d4">AZ</div><div class="p-name">Azure DevOps</div></div>
+        <div class="platform-card" data-platform="circleci" onclick="onboardingAddPlatform('circleci')"><div class="p-icon" style="color:#343434">CI</div><div class="p-name">CircleCI</div></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="loadDemoWorkspace()">Load Demo Workspace</button>
+        <button class="btn btn-outline btn-sm" onclick="startGitHubAppInstall()">Install GitHub App</button>
+      </div>
+      <button class="btn btn-ghost" onclick="dismissOnboarding()" style="margin-top:8px">Skip for now</button>
+    </div>
+  </div></div>
+
+  <!-- API Key Display Modal -->
+  <div class="modal-overlay hidden" id="apikey-modal" role="dialog" aria-modal="true"><div class="modal">
+    <h2>API Key Generated</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Connection: <strong id="apikey-modal-name"></strong></p>
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px">
+      <code id="apikey-modal-key" style="font-size:12px;word-break:break-all;color:var(--accent)"></code>
+    </div>
+    <p style="font-size:12px;color:var(--red);margin-bottom:16px">This key is shown only once. Copy it now and store it securely.</p>
+    <div class="form-actions">
+      <button class="btn btn-outline" onclick="copyToClipboard(document.getElementById('apikey-modal-key').textContent)">Copy Key</button>
+      <button class="btn btn-primary" onclick="closeModal('apikey-modal')">Done</button>
+    </div>
+  </div></div>
+
+  <style>
+    .schedule-panel { border-top: 0.5px solid var(--separator); background: var(--surface-1); }
+    .schedule-panel-inner { padding: var(--s-3) var(--s-4) var(--s-3); }
+    .schedule-panel .form-group label { font-size: var(--fs-footnote); color: var(--text-secondary); margin-bottom: var(--s-1); display: block; font-weight: 500; }
+    .schedule-panel input[type="text"], .schedule-panel select { background: var(--surface-1); border: 0.5px solid var(--separator-thin); color: var(--text-primary); border-radius: var(--r-sm); padding: var(--s-1) var(--s-2); font-size: var(--fs-footnote); min-height: 32px; }
+    .schedule-panel textarea { background: var(--surface-1); border: 0.5px solid var(--separator-thin); color: var(--text-primary); border-radius: var(--r-sm); padding: var(--s-2); width: 100%; font-size: var(--fs-footnote); }
+    .suppress-form select, .suppress-form textarea { background: var(--surface-1); border: 0.5px solid var(--separator-thin); color: var(--text-primary); border-radius: var(--r-sm); padding: var(--s-2); width: 100%; }
+    .finding-card.suppressed-row { opacity: 0.55; }
+    .status-badge.suppressed { background: var(--surface-2); color: var(--text-secondary); }
+    .integrations-webhook-card { background: var(--surface-1); border-radius: var(--r-md); padding: var(--s-4); margin-bottom: var(--s-3); }
+    .apikey-row { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0; border-bottom: 0.5px solid var(--separator-thin); }
+    .apikey-row:last-child { border-bottom: none; }
+  </style>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

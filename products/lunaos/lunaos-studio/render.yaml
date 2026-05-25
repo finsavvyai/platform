@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: lunaos-orchestrator-gui
+    env: python
+    plan: free
+    buildCommand: |
+      echo "Setting up LunaOS Orchestrator GUI..."
+      python3 -m http.server 8000 --directory . &
+      sleep 2
+      echo "GUI server started"
+    startCommand: python3 server.py --port $PORT --no-browser
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+    healthCheckPath: /
+    autoDeploy: true
+    branch: main
+    rootDir: apps/orchestrator-gui
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    dockerArgs:
+      - "--build-arg"
+      - "NODE_ENV=production"
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+    disk:
+      name: lunaos-gui-disk
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: LUNAS_API_URL
+        value: https://api.lunaos.ai
+      - key: LUNAS_API_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://lunaos.ai,https://orchestrator.lunaos.ai

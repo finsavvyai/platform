@@ -1,0 +1,96 @@
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '2'
+          memory: '1G'
+        reservations:
+          cpus: '0.5'
+          memory: '256M'
+    environment:
+      DATABASE_URL: postgres://aegis:aegis@postgres-primary:5432/aegis?sslmode=disable
+      REPLICA_URLS: postgres://aegis:aegis@postgres-replica:5432/aegis?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      WORKERS: "100"
+      QUEUE_DEPTH: "10000"
+      ENVIRONMENT: production
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  postgres-primary:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: aegis
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_primary_data:/var/lib/postgresql/data
+    command: >
+      postgres
+        -c shared_buffers=256MB
+        -c effective_cache_size=768MB
+        -c max_connections=200
+        -c work_mem=16MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-replica:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: aegis
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    volumes:
+      - pg_replica_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis_data:
+  pg_primary_data:
+  pg_replica_data:
+
+networks:
+  default:
+    driver: bridge

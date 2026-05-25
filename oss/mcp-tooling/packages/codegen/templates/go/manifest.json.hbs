@@ -1,0 +1,172 @@
+{
+  "name": "{{config.serviceName}}",
+  "description": "{{config.description}}",
+  "version": "{{config.serviceVersion}}",
+  "author": "{{config.author}}",
+  "license": "{{config.license}}",
+  "homepage": "{{config.homepage}}",
+  "repository": "{{config.repository}}",
+
+  "mcp": {
+    "protocol_version": "2024-11-05",
+    "capabilities": {
+      "tools": {
+        "list_changed": false
+      },
+      "resources": {
+        "subscribe": false,
+        "list_changed": false
+      },
+      "prompts": {
+        "list_changed": false
+      }
+    },
+    "tools": [
+      {{#each tools}}
+      {
+        "name": "{{this.name}}",
+        "description": "{{this.description}}",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            {{#each this.parameters}}
+            "{{this.name}}": {
+              "type": "{{this.type}}",
+              "description": "{{this.description}}"{{#if this.enum}},
+              "enum": [{{#each this.enums}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]{{/if}}
+            }{{#unless @last}},{{/unless}}
+            {{/each}}
+          },
+          "required": [{{#each this.requiredParameters}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+        }
+      }{{#unless @last}},{{/unless}}
+      {{/each}}
+    ]
+  },
+
+  "agentkit": {
+    "enabled": true,
+    "runtime": "cloudflare_worker",
+    "manifest_url": "https://{{config.domain}}/manifest/{{config.connectorId}}",
+    "version": "{{config.serviceVersion}}",
+    "permissions": [
+      {{#each config.agentkitPermissions}}
+      {
+        "type": "{{this.type}}",
+        "scope": "{{this.scope}}",
+        "description": "{{this.description}}"
+      }{{#unless @last}},{{/unless}}
+      {{/each}}
+    ],
+    "tools": [
+      {{#each tools}}
+      {
+        "name": "{{this.name}}",
+        "description": "{{this.description}}",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            {{#each this.parameters}}
+            "{{this.name}}": {
+              "type": "{{this.type}}",
+              "description": "{{this.description}}"
+            }{{#unless @last}},{{/unless}}
+            {{/each}}
+          }
+        }
+      }{{#unless @last}},{{/unless}}
+      {{/each}}
+    ],
+    "metadata": {
+      "generated_by": "MCPoverflow",
+      "generated_at": "{{generatedAt}}",
+      "connector_id": "{{config.connectorId}}",
+      "domain": "{{config.domain}}",
+      "category": "{{config.category}}"
+    }
+  },
+
+  "runtime": {
+    "type": "cloudflare_worker",
+    "entry_point": "main.go",
+    "environment": "production",
+    "timeout": 30,
+    "memory_limit": "128MB",
+    "cpu_limit": "50ms"
+  },
+
+  "deployment": {
+    "platform": "cloudflare",
+    "regions": ["auto"],
+    "environment_variables": {
+      {{#each config.environment}}
+      "{{this.key}}": "{{this.value}}"{{#unless @last}},{{/unless}}
+      {{/each}}
+    },
+    "secrets": [
+      {{#each config.secrets}}
+      "{{this.key}}"{{#unless @last}},{{/unless}}
+      {{/each}}
+    ]
+  },
+
+  "endpoints": {
+    "mcp": {
+      "websocket": "wss://{{config.domain}}/mcp",
+      "http": "https://{{config.domain}}/mcp"
+    },
+    "health": "https://{{config.domain}}/health",
+    "metrics": "https://{{config.domain}}/metrics",
+    "manifest": "https://{{config.domain}}/manifest/{{config.connectorId}}"
+  },
+
+  "monitoring": {
+    "enabled": true,
+    "metrics": {
+      "invocation_count": true,
+      "response_time": true,
+      "error_rate": true,
+      "memory_usage": true
+    },
+    "logging": {
+      "level": "info",
+      "format": "json"
+    }
+  },
+
+  "security": {
+    "authentication": {
+      "type": "jwt",
+      "token_expiry": "24h"
+    },
+    "rate_limiting": {
+      "enabled": true,
+      "requests_per_minute": 100
+    }
+  },
+
+  "tags": [
+    "mcp",
+    "api",
+    "automation"{{#each config.tags}},
+    "{{this}}"{{/each}}
+  ],
+
+  "categories": [
+    "api_integration",
+    "automation",
+    "developer_tools"
+  ],
+
+  "created_at": "{{generatedAt}}",
+  "updated_at": "{{generatedAt}}",
+
+  "_metadata": {
+    "generator": {
+      "name": "MCPoverflow",
+      "version": "1.0.0"
+    },
+    "schema_version": "1.0.0",
+    "checksum": "{{checksum}}"
+  }
+}

@@ -1,0 +1,50 @@
+[Unit]
+Description=FinSavvyAI Cluster Master Server
+Documentation=https://github.com/finsavvyai/llm
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=finsavvyai
+Group=finsavvyai
+WorkingDirectory=/opt/finsavvyai
+EnvironmentFile=-/opt/finsavvyai/.env
+
+# Python virtualenv activation
+ExecStart=/opt/finsavvyai/venv/bin/python -m src.core.master_server --port 8000
+
+# Graceful shutdown (SIGTERM -> asyncio shutdown)
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Restart policy
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Logging - structured JSON to journald + file
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=finsavvyai-master
+
+# Resource limits
+MemoryMax=1G
+MemoryHigh=768M
+CPUQuota=200%
+TasksMax=256
+LimitNOFILE=65536
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/finsavvyai/logs /var/log/finsavvyai
+ReadOnlyPaths=/opt/finsavvyai
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

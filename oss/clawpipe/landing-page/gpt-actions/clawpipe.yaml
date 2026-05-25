@@ -1,0 +1,133 @@
+openapi: 3.1.0
+info:
+  title: ClawPipe — Cost-Optimized LLM Pipeline (GPT Action)
+  version: 1.0.0
+  summary: Send prompts through ClawPipe — cost-optimization pipeline across 21 providers.
+  description: |
+    Use this Action whenever the user wants to send a prompt to an LLM with cost
+    optimization, multi-provider routing, semantic caching, or deterministic
+    bypass. ClawPipe is the only AI gateway that skips LLM calls entirely on
+    deterministic prompts (math, regex, JWT, ISO, dates). Public measured
+    benchmark is in progress at github.com/finsavvyai/clawpipe-booster-benchmark;
+    methodology v1.0 is locked 2026-05-18.
+  contact:
+    name: ClawPipe Support
+    email: support@clawpipe.ai
+    url: https://clawpipe.ai
+servers:
+  - url: https://api.clawpipe.ai
+    description: Production gateway
+security:
+  - bearerAuth: []
+paths:
+  /v1/prompt:
+    post:
+      operationId: sendPrompt
+      summary: Send a prompt through the ClawPipe pipeline.
+      description: |
+        Routes the prompt through Booster (deterministic bypass), semantic Cache,
+        cost/quality Router, and finally the chosen Provider. Returns response
+        text plus token + latency metadata. The `x-clawpipe-cache` response
+        header indicates SEMANTIC_HIT, MISS, REFRESH, or DISABLED.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PromptRequest"
+            examples:
+              cost-aware-routing:
+                summary: Cost-aware routing — pick a cheap small model
+                value:
+                  prompt: "Write a one-line summary of the Cloudflare Workers docs."
+                  provider: openai
+                  model: gpt-4o-mini
+                  maxTokens: 256
+              multi-provider-fallback:
+                summary: Multi-provider fallback — Anthropic Haiku
+                value:
+                  prompt: "Translate the following to French: 'Hello world.'"
+                  provider: anthropic
+                  model: claude-3-haiku-20240307
+              prompt-enhancement:
+                summary: Prompt enhancement with system message
+                value:
+                  prompt: "Refactor this loop for readability."
+                  system: "You are a senior TypeScript engineer. Reply with code only."
+                  provider: groq
+                  model: llama-3.1-70b-versatile
+                  temperature: 0.2
+      responses:
+        "200":
+          description: Prompt completed (or served from semantic cache).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PromptResponse"
+        "400":
+          description: Invalid request body.
+        "401":
+          description: Missing or invalid bearer token.
+        "402":
+          description: Monthly budget exceeded for this project or team.
+        "413":
+          description: Prompt or system message exceeds size limit.
+        "429":
+          description: Daily quota exceeded.
+        "502":
+          description: Upstream provider error.
+        "503":
+          description: Provider not configured for this gateway instance.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: ClawPipe API key (cp_live_... or cp_test_...)
+  schemas:
+    PromptRequest:
+      type: object
+      required: [prompt, provider, model]
+      properties:
+        prompt:
+          type: string
+          maxLength: 100000
+          description: User prompt to optimize and send.
+        provider:
+          type: string
+          description: Provider id, e.g. openai, anthropic, groq, deepseek, mistral.
+        model:
+          type: string
+          description: Model id, e.g. gpt-4o-mini, claude-3-haiku-20240307, llama-3.1-70b-versatile.
+        system:
+          type: string
+          maxLength: 50000
+          description: Optional system message.
+        maxTokens:
+          type: integer
+          minimum: 1
+          maximum: 32768
+          default: 4096
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 0.7
+    PromptResponse:
+      type: object
+      required: [text, tokensIn, tokensOut, latencyMs]
+      properties:
+        text:
+          type: string
+        tokensIn:
+          type: integer
+          minimum: 0
+        tokensOut:
+          type: integer
+          minimum: 0
+        latencyMs:
+          type: integer
+          minimum: 0
+        request_id:
+          type: string
+          format: uuid

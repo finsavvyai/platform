@@ -1,0 +1,95 @@
+name: OPA Policy Tests
+
+on:
+  pull_request:
+    paths:
+      - "services/opa/**"
+      - ".github/workflows/opa-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/opa/**"
+
+permissions:
+  contents: read
+
+jobs:
+  rego:
+    name: opa test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPA_VERSION: "0.70.0"
+      COVERAGE_THRESHOLD: "90"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OPA
+        run: |
+          curl -sSL -o /usr/local/bin/opa \
+            "https://openpolicyagent.org/downloads/v${OPA_VERSION}/opa_linux_amd64_static"
+          chmod +x /usr/local/bin/opa
+          opa version
+
+      # Existing policies have pre-existing compile errors (tuple keys,
+      # shadowed `data` args, `->` pseudocode). Treat parse/test as advisory
+      # until sdlc.api/auth/data/multitenancy policies are refactored.
+      # Tracking: https://github.com/finsavvyai/sdlc-platform/issues (W2-9
+      # follow-up — rewrite rego policies against Rego v1 syntax).
+      # Hard cutover date: 2026-07-01. After that, this workflow fails
+      # hard on parse/test errors instead of warning.
+      - name: Check advisory window
+        id: advisory
+        run: |
+          today=$(date -u +%Y-%m-%d)
+          if [[ "$today" > "2026-07-01" ]]; then
+            echo "advisory=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::advisory window closed on 2026-07-01; rego failures now block CI"
+          else
+            echo "advisory=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Parse check (advisory)
+        if: steps.advisory.outputs.advisory == 'true'
+        working-directory: services/opa/policies
+        run: opa parse sdlc.auth.rego sdlc.api.rego sdlc.data.rego sdlc.multitenancy.rego || true
+
+      - name: Parse check (strict)
+        if: steps.advisory.outputs.advisory != 'true'
+        working-directory: services/opa/policies
+        run: opa parse sdlc.auth.rego sdlc.api.rego sdlc.data.rego sdlc.multitenancy.rego
+
+      - name: Run tests (advisory)
+        if: steps.advisory.outputs.advisory == 'true'
+        working-directory: services/opa/policies
+        continue-on-error: true
+        run: opa test -v .
+
+      - name: Run tests (strict)
+        if: steps.advisory.outputs.advisory != 'true'
+        working-directory: services/opa/policies
+        run: opa test -v .
+
+      - name: Coverage gate
+        working-directory: services/opa/policies
+        continue-on-error: true
+        run: |
+          opa test --coverage --format=json . > coverage.json || echo '{}' > coverage.json
+          cov=$(python3 -c "import json; d=json.load(open('coverage.json')); print(round(d.get('coverage',0),2))")
+          echo "coverage=$cov%"
+          python3 - <<PY
+          import json, sys
+          d = json.load(open('coverage.json'))
+          cov = d.get('coverage', 0)
+          if cov < ${COVERAGE_THRESHOLD}:
+              print(f"::warning::rego coverage {cov}% below threshold ${COVERAGE_THRESHOLD}%")
+              # Warn only until all 4 policies have full test matrices.
+              # Flip to sys.exit(1) once baseline lands.
+          PY
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rego-coverage
+          path: services/opa/policies/coverage.json
+          retention-days: 14

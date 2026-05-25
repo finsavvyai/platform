@@ -1,0 +1,78 @@
+# sdlc-platform
+
+> Open-source privacy gateway that scrubs PII and secrets out of every prompt before it reaches an LLM. Self-hosted Go backend with browser extensions for ChatGPT / Claude / Gemini / Copilot, IDE addins for VS Code / JetBrains / Cursor (VS Code shipped, others on roadmap), and Office addins for Word / Outlook (roadmap). Five DLP presets, HMAC-chained audit log, RBAC, SCIM 2.0, SAML 2.0, per-tenant spend caps, multi-provider routing across Anthropic, OpenAI, Amazon Bedrock, Google Vertex AI, Azure OpenAI, and self-hosted vLLM / Ollama.
+
+sdlc-platform is the open-source anchor of a three-product portfolio bundled under one Trust Center and one MSA: the privacy gateway itself, **AMLIQ** (AML compliance dashboard built on the same primitives), and **OpenSyber / Claw** (multi-provider AI routing layer). Customers sign once and can adopt any combination.
+
+Licensing is tiered. The OSS distribution is AGPL-3.0-or-later. Commercial buyout (closed-source embedding) is available at **Team** $39/seat/mo, **Business** $79/seat/mo, or **Enterprise** from $4,000/seat/yr. Every paid tier ships the same binary as the AGPL release — the difference is the commercial buyout, bundled SLA, and (Enterprise) negotiable DPA + MSA, custom DLP presets, CMEK, and named on-call.
+
+## Market context — why a privacy gateway, why now
+
+The category was priced loudly in May 2025 when Cisco acquired **Lakera Guard** for approximately $300 million. Buyers know the category, have budget, and want a non-acquired-by-bigco alternative. Regulatory tailwinds in 2026:
+
+- **EU AI Act GPAI enforcement** begins August 2026. Every EU-touching application that submits user data to a general-purpose model needs a documentable pre-prompt redaction story.
+- **Anthropic FSI push** (Blackstone JV, FIS partnership, 10 financial agents announced May 2026) means regulated buyers are actively shortlisting Claude wrappers, and Trust posture decides the shortlist.
+- **FINRA 2026 AI oversight** and parallel SOC 2 AI control points create compliance line items for vendor-prompt handling.
+- **United States v. Heppner** (SDNY, 2026-02-17) held that prompts to consumer Claude destroyed attorney-client privilege and may have waived privilege over the underlying communications. That's now one DLP preset (`legal`) inside the broader product, not the headline.
+
+## Product surface
+
+### Core gateway (services/gateway, Go 1.24, Chi router)
+
+- `POST /v1/redact` — standalone DLP scan endpoint clients hit before submitting to an LLM. Request `{text, presets?, tenant?}`. Response `{redacted, detections[], blocked, block_reason?}`. Uses the same per-tenant policy, custom patterns, and vertical presets as the inbound middleware via the public `DLP.Scan` method.
+- Inbound + outbound DLP middleware on every LLM-proxy route. Per-tenant action enum (`allow | mask | redact | block | tokenize`). Tokenize round-trip preserves prompts for the customer while keeping the model blind.
+- HMAC-chained immutable audit log. Tamper-evident; replay-with-redaction supported. Per-tenant chain key, rotatable, rotation itself audited.
+- RBAC evaluator backed by an OPA Rego policy. SCIM 2.0 provisioning. SAML 2.0 SSO with MFA + WebAuthn for admin accounts.
+- Per-tenant spend cap with RFC-7807 402 on overage. Per-provider routing with circuit breakers across Anthropic, OpenAI, Bedrock, Vertex, Azure, vLLM, Ollama.
+- Postgres 16 + pgvector with Row-Level Security on every multi-tenant table. CMEK envelope encryption (customer holds the KEK) on Enterprise.
+- CLI proxy mode (`gateway proxy`) for transparent localhost interception of any HTTP LLM call.
+
+### DLP presets
+
+| Preset | Status | Patterns | Opt-in |
+|---|---|---|---|
+| `pii_default` | always on (built-in pack) | ssn · itin · mrn · credit_card · email · account_number | no — base |
+| `secrets` | always on (built-in pack) | anthropic_key · openai_key · aws_access_key · github_token · slack_token · stripe_key · jwt · private-key armor | no — base |
+| `legal` | opt-in (migration 032) | attorney_client_privilege · attorney_work_product · case_caption · federal/state docket numbers · state-bar numbers · NDA markers · more | per-tenant boolean |
+| `finance` | opt-in (migration 033) | iban · bic · israeli_id · aba_routing (PAN already in base) | per-tenant boolean |
+| `healthcare` | opt-in (migration 033) | phi_marker · npi · dea · icd10 (MRN already in base) | per-tenant boolean |
+| custom | opt-in | tenant-defined regex pack via `CustomPatternSpec` | per-tenant pack |
+
+Each pattern is heuristic, not a compliance-evidence engine. Disclaimers and citations live inline in `services/gateway/internal/infrastructure/middleware/dlp_*.go`.
+
+### Browser extension (extensions/browser, Manifest V3, TypeScript, Vite)
+
+- Content scripts for `chat.openai.com`, `chatgpt.com`, `claude.ai`, `gemini.google.com`, `copilot.microsoft.com`.
+- Background worker intercepts the submit keystroke, sends the prompt to `POST /v1/redact`, surfaces detections, replaces the textarea, then submits.
+- Options page: gateway URL, API key, tenant, presets, preview-vs-auto mode, master enable/disable.
+- Cross-browser submissions planned: Chrome Web Store, Edge add-ons, Firefox AMO, Safari Web Extension.
+
+### IDE addin (extensions/ide/vscode, vsce + @vscode/test-electron)
+
+- Two commands: `Privacy Gateway: Scrub selection` (default key `Cmd+Alt+R` / `Ctrl+Alt+R`) and `Privacy Gateway: Scrub clipboard`.
+- Status-bar toggle, configurable presets, gateway URL + API key + tenant.
+- JetBrains and Cursor builds on the roadmap. Office addins (Word, Outlook) on the roadmap.
+
+### 3-product Trust Bundle (trust/)
+
+- Static Trust Center at `trust.sdlc.cc` covering sdlc-platform, AMLIQ, OpenSyber/Claw.
+- Pages: security overview · sub-processors · DPA + MSA · audit-log architecture · SOC 2 status (transparent: yr-2 target after first ~$30K cleared).
+- Strict CSP, HSTS, frame-ancestors-deny via `_headers`.
+
+## Pricing
+
+- **Free (self-host)** — $0, AGPL-3.0 terms.
+- **Team** — $39/seat/mo, 5-seat minimum. Commercial buyout + email support.
+- **Business** — $79/seat/mo, 10-seat minimum. Team + store-listed extensions + SAML/SCIM + 1-business-day SLA + DPA template.
+- **Enterprise** — from $4,000/seat/yr. Business + custom DLP presets + negotiated DPA + CMEK + named on-call.
+
+Add-ons (any tier): Setup engagement $5,000 one-time, Support contract $500–$2,000/mo.
+
+## Repository
+
+- GitHub: https://github.com/finsavvyai/sdlc-platform
+- License: AGPL-3.0-or-later
+- Trust Center: https://trust.sdlc.cc/
+- Decision record (current direction): docs/PIVOT-2026-05-20-PRIVACY-GATEWAY.md
+- Roadmap: ROADMAP.md
+- Commercial license: COMMERCIAL.md

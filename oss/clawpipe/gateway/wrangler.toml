@@ -1,0 +1,37 @@
+name = "clawpipe-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+routes = [
+  { pattern = "api.clawpipe.ai", custom_domain = true }
+]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "clawpipe"
+database_id = "08424399-9eda-4ade-9cd7-142c112f9118"
+migrations_dir = "migrations"
+# NOTE: read_replication is configured server-side on the D1 database, not
+# via wrangler.toml (wrangler ignores the field with a warning). Current
+# state is visible via `wrangler d1 info clawpipe` → `read_replication.mode`.
+# To enable, use the Cloudflare dashboard or:
+#   curl -X PATCH \
+#     "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/d1/database/$DB_ID" \
+#     -H "Authorization: Bearer <token-with-D1:Edit-scope>" \
+#     -H "Content-Type: application/json" \
+#     -d '{"read_replication":{"mode":"auto"}}'
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "2ca9dd91700743e687998276f68204c0"
+
+[ai]
+binding = "AI"
+
+[vars]
+ENVIRONMENT = "production"
+
+# Crons:
+#  - Weekly Slack digest: Mondays 09:00 UTC
+#  - Webhook DLQ drain: every 5 minutes (drains due retries, batched)
+[triggers]
+crons = ["0 9 * * 1", "*/5 * * * *"]

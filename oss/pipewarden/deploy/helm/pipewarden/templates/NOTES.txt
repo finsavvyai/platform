@@ -1,0 +1,25 @@
+PipeWarden {{ .Chart.AppVersion }} installed.
+
+1. Wait for the pod:
+     kubectl rollout status deploy/{{ include "pipewarden.fullname" . }}
+
+2. Port-forward the dashboard:
+     kubectl port-forward svc/{{ include "pipewarden.fullname" . }} 8080:{{ .Values.service.port }}
+     open http://localhost:8080
+
+{{- if .Values.airGap.enabled }}
+
+AIR-GAP MODE is enabled. Outbound HTTPS is blocked by NetworkPolicy.
+Offline LLM: {{ .Values.airGap.offlineLLM.provider }} at {{ .Values.airGap.offlineLLM.endpoint }}
+Confirm the offline provider is reachable:
+   kubectl exec deploy/{{ include "pipewarden.fullname" . }} -- wget -qO- {{ .Values.airGap.offlineLLM.endpoint }}
+{{- end }}
+
+3. Vault key secret: {{ include "pipewarden.vaultSecretName" . }}
+   Protect this Secret — credentials are encrypted with its value. Losing it
+   bricks all stored provider tokens.
+
+{{- if not .Values.vault.existingSecret }}
+   A random key was generated and pinned by helm resource-policy: keep.
+   To rotate: re-create the Secret with a new value and roll the Deployment.
+{{- end }}

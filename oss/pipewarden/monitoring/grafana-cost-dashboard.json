@@ -1,0 +1,146 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "datasource", "uid": "grafana"},
+        "enable": true,
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "PipeWarden AI model spend, savings vs claude-sonnet baseline, and per-model breakdown. Source: pipewarden_model_* counters at /metrics. Pair with PIPEWARDEN_CHEAP_MODE=1 to flip routing and watch the savings panel grow.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Cumulative spend (USD)",
+      "type": "stat",
+      "id": 1,
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2}},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [
+        {
+          "expr": "sum(pipewarden_model_cost_usd_total)",
+          "legendFormat": "spend",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Cumulative savings vs claude-sonnet baseline (USD)",
+      "type": "stat",
+      "id": 2,
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "decimals": 2, "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "gray", "value": null}, {"color": "green", "value": 0.01}]}}},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [
+        {
+          "expr": "pipewarden_model_savings_usd_total",
+          "legendFormat": "savings",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Cheap-mode call ratio",
+      "type": "gauge",
+      "id": 3,
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}},
+      "targets": [
+        {
+          "expr": "sum(pipewarden_model_calls_total{mode=\"cheap\"}) / sum(pipewarden_model_calls_total)",
+          "legendFormat": "cheap %",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Total calls",
+      "type": "stat",
+      "id": 4,
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}},
+      "targets": [
+        {
+          "expr": "sum(pipewarden_model_calls_total)",
+          "legendFormat": "calls",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Spend rate by model ($/min)",
+      "type": "timeseries",
+      "id": 5,
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 5},
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "custom": {"drawStyle": "line", "lineWidth": 2, "fillOpacity": 10}}},
+      "targets": [
+        {
+          "expr": "sum by (model) (rate(pipewarden_model_cost_usd_total[5m]) * 60)",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Token throughput by model + direction",
+      "type": "timeseries",
+      "id": 6,
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 5},
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"drawStyle": "line", "lineWidth": 2}}},
+      "targets": [
+        {
+          "expr": "sum by (model, direction) (rate(pipewarden_model_tokens_total[5m]))",
+          "legendFormat": "{{model}} ({{direction}})",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Calls per minute by mode",
+      "type": "timeseries",
+      "id": 7,
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 14},
+      "datasource": {"type": "prometheus", "uid": "$datasource"},
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"drawStyle": "bars", "lineWidth": 1, "fillOpacity": 60, "stacking": {"mode": "normal"}}}},
+      "targets": [
+        {
+          "expr": "sum by (mode) (rate(pipewarden_model_calls_total[1m]) * 60)",
+          "legendFormat": "{{mode}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 38,
+  "tags": ["pipewarden", "ai-cost", "finops"],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "label": "Prometheus"
+      }
+    ]
+  },
+  "time": {"from": "now-6h", "to": "now"},
+  "title": "PipeWarden — AI Cost & Savings",
+  "uid": "pipewarden-ai-cost",
+  "version": 1
+}

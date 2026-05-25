@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawPipe across the SDLC — for every team that touches AI</title>
+  <meta name="description" content="Not just for developers. Product managers, designers, QA, ops, support, and marketing all use ClawPipe — via MCP, OpenAI-compatible endpoint, no-code tools, prompt store, and webhooks.">
+  <link rel="canonical" href="https://clawpipe.ai/sdlc">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/legal.css">
+  <style>
+    pre{background:#0a0a0a;color:#e5e5e5;padding:14px;border-radius:8px;overflow-x:auto;font-family:ui-monospace,monospace;font-size:13px}
+    code{background:rgba(0,0,0,.06);padding:2px 6px;border-radius:4px;font-family:ui-monospace,monospace;font-size:.92em}
+    .role{margin:28px 0;padding:20px;border:1px solid var(--separator,#ddd);border-radius:12px;background:var(--bg-secondary,#fafafa)}
+    .role h3{margin:0 0 6px;display:flex;align-items:center;gap:10px}
+    .pill{display:inline-block;padding:2px 10px;border-radius:999px;background:#eef;font-size:11px;font-weight:600}
+    .pain{color:#666;font-size:14px;margin:0 0 12px}
+  </style>
+</head>
+<body>
+<div class="container">
+  <header class="legal-header">
+    <a href="/" class="logo" style="text-decoration:none">ClawPipe</a>
+    <nav><a href="/#pricing">Pricing</a><a href="/benchmarks">Benchmarks</a><a href="/blog/how-to-use-clawpipe">How to use</a><a href="https://app.clawpipe.ai/signup">Sign in</a></nav>
+  </header>
+  <main class="content">
+    <h1>ClawPipe across the SDLC</h1>
+    <p class="lead">ClawPipe started as a developer SDK. The same pipeline now powers every team that touches AI — through MCP for agents, an OpenAI-compatible endpoint for no-code tools, a prompt store for templates, and webhooks for alerts. One LLM cost layer for the whole org.</p>
+
+    <h2>Three surfaces, ten roles</h2>
+    <table class="compare-table">
+      <thead><tr><th>Surface</th><th>Who uses it</th></tr></thead>
+      <tbody>
+        <tr><td><strong>SDK</strong> (TS / Python / Go / Rust)</td><td>Engineers, ML engineers</td></tr>
+        <tr><td><strong>MCP server</strong> (clawpipe-mcp-server)</td><td>Anyone using Claude Desktop, Cursor, Cepien, agent platforms</td></tr>
+        <tr><td><strong>OpenAI-compatible REST</strong> (api.clawpipe.ai)</td><td>Zapier, n8n, Make, Retool, Bubble, Power Automate, custom GPTs</td></tr>
+        <tr><td><strong>Dashboard + Prompt Store</strong></td><td>PMs, designers, support, ops, marketing</td></tr>
+        <tr><td><strong>Webhooks + Jira/Notion MCP tools</strong></td><td>Release managers, on-call SREs, finance</td></tr>
+      </tbody>
+    </table>
+
+    <h2>By role</h2>
+
+    <div class="role">
+      <h3>📋 Product Manager <span class="pill">Dashboard · Prompt Store · MCP</span></h3>
+      <p class="pain">Pain: feedback piles up faster than the team can categorize. Premium-model categorization burns $1K/wk on what regex could do.</p>
+      <p>Use the <strong>Booster regex pack</strong> via dashboard prompt store. Common tags resolve at $0:</p>
+      <pre>POST /v1/prompts/customer-feedback-tag/render
+{ "variables": { "feedback": "{{user_message}}" } }
+→ Booster matches "extract emails", "slugify", "title case"
+   on common patterns; only ambiguous tickets hit an LLM.</pre>
+      <p>Cepien, Productboard, Linear-style tools that call ClawPipe via MCP get this for free.</p>
+    </div>
+
+    <div class="role">
+      <h3>🎨 Designer / UX <span class="pill">No-code · Figma plugin · Swarm</span></h3>
+      <p class="pain">Pain: copy variants and microcopy A/B tests get expensive when every iteration runs through GPT-4.</p>
+      <p>Point Figma's AI plugin at <code>https://api.clawpipe.ai/v1</code>. Use <strong>Swarm</strong> for 3-model voting on each variant — Claude Haiku + GPT-4o-mini + Gemini Flash, picked automatically by the router.</p>
+    </div>
+
+    <div class="role">
+      <h3>🧪 QA Engineer <span class="pill">SDK · Booster</span></h3>
+      <p class="pain">Pain: synthetic test data generation, bug-report PII leakage.</p>
+      <pre>const { text } = await pipe.prompt('extract emails from log: ' + logBlob);
+// Booster regex_extract_emails → 0 cost, 0.01ms
+// Plus guardRules: ['pii_redact'] strips SSN/credit card from saved cases.</pre>
+    </div>
+
+    <div class="role">
+      <h3>🚀 Release Manager <span class="pill">MCP · Prompt Store</span></h3>
+      <p class="pain">Pain: changelog drafts and rollback runbooks every sprint.</p>
+      <p>Save a <code>release-notes</code> template in the prompt store. Aether/Claude/Cursor renders it via the MCP tool when called from a release branch. Webhook fires <code>clawpipe_report_to_jira</code> if rollback is required.</p>
+    </div>
+
+    <div class="role">
+      <h3>📞 Support Lead <span class="pill">No-code · Webhooks</span></h3>
+      <p class="pain">Pain: 80% of incoming tickets are "where's my order?" / "reset password" — premium model overkill.</p>
+      <p>n8n flow: ticket arrives → ClawPipe Booster classifies (regex on order-id format, email, account-status) → if matched, auto-reply at $0; otherwise route to Claude Haiku for nuance. Saves $5K/mo at modest volume.</p>
+    </div>
+
+    <div class="role">
+      <h3>🛡️ Security / Compliance <span class="pill">Guard · Audit</span></h3>
+      <p class="pain">Pain: prompt injection, PII leakage, model-allowlist enforcement.</p>
+      <pre>new ClawPipe({
+  guardRules: [
+    { guard: 'pii_redact' },
+    { guard: 'regex_match', config: { pattern: 'SSN-\\d{3}' }, blockOnFail: true },
+    { guard: 'model_whitelist', config: { models: ['claude-haiku-4-5', 'gpt-4o-mini'] } },
+    { guard: 'webhook', config: { url: 'https://compliance.acme/log' } },
+  ],
+  enableAudit: true,
+});</pre>
+      <p>15 default guards. Full audit log shipped to your SIEM via webhook.</p>
+    </div>
+
+    <div class="role">
+      <h3>📊 Data Analyst / BI <span class="pill">REST · Booster</span></h3>
+      <p class="pain">Pain: parsing semi-structured logs and customer responses costs $1-3 per dashboard refresh.</p>
+      <p>Booster covers extract-emails / extract-urls / extract-numbers / CSV row count / JSON keys at $0. Anything ambiguous falls through to a cheap model. Refresh cost drops to pennies.</p>
+    </div>
+
+    <div class="role">
+      <h3>💰 Finance / FinOps <span class="pill">Dashboard · Webhooks</span></h3>
+      <p class="pain">Pain: AI bill is unpredictable, no per-team attribution, no budget controls.</p>
+      <p>Dashboard shows <strong>per-project cost trend</strong> + <strong>savings by bucket</strong>. Set hard <code>budgetCapUsd</code> per project. Webhook fires when spend crosses 80%/100% — lands in Slack or as a Jira ticket via <code>clawpipe_report_to_jira</code>.</p>
+      <p>Budget hierarchy (org → team → user → key) for enterprise — first node to exhaust blocks the call.</p>
+    </div>
+
+    <div class="role">
+      <h3>📝 Marketing / Content <span class="pill">No-code · Swarm</span></h3>
+      <p class="pain">Pain: drafting at scale gets expensive, multilingual versions multiply the bill.</p>
+      <p>Use the OpenAI-compatible endpoint from any CMS or no-code stack. The router picks cheap models for first drafts, escalates to premium only for final polish or sensitive copy. <strong>25+ languages</strong> (ISO rules table).</p>
+    </div>
+
+    <div class="role">
+      <h3>🔧 SRE / Platform <span class="pill">Gateway · Circuit breaker · Fair-share</span></h3>
+      <p class="pain">Pain: provider outages, noisy keys eating shared TPM, no fallback.</p>
+      <p>Gateway has <strong>circuit breakers</strong> per provider, <strong>fair-share rate limiting</strong> across keys in a group, and <strong>recursive fallback targets</strong>. When OpenAI degrades, traffic auto-shifts to Anthropic + Groq — no code change.</p>
+    </div>
+
+    <h2>One pipeline. Ten teams. One bill.</h2>
+    <p>Every prompt — whether from your code, your designer's Figma plugin, your support team's n8n flow, or your CFO's prompt store template — flows through the same Booster + Packer + Cache + Router + Gateway + Learner pipeline. One dashboard. One budget. One audit log.</p>
+
+    <p><a class="cta" href="https://app.clawpipe.ai/signup">Start free →</a> &nbsp; <a href="/blog/how-to-use-clawpipe">60-second guide →</a></p>
+  </main>
+  <footer class="legal-footer">
+    <div><a href="/">Home</a> · <a href="/benchmarks">Benchmarks</a> · <a href="/blog/how-to-use-clawpipe">How to use</a> · <a href="https://github.com/finsavvyai/clawpipe-sdk">GitHub</a></div>
+    <div>&copy; 2026 ClawPipe</div>
+  </footer>
+</div>
+</body>
+</html>

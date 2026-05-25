@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  lunaos-orchestrator-gui:
+    build: .
+    ports:
+      - "8080:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LUNAS_API_URL=http://localhost:8000
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - lunaos-network
+
+  # Optional: LunaOS API for local development
+  lunaos-api:
+    image: lunaos-api:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - DATABASE_URL=postgresql://lunaos:lunaos@postgres:5432/lunaos
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - lunaos-network
+
+  postgres:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=lunaos
+      - POSTGRES_USER=lunaos
+      - POSTGRES_PASSWORD=lunaos
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - lunaos-network
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    networks:
+      - lunaos-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  lunaos-network:
+    driver: bridge

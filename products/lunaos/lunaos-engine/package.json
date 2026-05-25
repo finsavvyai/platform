@@ -1,0 +1,210 @@
+{
+  "name": "claude-agent-platform",
+  "version": "1.0.0",
+  "description": "Complete multi-purpose AI agent platform with Luna development lifecycle management and Nexa on-device inference",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "claude-agent/*",
+    "apps/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "setup": "npm install && npm run build:infra && npm run setup:hooks",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "cd packages/api && npm run dev",
+    "dev:web": "cd apps/web && npm run dev",
+    "build": "npm run build:packages && npm run build:apps && npm run build:tools",
+    "build:packages": "npm run build --workspaces --if-present",
+    "build:apps": "npm run build --workspace=apps/*",
+    "build:tools": "npm run build --workspace=tools/*",
+    "build:web": "cd apps/web && npm run build",
+    "build:cli": "cd packages/cli && npm run build",
+    "build:gateway": "cd packages/gateway && npm run build",
+    "build:agents": "cd packages/agents && npm run build",
+    "build:infra": "docker-compose build",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "jest --config=jest.integration.config.js",
+    "test:e2e": "playwright test",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "node scripts/test-runner.js --watch",
+    "test:smoke": "playwright test --config=playwright.smoke.config.js",
+    "test:performance": "node tests/performance/load-test.js",
+    "test:performance:api": "node tests/performance/api-performance-test.js",
+    "test:integration:prod": "jest --config=jest.integration.prod.config.js",
+    "test:smart": "node scripts/test-runner.js",
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:fix": "npm run lint:fix --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "type-check": "npm run type-check --workspaces --if-present",
+    "clean": "npm run clean --workspaces --if-present && rm -rf node_modules",
+    "reinstall": "npm run clean && npm install",
+    "setup:hooks": "husky install",
+    "prepare": "husky install",
+    "analyze": "npm run build -- --analyze",
+    "security:audit": "npm audit",
+    "security:fix": "npm audit fix",
+    "deps:update": "npm-check-updates -u",
+    "deps:check": "ncu",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "migrate": "cd packages/api && npm run migrate",
+    "migrate:dev": "cd packages/api && npm run migrate:dev",
+    "migrate:test": "cd packages/api && npm run migrate:test",
+    "seed": "cd packages/api && npm run seed",
+    "db:studio": "cd packages/api && npm run db:studio",
+    "monitoring:up": "docker-compose -f docker-compose.monitoring.yml up -d",
+    "monitoring:down": "docker-compose -f docker-compose.monitoring.yml down",
+    "deploy:staging": "cd tools/deployment && npm run deploy:staging",
+    "deploy:production": "cd tools/deployment && npm run deploy:production",
+    "release": "changeset publish",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "ops:deploy:prod": "npm run deploy:production",
+    "ops:deploy:stage": "npm run deploy:staging",
+    "ops:db:migrate": "npm run migrate",
+    "ops:test:suite": "npm run test",
+    "ops:env:sync": "echo 'Syncing environment variables...'",
+    "ops:scaffold": "echo 'Scaffolding new agent...'"
+  },
+  "keywords": [
+    "ai-agents",
+    "claude-code",
+    "development-lifecycle",
+    "on-device-inference",
+    "rag",
+    "multi-platform",
+    "cloudflare-workers",
+    "apple-hig",
+    "token-optimization",
+    "app-generation",
+    "mobile-development",
+    "web-development",
+    "monitoring",
+    "observability",
+    "security"
+  ],
+  "author": "Claude Agent Platform Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/claude-agent/platform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/claude-agent/platform/issues"
+  },
+  "homepage": "https://claude-agent.dev",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "@commitlint/cli": "^18.4.4",
+    "@commitlint/config-conventional": "^18.5.0",
+    "@faker-js/faker": "^8.3.1",
+    "@playwright/test": "^1.40.1",
+    "@types/jest": "^29.5.8",
+    "@types/node": "^20.9.0",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@typescript-eslint/parser": "^6.12.0",
+    "@vitest/coverage-v8": "^1.0.4",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.54.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-jest": "^27.6.0",
+    "eslint-plugin-security": "^1.7.1",
+    "hono": "^4.0.0",
+    "husky": "^8.0.3",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jest-html-reporters": "^3.1.5",
+    "jest-junit": "^16.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "lint-staged": "^15.1.0",
+    "miniflare": "^4.20260329.0",
+    "npm-check-updates": "^16.14.11",
+    "prettier": "^3.1.0",
+    "prettier-plugin-tailwindcss": "^0.5.7",
+    "testcontainers": "^9.3.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.2",
+    "vitepress": "^1.0.0-rc.31",
+    "vitest": "^1.0.4"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^8.3.1",
+    "amqplib": "^0.10.3",
+    "dotenv": "^16.3.1",
+    "ioredis": "^5.3.2",
+    "pg": "^8.11.3"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "eslintConfig": {
+    "root": true,
+    "extends": [
+      "eslint:recommended",
+      "@typescript-eslint/recommended",
+      "prettier"
+    ],
+    "plugins": [
+      "@typescript-eslint",
+      "security"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaVersion": 2022,
+      "sourceType": "module",
+      "project": "./tsconfig.json"
+    },
+    "rules": {
+      "no-console": "warn",
+      "no-debugger": "error",
+      "security/detect-object-injection": "warn"
+    },
+    "ignorePatterns": [
+      "node_modules/",
+      "dist/",
+      "build/",
+      "*.config.js",
+      "*.config.ts"
+    ]
+  },
+  "prettier": {
+    "semi": true,
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "printWidth": 80,
+    "tabWidth": 2,
+    "useTabs": false,
+    "bracketSpacing": true,
+    "arrowParens": "avoid",
+    "endOfLine": "lf"
+  },
+  "jest": {
+    "projects": [
+      "<rootDir>/packages/*/jest.config.{js,ts}",
+      "<rootDir>/apps/*/jest.config.{js,ts}"
+    ]
+  }
+}

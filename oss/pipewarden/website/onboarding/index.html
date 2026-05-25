@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Get started — PipeWarden</title>
+<meta name="description" content="Welcome to PipeWarden. Two minutes to your first scan." />
+<link rel="stylesheet" href="/auth.css" />
+<link rel="icon" href="/favicon.svg" />
+</head>
+<body>
+<main class="auth-shell">
+  <section class="auth-card">
+    <a href="/" class="auth-brand"><span class="dot"></span>PipeWarden</a>
+
+    <div class="steps">
+      <div class="step active" id="step-1-bar"></div>
+      <div class="step" id="step-2-bar"></div>
+      <div class="step" id="step-3-bar"></div>
+    </div>
+
+    <!-- Step 1: profile -->
+    <div id="step-1">
+      <h1 class="auth-title">Tell us who you are</h1>
+      <p class="auth-sub">We use this to personalise your dashboard. Skip company if you're solo.</p>
+
+      <div class="error" id="err-1"></div>
+
+      <form id="profile-form" novalidate>
+        <div class="field">
+          <label for="name">Your name</label>
+          <input type="text" id="name" name="name" autocomplete="name" required placeholder="Ada Lovelace" />
+        </div>
+        <div class="field">
+          <label for="company">Company (optional)</label>
+          <input type="text" id="company" name="company" autocomplete="organization" placeholder="Acme Corp" />
+        </div>
+        <button type="submit" class="btn-primary" id="step-1-btn">Continue</button>
+      </form>
+    </div>
+
+    <!-- Step 2: connect first CI/CD -->
+    <div id="step-2" hidden>
+      <h1 class="auth-title">Connect your first pipeline</h1>
+      <p class="auth-sub">Pick the platform you use most. You can add more later.</p>
+
+      <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); margin-bottom: var(--s-6);">
+        <button class="provider-btn" data-platform="github">GitHub Actions</button>
+        <button class="provider-btn" data-platform="gitlab">GitLab CI</button>
+        <button class="provider-btn" data-platform="bitbucket">Bitbucket</button>
+        <button class="provider-btn" data-platform="jenkins">Jenkins</button>
+        <button class="provider-btn" data-platform="azure">Azure DevOps</button>
+        <button class="provider-btn" data-platform="circleci">CircleCI</button>
+      </div>
+
+      <button type="button" class="btn-primary" id="step-2-skip" style="background: transparent; color: var(--text-secondary); border: 1px solid var(--hairline);">I'll do this later</button>
+    </div>
+
+    <!-- Step 3: done -->
+    <div id="step-3" hidden>
+      <h1 class="auth-title">You're all set</h1>
+      <p class="auth-sub">Welcome to PipeWarden. Your dashboard is ready.</p>
+      <a href="/dashboard/" class="btn-primary" style="display:block; text-align:center; text-decoration:none;">Open dashboard</a>
+    </div>
+  </section>
+</main>
+
+<style>
+  .provider-btn {
+    padding: var(--s-4);
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-md);
+    font-family: inherit;
+    font-size: var(--fs-13);
+    font-weight: var(--fw-medium);
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .provider-btn:hover { border-color: var(--brand-green); background: color-mix(in oklab, var(--brand-green) 8%, transparent); }
+</style>
+
+<script>
+const API_BASE = window.location.hostname === 'pipewarden.com' || window.location.hostname === 'pipewarden.io'
+  ? 'https://api.pipewarden.io'
+  : '';
+
+function showStep(n) {
+  for (const i of [1, 2, 3]) {
+    document.getElementById('step-' + i).hidden = (i !== n);
+    document.getElementById('step-' + i + '-bar').classList.toggle('active', i <= n);
+  }
+}
+
+document.getElementById('profile-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('step-1-btn');
+  const err = document.getElementById('err-1');
+  err.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const res = await fetch(API_BASE + '/api/v1/auth/onboarding', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        name: document.getElementById('name').value,
+        company: document.getElementById('company').value,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error((data && data.error) || 'Failed to save profile');
+    }
+    showStep(2);
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('visible');
+    btn.disabled = false;
+    btn.textContent = 'Continue';
+  }
+});
+
+document.querySelectorAll('.provider-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    // Hand off to dashboard's connection wizard. The dashboard SPA shows
+    // its built-in onboarding modal pre-filtered to the chosen platform.
+    window.location.href = '/dashboard/?add=' + encodeURIComponent(b.dataset.platform);
+  });
+});
+
+document.getElementById('step-2-skip').addEventListener('click', () => showStep(3));
+</script>
+</body>
+</html>

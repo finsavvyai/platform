@@ -1,0 +1,23 @@
+# Cloudflare Tunnel — app.pipewarden.com → Go API server
+# Setup:
+#   1. cloudflared tunnel login
+#   2. cloudflared tunnel create pipewarden
+#   3. Copy tunnel ID below and credentials-file path
+#   4. cloudflared tunnel route dns pipewarden app.pipewarden.com
+#   5. cloudflared --config deploy/cloudflare/tunnel.yml tunnel run
+#
+# In Docker Compose: set CLOUDFLARE_TUNNEL_TOKEN from:
+#   cloudflared tunnel token <tunnel-id>
+
+tunnel: <YOUR_TUNNEL_ID>
+credentials-file: /root/.cloudflared/<YOUR_TUNNEL_ID>.json
+
+ingress:
+  - hostname: app.pipewarden.com
+    service: http://pipewarden:8080
+    originRequest:
+      connectTimeout: 10s
+      httpHostHeader: app.pipewarden.com
+      noHappyEyeballs: false
+      disableChunkedEncoding: false
+  - service: http_status:404

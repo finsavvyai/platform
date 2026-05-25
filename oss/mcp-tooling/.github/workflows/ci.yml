@@ -1,0 +1,350 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '18'
+  GO_VERSION: '1.21'
+  TINYGO_VERSION: '0.32.0'
+
+jobs:
+  # Code Quality Checks
+  lint:
+    name: Lint and Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format --check
+
+      - name: Run Go fmt
+        run: |
+          cd services/api-service
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "Go code is not formatted:"
+            gofmt -s -l .
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: |
+          cd services/api-service
+          go vet ./...
+
+  # Tests
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript tests
+        run: npm run test
+
+      - name: Run Go tests
+        run: |
+          cd services/api-service
+          go mod tidy
+          go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Upload Go coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./services/api-service/coverage.out
+          flags: go
+          name: codecov-umbrella
+
+  # Build and Test with Docker
+  build-docker:
+    name: Docker Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker images
+        run: |
+          docker-compose build
+
+      - name: Start services
+        run: |
+          docker-compose up -d
+          sleep 30
+
+      - name: Run health checks
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:8080/health; do sleep 5; done'
+
+      - name: Run integration tests
+        run: |
+          test -f tests/e2e/package.json
+          cd tests/e2e
+          npm ci
+          npx playwright install --with-deps chromium
+          npm test
+
+      - name: Stop services
+        if: always()
+        run: |
+          docker-compose logs
+          docker-compose down
+
+  # TinyGo and WASM Compilation
+  build-wasm:
+    name: Build WASM with TinyGo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install TinyGo
+        run: |
+          curl -L https://github.com/tinygo-org/tinygo/releases/download/v${{ env.TINYGO_VERSION }}/tinygo_${{ env.TINYGO_VERSION }}_linux_amd64.tar.gz | tar -C /usr/local -xzf -
+          echo "/usr/local/tinygo/bin" >> $GITHUB_PATH
+
+      - name: Verify TinyGo installation
+        run: tinygo version
+
+      - name: Build WASM examples
+        run: |
+          mkdir -p wasm-output
+          mapfile -t WASM_SOURCES < <(find . -type f -name '*.go' -path '*/wasm/*')
+          if [ "${#WASM_SOURCES[@]}" -eq 0 ]; then
+            echo "No WASM entrypoints found under */wasm/* in this repository." > wasm-output/README.txt
+            exit 0
+          fi
+
+          for src in "${WASM_SOURCES[@]}"; do
+            name=$(basename "$(dirname "$src")")
+            out="wasm-output/${name}.wasm"
+            tinygo build -target wasm -o "$out" "$src"
+          done
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-builds
+          path: wasm-output/
+          retention-days: 7
+
+  # Security Scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run npm audit
+        run: npm audit --audit-level high
+
+      - name: Run Go security scan
+        run: |
+          cd services/api-service
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  # Build and Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [lint, test, build-docker, build-wasm, security]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Build applications
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: mcpoverflow-staging
+          directory: apps/io/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Go service staging artifact
+        run: |
+          cd services/api-service
+          mkdir -p ../../dist
+          GOOS=linux GOARCH=amd64 go build -o ../../dist/api-service-staging ./cmd/server
+
+  # Production Deployment
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [lint, test, build-docker, build-wasm, security]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Build applications
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy frontend to Cloudflare Pages
+        id: deploy-pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: mcpoverflow-io
+          directory: apps/io/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Go service production artifact
+        run: |
+          cd services/api-service
+          mkdir -p ../../dist
+          GOOS=linux GOARCH=amd64 go build -o ../../dist/api-service-production ./cmd/server
+
+      - name: Run smoke tests
+        run: |
+          DEPLOY_URL="${{ steps.deploy-pages.outputs.url }}"
+          if [ -z "$DEPLOY_URL" ]; then
+            DEPLOY_URL="https://mcpoverflow.io"
+          fi
+          curl -fsSL "$DEPLOY_URL" >/dev/null
+
+  # Performance Testing
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Run performance tests
+        run: |
+          mkdir -p performance-tests
+          test -f tests/performance/load-test.js
+          k6 run tests/performance/load-test.js --summary-export performance-tests/k6-summary.json
+
+  # Release Management
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create release
+        uses: changesets/action@v1
+        with:
+          publish: npm run release
+          commit: "chore: release packages"
+          title: "chore: release packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

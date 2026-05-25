@@ -1,0 +1,45 @@
+# LunaOS AI Code Review — runs on every PR
+#
+# To use in your own repo, copy this file to .github/workflows/luna-review.yml
+# and add your LLM API key as a GitHub Secret named DEEPSEEK_API_KEY (or any provider).
+#
+# Docs: https://docs.lunaos.ai/integrations/github-action
+
+name: '🌙 LunaOS Review'
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  code-review:
+    name: AI Code Review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: lunaos-ai/luna-agents/.github/actions/luna@main
+        with:
+          agent: code-review
+          provider: deepseek
+          api-key: ${{ secrets.DEEPSEEK_API_KEY }}
+          comment: true
+          fail-on-critical: false
+
+  # Optional: Run security agent too
+  # security-scan:
+  #   name: AI Security Scan
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: lunaos-ai/luna-agents/.github/actions/luna@main
+  #       with:
+  #         agent: 365-security
+  #         provider: deepseek
+  #         api-key: ${{ secrets.DEEPSEEK_API_KEY }}
+  #         comment: true
+  #         fail-on-critical: true

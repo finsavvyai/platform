@@ -1,0 +1,87 @@
+server:
+  port: 9098
+logging:
+  level:
+    root: INFO
+    sample:
+      mybatis:
+        mapper: TRACE
+    org:
+      hibernate: error
+zapier_enabled: true
+email_enabled: true
+envname: PROD
+message_subject: "Billpro Service Monitor alert"
+sms_enabled: false
+
+email:
+  sender_email: billpro2021@gmail.com
+  sender_password: 2KUyhyKuj4PJdPXyxWn3/w==
+  test_host: smtp.gmail.com
+  host: localhost
+  port: 587
+  ssl: true
+  auth: true
+  recipients: "ninjasupportdk@teliacompanyspace.onmicrosoft.com"
+  zapier_recipients: "shacharsol@gmail.com;shahar.solomon@billpro-software.com"
+  starttlsenable: true
+  testmode: false
+  from: "Billpro Service Monitor"
+twilio:
+  sender: +16672223821
+  sid: AC000d06ee5da99db13312a078a7bf71b7
+  token: 34bd2f22429942c0f032f3019945cf0f
+  recipients: ["+972545253534"]
+sms:
+  envname: PROD
+  service:
+    name: mdwc
+    url: "http://na001ninjaprod1.ddc.teliasonera.net:7022/NinjaMDWCInterface"
+    requests: [ MDWC_SendMessage]
+    recipients: "04528270086"
+database:
+  dbname: PROD
+  datasources:
+   - {name: ninja, jdbc_url: dk001ninjaprod1.ddc.teliasonera.net:1521/NINJADK, user: ninjamain , password: "aYM6349xaIXV+99LpGEiTNC6vWvIGW/Y05k6YEygN2g=" , driver_class_name: "oracle.jdbc.driver.OracleDriver"}
+    - {name: fokus, jdbc_url: (DESCRIPTION=(CONNECT_TIMEOUT=10)(ADDRESS_LIST=(ADDRESS=(PROTOCOL=TCP)(HOST=no001fddbprod.ddc.teliasonera.net)(PORT=1521))(ADDRESS=(PROTOCOL=TCP)(HOST=no002fddbprod.ddc.teliasonera.net)(PORT=1521)))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=P02OL1SRV)))
+      , user: tmdninja , password: Kt2sMLBBVvjsAjD1ahseZw== , driver_class_name: "oracle.jdbc.driver.OracleDriver" }
+    - {name: rep, jdbc_url: rep11.db.han.telia.se:1521/REP11, user: repl_cust2 , password: QFJkFNuJ//TNQGCIp4/z3A==, driver_class_name: "oracle.jdbc.driver.OracleDriver"}
+    - {name: bmpa, jdbc_url: dk001foton.ddc.teliasonera.net:1521/INITBMPA, user: tertium , password: anEq5QXDKA8oHwckF6twfQ==, driver_class_name: "oracle.jdbc.driver.OracleDriver"}
+    - {name: etray, jdbc_url: dk001etraydbprd.ddc.teliasonera.net:1521/ETRAYPRD, user: etray_ninja , password: r7yYxHqwHI34X7J08d5ENw==, driver_class_name: "oracle.jdbc.driver.OracleDriver"}
+    - {name: ich, jdbc_url: ic007ichprd.ddc.teliasonera.net:1521/ICH2PRD, user: ICH_VIEWER , password: VsCojyAVLUgyoiO1dru5Tw==, driver_class_name: "oracle.jdbc.driver.OracleDriver"}
+    - {name: foton, jdbc_url: dk001foton.ddc.teliasonera.net:1521/INITBMPA, user: ninja , password: AqjGIck1xkwfFMvuQ5YrHA==, driver_class_name: "oracle.jdbc.driver.OracleDriver"}
+sanity-app:
+  services:
+    - { name: generic_prod1 ,type: generic, url: "http://na001ninjaprod1.ddc.teliasonera.net:7002/", requests: [ CheckConnections,GetAvailableMsisdns ],dbignorelist: [ EtrayDB,FotonDB ] }
+    - { name: generic_callmeprod, type: generic, url: "http://na001ninjaprod2.ddc.teliasonera.net:7032/", requests: [ CheckConnections,GetAvailableMsisdns ],dbignorelist: [EtrayDB,FotonDB] }
+    - { name: generic_mitteliaprod, type: generic, url: "http://na001ninjaprod1.ddc.teliasonera.net:7092/", requests: [ CheckConnections,GetAvailableMsisdns ]}
+    - { name: sp_prod1, type: sp, url: "http://na001ninjaprod1.ddc.teliasonera.net:7003/",  requests: [ CheckConnections ] }
+    - { name: mdwc_prod1, type: mdwc, url: "http://na001ninjaprod1.ddc.teliasonera.net:7022/",  requests: [ CheckConnections,MeMDWC_GetLimit ],dbignorelist: [SplitDB,TUXEDO ], timeoutSeconds: 60 }
+    - { name: mdwc_prod2, type: mdwc, url: "http://na001ninjaprod2.ddc.teliasonera.net:7062/",  requests: [ CheckConnections,MeMDWC_GetLimit ],dbignorelist: [SplitDB,TUXEDO ], timeoutSeconds: 60 }
+    - { name: mdwc_prod3, type: mdwc, url: "http://na001ninjaprod1.ddc.teliasonera.net:7072/",  requests: [ CheckConnections,MeMDWC_GetLimit ],dbignorelist: [SplitDB,TUXEDO ], timeoutSeconds: 60 }
+    - { name: mdwc_prod4, type: mdwc, url: "http://na001ninjaprod2.ddc.teliasonera.net:7082/",  requests: [ CheckConnections,MeMDWC_GetLimit ],dbignorelist: [SplitDB,TUXEDO ], timeoutSeconds: 60 }
+    - { name: mdwc_prodp, type: mdwc, url: "http://na001ninjaprod1.ddc.teliasonera.net:7042/",  requests: [ CheckConnections,MeMDWC_GetLimit ],dbignorelist: [SplitDB,TUXEDO ], timeoutSeconds: 60 }
+    # TEDDK - AWS hosted, now accessible after ALB security group configuration
+    # - { name: teddk_prod, type: teddk, url: "https://prod.teddk.telia.dk",  requests: [ sanity ], timeoutSeconds: 45 }
+
+time-based-monitoring:
+  enabled: true
+  default-timeout-seconds: 45
+
+scheduler:
+  period: PT30M
+  skip_time_interval: "23:10-23:45"
+mybatis:
+  type-aliases-package: com.bsl.service.monitor.sanity.db
+  type-handlers-package: com.bsl.service.monitor.sanity.db
+  configuration:
+    map-underscore-to-camel-case: true
+    default-fetch-size: 100
+    default-statement-timeout: 30
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.microsoftonline.com/05764a73-8c6f-4538-83cd-413f1e1b5665/v2.0

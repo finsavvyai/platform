@@ -1,0 +1,43 @@
+import type { Hono } from 'hono';
+import { cisBenchmarkRoutes as cisBenchmark } from '../routes/cis-benchmark';
+import security from '../routes/security';
+import securityCompliance from '../routes/security-compliance';
+import compliancePosture from '../routes/compliance-posture';
+import { copilotReadinessRoutes as copilotReadiness } from '../routes/copilot-readiness';
+import { copilotSecurityRoutes } from '../routes/copilot-security';
+import { copilotReadinessPdfRoutes } from '../routes/copilot-readiness-pdf';
+import { copilotUsageRoutes } from '../routes/copilot-usage';
+import zeroTrustRoutes from '../routes/zero-trust';
+import purviewDlpRoutes from '../routes/purview';
+import { federatedIdentityRoutes } from '../routes/federated-identity';
+import { ssoRoutes } from '../routes/sso';
+import { ssoLoginRoutes } from '../routes/sso-login';
+import { ssoCallbackRoutes } from '../routes/sso-callback';
+import { scimUsersRoutes } from '../routes/scim/users';
+import { scimGroupsRoutes } from '../routes/scim/groups';
+import { scimTokensRoutes } from '../routes/scim-tokens';
+import anomalyDetection from '../routes/anomaly-detection';
+import healthScore from '../routes/health-score';
+import type { AppEnv } from './types';
+
+export function registerSecurityRoutes(app: Hono<AppEnv>) {
+	app.route('/api/security', security);
+	app.route('/api/security', securityCompliance);
+	app.route('/api/compliance-posture', compliancePosture);
+	app.route('/api/cis-benchmark', cisBenchmark);
+	app.route('/api/copilot-readiness', copilotReadiness);
+	app.route('/api/copilot-readiness', copilotReadinessPdfRoutes);
+	app.route('/api/copilot-security', copilotSecurityRoutes);
+	app.route('/api/copilot-usage', copilotUsageRoutes);
+	app.route('/api/zero-trust', zeroTrustRoutes);
+	app.route('/api/purview', purviewDlpRoutes);
+	app.route('/api/federated-identity', federatedIdentityRoutes);
+	app.route('/api/sso', ssoRoutes);
+	app.route('/api/sso', ssoLoginRoutes);
+	app.route('/api/sso', ssoCallbackRoutes);
+	app.route('/scim/v2/Users', scimUsersRoutes);
+	app.route('/scim/v2/Groups', scimGroupsRoutes);
+	app.route('/api/sso/scim-tokens', scimTokensRoutes);
+	app.route('/api/anomaly-detection', anomalyDetection);
+	app.route('/api/health-score', healthScore);
+}

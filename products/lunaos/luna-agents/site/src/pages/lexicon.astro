@@ -1,0 +1,105 @@
+---
+import Book from "../layouts/Book.astro";
+import LexiconHeader from "../components/lexicon/LexiconHeader.astro";
+import LexiconCategory from "../components/lexicon/LexiconCategory.astro";
+import LexiconFilter from "../components/lexicon/LexiconFilter.astro";
+import data from "../data/skills.json";
+
+const categories = Object.entries(data.byCategory)
+  .filter(([cat]) => cat !== "shortcut")
+  .sort((a, b) => a[0].localeCompare(b[0]));
+const shortcutEntries = data.byCategory.shortcut ?? [];
+
+const statusCounts: Record<string, number> = {};
+for (const e of data.entries) {
+  const s = (e as any).status ?? "unknown";
+  statusCounts[s] = (statusCounts[s] ?? 0) + 1;
+}
+---
+
+<Book
+  title="Lexicon"
+  chapter="lexicon"
+  description={`The ${data.count}-entry standard library of the Luna Pipes language.`}
+>
+  <LexiconHeader count={data.count} categories={Object.keys(data.byCategory)} statusCounts={statusCounts} />
+  <LexiconFilter />
+
+  <div class="wrap">
+    {categories.map(([cat, entries]) => (
+      <LexiconCategory category={cat} entries={entries} />
+    ))}
+
+    {shortcutEntries.length > 0 && (
+      <section class="cat" id="cat-shortcut">
+        <header class="cat-head">
+          <span class="cat-num" aria-hidden="true">§</span>
+          <h3 class="cat-title">Aux. shortcuts</h3>
+          <span class="cat-count">{shortcutEntries.length}</span>
+        </header>
+        <p class="aux-note dim">
+          <small>
+            Auxiliary forms. Each is a one-token alias for a verb in another
+            chapter; calling the aux is identical to calling the verb. Listed
+            here for completeness; not part of the canonical lexicon count.
+          </small>
+        </p>
+        <ul class="aux-grid">
+          {shortcutEntries.map((e) => (
+            <li>
+              <code>/{e.word}</code>
+              <span class="aux-arrow" aria-hidden="true">→</span>
+              <a href={`#w-${e.shortcutFor}`}><code>/{e.shortcutFor}</code></a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </div>
+</Book>
+
+<style>
+  .cat { padding-top: var(--t-8); padding-bottom: var(--t-6); }
+  .cat-head {
+    display: flex;
+    align-items: baseline;
+    gap: 1ch;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: var(--t-1);
+    margin-bottom: var(--t-3);
+  }
+  .cat-num { font-family: var(--font-mono); color: var(--saffron-deep); font-size: var(--step-2); }
+  .cat-title {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: var(--step-3);
+    margin: 0;
+  }
+  .cat-count {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    font-size: var(--step--1);
+    font-feature-settings: "tnum";
+  }
+  .aux-note { max-width: var(--measure); margin-bottom: var(--t-3); }
+  .aux-grid {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--t-1) var(--t-3);
+  }
+  .aux-grid li {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.75ch;
+    padding: 0.25rem 0;
+    border-bottom: 1px dotted var(--rule);
+    font-size: var(--step--1);
+  }
+  .aux-arrow { color: var(--muted); }
+  .aux-grid code { background: none; border: 0; padding: 0; font-family: var(--font-mono); }
+</style>

@@ -1,0 +1,95 @@
+---
+import Book from "../layouts/Book.astro";
+import ChapterOpener from "../components/ChapterOpener.astro";
+import PipeBlock from "../components/PipeBlock.astro";
+---
+
+<Book title="Install" chapter="install" description="Install Luna Agents, npm, Claude Code plugin, source.">
+  <ChapterOpener
+    num="04"
+    word="Install"
+    subtitle="Three ways to get the binary. Pick the one that matches your runtime."
+  />
+
+  <section class="wrap">
+    <h2>From npm.</h2>
+    <p>The fastest path. Requires Node ≥ 18.</p>
+    <PipeBlock
+      code={'npm install -g luna-agents'}
+      output={['installed: luna-agents@1.0.0', '+ luna binary at /usr/local/bin/luna', 'next: luna --help']}
+    />
+
+    <h2>As a Claude Code plugin.</h2>
+    <p>
+      Luna Agents ships as a plugin that registers all 277 verbs as slash
+      commands inside Claude Code. The plugin is detected automatically once
+      the package is installed.
+    </p>
+    <PipeBlock
+      code={'luna setup --plugin'}
+      output={[
+        'detected: claude code at ~/.claude',
+        'registered: 277 slash commands',
+        'try:     /persona generate',
+        'or:      /pipe "persona generate >> ghost \\"post\\""',
+      ]}
+    />
+
+    <h2>From source.</h2>
+    <p>For contributors and folks who want the head of main.</p>
+    <PipeBlock
+      code={'git clone https://github.com/lunaos/luna-agents && cd luna-agents && npm install && npm run build && npm link'}
+      output={['cloned, built, linked. luna binary now points at your working copy.']}
+    />
+
+    <h2>Verify.</h2>
+    <PipeBlock
+      code={'luna --version && luna pipe "persona generate >> ghost \\"hello\\""'}
+      output={[
+        'luna 1.0.0',
+        'composed: 2 stages',
+        '  [01] /persona generate',
+        '  [02] /ghost "hello"',
+        'ok.',
+      ]}
+    />
+
+    <h2>Configure.</h2>
+    <p>
+      Most verbs work without keys. A few (image generation, voice, certain
+      external APIs) need credentials. The runtime reads from your OS
+      keychain first, then <code>.env</code>. Never paste keys into pipes.
+    </p>
+    <PipeBlock
+      code={'luna config set openai_key && luna config set anthropic_key'}
+      output={['stored in OS keychain. never written to disk in plaintext.']}
+    />
+
+    <h2>Where to read next.</h2>
+    <ul class="next-list">
+      <li><a href="/lexicon">Chapter 01 · Lexicon</a>, every verb, with call signatures.</li>
+      <li><a href="/grammar">Chapter 02 · Grammar</a>, the five operators in full.</li>
+      <li><a href="/etymology">Chapter 03 · Etymology</a>, where the language came from.</li>
+      <li><a href="https://github.com/lunaos/luna-agents">Source</a>, the parser, runtime, and verb registry.</li>
+    </ul>
+  </section>
+</Book>
+
+<style>
+  section { padding: var(--t-6) 0 var(--t-12); }
+  .next-list {
+    list-style: none;
+    padding: 0;
+    margin: var(--t-3) 0;
+    border-top: 1px solid var(--rule);
+    max-width: var(--measure-wide);
+  }
+  .next-list li {
+    margin: 0;
+    padding: var(--t-2) 0;
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+  }
+  .next-list a { text-decoration-color: var(--saffron-deep); }
+</style>

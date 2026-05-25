@@ -1,0 +1,43 @@
+# Development overrides for docker-compose.yml
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  web:
+    environment:
+      - NODE_ENV=development
+      - NEXT_PRIVATE_WATCH_PATH=1
+      - WATCHPACK_POLLING=true
+    volumes:
+      # Hot reload: Mount source code
+      - ../../apps/web/src:/app/apps/web/src:delegated
+      - ../../apps/web/app:/app/apps/web/app:delegated
+      - ../../apps/web/components:/app/apps/web/components:delegated
+      - ../../apps/web/public:/app/apps/web/public:delegated
+      - ../../apps/web/styles:/app/apps/web/styles:delegated
+      - ../../apps/web/tailwind.config.ts:/app/apps/web/tailwind.config.ts:delegated
+      - ../../apps/web/next.config.ts:/app/apps/web/next.config.ts:delegated
+    # Enable debugging
+    command: pnpm dev
+
+  tokenforge-web:
+    environment:
+      - NODE_ENV=development
+      - NEXT_PRIVATE_WATCH_PATH=1
+      - WATCHPACK_POLLING=true
+    volumes:
+      # Hot reload: Mount source code
+      - ../../tokenforge/apps/web/src:/app/tokenforge/apps/web/src:delegated
+      - ../../tokenforge/apps/web/app:/app/tokenforge/apps/web/app:delegated
+      - ../../tokenforge/apps/web/components:/app/tokenforge/apps/web/components:delegated
+      - ../../tokenforge/apps/web/public:/app/tokenforge/apps/web/public:delegated
+    command: pnpm dev
+
+  mock-api:
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+    volumes:
+      - .:/app:delegated
+    command: node mock-server.js

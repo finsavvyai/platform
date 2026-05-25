@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — SDLC.ai</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --blue: #0071e3;
+            --blue-hover: #0077ED;
+            --green: #34c759;
+            --red: #ff3b30;
+            --orange: #ff9f0a;
+            --purple: #af52de;
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-tertiary: #86868b;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f7;
+            --bg-sidebar: #fbfbfd;
+            --border: #d2d2d7;
+            --border-light: #e8e8ed;
+            --sidebar-w: 240px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: var(--sidebar-w); background: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            position: fixed; top: 0; left: 0; bottom: 0; z-index: 30;
+        }
+        .sidebar-logo {
+            padding: 20px 20px 16px;
+            display: flex; align-items: center; gap: 10px;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .sidebar-logo .icon {
+            width: 32px; height: 32px; background: var(--text-primary);
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+        }
+        .sidebar-logo .icon i { color: #fff; font-size: 14px; }
+        .sidebar-logo span { font-size: 15px; font-weight: 700; }
+        .sidebar-org {
+            padding: 12px 20px; font-size: 11px; font-weight: 600;
+            color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .sidebar-nav { flex: 1; padding: 0 10px; }
+        .nav-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 10px;
+            font-size: 13px; font-weight: 500; color: var(--text-secondary);
+            cursor: pointer; transition: all 0.15s; margin-bottom: 2px;
+            text-decoration: none;
+        }
+        .nav-item:hover { background: rgba(0,0,0,0.04); color: var(--text-primary); }
+        .nav-item.active { background: rgba(0,113,227,0.1); color: var(--blue); font-weight: 600; }
+        .nav-item i { width: 18px; text-align: center; font-size: 14px; }
+        .nav-item .badge {
+            margin-left: auto; font-size: 10px; font-weight: 700;
+            background: var(--red); color: #fff; padding: 1px 6px;
+            border-radius: 10px; min-width: 18px; text-align: center;
+        }
+        .sidebar-bottom {
+            padding: 16px 20px; border-top: 1px solid var(--border-light);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .sidebar-bottom .avatar {
+            width: 32px; height: 32px; border-radius: 50%;
+            background: var(--blue); display: flex; align-items: center;
+            justify-content: center; color: #fff; font-size: 12px; font-weight: 600;
+        }
+        .sidebar-bottom .user-info { flex: 1; }
+        .sidebar-bottom .user-name { font-size: 13px; font-weight: 600; }
+        .sidebar-bottom .user-role { font-size: 11px; color: var(--text-tertiary); }
+
+        /* ── Main ── */
+        .main { margin-left: var(--sidebar-w); flex: 1; }
+        .topbar {
+            background: var(--bg-primary); border-bottom: 1px solid var(--border-light);
+            padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 20;
+        }
+        .topbar-title { font-size: 18px; font-weight: 700; }
+        .topbar-actions { display: flex; gap: 12px; align-items: center; }
+        .topbar-btn {
+            padding: 8px 16px; font-size: 13px; font-weight: 600;
+            border-radius: 980px; cursor: pointer; transition: all 0.15s;
+            font-family: inherit; display: flex; align-items: center; gap: 6px;
+        }
+        .topbar-btn.primary { background: var(--blue); color: #fff; border: none; }
+        .topbar-btn.primary:hover { background: var(--blue-hover); }
+        .topbar-btn.secondary { background: none; color: var(--text-secondary); border: 1px solid var(--border); }
+        .topbar-btn.secondary:hover { background: var(--bg-secondary); }
+        .content { padding: 32px; }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--bg-primary); border: 1px solid var(--border-light);
+            border-radius: 16px; padding: 24px;
+        }
+        .card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .card-title { font-size: 15px; font-weight: 700; }
+        .card-subtitle { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+
+        /* ── Metric cards ── */
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+        .metric-card {
+            background: var(--bg-primary); border: 1px solid var(--border-light);
+            border-radius: 14px; padding: 20px;
+        }
+        .metric-label { font-size: 12px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.03em; }
+        .metric-value { font-size: 28px; font-weight: 700; margin-top: 6px; letter-spacing: -0.02em; }
+        .metric-change { font-size: 12px; font-weight: 600; margin-top: 4px; }
+        .metric-change.up { color: var(--green); }
+        .metric-change.down { color: var(--red); }
+
+        /* ── Chart placeholder ── */
+        .chart-area {
+            height: 220px; background: linear-gradient(180deg, rgba(0,113,227,0.08) 0%, rgba(0,113,227,0) 100%);
+            border-radius: 12px; position: relative; overflow: hidden;
+        }
+        .chart-line {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            height: 100%;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 200'%3E%3Cpath d='M0,160 C100,140 150,120 200,100 C250,80 300,90 350,70 C400,50 450,60 500,40 C550,20 600,30 650,25 C700,20 750,15 800,10' fill='none' stroke='%230071e3' stroke-width='2.5'/%3E%3Cpath d='M0,160 C100,140 150,120 200,100 C250,80 300,90 350,70 C400,50 450,60 500,40 C550,20 600,30 650,25 C700,20 750,15 800,10 L800,200 L0,200Z' fill='rgba(0,113,227,0.06)'/%3E%3C/svg%3E") no-repeat center;
+            background-size: cover;
+        }
+        .chart-labels {
+            position: absolute; bottom: 8px; left: 16px; right: 16px;
+            display: flex; justify-content: space-between;
+            font-size: 10px; color: var(--text-tertiary);
+        }
+
+        /* ── Table ── */
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th {
+            text-align: left; padding: 10px 12px; font-size: 11px;
+            font-weight: 600; color: var(--text-tertiary); text-transform: uppercase;
+            letter-spacing: 0.03em; border-bottom: 1px solid var(--border-light);
+        }
+        .data-table td {
+            padding: 12px; font-size: 13px; border-bottom: 1px solid var(--border-light);
+            color: var(--text-primary);
+        }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table tr:hover td { background: var(--bg-secondary); }
+
+        /* ── Status badges ── */
+        .status { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 8px; }
+        .status.success { background: rgba(52,199,89,0.12); color: var(--green); }
+        .status.warning { background: rgba(255,159,10,0.12); color: var(--orange); }
+        .status.error { background: rgba(255,59,48,0.12); color: var(--red); }
+        .status.info { background: rgba(0,113,227,0.1); color: var(--blue); }
+        .status.neutral { background: rgba(142,142,147,0.12); color: var(--text-secondary); }
+
+        /* ── PII type badges ── */
+        .pii-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; display: inline-block; margin: 1px 2px; }
+        .pii-badge.ssn { background: rgba(255,59,48,0.1); color: var(--red); }
+        .pii-badge.email { background: rgba(0,113,227,0.1); color: var(--blue); }
+        .pii-badge.phone { background: rgba(175,82,222,0.1); color: var(--purple); }
+        .pii-badge.cc { background: rgba(255,159,10,0.1); color: var(--orange); }
+
+        /* ── API Key display ── */
+        .key-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border-light); }
+        .key-row:last-child { border-bottom: none; }
+        .key-value {
+            font-family: 'SF Mono', monospace; font-size: 13px;
+            background: var(--bg-secondary); padding: 6px 12px; border-radius: 8px;
+            color: var(--text-primary); flex: 1;
+        }
+        .key-meta { font-size: 12px; color: var(--text-tertiary); }
+        .key-actions { display: flex; gap: 8px; }
+        .icon-btn {
+            width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border-light);
+            background: var(--bg-primary); cursor: pointer; display: flex;
+            align-items: center; justify-content: center; font-size: 13px;
+            color: var(--text-secondary); transition: all 0.15s;
+        }
+        .icon-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
+        .icon-btn.danger:hover { background: rgba(255,59,48,0.1); color: var(--red); border-color: rgba(255,59,48,0.3); }
+
+        /* ── Team member row ── */
+        .member-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border-light); }
+        .member-row:last-child { border-bottom: none; }
+        .member-avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 13px; font-weight: 600; flex-shrink: 0;
+        }
+        .member-info { flex: 1; }
+        .member-name { font-size: 14px; font-weight: 600; }
+        .member-email { font-size: 12px; color: var(--text-tertiary); }
+        .role-select {
+            font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 8px;
+            border: 1px solid var(--border-light); background: var(--bg-primary);
+            color: var(--text-primary); font-family: inherit; cursor: pointer;
+        }
+
+        /* ── Report cards ── */
+        .report-card {
+            border: 1px solid var(--border-light); border-radius: 14px;
+            padding: 24px; background: var(--bg-primary);
+            display: flex; align-items: center; gap: 20px;
+            transition: all 0.2s; cursor: pointer;
+        }
+        .report-card:hover { border-color: var(--blue); box-shadow: 0 2px 12px rgba(0,113,227,0.08); }
+        .report-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; flex-shrink: 0;
+        }
+        .report-info { flex: 1; }
+        .report-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .report-desc { font-size: 12px; color: var(--text-secondary); }
+        .report-action { color: var(--blue); font-size: 14px; }
+
+        /* ── Settings form ── */
+        .setting-group { margin-bottom: 28px; }
+        .setting-label { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+        .setting-desc { font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px; }
+        .setting-input {
+            width: 100%; max-width: 400px; padding: 10px 14px; font-size: 14px;
+            border: 1px solid var(--border); border-radius: 10px;
+            font-family: inherit; color: var(--text-primary); background: var(--bg-primary);
+        }
+        .setting-input:focus { outline: none; border-color: var(--blue); }
+        .setting-toggle {
+            display: flex; align-items: center; gap: 10px; cursor: pointer;
+        }
+        .toggle-track {
+            width: 44px; height: 24px; border-radius: 12px;
+            background: var(--border); position: relative; transition: background 0.2s;
+        }
+        .toggle-track.on { background: var(--green); }
+        .toggle-track .toggle-thumb {
+            width: 20px; height: 20px; border-radius: 50%; background: #fff;
+            position: absolute; top: 2px; left: 2px; transition: left 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        }
+        .toggle-track.on .toggle-thumb { left: 22px; }
+
+        /* ── Search ── */
+        .search-box {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--bg-secondary); border: 1px solid var(--border-light);
+            border-radius: 10px; padding: 8px 14px; max-width: 300px;
+        }
+        .search-box i { color: var(--text-tertiary); font-size: 13px; }
+        .search-box input {
+            border: none; background: none; font-size: 13px;
+            font-family: inherit; color: var(--text-primary); outline: none; width: 100%;
+        }
+
+        /* ── Empty state ── */
+        .empty-state { text-align: center; padding: 48px 24px; color: var(--text-tertiary); }
+        .empty-state i { font-size: 32px; margin-bottom: 12px; display: block; }
+
+        /* ── Grid helpers ── */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .mb-16 { margin-bottom: 16px; }
+        .mb-24 { margin-bottom: 24px; }
+
+        /* ── Tab hidden ── */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ── Responsive ── */
+        @media (max-width: 1024px) {
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+        }
+
+        /* ── Activity feed ── */
+        .activity-item {
+            display: flex; gap: 12px; padding: 12px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .activity-item:last-child { border-bottom: none; }
+        .activity-dot {
+            width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0;
+        }
+        .activity-text { font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+        .activity-time { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+
+        /* ── Modal ── */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+            z-index: 100; display: flex; align-items: center; justify-content: center;
+        }
+        .modal-overlay.hidden { display: none; }
+        .modal {
+            background: var(--bg-primary); border-radius: 20px;
+            padding: 32px; max-width: 480px; width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        .modal-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+        .modal-desc { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; }
+        .modal-actions { display: flex; gap: 12px; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+
+<!-- ═══════ SIDEBAR ═══════ -->
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <div class="icon"><i class="fas fa-shield-alt"></i></div>
+        <span>SDLC.ai</span>
+    </div>
+    <p class="sidebar-org">BigCorp Industries</p>
+    <nav class="sidebar-nav">
+        <a class="nav-item active" onclick="switchTab('overview')"><i class="fas fa-chart-line"></i> Overview</a>
+        <a class="nav-item" onclick="switchTab('audit')"><i class="fas fa-list-check"></i> Audit Trail <span class="badge">12</span></a>
+        <a class="nav-item" onclick="switchTab('keys')"><i class="fas fa-key"></i> API Keys</a>
+        <a class="nav-item" onclick="switchTab('team')"><i class="fas fa-users"></i> Team</a>
+        <a class="nav-item" onclick="switchTab('reports')"><i class="fas fa-file-chart-line"></i> Reports</a>
+        <a class="nav-item" onclick="switchTab('settings')"><i class="fas fa-gear"></i> Settings</a>
+    </nav>
+    <div style="padding: 10px 10px 0;">
+        <a class="nav-item" href="../landing/" style="color:var(--text-tertiary);"><i class="fas fa-arrow-left"></i> Back to site</a>
+    </div>
+    <div class="sidebar-bottom">
+        <div class="avatar">JE</div>
+        <div class="user-info">
+            <div class="user-name">John Enterprise</div>
+            <div class="user-role">Admin</div>
+        </div>
+    </div>
+</aside>
+
+<!-- ═══════ MAIN CONTENT ═══════ -->
+<div class="main">
+
+    <!-- Top bar -->
+    <div class="topbar">
+        <div class="topbar-title" id="pageTitle">Overview</div>
+        <div class="topbar-actions">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input placeholder="Search..." id="globalSearch">
+            </div>
+            <button class="topbar-btn secondary"><i class="fas fa-bell"></i></button>
+            <button class="topbar-btn primary" onclick="showModal('newKey')"><i class="fas fa-plus"></i> New API Key</button>
+        </div>
+    </div>
+
+    <div class="content">
+
+        <!-- ═══════ OVERVIEW TAB ═══════ -->
+        <div class="tab-content active" id="tab-overview">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Total Requests (30d)</div>
+                    <div class="metric-value">1,247,832</div>
+                    <div class="metric-change up"><i class="fas fa-arrow-up"></i> 23% vs last month</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">PII Detected</div>
+                    <div class="metric-value">38,492</div>
+                    <div class="metric-change up"><i class="fas fa-arrow-up"></i> 12% vs last month</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Avg. Latency</div>
+                    <div class="metric-value">43ms</div>
+                    <div class="metric-change up"><i class="fas fa-arrow-down"></i> 8ms improvement</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Compliance Score</div>
+                    <div class="metric-value" style="color:var(--green);">100%</div>
+                    <div class="metric-change up"><i class="fas fa-shield-check"></i> All checks passing</div>
+                </div>
+            </div>
+
+            <div class="grid-2 mb-24">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">API Requests</div>
+                            <div class="card-subtitle">Last 30 days</div>
+                        </div>
+                        <span class="status info">Live</span>
+                    </div>
+                    <div class="chart-area">
+                        <div class="chart-line"></div>
+                        <div class="chart-labels">
+                            <span>Jan 8</span><span>Jan 15</span><span>Jan 22</span><span>Jan 29</span><span>Feb 5</span><span>Today</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">PII by Type</div>
+                            <div class="card-subtitle">Last 30 days</div>
+                        </div>
+                    </div>
+                    <div style="space-y:12px;">
+                        <div style="margin-bottom:14px;">
+                            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px;">
+                                <span>Email Addresses</span><span>14,231</span>
+                            </div>
+                            <div style="height:6px;background:var(--bg-secondary);border-radius:3px;overflow:hidden;">
+                                <div style="width:37%;height:100%;background:var(--blue);border-radius:3px;"></div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px;">
+                                <span>Phone Numbers</span><span>9,847</span>
+                            </div>
+                            <div style="height:6px;background:var(--bg-secondary);border-radius:3px;overflow:hidden;">
+                                <div style="width:26%;height:100%;background:var(--purple);border-radius:3px;"></div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px;">
+                                <span>Social Security Numbers</span><span>7,392</span>
+                            </div>
+                            <div style="height:6px;background:var(--bg-secondary);border-radius:3px;overflow:hidden;">
+                                <div style="width:19%;height:100%;background:var(--red);border-radius:3px;"></div>
+                            </div>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px;">
+                                <span>Credit Cards</span><span>4,108</span>
+                            </div>
+                            <div style="height:6px;background:var(--bg-secondary);border-radius:3px;overflow:hidden;">
+                                <div style="width:11%;height:100%;background:var(--orange);border-radius:3px;"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px;">
+                                <span>Other (Medical, IP, etc.)</span><span>2,914</span>
+                            </div>
+                            <div style="height:6px;background:var(--bg-secondary);border-radius:3px;overflow:hidden;">
+                                <div style="width:8%;height:100%;background:var(--text-tertiary);border-radius:3px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Recent Activity</div>
+                        <a style="font-size:13px;color:var(--blue);cursor:pointer;font-weight:600;" onclick="switchTab('audit')">View all</a>
+                    </div>
+                    <div class="activity-item"><div class="activity-dot" style="background:var(--red);"></div><div><div class="activity-text">SSN detected in <strong>GPT-4</strong> request from <strong>api-key-prod-3</strong></div><div class="activity-time">2 minutes ago</div></div></div>
+                    <div class="activity-item"><div class="activity-dot" style="background:var(--blue);"></div><div><div class="activity-text">Email redacted in <strong>Claude</strong> request — <strong>patient-intake.csv</strong> attachment</div><div class="activity-time">8 minutes ago</div></div></div>
+                    <div class="activity-item"><div class="activity-dot" style="background:var(--green);"></div><div><div class="activity-text"><strong>Sarah Liu</strong> generated new API key <strong>api-key-staging-1</strong></div><div class="activity-time">1 hour ago</div></div></div>
+                    <div class="activity-item"><div class="activity-dot" style="background:var(--orange);"></div><div><div class="activity-text">Credit card detected in <strong>Gemini</strong> request — blocked & logged</div><div class="activity-time">3 hours ago</div></div></div>
+                    <div class="activity-item"><div class="activity-dot" style="background:var(--purple);"></div><div><div class="activity-text"><strong>Weekly compliance report</strong> auto-generated and emailed to admin</div><div class="activity-time">Yesterday</div></div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">System Health</div>
+                        <span class="status success"><i class="fas fa-circle" style="font-size:6px;"></i> All Operational</span>
+                    </div>
+                    <div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-light);">
+                        <span style="font-size:13px;font-weight:500;">API Gateway</span>
+                        <span class="status success">Operational</span>
+                    </div>
+                    <div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-light);">
+                        <span style="font-size:13px;font-weight:500;">PII Detection Engine</span>
+                        <span class="status success">Operational</span>
+                    </div>
+                    <div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-light);">
+                        <span style="font-size:13px;font-weight:500;">Audit Logging</span>
+                        <span class="status success">Operational</span>
+                    </div>
+                    <div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-light);">
+                        <span style="font-size:13px;font-weight:500;">File Scanner</span>
+                        <span class="status success">Operational</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;">
+                        <span style="font-size:13px;font-weight:500;">Uptime (30d)</span>
+                        <span style="font-size:14px;font-weight:700;color:var(--green);">99.99%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ AUDIT TRAIL TAB ═══════ -->
+        <div class="tab-content" id="tab-audit">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Audit Trail</div>
+                        <div class="card-subtitle">All PII detection events across your organization</div>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <div class="search-box" style="max-width:220px;">
+                            <i class="fas fa-search"></i>
+                            <input placeholder="Search events...">
+                        </div>
+                        <button class="topbar-btn secondary"><i class="fas fa-filter"></i> Filter</button>
+                        <button class="topbar-btn secondary"><i class="fas fa-download"></i> Export</button>
+                    </div>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Provider</th>
+                            <th>Source</th>
+                            <th>PII Found</th>
+                            <th>Action</th>
+                            <th>User / Key</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="white-space:nowrap;font-size:12px;color:var(--text-tertiary);">Feb 7, 2026 8:02 PM</td>
+                            <td><span style="font-weight:600;">GPT-4</span></td>
+                            <td>Text input</td>
+                            <td><span class="pii-badge ssn">SSN</span> <span class="pii-badge email">Email</span></td>
+                            <td><span class="status success">Redacted</span></td>
+                            <td style="font-size:12px;">api-key-prod-3</td>
+                        </tr>
+                        <tr>
+                            <td style="white-space:nowrap;font-size:12px;color:var(--text-tertiary);">Feb 7, 2026 7:54 PM</td>
+                            <td><span style="font-weight:600;">Claude 3</span></td>
+                            <td><i class="fas fa-paperclip" style="color:var(--text-tertiary);margin-right:4px;"></i>patient-intake.csv</td>
+                            <td><span class="pii-badge email">Email</span> <span class="pii-badge phone">Phone</span> <span class="pii-badge ssn">SSN ×3</span></td>
+                            <td><span class="status success">Redacted</span></td>
+                            <td style="font-size:12px;">api-key-prod-1</td>
+                        </tr>
+                        <tr>
+                            <td style="white-space:nowrap;font-size:12px;color:var(--text-tertiary);">Feb 7, 2026 7:41 PM</td>
+                            <td><span style="font-weight:600;">Gemini Pro</span></td>
+                            <td>Text input</td>
+                            <td><span class="pii-badge cc">Credit Card</span></td>
+                            <td><span class="status error">Blocked</span></td>
+                            <td style="font-size:12px;">api-key-dev-2</td>
+                        </tr>
+                        <tr>
+                            <td style="white-space:nowrap;font-size:12px;color:var(--text-tertiary);">Feb 7, 2026 7:33 PM</td>
+                            <td><span style="font-weight:600;">GPT-4</span></td>
+                            <td><i class="fas fa-paperclip" style="color:var(--text-tertiary);margin-right:4px;"></i>financial-report.json</td>
+                            <td><span class="pii-badge ssn">SSN ×12</span> <span class="pii-badge cc">CC ×4</span></td>
+                            <td><span class="status success">Redacted</span></td>
+                            <td style="font-size:12px;">api-key-prod-1</td>
+                        </tr>
+                        <tr>
+                            <td style="white-space:nowrap;font-size:12px;color:var(--text-tertiary);">Feb 7, 2026 7:18 PM</td>
+                            <td><span style="font-weight:600;">Claude 3</span></td>
+                            <td>Text input</td>
+                            <td><span class="pii-badge phone">Phone</span> <span class="pii-badge email">Email ×2</span></td>
+                            <td><span class="status success">Redacted</span></td>
+                            <td style="font-size:12px;">api-key-prod-3</td>
+                        </tr>
+                        <tr>
+                            <td style="white-space:nowrap;font-size:12px;color:var(--text-tertiary);">Feb 7, 2026 6:55 PM</td>
+                            <td><span style="font-weight:600;">GPT-4</span></td>
+                            <td>Text input</td>
+                            <td style="color:var(--text-tertiary);">None</td>
+                            <td><span class="status neutral">Passed</span></td>
+                            <td style="font-size:12px;">api-key-staging-1</td>
+                        </tr>
+                        <tr>
+                            <td style="white-space:nowrap;font-size:12px;color:var(--text-tertiary);">Feb 7, 2026 6:42 PM</td>
+                            <td><span style="font-weight:600;">Gemini Pro</span></td>
+                            <td><i class="fas fa-paperclip" style="color:var(--text-tertiary);margin-right:4px;"></i>customer-list.csv</td>
+                            <td><span class="pii-badge email">Email ×48</span> <span class="pii-badge phone">Phone ×48</span></td>
+                            <td><span class="status success">Redacted</span></td>
+                            <td style="font-size:12px;">api-key-prod-1</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-top:16px;margin-top:8px;border-top:1px solid var(--border-light);">
+                    <span style="font-size:12px;color:var(--text-tertiary);">Showing 7 of 38,492 events</span>
+                    <div style="display:flex;gap:4px;">
+                        <button class="icon-btn" disabled><i class="fas fa-chevron-left"></i></button>
+                        <button class="icon-btn" style="background:var(--blue);color:#fff;border-color:var(--blue);">1</button>
+                        <button class="icon-btn">2</button>
+                        <button class="icon-btn">3</button>
+                        <button class="icon-btn"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ API KEYS TAB ═══════ -->
+        <div class="tab-content" id="tab-keys">
+            <div class="card mb-24">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">API Keys</div>
+                        <div class="card-subtitle">Manage your API keys. Never share production keys.</div>
+                    </div>
+                    <button class="topbar-btn primary" onclick="showModal('newKey')"><i class="fas fa-plus"></i> Generate Key</button>
+                </div>
+                <div class="key-row">
+                    <div style="flex:1;">
+                        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Production — Primary</div>
+                        <div class="key-value">sk-sdlc-prod-****************************wX7m</div>
+                        <div class="key-meta" style="margin-top:4px;">Created Jan 12, 2026 · Last used 2 min ago · 847,231 requests</div>
+                    </div>
+                    <div class="key-actions">
+                        <button class="icon-btn" title="Copy"><i class="fas fa-copy"></i></button>
+                        <button class="icon-btn" title="Rotate"><i class="fas fa-rotate"></i></button>
+                        <button class="icon-btn danger" title="Revoke"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                <div class="key-row">
+                    <div style="flex:1;">
+                        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Production — Secondary</div>
+                        <div class="key-value">sk-sdlc-prod-****************************kR9p</div>
+                        <div class="key-meta" style="margin-top:4px;">Created Jan 20, 2026 · Last used 8 min ago · 400,601 requests</div>
+                    </div>
+                    <div class="key-actions">
+                        <button class="icon-btn" title="Copy"><i class="fas fa-copy"></i></button>
+                        <button class="icon-btn" title="Rotate"><i class="fas fa-rotate"></i></button>
+                        <button class="icon-btn danger" title="Revoke"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                <div class="key-row">
+                    <div style="flex:1;">
+                        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Staging</div>
+                        <div class="key-value">sk-sdlc-stg-*****************************aB2n</div>
+                        <div class="key-meta" style="margin-top:4px;">Created Feb 1, 2026 · Last used 1 hour ago · 12,847 requests</div>
+                    </div>
+                    <div class="key-actions">
+                        <button class="icon-btn" title="Copy"><i class="fas fa-copy"></i></button>
+                        <button class="icon-btn" title="Rotate"><i class="fas fa-rotate"></i></button>
+                        <button class="icon-btn danger" title="Revoke"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+                <div class="key-row">
+                    <div style="flex:1;">
+                        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Development <span class="status warning" style="font-size:10px;margin-left:6px;">Rate Limited</span></div>
+                        <div class="key-value">sk-sdlc-dev-*****************************qL5j</div>
+                        <div class="key-meta" style="margin-top:4px;">Created Feb 3, 2026 · Last used 3 hours ago · 1,204 requests</div>
+                    </div>
+                    <div class="key-actions">
+                        <button class="icon-btn" title="Copy"><i class="fas fa-copy"></i></button>
+                        <button class="icon-btn" title="Rotate"><i class="fas fa-rotate"></i></button>
+                        <button class="icon-btn danger" title="Revoke"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Key Policies</div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light);">
+                    <div><div class="setting-label" style="margin:0;">Auto-rotate keys every 90 days</div><div style="font-size:12px;color:var(--text-tertiary);">Automatically generate new keys and deprecate old ones</div></div>
+                    <div class="toggle-track on" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light);">
+                    <div><div class="setting-label" style="margin:0;">IP allowlist for production keys</div><div style="font-size:12px;color:var(--text-tertiary);">Restrict production keys to specific IP addresses</div></div>
+                    <div class="toggle-track on" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;">
+                    <div><div class="setting-label" style="margin:0;">Alert on unusual key usage</div><div style="font-size:12px;color:var(--text-tertiary);">Notify admins when keys exceed normal usage patterns</div></div>
+                    <div class="toggle-track on" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ TEAM TAB ═══════ -->
+        <div class="tab-content" id="tab-team">
+            <div class="card mb-24">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Team Members</div>
+                        <div class="card-subtitle">6 members · Enterprise plan</div>
+                    </div>
+                    <button class="topbar-btn primary" onclick="showModal('invite')"><i class="fas fa-plus"></i> Invite Member</button>
+                </div>
+                <div class="member-row">
+                    <div class="member-avatar" style="background:var(--blue);">JE</div>
+                    <div class="member-info"><div class="member-name">John Enterprise</div><div class="member-email">john@bigcorp.com</div></div>
+                    <span class="status info">You</span>
+                    <select class="role-select"><option selected>Admin</option><option>Developer</option><option>Viewer</option></select>
+                </div>
+                <div class="member-row">
+                    <div class="member-avatar" style="background:var(--green);">SL</div>
+                    <div class="member-info"><div class="member-name">Sarah Liu</div><div class="member-email">sarah.liu@bigcorp.com</div></div>
+                    <select class="role-select"><option selected>Admin</option><option>Developer</option><option>Viewer</option></select>
+                </div>
+                <div class="member-row">
+                    <div class="member-avatar" style="background:var(--purple);">MT</div>
+                    <div class="member-info"><div class="member-name">Marcus Thompson</div><div class="member-email">m.thompson@bigcorp.com</div></div>
+                    <select class="role-select"><option>Admin</option><option selected>Developer</option><option>Viewer</option></select>
+                </div>
+                <div class="member-row">
+                    <div class="member-avatar" style="background:var(--orange);">AK</div>
+                    <div class="member-info"><div class="member-name">Aisha Khan</div><div class="member-email">a.khan@bigcorp.com</div></div>
+                    <select class="role-select"><option>Admin</option><option selected>Developer</option><option>Viewer</option></select>
+                </div>
+                <div class="member-row">
+                    <div class="member-avatar" style="background:var(--red);">DW</div>
+                    <div class="member-info"><div class="member-name">David Wright</div><div class="member-email">d.wright@bigcorp.com</div></div>
+                    <select class="role-select"><option>Admin</option><option>Developer</option><option selected>Viewer</option></select>
+                </div>
+                <div class="member-row">
+                    <div class="member-avatar" style="background:var(--text-tertiary);">RJ</div>
+                    <div class="member-info"><div class="member-name">Rachel Johansson</div><div class="member-email">r.johansson@bigcorp.com</div></div>
+                    <span class="status warning" style="font-size:11px;">Pending invite</span>
+                    <select class="role-select"><option>Admin</option><option selected>Developer</option><option>Viewer</option></select>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">SSO Configuration</div></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light);">
+                    <div><div class="setting-label" style="margin:0;">SAML 2.0 SSO</div><div style="font-size:12px;color:var(--text-tertiary);">Connect your identity provider for single sign-on</div></div>
+                    <span class="status success">Connected</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;">
+                    <div><div class="setting-label" style="margin:0;">Enforce SSO for all members</div><div style="font-size:12px;color:var(--text-tertiary);">Require all team members to authenticate via SSO</div></div>
+                    <div class="toggle-track on" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ REPORTS TAB ═══════ -->
+        <div class="tab-content" id="tab-reports">
+            <div class="grid-3 mb-24">
+                <div class="report-card" onclick="alert('Generating SOC 2 report...')">
+                    <div class="report-icon" style="background:rgba(0,113,227,0.1);color:var(--blue);"><i class="fas fa-certificate"></i></div>
+                    <div class="report-info">
+                        <div class="report-title">SOC 2 Type II Report</div>
+                        <div class="report-desc">Compliance evidence for auditors. Covers access controls, encryption, and audit trails.</div>
+                    </div>
+                    <i class="fas fa-download report-action"></i>
+                </div>
+                <div class="report-card" onclick="alert('Generating HIPAA report...')">
+                    <div class="report-icon" style="background:rgba(52,199,89,0.1);color:var(--green);"><i class="fas fa-hospital"></i></div>
+                    <div class="report-info">
+                        <div class="report-title">HIPAA Compliance Report</div>
+                        <div class="report-desc">PHI detection summary, BAA status, and data handling practices.</div>
+                    </div>
+                    <i class="fas fa-download report-action"></i>
+                </div>
+                <div class="report-card" onclick="alert('Generating GDPR report...')">
+                    <div class="report-icon" style="background:rgba(175,82,222,0.1);color:var(--purple);"><i class="fas fa-globe-europe"></i></div>
+                    <div class="report-info">
+                        <div class="report-title">GDPR Compliance Report</div>
+                        <div class="report-desc">Data processing records, consent management, and erasure logs.</div>
+                    </div>
+                    <i class="fas fa-download report-action"></i>
+                </div>
+            </div>
+
+            <div class="card mb-24">
+                <div class="card-header">
+                    <div class="card-title">Scheduled Reports</div>
+                    <button class="topbar-btn secondary"><i class="fas fa-plus"></i> Add Schedule</button>
+                </div>
+                <table class="data-table">
+                    <thead><tr><th>Report</th><th>Frequency</th><th>Recipients</th><th>Last Sent</th><th>Status</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td style="font-weight:600;">Weekly PII Summary</td>
+                            <td>Every Monday</td>
+                            <td>john@bigcorp.com, sarah.liu@bigcorp.com</td>
+                            <td style="font-size:12px;color:var(--text-tertiary);">Feb 3, 2026</td>
+                            <td><span class="status success">Active</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight:600;">Monthly Compliance Digest</td>
+                            <td>1st of month</td>
+                            <td>compliance-team@bigcorp.com</td>
+                            <td style="font-size:12px;color:var(--text-tertiary);">Feb 1, 2026</td>
+                            <td><span class="status success">Active</span></td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight:600;">Quarterly Audit Package</td>
+                            <td>Quarterly</td>
+                            <td>ciso@bigcorp.com</td>
+                            <td style="font-size:12px;color:var(--text-tertiary);">Jan 1, 2026</td>
+                            <td><span class="status success">Active</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">Export History</div></div>
+                <table class="data-table">
+                    <thead><tr><th>File</th><th>Type</th><th>Size</th><th>Generated</th><th></th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td style="font-weight:500;"><i class="fas fa-file-pdf" style="color:var(--red);margin-right:6px;"></i>SOC2-Report-Q4-2025.pdf</td>
+                            <td>SOC 2</td><td>2.4 MB</td>
+                            <td style="font-size:12px;color:var(--text-tertiary);">Jan 15, 2026</td>
+                            <td><button class="icon-btn"><i class="fas fa-download"></i></button></td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight:500;"><i class="fas fa-file-csv" style="color:var(--green);margin-right:6px;"></i>audit-trail-jan-2026.csv</td>
+                            <td>Audit Trail</td><td>18.7 MB</td>
+                            <td style="font-size:12px;color:var(--text-tertiary);">Feb 1, 2026</td>
+                            <td><button class="icon-btn"><i class="fas fa-download"></i></button></td>
+                        </tr>
+                        <tr>
+                            <td style="font-weight:500;"><i class="fas fa-file-pdf" style="color:var(--purple);margin-right:6px;"></i>HIPAA-Compliance-Feb-2026.pdf</td>
+                            <td>HIPAA</td><td>1.1 MB</td>
+                            <td style="font-size:12px;color:var(--text-tertiary);">Feb 5, 2026</td>
+                            <td><button class="icon-btn"><i class="fas fa-download"></i></button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ═══════ SETTINGS TAB ═══════ -->
+        <div class="tab-content" id="tab-settings">
+            <div class="card mb-24">
+                <div class="card-header"><div class="card-title">Organization</div></div>
+                <div class="setting-group">
+                    <div class="setting-label">Organization Name</div>
+                    <input class="setting-input" value="BigCorp Industries">
+                </div>
+                <div class="setting-group">
+                    <div class="setting-label">Billing Email</div>
+                    <input class="setting-input" value="billing@bigcorp.com">
+                </div>
+                <div class="setting-group" style="margin-bottom:0;">
+                    <div class="setting-label">Plan</div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <span class="status info" style="font-size:14px;padding:6px 14px;">Enterprise</span>
+                        <span style="font-size:13px;color:var(--text-tertiary);">Custom pricing · Unlimited requests · Dedicated support</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-24">
+                <div class="card-header"><div class="card-title">Compliance Policies</div></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light);">
+                    <div><div class="setting-label" style="margin:0;">Block requests with high-risk PII</div><div style="font-size:12px;color:var(--text-tertiary);">Stop requests containing SSN, credit cards, or medical records instead of redacting</div></div>
+                    <div class="toggle-track" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light);">
+                    <div><div class="setting-label" style="margin:0;">Scan file attachments</div><div style="font-size:12px;color:var(--text-tertiary);">Automatically scan CSV, JSON, TXT, and other text files for PII</div></div>
+                    <div class="toggle-track on" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light);">
+                    <div><div class="setting-label" style="margin:0;">Log all requests (including clean ones)</div><div style="font-size:12px;color:var(--text-tertiary);">Record every API call for complete audit trail coverage</div></div>
+                    <div class="toggle-track on" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;">
+                    <div><div class="setting-label" style="margin:0;">Data retention period</div><div style="font-size:12px;color:var(--text-tertiary);">How long to keep audit logs before auto-deletion</div></div>
+                    <select class="role-select" style="padding:8px 14px;font-size:13px;"><option>30 days</option><option selected>90 days</option><option>1 year</option><option>Custom</option></select>
+                </div>
+            </div>
+
+            <div class="card mb-24">
+                <div class="card-header"><div class="card-title">Notifications</div></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light);">
+                    <div><div class="setting-label" style="margin:0;">PII detection alerts</div><div style="font-size:12px;color:var(--text-tertiary);">Get notified when high-risk PII is detected</div></div>
+                    <div class="toggle-track on" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light);">
+                    <div><div class="setting-label" style="margin:0;">Weekly digest email</div><div style="font-size:12px;color:var(--text-tertiary);">Summary of all compliance events sent every Monday</div></div>
+                    <div class="toggle-track on" onclick="this.classList.toggle('on')"><div class="toggle-thumb"></div></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;">
+                    <div><div class="setting-label" style="margin:0;">Slack integration</div><div style="font-size:12px;color:var(--text-tertiary);">Send real-time alerts to a Slack channel</div></div>
+                    <button class="topbar-btn secondary" style="padding:6px 14px;font-size:12px;"><i class="fab fa-slack"></i> Connect Slack</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title" style="color:var(--red);">Danger Zone</div></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;">
+                    <div><div class="setting-label" style="margin:0;">Delete Organization</div><div style="font-size:12px;color:var(--text-tertiary);">Permanently delete this organization and all associated data</div></div>
+                    <button class="topbar-btn secondary" style="color:var(--red);border-color:rgba(255,59,48,0.3);font-size:12px;padding:6px 14px;">Delete Organization</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ═══════ MODALS ═══════ -->
+<div class="modal-overlay hidden" id="modal-newKey">
+    <div class="modal">
+        <div class="modal-title">Generate New API Key</div>
+        <div class="modal-desc">Choose a name and environment for your new key.</div>
+        <div style="margin-bottom:16px;">
+            <div class="setting-label">Key Name</div>
+            <input class="setting-input" placeholder="e.g. Production — Analytics" style="max-width:100%;">
+        </div>
+        <div style="margin-bottom:24px;">
+            <div class="setting-label">Environment</div>
+            <select class="role-select" style="padding:10px 14px;font-size:14px;width:100%;max-width:400px;">
+                <option>Production</option><option>Staging</option><option>Development</option>
+            </select>
+        </div>
+        <div class="modal-actions">
+            <button class="topbar-btn secondary" onclick="closeModals()">Cancel</button>
+            <button class="topbar-btn primary" onclick="closeModals();const a=new Uint8Array(12);crypto.getRandomValues(a);alert('API key generated! sk-sdlc-prod-' + Array.from(a,b=>b.toString(16).padStart(2,'0')).join(''));">Generate Key</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay hidden" id="modal-invite">
+    <div class="modal">
+        <div class="modal-title">Invite Team Member</div>
+        <div class="modal-desc">They'll receive an email invitation to join your organization.</div>
+        <div style="margin-bottom:16px;">
+            <div class="setting-label">Email Address</div>
+            <input class="setting-input" type="email" placeholder="colleague@bigcorp.com" style="max-width:100%;">
+        </div>
+        <div style="margin-bottom:24px;">
+            <div class="setting-label">Role</div>
+            <select class="role-select" style="padding:10px 14px;font-size:14px;width:100%;max-width:400px;">
+                <option>Admin</option><option selected>Developer</option><option>Viewer</option>
+            </select>
+        </div>
+        <div class="modal-actions">
+            <button class="topbar-btn secondary" onclick="closeModals()">Cancel</button>
+            <button class="topbar-btn primary" onclick="closeModals();alert('Invitation sent!');">Send Invite</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const tabNames = { overview: 'Overview', audit: 'Audit Trail', keys: 'API Keys', team: 'Team', reports: 'Reports', settings: 'Settings' };
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n => {
+            if (n.textContent.trim().startsWith(tabNames[tab])) n.classList.add('active');
+        });
+        document.getElementById('pageTitle').textContent = tabNames[tab];
+    }
+
+    function showModal(id) { document.getElementById('modal-' + id).classList.remove('hidden'); }
+    function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden')); }
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+        m.addEventListener('click', e => { if (e.target === m) closeModals(); });
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Control Hub Facade</title>
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/onboarding-extras.css" />
+    <link rel="stylesheet" href="/css/states.css" />
+    <link rel="stylesheet" href="/css/a11y.css" />
+    <link rel="stylesheet" href="/css/motion.css" />
+    <link rel="stylesheet" href="/css/responsive.css" />
+  </head>
+  <body>
+    <a href="#content-main" class="skip-link">Skip to main content</a>
+    <div class="app-shell" role="application" aria-label="Control Hub Dashboard">
+      <header class="topbar" role="banner">
+        <div class="brand">
+          <p class="eyebrow">FinSavvyAI</p>
+          <h1>Control Hub Dashboard</h1>
+          <p class="subtitle">One place for channels, skills, nodes, and model operations</p>
+        </div>
+        <div class="topbar-toys" aria-hidden="true">
+          <span class="toy toy-a"></span>
+          <span class="toy toy-b"></span>
+          <span class="toy toy-c"></span>
+        </div>
+        <div class="ops topbar-actions">
+          <button id="toggle-onboarding" class="btn" aria-label="Toggle guided setup flow">Guided Flow</button>
+          <button id="refresh-all" class="btn" aria-label="Refresh all dashboard data">Refresh All</button>
+        </div>
+      </header>
+
+      <div class="dashboard-shell">
+        <aside class="sidebar">
+          <h2 class="sidebar-title">Workspace</h2>
+          <nav class="sidebar-nav" role="navigation" aria-label="Workspace navigation">
+            <a href="#sec-connection">Connection</a>
+            <a href="#sec-snapshot">Snapshot</a>
+            <a href="#sec-connect-channel">Connect Channel</a>
+            <a href="#sec-connected">Connected Channels</a>
+            <a href="#sec-channel-types">Available Channels</a>
+            <a href="#sec-services">Services</a>
+            <a href="#sec-skill">Skill Runner</a>
+            <a href="#sec-node">Node Manager</a>
+            <a href="#sec-offerings">LLM Offerings</a>
+          </nav>
+        </aside>
+
+        <main id="content-main" class="content" role="main" aria-label="Dashboard panels">
+          <section id="sec-onboarding" class="card span-12 onboarding-panel" data-flow-section="onboarding" aria-label="Guided setup">
+            <div class="card-header">
+              <h2>Guided Setup</h2>
+              <p id="onboarding-step-title">Step 1 of 4</p>
+            </div>
+            <div class="onboarding-mascot-wrap" aria-hidden="true">
+              <div class="onboarding-mascot">
+                <span class="eye eye-left"></span>
+                <span class="eye eye-right"></span>
+                <span class="smile"></span>
+              </div>
+              <span class="mascot-bubble bubble-1"></span>
+              <span class="mascot-bubble bubble-2"></span>
+            </div>
+            <p id="onboarding-step-description" class="onboarding-description"></p>
+            <div class="onboarding-guide">
+              <h3>Do This Now</h3>
+              <ul id="onboarding-checklist" class="onboarding-checklist"></ul>
+            </div>
+            <div class="onboarding-progress">
+              <div id="onboarding-progress-fill" class="onboarding-progress-fill"></div>
+            </div>
+            <p id="onboarding-hint" class="onboarding-hint"></p>
+            <p id="onboarding-next-instruction" class="onboarding-next-instruction"></p>
+            <div id="onboarding-docker-config" class="grid2 onboarding-docker-config">
+              <label>
+                Docker Stack
+                <select id="onboarding-docker-stack">
+                  <option value="full">full (OpenClaw + master + worker + gateway)</option>
+                  <option value="core">core (master + worker + gateway)</option>
+                </select>
+              </label>
+              <label>
+                OpenClaw Image (fork override)
+                <input
+                  id="onboarding-openclaw-image"
+                  placeholder="ghcr.io/your-org/openclaw:latest"
+                />
+              </label>
+              <label>
+                OpenClaw Container Port (advanced)
+                <input id="onboarding-openclaw-port" placeholder="11434 (or 8000 for LunaOS fork)" />
+              </label>
+            </div>
+            <div class="ops onboarding-actions">
+              <button id="onboarding-prev" class="btn" aria-label="Go to previous setup step">Previous</button>
+              <button id="onboarding-docker-start" class="btn" aria-label="Start Docker containers for setup">Start Here (Docker)</button>
+              <button id="onboarding-docker-stop" class="btn" aria-label="Stop running Docker containers">Stop Docker</button>
+              <button id="onboarding-docker-status" class="btn" aria-label="Check Docker container status">Check Docker</button>
+              <button id="onboarding-autofill" class="btn" aria-label="Auto-fill current setup step fields">Auto Fill Step</button>
+              <button id="onboarding-step-action" class="btn primary" aria-label="Execute current setup step">Run Step</button>
+              <button id="onboarding-next" class="btn" aria-label="Go to next setup step">Next</button>
+              <button id="onboarding-skip" class="btn" aria-label="Skip guided setup and go to dashboard">Skip to Dashboard</button>
+            </div>
+            <pre id="onboarding-docker-log" class="log onboarding-docker-log">Docker helper is idle.</pre>
+          </section>
+
+          <section id="sec-snapshot" class="card span-12" data-flow-section="snapshot" aria-label="Cluster snapshot">
+            <div class="card-header">
+              <h2>Snapshot</h2>
+              <p>Live cluster and integration health</p>
+            </div>
+            <div class="kpis" role="group" aria-label="Key metrics">
+              <div class="kpi" role="status" aria-label="Node count"><span>Nodes</span><strong id="kpi-nodes">--</strong></div>
+              <div class="kpi" role="status" aria-label="Model count"><span>Models</span><strong id="kpi-models">--</strong></div>
+              <div class="kpi" role="status" aria-label="Channel count"><span>Channels</span><strong id="kpi-channels">--</strong></div>
+              <div class="kpi" role="status" aria-label="Service count"><span>Services</span><strong id="kpi-services">--</strong></div>
+            </div>
+          </section>
+
+          <section id="sec-connection" class="card span-6" data-flow-section="connection" aria-label="Connection settings">
+            <div class="card-header">
+              <h2>Connection</h2>
+              <p>OpenClaw + FinSavvy endpoints and auth</p>
+            </div>
+            <div id="platform-mode" class="mode-chip">Mode: detecting...</div>
+            <div class="grid2">
+              <label>
+                OpenClaw Base URL
+                <input id="openclaw-url" placeholder="https://openclaw.example.com" />
+              </label>
+              <label>
+                Gateway URL
+                <input id="gateway-url" placeholder="http://localhost:8080" />
+              </label>
+              <label>
+                Master URL
+                <input id="master-url" placeholder="http://localhost:8000" />
+              </label>
+              <label>
+                Auth Mode
+                <select id="auth-mode">
+                  <option value="none">None</option>
+                  <option value="bearer">Bearer Token</option>
+                  <option value="apikey">X-API-Key</option>
+                  <option value="service">X-Service-Key</option>
+                </select>
+              </label>
+              <label>
+                Auth Secret
+                <input id="auth-secret" type="password" placeholder="token/key" />
+              </label>
+              <label>
+                User ID (service mode)
+                <input id="auth-user-id" placeholder="optional-user-id" />
+              </label>
+            </div>
+            <label class="inline-check">
+              <input id="remember-auth-secret" type="checkbox" />
+              Remember Auth Secret on this browser
+            </label>
+            <div class="ops">
+              <button id="save-config" class="btn primary" aria-label="Save connection configuration">Save</button>
+              <button id="test-openclaw" class="btn" aria-label="Test OpenClaw endpoint connectivity">Test OpenClaw</button>
+              <span id="openclaw-status" class="status">Not checked</span>
+            </div>
+          </section>
+
+          <section id="sec-connect-channel" class="card span-6" data-flow-section="connect-channel" aria-label="Connect a channel">
+            <div class="card-header">
+              <h2>Connect Channel</h2>
+              <p>Provision WhatsApp, Telegram, Slack, Discord, or webhook</p>
+            </div>
+            <div class="grid2">
+              <label>
+                Type
+                <select id="channel-type">
+                  <option value="whatsapp">whatsapp</option>
+                  <option value="telegram">telegram</option>
+                  <option value="slack">slack</option>
+                  <option value="discord">discord</option>
+                  <option value="webhook">webhook</option>
+                </select>
+              </label>
+              <label>
+                Label
+                <input id="channel-label" placeholder="My Channel" />
+              </label>
+              <label>
+                Default Agent
+                <input id="channel-agent" value="run" />
+              </label>
+              <label>
+                Verify Token (optional)
+                <input id="channel-verify" placeholder="for whatsapp" />
+              </label>
+              <label>
+                Access Token (whatsapp)
+                <input id="channel-access-token" type="password" />
+              </label>
+              <label>
+                Phone Number ID (whatsapp)
+                <input id="channel-phone-id" />
+              </label>
+              <label>
+                Bot Token (telegram)
+                <input id="channel-bot-token" type="password" />
+              </label>
+            </div>
+            <div class="ops">
+              <button id="connect-channel" class="btn primary" aria-label="Connect the configured channel">Connect</button>
+              <button id="reload-connections" class="btn" aria-label="Reload channel connections list">Reload Connections</button>
+            </div>
+            <pre id="connect-result" class="log">No connection attempts yet.</pre>
+            <div id="channel-setup-guide" class="channel-setup-guide hidden">
+              <div class="setup-head">
+                <strong id="channel-setup-title">Channel Setup Guide</strong>
+                <span id="channel-setup-mode" class="mode-chip small">mode</span>
+              </div>
+              <p id="channel-setup-text" class="setup-text"></p>
+              <div class="grid2">
+                <label>
+                  Webhook URL
+                  <input id="channel-setup-webhook" readonly />
+                </label>
+                <label>
+                  Session ID (test)
+                  <input id="channel-setup-session" value="demo-session-1" />
+                </label>
+              </div>
+              <div class="ops">
+                <button id="channel-setup-copy-url" class="btn" aria-label="Copy webhook URL to clipboard">Copy Webhook URL</button>
+                <button id="channel-setup-copy-instructions" class="btn" aria-label="Copy setup instructions to clipboard">Copy Setup Text</button>
+                <button id="channel-setup-send-test" class="btn primary" aria-label="Send a test event to the channel">Send Test Event</button>
+              </div>
+              <pre id="channel-setup-log" class="log">No setup actions yet.</pre>
+            </div>
+          </section>
+
+          <section id="sec-connected" class="card span-6" data-flow-section="connected" aria-label="Connected channels">
+            <div class="card-header">
+              <h2>Connected Channels</h2>
+              <p>Current active channel connections</p>
+            </div>
+            <div id="connections" class="list" role="list" aria-label="Connected channels list"><div class="empty-state">No connected channels yet</div></div>
+          </section>
+
+          <section id="sec-channel-types" class="card span-6" data-flow-section="channel-types" aria-label="Available channel types">
+            <div class="card-header">
+              <h2>Available Channels</h2>
+              <p>Supported channel adapters and auth method</p>
+            </div>
+            <div id="channel-types" class="list" role="list" aria-label="Available channel types list"><div class="empty-state">Loading channel types...</div></div>
+          </section>
+
+          <section id="sec-services" class="card span-6" data-flow-section="services" aria-label="Services and skills catalog">
+            <div class="card-header">
+              <h2>Services / Skills</h2>
+              <p>OpenClaw service catalog and operational status</p>
+            </div>
+            <div id="services" class="list" role="list" aria-label="Services list"><div class="empty-state">Loading services...</div></div>
+          </section>
+
+          <section id="sec-skill" class="card span-6" data-flow-section="skill" aria-label="Skill runner">
+            <div class="card-header">
+              <h2>Skill Runner</h2>
+              <p>Execute skills from a single control plane</p>
+            </div>
+            <div class="grid2">
+              <label>
+                Agent Skill
+                <select id="skill-agent" aria-label="Select agent skill"></select>
+              </label>
+              <label>
+                Provider (optional)
+                <input id="skill-provider" placeholder="deepseek / openai / anthropic" />
+              </label>
+              <label>
+                Use RAG
+                <select id="skill-rag">
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              </label>
+              <label>
+                Source Tag
+                <input id="skill-source" value="control-hub-node" />
+              </label>
+            </div>
+            <label class="stacked-label">
+              Context
+              <textarea id="skill-context" rows="6" placeholder="Paste problem, code, or request..."></textarea>
+            </label>
+            <div class="ops">
+              <button id="run-skill" class="btn primary" aria-label="Execute the selected agent skill">Run Skill</button>
+            </div>
+            <pre id="skill-result" class="log">No runs yet.</pre>
+          </section>
+
+          <section id="sec-node" class="card span-6" data-flow-section="node" aria-label="Node manager">
+            <div class="card-header">
+              <h2>Node Manager</h2>
+              <p>Inspect workers and control model lifecycle</p>
+            </div>
+            <div class="grid2">
+              <label>
+                Worker Node
+                <select id="node-select" aria-label="Select worker node"></select>
+              </label>
+              <label>
+                Worker URL (override)
+                <input id="node-url-override" placeholder="http://127.0.0.1:8001" />
+              </label>
+            </div>
+            <div class="ops">
+              <button id="inspect-node" class="btn" aria-label="Inspect selected worker node">Inspect Node</button>
+            </div>
+            <pre id="node-inspect-result" class="log">No inspections yet.</pre>
+
+            <h3>Model Control</h3>
+            <div class="grid2">
+              <label>
+                Model ID
+                <input id="node-model-id" placeholder="phi-2" />
+              </label>
+              <label>
+                Model Path (for load)
+                <input id="node-model-path" placeholder="/path/to/model.gguf" />
+              </label>
+            </div>
+            <div class="ops">
+              <button id="node-load-model" class="btn primary" aria-label="Load model onto the selected worker node">Load Model</button>
+              <button id="node-unload-model" class="btn" aria-label="Unload model from the selected worker node">Unload Model</button>
+            </div>
+            <pre id="node-model-result" class="log">No model actions yet.</pre>
+          </section>
+
+          <section id="sec-offerings" class="card span-6" data-flow-section="offerings" aria-label="LLM offerings and providers">
+            <div class="card-header">
+              <h2>LLM Offerings</h2>
+              <p>Provider health and available model identifiers</p>
+            </div>
+            <h3>Provider Status</h3>
+            <pre id="providers" class="log">No data</pre>
+            <h3>Models</h3>
+            <pre id="models" class="log">No data</pre>
+          </section>
+        </main>
+      </div>
+      <div id="error-toast" class="error-toast hidden" role="alert" aria-live="assertive"></div>
+    </div>
+
+    <script src="/js/utils.js"></script>
+    <script src="/js/states.js"></script>
+    <script src="/js/theme.js"></script>
+    <script src="/app.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/onboarding.js"></script>
+    <script src="/js/onboarding_render.js"></script>
+    <script src="/js/onboarding_actions.js"></script>
+    <script src="/js/channels.js"></script>
+    <script src="/js/services.js"></script>
+    <script src="/js/models.js"></script>
+    <script src="/js/cluster.js"></script>
+    <script src="/js/init.js"></script>
+    <script src="/onboarding-extras.js"></script>
+  </body>
+</html>

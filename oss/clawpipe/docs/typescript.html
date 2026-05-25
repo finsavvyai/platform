@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeScript SDK - ClawPipe Docs</title>
+  <meta name="description" content="Full TypeScript SDK reference for ClawPipe: config options, exports, CLI, and streaming.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="docs-layout">
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Documentation">
+    <a href="/" class="logo">ClawPipe</a>
+    <nav>
+      <a href="index.html">Getting Started</a>
+      <a href="concepts.html">How It Works</a>
+      <div class="sep"></div>
+      <a href="typescript.html" class="active">TypeScript SDK</a>
+      <a href="python.html">Python SDK</a>
+      <a href="go.html">Go SDK</a>
+      <div class="sep"></div>
+      <a href="integrations.html">Integrations</a>
+      <a href="api.html">Gateway API</a>
+      <a href="oauth-setup.html">OAuth Setup</a>
+      <a href="migration.html">Migration</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="doc-header">
+      <div>
+        <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Toggle menu">&#9776;</button>
+        <span class="breadcrumb">Docs / TypeScript SDK</span>
+      </div>
+      <div class="links">
+        <a href="https://github.com/finsavvyai/clawpipe">GitHub</a>
+        <a href="https://clawpipe.ai">Home</a>
+      </div>
+    </header>
+    <main id="main-content" class="content">
+      <h1><span>TypeScript</span> SDK Guide</h1>
+      <p>The primary ClawPipe SDK. Install from npm and use with any Node.js or edge runtime.</p>
+
+      <h2>Install</h2>
+<pre><code>npm install clawpipe-ai</code></pre>
+
+      <h2>Full Configuration</h2>
+      <p>Pass a <code>ClawPipeConfig</code> object to the constructor. All options except <code>apiKey</code> and <code>projectId</code> are optional.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>apiKey</td><td>string</td><td>required</td><td>Your ClawPipe API key (cp_xxx)</td></tr>
+            <tr><td>projectId</td><td>string</td><td>required</td><td>Project identifier</td></tr>
+            <tr><td>gatewayUrl</td><td>string</td><td>https://api.clawpipe.ai/v1</td><td>Gateway endpoint URL</td></tr>
+            <tr><td>cacheTtlMs</td><td>number</td><td>300000</td><td>Cache time-to-live in ms (5 min)</td></tr>
+            <tr><td>enableBooster</td><td>boolean</td><td>true</td><td>Enable Agent Booster stage</td></tr>
+            <tr><td>enablePacker</td><td>boolean</td><td>true</td><td>Enable Context Packer stage</td></tr>
+            <tr><td>enableCache</td><td>boolean</td><td>true</td><td>Enable Semantic Cache stage</td></tr>
+            <tr><td>enableTrace</td><td>boolean</td><td>false</td><td>Enable pipeline stage tracing</td></tr>
+            <tr><td>localModelUrl</td><td>string</td><td>auto-detect</td><td>URL of a local LLM server</td></tr>
+            <tr><td>enableLocalFallback</td><td>boolean</td><td>false</td><td>Auto-detect local LLM servers</td></tr>
+            <tr><td>budgetCapUsd</td><td>number</td><td>undefined</td><td>Hard budget cap in USD</td></tr>
+            <tr><td>budgetWarnUsd</td><td>number</td><td>undefined</td><td>Soft budget warning threshold</td></tr>
+            <tr><td>rateLimitPerDay</td><td>number</td><td>tier default</td><td>Max calls per day</td></tr>
+            <tr><td>allowlist</td><td>AllowlistEntry[]</td><td>undefined</td><td>Permitted providers/models</td></tr>
+            <tr><td>denylist</td><td>AllowlistEntry[]</td><td>undefined</td><td>Blocked providers/models</td></tr>
+            <tr><td>enableAudit</td><td>boolean</td><td>false</td><td>Enable audit logging</td></tr>
+            <tr><td>auditTransport</td><td>function</td><td>console</td><td>Custom audit log handler</td></tr>
+            <tr><td>enableTelemetry</td><td>boolean</td><td>true</td><td>Enable telemetry tracking</td></tr>
+            <tr><td>circuitBreakerThreshold</td><td>number</td><td>5</td><td>Failures before circuit opens</td></tr>
+            <tr><td>circuitBreakerRecoveryMs</td><td>number</td><td>30000</td><td>Recovery time in ms</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>PromptOptions</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Option</th><th>Type</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>system</td><td>string</td><td>System prompt</td></tr>
+            <tr><td>maxTokens</td><td>number</td><td>Max output tokens</td></tr>
+            <tr><td>temperature</td><td>number</td><td>Sampling temperature (0-2)</td></tr>
+            <tr><td>model</td><td>string</td><td>Force a specific model</td></tr>
+            <tr><td>provider</td><td>string</td><td>Force a specific provider</td></tr>
+            <tr><td>taskType</td><td>string</td><td>Hint for the router (e.g. "code", "chat")</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>All Exports</h2>
+      <h3>Core Pipeline</h3>
+<pre><code><span class="code-accent">import</span> { ClawPipe, Booster, Packer, Cache, Router, Gateway } <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>;</code></pre>
+
+      <h3>Enterprise Features</h3>
+<pre><code><span class="code-accent">import</span> { Telemetry, Budget, RateLimiter, CircuitBreaker } <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>;
+<span class="code-accent">import</span> { Allowlist, AuditLogger } <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>;</code></pre>
+
+      <h3>Advanced Modules</h3>
+<pre><code><span class="code-accent">import</span> { Swarm, SemanticCache, Rag, Voice } <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>;
+<span class="code-accent">import</span> { Tracer, WeightStore, LocalProvider, LocalGateway } <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>;
+<span class="code-accent">import</span> { OpenAICompat } <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>; <span class="code-dim">// OpenAI drop-in replacement</span></code></pre>
+
+      <h3>Type Exports</h3>
+<pre><code><span class="code-accent">import type</span> {
+  ClawPipeConfig, PromptOptions, PipelineMeta, PipelineResult,
+  TelemetrySnapshot, AllowlistEntry, AuditLogEntry, AuditTransport,
+  GatewayResponse, BudgetStatus, RateLimitStatus, CircuitStatus,
+  RouteDecision, PackResult, SwarmConfig, SwarmStrategy, SwarmResult,
+  SwarmCandidate, SemanticCacheConfig, StageTrace, TraceEvent,
+  StoredWeight, ChatCompletion, ChatCompletionMessage, Choice,
+  CompletionUsage, OpenAIConfig, CreateParams,
+} <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>;</code></pre>
+
+      <h2>Streaming</h2>
+<pre><code><span class="code-accent">for await</span> (<span class="code-accent">const</span> chunk <span class="code-accent">of</span> pipe.stream(<span class="code-green">'Analyze this code'</span>, {
+  system: <span class="code-green">'You are a code reviewer'</span>,
+})) {
+  process.stdout.write(chunk);
+}</code></pre>
+
+      <h2>Observability Methods</h2>
+<pre><code>pipe.stats();          <span class="code-dim">// TelemetrySnapshot: requests, cost, cache rate</span>
+pipe.budgetStatus();   <span class="code-dim">// Budget: spent, cap, remaining, percent</span>
+pipe.rateLimitStatus();<span class="code-dim">// Rate limits: remaining calls, reset time</span>
+pipe.circuitStatus();  <span class="code-dim">// Provider health: state, failures per provider</span>
+pipe.auditLogs();      <span class="code-dim">// Compliance: timestamped action log</span></code></pre>
+
+      <h2>CLI Usage</h2>
+<pre><code>clawpipe prompt <span class="code-green">"What is 2+2"</span>                         <span class="code-dim"># Send a prompt</span>
+clawpipe prompt <span class="code-green">"Explain"</span> --system <span class="code-green">"..."</span> --trace     <span class="code-dim"># With tracing</span>
+clawpipe test                                          <span class="code-dim"># Test pipeline</span>
+clawpipe stats                                         <span class="code-dim"># Telemetry</span>
+clawpipe export                                        <span class="code-dim"># JSON telemetry</span>
+clawpipe config                                        <span class="code-dim"># Show configuration</span></code></pre>
+
+      <h2>Pipeline Tracing</h2>
+<pre><code><span class="code-accent">const</span> pipe = <span class="code-accent">new</span> ClawPipe({ ...config, enableTrace: <span class="code-accent">true</span> });
+<span class="code-accent">const</span> result = <span class="code-accent">await</span> pipe.prompt(<span class="code-green">'Hello'</span>);
+console.log(result.trace);
+<span class="code-dim">// --- trace:
+//   Booster      0.1ms (result=pass-through)
+//   Packer       0.3ms (savings=22%)
+//   Cache        0.1ms (result=miss)
+//   Router       0.2ms (model=deepseek:deepseek-chat)
+//   Gateway    412.0ms (tokensOut=156)
+//   Total      412.7ms</span>
+
+<span class="code-dim">// Export as Perfetto JSON for visual analysis:</span>
+<span class="code-accent">const</span> tracer = <span class="code-accent">new</span> Tracer(<span class="code-accent">true</span>);
+tracer.toPerfetto(); <span class="code-dim">// Chrome-compatible trace format</span></code></pre>
+    </main>
+  </div>
+</div>
+</body>
+</html>

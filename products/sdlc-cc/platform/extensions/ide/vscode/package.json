@@ -1,0 +1,96 @@
+{
+  "name": "privacy-gateway-vscode",
+  "displayName": "Privacy Gateway",
+  "description": "Scrub PII and secrets out of prompts before they reach Copilot, Cursor, Cline, or any AI assistant.",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
+  "publisher": "sdlc-platform",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "Linters"],
+  "keywords": ["ai", "llm", "privacy", "dlp", "redaction", "copilot", "security"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "privacyGateway.scrubSelection",
+        "title": "Privacy Gateway: Scrub selection"
+      },
+      {
+        "command": "privacyGateway.scrubClipboard",
+        "title": "Privacy Gateway: Scrub clipboard"
+      },
+      {
+        "command": "privacyGateway.toggleEnabled",
+        "title": "Privacy Gateway: Toggle enabled"
+      },
+      {
+        "command": "privacyGateway.openSettings",
+        "title": "Privacy Gateway: Open settings"
+      }
+    ],
+    "configuration": {
+      "title": "Privacy Gateway",
+      "properties": {
+        "privacyGateway.gatewayUrl": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "Base URL of the Privacy Gateway."
+        },
+        "privacyGateway.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Bearer token. Leave blank for unauthenticated self-host."
+        },
+        "privacyGateway.tenant": {
+          "type": "string",
+          "default": "",
+          "description": "Tenant id header (optional)."
+        },
+        "privacyGateway.presets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["pii_default", "secrets"],
+          "description": "DLP presets to apply."
+        },
+        "privacyGateway.mode": {
+          "type": "string",
+          "enum": ["preview", "auto"],
+          "default": "preview",
+          "description": "preview: show detections before replacing. auto: silent."
+        },
+        "privacyGateway.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Master switch."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "privacyGateway.scrubSelection",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "package": "vsce package",
+    "pretest": "tsc -p . && tsc -p tsconfig.test.json",
+    "test": "node out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.4.0",
+    "@vscode/vsce": "^2.30.0",
+    "glob": "^11.0.0",
+    "mocha": "^10.4.0",
+    "typescript": "^5.4.0"
+  }
+}

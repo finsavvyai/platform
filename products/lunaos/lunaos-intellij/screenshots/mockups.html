@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LunaOS IntelliJ Plugin — UI Mockups</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1e1e1e; color: #a9b7c6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 48px; }
+  h1 { color: #6897bb; font-size: 20px; font-weight: 500; letter-spacing: 0.5px; }
+  .mockup-label { color: #bbb; font-size: 14px; font-weight: 500; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+  .frame { width: 800px; height: 500px; background: #2b2b2b; border: 1px solid #555; border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+  .toolbar { background: #3c3d3f; border-bottom: 1px solid #515151; padding: 6px 10px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .toolbar-title { font-size: 12px; color: #bbb; font-weight: 500; margin-right: auto; }
+  .btn { background: #4c5052; color: #bbb; border: 1px solid #5a5d5f; border-radius: 3px; padding: 4px 12px; font-size: 12px; font-family: inherit; cursor: default; }
+  .btn-primary { background: #365880; border-color: #4a6d8c; color: #a9b7c6; }
+  .search-input { background: #45494a; border: 1px solid #5a5d5f; border-radius: 3px; padding: 5px 10px; color: #a9b7c6; font-size: 12px; font-family: inherit; flex: 1; outline: none; }
+  .search-input::placeholder { color: #6d7174; }
+  .text-field { background: #45494a; border: 1px solid #5a5d5f; border-radius: 3px; padding: 4px 8px; color: #a9b7c6; font-size: 12px; font-family: inherit; outline: none; }
+  .content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .separator { height: 1px; background: #515151; flex-shrink: 0; }
+  .bottom-bar { background: #3c3d3f; border-top: 1px solid #515151; padding: 6px 10px; display: flex; gap: 8px; flex-shrink: 0; }
+  /* Agent list */
+  .agent-list { flex: 1; overflow-y: auto; }
+  .agent-item { padding: 8px 12px; border-bottom: 1px solid #363738; display: flex; flex-direction: column; gap: 2px; cursor: default; }
+  .agent-item:hover { background: #333436; }
+  .agent-item.selected { background: #214283; }
+  .agent-name { font-size: 13px; color: #a9b7c6; font-weight: 500; }
+  .agent-item.selected .agent-name { color: #fff; }
+  .agent-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .agent-tag { background: #365880; color: #6897bb; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 500; }
+  .agent-desc { color: #6d7174; font-size: 11px; }
+  .agent-item.selected .agent-desc { color: #8899aa; }
+  /* Runs table */
+  .table-wrap { flex: 1; overflow: auto; padding: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #3c3d3f; color: #bbb; font-weight: 500; text-align: left; padding: 6px 10px; border-bottom: 1px solid #515151; position: sticky; top: 0; }
+  td { padding: 6px 10px; border-bottom: 1px solid #363738; }
+  tr:hover td { background: #333436; }
+  .badge { padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+  .badge-ok { background: #2e4a28; color: #6a8759; }
+  .badge-run { background: #4a4528; color: #bbb529; }
+  .badge-err { background: #4a2828; color: #cc7832; }
+  /* Logs */
+  .log-area { flex: 1; background: #2b2b2b; padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; overflow-y: auto; white-space: pre-wrap; }
+  .log-ts { color: #6d7174; }
+  .log-info { color: #6a8759; }
+  .log-warn { color: #bbb529; }
+  .log-err { color: #cc7832; }
+  .log-msg { color: #a9b7c6; }
+  /* Settings */
+  .settings-frame { display: flex; height: 100%; }
+  .settings-sidebar { width: 180px; background: #313335; border-right: 1px solid #515151; padding: 12px 0; flex-shrink: 0; }
+  .settings-sidebar .item { padding: 5px 16px; font-size: 12px; color: #bbb; cursor: default; }
+  .settings-sidebar .item.active { background: #214283; color: #fff; }
+  .settings-body { flex: 1; padding: 16px 20px; overflow-y: auto; }
+  .group-title { font-size: 13px; color: #bbb; font-weight: 600; border-bottom: 1px solid #515151; padding-bottom: 4px; margin: 16px 0 10px; }
+  .group-title:first-child { margin-top: 0; }
+  .form-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 12px; }
+  .form-label { width: 160px; text-align: right; color: #a9b7c6; flex-shrink: 0; }
+  .form-field { flex: 1; }
+  .form-field input[type="text"], .form-field input[type="password"] { width: 260px; background: #45494a; border: 1px solid #5a5d5f; border-radius: 3px; padding: 4px 8px; color: #a9b7c6; font-size: 12px; font-family: inherit; }
+  .form-comment { color: #6d7174; font-size: 11px; margin-top: 2px; }
+  .checkbox-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; margin-left: 170px; font-size: 12px; }
+  .spinner { width: 60px; background: #45494a; border: 1px solid #5a5d5f; border-radius: 3px; padding: 4px 6px; color: #a9b7c6; font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<h1>LunaOS IntelliJ Plugin  --  Marketplace Screenshots</h1>
+
+<!-- 1. AGENTS PANEL -->
+<div class="mockup-label">Agents Panel</div>
+<div class="frame">
+  <div class="toolbar">
+    <span class="toolbar-title">LunaOS  &rsaquo;  Agents</span>
+    <input class="search-input" style="max-width:260px" placeholder="Search agents..." readonly>
+    <button class="btn">Refresh</button>
+  </div>
+  <div class="content agent-list">
+    <div class="agent-item selected">
+      <span class="agent-name">Code Review Agent</span>
+      <div class="agent-meta"><span class="agent-tag">code-quality</span><span class="agent-desc">Analyze code for style, complexity, and best practices</span></div>
+    </div>
+    <div class="agent-item">
+      <span class="agent-name">Security Audit Agent</span>
+      <div class="agent-meta"><span class="agent-tag">security</span><span class="agent-desc">OWASP top-10 checks, dependency vulnerability scan</span></div>
+    </div>
+    <div class="agent-item">
+      <span class="agent-name">Database Optimizer</span>
+      <div class="agent-meta"><span class="agent-tag">database</span><span class="agent-desc">Analyze queries, suggest indexes, detect N+1 patterns</span></div>
+    </div>
+    <div class="agent-item">
+      <span class="agent-name">API Generator</span>
+      <div class="agent-meta"><span class="agent-tag">codegen</span><span class="agent-desc">Generate REST/GraphQL endpoints from schema definitions</span></div>
+    </div>
+    <div class="agent-item">
+      <span class="agent-name">Docker Compose Builder</span>
+      <div class="agent-meta"><span class="agent-tag">devops</span><span class="agent-desc">Create multi-service Docker configs from project structure</span></div>
+    </div>
+    <div class="agent-item">
+      <span class="agent-name">Deployment Pipeline</span>
+      <div class="agent-meta"><span class="agent-tag">ci-cd</span><span class="agent-desc">Generate CI/CD workflows for GitHub Actions, GitLab CI</span></div>
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <button class="btn btn-primary">Run Selected</button>
+    <button class="btn">Run with Context...</button>
+  </div>
+</div>
+
+<!-- 2. RUNS PANEL -->
+<div class="mockup-label">Runs Panel</div>
+<div class="frame">
+  <div class="toolbar">
+    <span class="toolbar-title">LunaOS  &rsaquo;  Runs</span>
+    <button class="btn">Refresh Runs</button>
+    <button class="btn">View Logs</button>
+  </div>
+  <div class="separator"></div>
+  <div class="content table-wrap">
+    <table>
+      <thead><tr><th>Run ID</th><th>Agent</th><th>Status</th><th>Started</th><th>Duration</th></tr></thead>
+      <tbody>
+        <tr><td>a3f8c21e</td><td>Code Review Agent</td><td><span class="badge badge-ok">completed</span></td><td>2026-03-30 09:42:18</td><td>1240ms</td></tr>
+        <tr><td>b7d1e09a</td><td>Security Audit Agent</td><td><span class="badge badge-run">running</span></td><td>2026-03-30 09:44:05</td><td>&mdash;</td></tr>
+        <tr><td>c2a5f83b</td><td>Database Optimizer</td><td><span class="badge badge-ok">completed</span></td><td>2026-03-30 09:38:51</td><td>3820ms</td></tr>
+        <tr><td>d9e4b16c</td><td>API Generator</td><td><span class="badge badge-err">failed</span></td><td>2026-03-30 09:35:12</td><td>890ms</td></tr>
+        <tr><td>e6f2a47d</td><td>Docker Compose Builder</td><td><span class="badge badge-ok">completed</span></td><td>2026-03-30 09:30:44</td><td>2150ms</td></tr>
+        <tr><td>f1c8d93e</td><td>Deployment Pipeline</td><td><span class="badge badge-ok">completed</span></td><td>2026-03-30 09:25:07</td><td>4610ms</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 3. LOGS PANEL -->
+<div class="mockup-label">Logs Panel</div>
+<div class="frame">
+  <div class="toolbar">
+    <span class="toolbar-title">LunaOS  &rsaquo;  Logs</span>
+    <input class="text-field" style="width:180px" value="a3f8c21e" readonly>
+    <button class="btn btn-primary">Load Logs</button>
+    <button class="btn">Clear</button>
+  </div>
+  <div class="separator"></div>
+  <div class="content log-area"><span class="log-ts">[2026-03-30 09:42:18.001]</span> <span class="log-info">INFO</span>  <span class="log-msg">Starting Code Review Agent for project lunaos-engine</span>
+<span class="log-ts">[2026-03-30 09:42:18.045]</span> <span class="log-info">INFO</span>  <span class="log-msg">Scanning 42 source files in src/routes/, src/services/</span>
+<span class="log-ts">[2026-03-30 09:42:18.312]</span> <span class="log-info">INFO</span>  <span class="log-msg">Analyzing complexity metrics and style patterns</span>
+<span class="log-ts">[2026-03-30 09:42:18.580]</span> <span class="log-warn">WARN</span>  <span class="log-msg">File src/routes/workflows.ts exceeds 180 lines (current: 194)</span>
+<span class="log-ts">[2026-03-30 09:42:18.741]</span> <span class="log-warn">WARN</span>  <span class="log-msg">Cyclomatic complexity > 10 in executeWorkflowStep()</span>
+<span class="log-ts">[2026-03-30 09:42:18.920]</span> <span class="log-info">INFO</span>  <span class="log-msg">Found 2 warnings, 0 errors across 42 files</span>
+<span class="log-ts">[2026-03-30 09:42:19.102]</span> <span class="log-err">ERROR</span> <span class="log-msg">Unused import detected: src/services/legacy-handler.ts:3</span>
+<span class="log-ts">[2026-03-30 09:42:19.180]</span> <span class="log-info">INFO</span>  <span class="log-msg">Generating review summary with recommendations</span>
+<span class="log-ts">[2026-03-30 09:42:19.241]</span> <span class="log-info">INFO</span>  <span class="log-msg">Run a3f8c21e completed in 1240ms  --  score: 87/100</span>
+</div>
+</div>
+
+<!-- 4. SETTINGS PAGE -->
+<div class="mockup-label">Settings Page</div>
+<div class="frame">
+  <div class="toolbar">
+    <span class="toolbar-title">Settings  &rsaquo;  Tools  &rsaquo;  LunaOS</span>
+  </div>
+  <div class="content settings-frame">
+    <div class="settings-sidebar">
+      <div class="item">Appearance</div>
+      <div class="item">Keymap</div>
+      <div class="item">Editor</div>
+      <div class="item">Plugins</div>
+      <div class="item">Tools</div>
+      <div class="item active">&nbsp;&nbsp;LunaOS</div>
+      <div class="item">Version Control</div>
+      <div class="item">Build, Execution</div>
+    </div>
+    <div class="settings-body">
+      <div class="group-title">API Connection</div>
+      <div class="form-row">
+        <span class="form-label">Endpoint:</span>
+        <div class="form-field">
+          <input type="text" value="https://api.lunaos.ai" readonly>
+          <div class="form-comment">LunaOS Engine API base URL</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <span class="form-label">API Key:</span>
+        <div class="form-field">
+          <input type="password" value="sk-luna-xxxxxxxxxxxx" readonly>
+          <div class="form-comment">Generate at agents.lunaos.ai/dashboard/api-keys</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <span class="form-label"></span>
+        <div class="form-field"><button class="btn btn-primary">Test Connection</button></div>
+      </div>
+      <div class="group-title">Defaults</div>
+      <div class="form-row">
+        <span class="form-label">Default Agent ID:</span>
+        <div class="form-field">
+          <input type="text" value="code-review" readonly>
+          <div class="form-comment">Used for quick-run and editor context actions</div>
+        </div>
+      </div>
+      <div class="group-title">Behavior</div>
+      <div class="checkbox-row"><input type="checkbox" checked disabled> Auto-refresh agent list and run status</div>
+      <div class="form-row">
+        <span class="form-label">Refresh interval (seconds):</span>
+        <div class="form-field"><input class="spinner" value="30" readonly></div>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" checked disabled> Show balloon notifications for completed runs</div>
+    </div>
+  </div>
+</div>
+
+<p style="color:#555; font-size:11px; margin-top:16px;">LunaOS IntelliJ Plugin v1.0.0 -- Darcula theme mockups for JetBrains Marketplace</p>
+</body>
+</html>

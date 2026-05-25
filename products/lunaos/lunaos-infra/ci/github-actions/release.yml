@@ -1,0 +1,369 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.2.3)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a prerelease?'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.id }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build applications
+        run: pnpm build
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Generate changelog from git commits
+          VERSION=${{ github.event.inputs.version || github.ref_name }}
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -20)
+          fi
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          release_name: Release ${{ github.event.inputs.version || github.ref_name }}
+          body: |
+            ## Changes in this release
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Installation
+
+            ### Docker
+            ```bash
+            docker pull ghcr.io/claude-agent-platform/claude-agent-platform:${{ github.event.inputs.version || github.ref_name }}
+            ```
+
+            ### npm
+            ```bash
+            npm install @claude-agent/cli@${{ github.event.inputs.version || github.ref_name }}
+            ```
+
+            ### Download
+            - [Web Application](https://github.com/claude-agent-platform/claude-agent/releases/download/${{ github.event.inputs.version || github.ref_name }}/web-dist.zip)
+            - [CLI Binary (Linux)](https://github.com/claude-agent-platform/claude-agent/releases/download/${{ github.event.inputs.version || github.ref_name }}/claude-cli-linux-x64)
+            - [CLI Binary (macOS)](https://github.com/claude-agent-platform/claude-agent/releases/download/${{ github.event.inputs.version || github.ref_name }}/claude-cli-darwin-x64)
+            - [CLI Binary (Windows)](https://github.com/claude-agent-platform/claude-agent/releases/download/${{ github.event.inputs.version || github.ref_name }}/claude-cli-win-x64.exe)
+
+            ## Documentation
+
+            Full documentation is available at: https://docs.claude-agent.com
+
+            ## Support
+
+            - 📖 [Documentation](https://docs.claude-agent.com)
+            - 🐛 [Issue Tracker](https://github.com/claude-agent-platform/claude-agent/issues)
+            - 💬 [Discussions](https://github.com/claude-agent-platform/claude-agent/discussions)
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+
+  build-and-upload-assets:
+    name: Build and Upload Release Assets
+    runs-on: ${{ matrix.os }}
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            binary_name: claude-cli-linux-x64
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+            binary_name: claude-cli-darwin-x64
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            binary_name: claude-cli-win-x64.exe
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build CLI binary
+        run: pnpm build:cli:${{ matrix.platform }}-${{ matrix.arch }}
+
+      - name: Build web distribution
+        run: pnpm build:web
+
+      - name: Package web distribution
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd apps/web/dist
+          zip -r ../../web-dist.zip .
+          cd ../..
+
+      - name: Upload CLI binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./packages/cli/dist/${{ matrix.binary_name }}
+          asset_name: ${{ matrix.binary_name }}
+          asset_content_type: application/octet-stream
+
+      - name: Upload web distribution
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./web-dist.zip
+          asset_name: web-dist.zip
+          asset_content_type: application/zip
+
+  publish-to-npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: startsWith(github.ref, 'refs/tags/v') && !github.event.inputs.prerelease
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Publish to npm
+        run: |
+          for package in packages/*/package.json; do
+            if [[ -f "$package" ]]; then
+              package_dir=$(dirname "$package")
+              package_name=$(node -p "require('$package').name")
+
+              # Skip if package is private
+              if [[ "$(node -p "require('$package').private")" == "true" ]]; then
+                echo "Skipping private package: $package_name"
+                continue
+              fi
+
+              echo "Publishing package: $package_name"
+              cd "$package_dir"
+              npm publish --access public
+              cd -
+            fi
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  update-docker-hub:
+    name: Update Docker Hub
+    runs-on: ubuntu-latest
+    needs: create-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            claudeagent/claude-agent-platform
+            ghcr.io/${{ github.repository }}/claude-agent-platform
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-documentation:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: create-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build documentation
+        run: pnpm docs:build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/dist
+          destination_dir: ${{ github.event.inputs.version || github.ref_name }}
+
+      - name: Update latest documentation
+        if: "!github.event.inputs.prerelease"
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs/dist
+          keep_files: true
+
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [create-release, build-and-upload-assets, publish-to-npm, update-docker-hub, deploy-documentation]
+    if: always()
+    steps:
+      - name: Notify release success
+        if: needs.create-release.result == 'success'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: '🎉 Release ${{ github.event.inputs.version || github.ref_name }} has been published successfully!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify release failure
+        if: needs.create-release.result == 'failure'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: '❌ Release ${{ github.event.inputs.version || github.ref_name }} failed! Please check the logs.'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Tweet release
+        if: needs.create-release.result == 'success' && !github.event.inputs.prerelease
+        uses: devigned/go-twitter-action@v1
+        with:
+          twitter-api-key: ${{ secrets.TWITTER_API_KEY }}
+          twitter-api-secret-key: ${{ secrets.TWITTER_API_SECRET_KEY }}
+          twitter-access-token: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          twitter-access-token-secret: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
+          tweet-message: |
+            🚀 Claude Agent Platform ${{ github.event.inputs.version || github.ref_name }} is now available!
+
+            ✨ AI-powered development workflows
+            🔍 Semantic code search with RAG
+            🏠 On-device inference for privacy
+            🛠️ Multi-platform support
+
+            Download now: https://github.com/claude-agent-platform/claude-agent/releases/tag/${{ github.event.inputs.version || github.ref_name }}
+
+            #ClaudeAgent #AI #DevTools #OpenSource

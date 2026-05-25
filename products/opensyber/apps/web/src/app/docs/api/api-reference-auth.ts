@@ -1,0 +1,73 @@
+/** Authentication & User endpoints */
+export const authSection = {
+  title: 'Authentication & User',
+  description: 'User authentication, profile, and onboarding endpoints',
+  endpoints: [
+    {
+      method: 'POST',
+      path: '/api/auth/login',
+      auth: 'none',
+      description: 'Login with email and password',
+      requestBody: { email: 'string', password: 'string (min 8 chars)' },
+      response: { token: 'string', user: '{ id, email, name }' },
+    },
+    {
+      method: 'POST',
+      path: '/api/auth/register',
+      auth: 'none',
+      description: 'Register a new user account',
+      requestBody: { email: 'string', password: 'string', name: 'string' },
+      response: { token: 'string', user: '{ id, email, name }' },
+    },
+    {
+      method: 'POST',
+      path: '/api/auth/refresh',
+      auth: 'bearer',
+      description: 'Refresh an expired JWT token',
+      response: { token: 'string' },
+    },
+    {
+      method: 'GET',
+      path: '/api/auth/me',
+      auth: 'bearer',
+      description: 'Get current authenticated user from token',
+      response: { user: '{ id, email, name }' },
+    },
+    {
+      method: 'GET',
+      path: '/api/user',
+      auth: 'bearer',
+      description: 'Get authenticated user profile from database',
+      response: { data: '{ id, email, name, plan, createdAt }' },
+    },
+    {
+      method: 'GET',
+      path: '/api/user/onboarding',
+      auth: 'bearer',
+      description: 'Get computed onboarding progress',
+      response: { data: '{ steps, progress, dismissed }' },
+    },
+    {
+      method: 'PATCH',
+      path: '/api/user/onboarding',
+      auth: 'bearer',
+      description: 'Mark an onboarding step complete or dismiss checklist',
+      requestBody: { step: 'string?', dismiss: 'boolean?' },
+      response: { data: '{ steps, progress }' },
+    },
+    {
+      method: 'GET',
+      path: '/api/user/referral',
+      auth: 'bearer',
+      description: 'Get referral code, count of referred users, and credits',
+      response: { data: '{ code, referredCount, credits }' },
+    },
+    {
+      method: 'GET',
+      path: '/api/plan/features',
+      auth: 'bearer',
+      description: 'Get features available on the current plan',
+      response: { data: '{ features: PlanFeature[] }' },
+    },
+  ],
+} as const;

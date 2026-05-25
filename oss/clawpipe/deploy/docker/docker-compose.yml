@@ -1,0 +1,80 @@
+# ClawPipe — Full self-hosted stack
+# Usage: docker compose up -d
+
+version: "3.9"
+
+services:
+  gateway:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    ports:
+      - "${GATEWAY_PORT:-8787}:8787"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=8787
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - clawpipe
+
+  dashboard:
+    image: nginx:alpine
+    ports:
+      - "${DASHBOARD_PORT:-3000}:80"
+    volumes:
+      - ../../dashboard/dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - gateway
+    restart: unless-stopped
+    networks:
+      - clawpipe
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-clawpipe}
+      POSTGRES_USER: ${POSTGRES_USER:-clawpipe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clawpipe}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - clawpipe
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - clawpipe
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  clawpipe:
+    driver: bridge

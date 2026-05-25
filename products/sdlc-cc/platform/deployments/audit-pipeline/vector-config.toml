@@ -1,0 +1,105 @@
+# SDLC Platform — Vector.dev pipeline
+# Collects structured audit events from services and routes them to:
+#   1. Loki        — hot, queryable, 90 days
+#   2. Cloudflare R2 — cold, gzipped JSON, 7 years (SOC2)
+
+data_dir = "/var/lib/vector"
+
+# ---------------------------------------------------------------
+# SOURCES
+# ---------------------------------------------------------------
+
+[sources.audit_files]
+type = "file"
+include = [
+  "/var/log/sdlc/*/audit.log",
+  "/var/log/sdlc/*/audit-*.log",
+]
+read_from = "beginning"
+ignore_older_secs = 86400
+multiline.start_pattern = '^\{'
+multiline.mode = "halt_before"
+multiline.condition_pattern = '^\{'
+multiline.timeout_ms = 1000
+
+[sources.docker_audit]
+type = "docker_logs"
+include_labels = ["com.sdlc.audit=true"]
+
+# ---------------------------------------------------------------
+# TRANSFORMS
+# ---------------------------------------------------------------
+
+[transforms.parse_json]
+type = "remap"
+inputs = ["audit_files", "docker_audit"]
+source = '''
+  parsed, err = parse_json(.message)
+  if err == null {
+    . = merge(., parsed) ?? .
+  }
+  .ingested_at = now()
+'''
+
+[transforms.filter_audit]
+type = "filter"
+inputs = ["parse_json"]
+condition = '''
+  exists(.event_type) &&
+  exists(.tenant_id) &&
+  is_string(.event_type)
+'''
+
+[transforms.enrich]
+type = "remap"
+inputs = ["filter_audit"]
+source = '''
+  .service = .service || "unknown"
+  .environment = get_env_var("ENVIRONMENT") ?? "dev"
+  .pipeline = "audit"
+  .schema_version = "1.0"
+  if !exists(.id) { .id = uuid_v4() }
+'''
+
+# ---------------------------------------------------------------
+# SINKS
+# ---------------------------------------------------------------
+
+[sinks.loki_hot]
+type = "loki"
+inputs = ["enrich"]
+endpoint = "http://loki:3100"
+encoding.codec = "json"
+compression = "gzip"
+out_of_order_action = "accept"
+
+  [sinks.loki_hot.labels]
+  tenant_id = "{{ tenant_id }}"
+  service = "{{ service }}"
+  event_type = "{{ event_type }}"
+  environment = "{{ environment }}"
+
+[sinks.r2_cold]
+type = "aws_s3"
+inputs = ["enrich"]
+bucket = "${R2_BUCKET:-sdlc-audit-logs}"
+region = "auto"
+endpoint = "${R2_ENDPOINT:-http://localhost:9000}"
+compression = "gzip"
+encoding.codec = "ndjson"
+key_prefix = "audit/tenant={{ tenant_id }}/date=%Y-%m-%d/"
+filename_time_format = "%H%M%S-%s"
+filename_append_uuid = true
+
+  [sinks.r2_cold.auth]
+  access_key_id = "${R2_ACCESS_KEY_ID:-dev}"
+  secret_access_key = "${R2_SECRET_ACCESS_KEY:-dev}"
+
+  [sinks.r2_cold.batch]
+  max_bytes = 10485760   # 10 MiB
+  timeout_secs = 300     # flush every 5 min
+
+  [sinks.r2_cold.buffer]
+  type = "disk"
+  max_size = 536870912   # 512 MiB on-disk buffer
+  when_full = "block"

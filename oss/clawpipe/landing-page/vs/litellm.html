@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawPipe vs LiteLLM — Open-Source Proxy vs Managed Pipeline</title>
+  <meta name="description" content="Honest comparison: LiteLLM is Apache-2.0 with 100+ providers and self-hosting. ClawPipe is a managed pipeline with Booster, semantic cache, and self-learning routing. Choose the right one.">
+  <link rel="canonical" href="https://clawpipe.ai/vs/litellm">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/legal.css">
+  <script type="application/ld+json">
+  { "@context": "https://schema.org", "@type": "BlogPosting",
+    "headline": "ClawPipe vs LiteLLM — Open-Source Proxy vs Managed Pipeline",
+    "description": "Honest, side-by-side comparison of ClawPipe and LiteLLM across model breadth, pre-LLM skip, semantic cache, self-learning routing, observability, and pricing.",
+    "author": { "@type": "Organization", "name": "ClawPipe" },
+    "publisher": { "@type": "Organization", "name": "ClawPipe", "logo": { "@type": "ImageObject", "url": "https://clawpipe.ai/logo.png" } },
+    "datePublished": "2026-04-27", "dateModified": "2026-04-27",
+    "mainEntityOfPage": { "@type": "WebPage", "@id": "https://clawpipe.ai/vs/litellm" } }
+  </script>
+</head>
+<body>
+<div class="container">
+  <header class="legal-header">
+    <a href="/" class="logo" style="text-decoration:none"><span>Claw</span>Pipe</a>
+    <nav><a href="/#pricing">Pricing</a><a href="https://docs.clawpipe.ai">Docs</a><a href="https://app.clawpipe.ai/signup">Sign in</a></nav>
+  </header>
+  <main class="content">
+    <h1>ClawPipe vs LiteLLM</h1>
+    <p class="lead">When you want LiteLLM's openness with production polish. LiteLLM is Apache-2.0 and self-hostable; ClawPipe ships a managed pipeline with deterministic skip, semantic cache, and a self-learning router.</p>
+
+    <h2>Honest feature matrix</h2>
+    <table>
+      <thead><tr><th>Feature</th><th>ClawPipe</th><th>LiteLLM</th></tr></thead>
+      <tbody>
+        <tr><td>Multi-provider routing</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Semantic cache</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Pre-LLM skip ("Booster")</td><td><strong>Yes (unique)</strong></td><td>No</td></tr>
+        <tr><td>Self-learning router</td><td>Yes (weighted bandit)</td><td>Config-only fallback</td></tr>
+        <tr><td>PII / guardrails</td><td>No</td><td>No</td></tr>
+        <tr><td>Observability dashboard</td><td>Partial</td><td>No</td></tr>
+        <tr><td>OpenAI-compatible shim</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Open-source gateway</td><td>No (SDK is OSS)</td><td><strong>Yes (Apache-2.0)</strong></td></tr>
+        <tr><td>Model count</td><td>22 providers</td><td>100+ providers</td></tr>
+        <tr><td>SDKs shipped</td><td>6 languages</td><td>1 (Python)</td></tr>
+        <tr><td>Pricing floor (paid)</td><td>$79/mo (Dev)</td><td>$50/mo hosted, free OSS</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Choose ClawPipe if...</h2>
+    <ul>
+      <li>You want savings before the network hop — Booster + Packer run client-side. Per-bucket skip rate pending public measured benchmark.</li>
+      <li>You're polyglot — native SDKs in TypeScript, Python, Go, PHP, .NET, Elixir.</li>
+      <li>You want a managed gateway on Cloudflare Workers, not another container to host.</li>
+    </ul>
+
+    <h2>Choose LiteLLM if...</h2>
+    <ul>
+      <li>Open-source is non-negotiable — Apache-2.0, fork it, run it, modify it.</li>
+      <li>You need long-tail provider support (100+ vs our 22).</li>
+      <li>Your stack is Python-only and you prefer a single proxy container over an SDK.</li>
+    </ul>
+
+    <h2>Pricing snapshot</h2>
+    <table>
+      <thead><tr><th>Tier</th><th>ClawPipe</th><th>LiteLLM</th></tr></thead>
+      <tbody>
+        <tr><td>Free</td><td>1,000 calls/day, all features</td><td>OSS — unlimited self-host</td></tr>
+        <tr><td>Entry paid</td><td>$79/mo (Dev, 15K calls/day)</td><td>$50/mo hosted</td></tr>
+        <tr><td>Enterprise</td><td>Custom, SSO + audit logs</td><td>Custom (Enterprise license)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Migration from LiteLLM</h2>
+    <p>If you're using LiteLLM Proxy with the OpenAI shim, swap your base URL:</p>
+    <pre style="background:var(--bg-subtle);padding:12px;border-radius:8px;font-size:13px;overflow:auto;">
+# before
+litellm --config litellm.yaml --port 4000
+# client points at http://localhost:4000
+
+# after — keep the OpenAI client, swap base URL
+from openai import OpenAI
+client = OpenAI(api_key="cp_...", base_url="https://api.clawpipe.ai/v1")
+</pre>
+    <p>Or chain them: point LiteLLM's <code>api_base</code> at <code>https://api.clawpipe.ai/v1</code> and keep both.</p>
+
+    <p style="margin-top:32px;"><a class="btn btn-primary" href="https://app.clawpipe.ai/signup?utm_source=vs&amp;utm_medium=litellm">Try the free tier (1,000 calls/day, no card) →</a></p>
+  </main>
+  <footer class="legal-footer">
+    <div><a href="/">Home</a> · <a href="/vs/portkey">vs Portkey</a> · <a href="/vs/openrouter">vs OpenRouter</a> · <a href="/vs/helicone">vs Helicone</a> · <a href="/vs/langsmith">vs LangSmith</a></div>
+    <div>&copy; 2026 ClawPipe</div>
+  </footer>
+</div>
+</body>
+</html>

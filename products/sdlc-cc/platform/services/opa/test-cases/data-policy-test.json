@@ -1,0 +1,419 @@
+{
+  "name": "Data Access Policy Tests",
+  "description": "Comprehensive test suite for data access policies",
+  "version": "1.0",
+  "policy_path": "sdlc.data.access",
+  "test_cases": [
+    {
+      "name": "Basic Data Access Test",
+      "description": "Test basic data access with proper permissions",
+      "input": {
+        "user_id": "user-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-456:documents:doc-789",
+        "data": {
+          "id": "doc-789",
+          "title": "Test Document",
+          "content": "This is test content",
+          "classification": "internal",
+          "owner": "user-123"
+        },
+        "purpose": "business_analysis",
+        "user_role": "analyst",
+        "user_location": {
+          "country": "US"
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason_contains": "User has appropriate data access permissions"
+      },
+      "tags": ["happy_path", "data_access", "permissions"]
+    },
+    {
+      "name": "Cross-Tenant Access Denied Test",
+      "description": "Test cross-tenant access is denied",
+      "input": {
+        "user_id": "user-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-789:documents:doc-123",
+        "data": {
+          "id": "doc-123",
+          "title": "Other Tenant Document"
+        },
+        "purpose": "business_analysis",
+        "user_role": "analyst"
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Tenant isolation violation"
+      },
+      "tags": ["negative", "tenant_isolation", "security"]
+    },
+    {
+      "name": "Super Admin Cross-Tenant Access Test",
+      "description": "Test super admin can access cross-tenant for admin purposes",
+      "input": {
+        "user_id": "admin-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-789:documents:doc-123",
+        "data": {
+          "id": "doc-123",
+          "title": "Other Tenant Document"
+        },
+        "purpose": "audit",
+        "user_role": "super_admin"
+      },
+      "expected": {
+        "decision": true,
+        "reason_contains": "Tenant isolation is respected"
+      },
+      "tags": ["admin", "cross_tenant", "audit"]
+    },
+    {
+      "name": "Insufficient Data Classification Access Test",
+      "description": "Test user cannot access data above their clearance level",
+      "input": {
+        "user_id": "user-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-456:documents:doc-789",
+        "data": {
+          "id": "doc-789",
+          "title": "Confidential Document",
+          "content": "Secret information",
+          "classification": "confidential"
+        },
+        "purpose": "business_analysis",
+        "user_role": "analyst"
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Insufficient clearance level"
+      },
+      "tags": ["negative", "classification", "clearance"]
+    },
+    {
+      "name": "Purpose-Based Access Control Test",
+      "description": "Test purpose-based access control",
+      "input": {
+        "user_id": "user-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-456:documents:doc-789",
+        "data": {
+          "id": "doc-789",
+          "title": "PII Document",
+          "content": "User's personal information",
+          "purpose_restrictions": {
+            "allowed_purposes": ["customer_service", "compliance"]
+          }
+        },
+        "purpose": "marketing",
+        "user_role": "analyst"
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Purpose-based access control violation"
+      },
+      "tags": ["negative", "purpose_based", "data_governance"]
+    },
+    {
+      "name": "Emergency Access Override Test",
+      "description": "Test emergency access override for compliance officers",
+      "input": {
+        "user_id": "compliance-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-456:documents:doc-789",
+        "data": {
+          "id": "doc-789",
+          "title": "PII Document",
+          "content": "User's personal information",
+          "purpose_restrictions": {
+            "allowed_purposes": ["customer_service"]
+          }
+        },
+        "purpose": "legal_compliance",
+        "user_role": "compliance_officer"
+      },
+      "expected": {
+        "decision": true,
+        "reason_contains": "Purpose-based access control passed"
+      },
+      "tags": ["emergency", "compliance", "override"]
+    },
+    {
+      "name": "Field-Level Access Control Test",
+      "description": "Test field-level access control",
+      "input": {
+        "user_id": "user-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-456:documents:doc-789",
+        "data": {
+          "id": "doc-789",
+          "title": "Document with PII",
+          "public_content": "This is public information",
+          "ssn": "123-45-6789",
+          "credit_card": "4111-1111-1111-1111"
+        },
+        "purpose": "business_analysis",
+        "user_role": "analyst"
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Field-level access control violation"
+      },
+      "tags": ["negative", "field_level", "pii"]
+    },
+    {
+      "name": "Time-Based Access Control Test",
+      "description": "Test time-based access restrictions",
+      "input": {
+        "user_id": "user-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-456:documents:doc-789",
+        "data": {
+          "id": "doc-789",
+          "title": "Time-Restricted Document",
+          "content": "Restricted content"
+        },
+        "purpose": "business_analysis",
+        "user_role": "analyst"
+      },
+      "mock_data": {
+        "time_restrictions": {
+          "tenant-456:documents:doc-789": {
+            "allowed_days": [1, 2, 3, 4, 5],  // Monday to Friday
+            "start_hour": 9,
+            "end_hour": 17
+          }
+        },
+        "current_time": "2023-10-29T20:00:00Z"  // Saturday 8 PM
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Time-based access control violation"
+      },
+      "tags": ["negative", "time_based", "access_control"]
+    },
+    {
+      "name": "Data Residency Compliance Test",
+      "description": "Test data residency compliance",
+      "input": {
+        "user_id": "user-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-456:documents:doc-789",
+        "data": {
+          "id": "doc-789",
+          "title": "EU Data Document",
+          "content": "European user data",
+          "residency_required": true,
+          "residency_requirements": {
+            "allowed_countries": ["DE", "FR", "UK", "IT"]
+          }
+        },
+        "purpose": "business_analysis",
+        "user_role": "analyst",
+        "user_location": {
+          "country": "US"
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Data residency compliance violation"
+      },
+      "tags": ["negative", "data_residency", "compliance"]
+    },
+    {
+      "name": "MFA Requirement Test",
+      "description": "Test MFA requirement for sensitive data",
+      "input": {
+        "user_id": "user-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-456:documents:doc-789",
+        "data": {
+          "id": "doc-789",
+          "title": "Secret Document",
+          "content": "Highly sensitive information",
+          "classification": "secret"
+        },
+        "purpose": "business_analysis",
+        "user_role": "analyst"
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Multi-factor authentication requirement not met"
+      },
+      "tags": ["negative", "mfa", "sensitive_data"]
+    },
+    {
+      "name": "MFA Satisfied Test",
+      "description": "Test successful access when MFA is satisfied",
+      "input": {
+        "user_id": "user-123",
+        "tenant_id": "tenant-456",
+        "action": "read",
+        "resource": "tenant-456:documents:doc-789",
+        "data": {
+          "id": "doc-789",
+          "title": "Secret Document",
+          "content": "Highly sensitive information",
+          "classification": "secret"
+        },
+        "purpose": "business_analysis",
+        "user_role": "analyst"
+      },
+      "mock_data": {
+        "mfa_sessions": {
+          "user-123": {
+            "valid": true,
+            "expires_at": 1893456000000000000
+          }
+        }
+      },
+      "expected": {
+        "decision": true,
+        "reason_contains": "MFA requirements satisfied"
+      },
+      "tags": ["positive", "mfa", "sensitive_data"]
+    },
+    {
+      "name": "Resource Quota Exceeded Test",
+      "description": "Test access when resource quotas are exceeded",
+      "input": {
+        "user_id": "user-123",
+        "tenant_id": "tenant-456",
+        "action": "create",
+        "resource": "tenant-456:documents:new-doc",
+        "data": {
+          "title": "New Document",
+          "content": "New content"
+        },
+        "purpose": "business_analysis",
+        "user_role": "analyst"
+      },
+      "mock_data": {
+        "tenant_quotas": {
+          "tenant-456": {
+            "resource_count": 100
+          }
+        },
+        "tenant_usage_metrics": {
+          "tenant-456": {
+            "resource_count": 150
+          }
+        }
+      },
+      "expected": {
+        "decision": false,
+        "reason_contains": "Resource quota exceeded"
+      },
+      "tags": ["negative", "quota", "limits"]
+    }
+  ],
+  "setup_data": {
+    "users": {
+      "user-123": {
+        "clearance_level": 1,
+        "role": "analyst",
+        "role_permissions": ["documents:read", "documents:write"],
+        "specific_permissions": [],
+        "field_restrictions": [
+          {
+            "field": "ssn",
+            "accessible": false,
+            "actions": {"read": false, "write": false}
+          },
+          {
+            "field": "credit_card",
+            "accessible": false,
+            "actions": {"read": false, "write": false}
+          }
+        ]
+      },
+      "admin-123": {
+        "clearance_level": 4,
+        "role": "super_admin",
+        "role_permissions": ["*"],
+        "specific_permissions": [],
+        "field_restrictions": []
+      },
+      "compliance-123": {
+        "clearance_level": 3,
+        "role": "compliance_officer",
+        "role_permissions": ["documents:read", "documents:write", "audit:read"],
+        "specific_permissions": [],
+        "field_restrictions": []
+      }
+    },
+    "tenants": {
+      "tenant-456": {
+        "status": "active",
+        "suspended": false,
+        "subscription_status": "active",
+        "compliance_status": "good"
+      },
+      "tenant-789": {
+        "status": "active",
+        "suspended": false,
+        "subscription_status": "active",
+        "compliance_status": "good"
+      }
+    },
+    "data_permission_mapping": {
+      ("read", "documents"): "documents:read",
+      ("write", "documents"): "documents:write",
+      ("delete", "documents"): "documents:delete",
+      ("share", "documents"): "documents:share",
+      ("read", "users"): "users:read",
+      ("write", "users"): "users:write",
+      ("delete", "users"): "users:delete"
+    },
+    "classification_clearance_levels": {
+      "public": 0,
+      "internal": 1,
+      "confidential": 2,
+      "secret": 3,
+      "top_secret": 4
+    },
+    "tenant_quotas": {
+      "tenant-456": {
+        "resource_count": 1000,
+        "storage_gb": 100,
+        "compute_units": 1000,
+        "api_requests_per_hour": 10000,
+        "max_concurrent_users": 100,
+        "export_gb_per_month": 10
+      }
+    },
+    "tenant_usage_metrics": {
+      "tenant-456": {
+        "resource_count": 500,
+        "storage_gb": 50,
+        "compute_units": 200,
+        "api_requests_per_hour": 1000,
+        "max_concurrent_users": 25,
+        "export_gb_per_month": 2
+      }
+    }
+  },
+  "teardown_data": {
+    "cleanup_temp_data": true,
+    "reset_mock_data": true
+  },
+  "execution_config": {
+    "timeout": 30,
+    "parallel": false,
+    "continue_on_failure": true,
+    "capture_logs": true,
+    "capture_metrics": true
+  }
+}

@@ -1,0 +1,117 @@
+# PipeWarden — Production Configuration Template
+#
+# DO NOT commit real secrets here. Required values are supplied via environment
+# variables. ValidateRequiredConfig (internal/config/validate.go) will refuse to
+# start the server if any of the marked-required values are empty or set to a
+# known development placeholder.
+#
+# Required env vars on first boot (server refuses to start without these):
+#   PIPEWARDEN_VAULT_KEY              — 32+ byte AES-256-GCM key
+#   PIPEWARDEN_SESSION_SECRET         — random 32+ byte string; signs auth cookies
+#   PIPEWARDEN_SMTP_HOST              — SMTP relay host (verify + reset emails)
+#   PIPEWARDEN_WEBAUTHN_RPID          — must be apex domain, never "localhost"
+#   PIPEWARDEN_DATABASE_URL           — Postgres URL when features.hostedMode=true
+#   GITHUB_APP_ID + GITHUB_PRIVATE_KEY (or _PATH) — when auth.githubApp.enabled
+#   GITHUB_WEBHOOK_SECRET             — when auth.githubApp.enabled
+#   LEMONSQUEEZY_WEBHOOK_SECRET       — when features.billing + LEMONSQUEEZY_API_KEY
+#
+# Strongly-recommended env vars (silent feature breakage if unset):
+#   CLAUDE_API_KEY (or ANTHROPIC_API_KEY) — Claude analyzer; AI scans 500 without
+#   PIPEWARDEN_COOKIE_DOMAIN          — e.g. ".pipewarden.io" for cross-subdomain
+#   PIPEWARDEN_WEBAUTHN_ORIGINS       — comma-separated https origins for passkeys
+#   PIPEWARDEN_WEBAUTHN_NAME          — display name in passkey prompt
+#   PIPEWARDEN_SMTP_PORT              — defaults to 587
+#   PIPEWARDEN_SMTP_USER              — SMTP relay username
+#   PIPEWARDEN_SMTP_PASSWORD          — SMTP relay password
+#   PIPEWARDEN_SMTP_FROM              — From: header (e.g. "PipeWarden <noreply@pipewarden.io>")
+#   GITHUB_APP_SLUG, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_API_BASE_URL
+#   LEMONSQUEEZY_API_KEY, LEMONSQUEEZY_STORE_ID
+#
+# Optional integrations:
+#   GITLAB_WEBHOOK_SECRET             — GitLab webhook HMAC
+#   CLAW_API_KEY, CLAW_PROJECT_ID     — ClawPipe cost router
+#   PIPEWARDEN_AUDIT_ENDPOINT, PIPEWARDEN_AUDIT_TOKEN — OpenSyber audit sink
+#   SLACK_WEBHOOK_URL, SLACK_CHANNEL  — SIEM Slack alerts
+#   PAGERDUTY_INTEGRATION_KEY         — SIEM PagerDuty
+#   JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_PROJECT_KEY — SIEM Jira
+#   PUSHCI_API_KEY, PUSHCI_BASE_URL   — PushCI integration
+#
+# Reverse-proxy expectations:
+#   - TLS terminated at the proxy (Cloudflare / nginx / Railway gateway)
+#   - X-Forwarded-For set so client IPs reach the rate limiter
+#   - Origin header preserved for CORS allowlist matching
+
+environment: production
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  readTimeout: 10s
+  writeTimeout: 30s
+  idleTimeout: 120s
+  publicUrl: "https://pipewarden.io"
+  # Production allows the marketing-site origins. Add any custom domain
+  # that calls /api/v1/auth/* with credentials. Wildcards are not honoured
+  # in credentialed-CORS — every origin must be listed verbatim.
+  corsOrigins:
+    - "https://pipewarden.com"
+    - "https://www.pipewarden.com"
+    - "https://app.pipewarden.com"
+    - "https://pipewarden.io"
+    - "https://www.pipewarden.io"
+    - "https://app.pipewarden.io"
+
+database:
+  driver: postgres
+  sslMode: require
+  maxOpenConns: 25
+  maxIdleConns: 5
+  connMaxLifetime: 30m
+
+analysis:
+  claudeModel: claude-sonnet-4-20250514
+  claudeBaseUrl: https://api.anthropic.com
+  heuristicEnabled: true
+  dlpEnabled: true
+  policyEnabled: true
+
+vault:
+  encryptionKey: ""
+
+clawpipe:
+  apiKey: ""
+  projectId: ""
+  endpoint: https://api.clawpipe.dev
+  offlineMode: false
+
+billing:
+  lemonsqueezyApiKey: ""
+  lemonsqueezyStoreId: ""
+  lemonsqueezyWebhookSecret: ""
+
+auth:
+  disabled: false
+  opensyber:
+    enabled: true
+    jwksUrl: "https://opensyber.com/.well-known/jwks.json"
+  githubApp:
+    enabled: true
+    slug: ""
+    appId: 0
+    privateKeyPath: "/run/secrets/github-app-private-key.pem"
+    clientId: ""
+    clientSecret: ""
+    webhookSecret: ""
+    apiBaseUrl: https://api.github.com
+
+features:
+  experimentalProviders: false
+  billing: true
+  dlp: true
+  policy: true
+  hostedMode: true
+
+logging:
+  level: info
+  json: true
+  format: json

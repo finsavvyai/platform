@@ -1,0 +1,57 @@
+[Unit]
+Description=FinSavvyAI Worker Node
+Documentation=https://github.com/finsavvyai/llm
+After=network-online.target finsavvyai-master.service
+Wants=network-online.target
+Requires=finsavvyai-master.service
+
+[Service]
+Type=simple
+User=finsavvyai
+Group=finsavvyai
+WorkingDirectory=/opt/finsavvyai
+EnvironmentFile=-/opt/finsavvyai/.env
+
+ExecStart=/opt/finsavvyai/venv/bin/python -m src.workers.worker_node \
+    --master localhost \
+    --master-port 8000 \
+    --port 8001
+
+# Graceful shutdown
+KillSignal=SIGTERM
+TimeoutStopSec=60
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=finsavvyai-worker
+
+# Resource limits - workers need more resources for LLM inference
+MemoryMax=16G
+MemoryHigh=12G
+CPUQuota=800%
+TasksMax=256
+LimitNOFILE=65536
+
+# GPU access - allow device access for Metal/CUDA inference
+DeviceAllow=/dev/dri rw
+DeviceAllow=/dev/nvidia* rw
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/finsavvyai/logs /opt/finsavvyai/models /var/log/finsavvyai
+ReadOnlyPaths=/opt/finsavvyai
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target

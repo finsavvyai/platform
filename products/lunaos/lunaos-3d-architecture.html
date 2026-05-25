@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LunaOS Architecture | 3D Visualization</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif; }
+  canvas { display: block; }
+
+  #info-panel {
+    position: fixed; top: 24px; left: 24px;
+    background: rgba(20, 20, 30, 0.85);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px; padding: 20px 24px;
+    color: #e0e0e0; max-width: 320px;
+    font-size: 13px; line-height: 1.5;
+    pointer-events: none; z-index: 10;
+  }
+  #info-panel h1 {
+    font-size: 18px; font-weight: 600; color: #fff;
+    margin-bottom: 4px; letter-spacing: -0.3px;
+  }
+  #info-panel .subtitle {
+    font-size: 11px; color: rgba(255,255,255,0.4);
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  #info-panel .stats {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px; margin-bottom: 12px;
+  }
+  #info-panel .stat {
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px; padding: 8px 10px;
+  }
+  #info-panel .stat-val {
+    font-size: 20px; font-weight: 700; color: #fff;
+  }
+  #info-panel .stat-label {
+    font-size: 10px; color: rgba(255,255,255,0.35);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  #info-panel .hint {
+    font-size: 11px; color: rgba(255,255,255,0.3);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 10px; margin-top: 4px;
+  }
+
+  #node-tooltip {
+    position: fixed; display: none;
+    background: rgba(20, 20, 30, 0.92);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 14px 18px;
+    color: #fff; font-size: 13px; z-index: 20;
+    pointer-events: none; max-width: 280px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  #node-tooltip .tt-name {
+    font-size: 15px; font-weight: 600; margin-bottom: 2px;
+  }
+  #node-tooltip .tt-tech {
+    font-size: 11px; color: rgba(255,255,255,0.4);
+    margin-bottom: 8px;
+  }
+  #node-tooltip .tt-desc {
+    font-size: 12px; color: rgba(255,255,255,0.6);
+    line-height: 1.4;
+  }
+  #node-tooltip .tt-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  #legend {
+    position: fixed; bottom: 24px; left: 24px;
+    background: rgba(20, 20, 30, 0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 14px 18px;
+    z-index: 10; pointer-events: none;
+  }
+  #legend .leg-title {
+    font-size: 10px; color: rgba(255,255,255,0.35);
+    text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .leg-item {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 4px; font-size: 12px; color: rgba(255,255,255,0.6);
+  }
+  .leg-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="info-panel">
+  <h1>LunaOS Platform</h1>
+  <div class="subtitle">3D Architecture Map</div>
+  <div class="stats">
+    <div class="stat"><div class="stat-val">10</div><div class="stat-label">Products</div></div>
+    <div class="stat"><div class="stat-val">30+</div><div class="stat-label">DB Tables</div></div>
+    <div class="stat"><div class="stat-val">53</div><div class="stat-label">Agents</div></div>
+    <div class="stat"><div class="stat-val">6</div><div class="stat-label">Ext Services</div></div>
+  </div>
+  <div class="hint">Drag to rotate / Scroll to zoom / Hover nodes for details</div>
+</div>
+
+<div id="node-tooltip"></div>
+
+<div id="legend">
+  <div class="leg-title">Service Types</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#4a9eff"></div>Frontend</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#34d399"></div>API / Backend</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#fbbf24"></div>Data / Storage</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#f472b6"></div>CLI / IDE</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#a78bfa"></div>AI / ML</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#6b7280"></div>Infrastructure</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#475569"></div>External</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// --- Node definitions ---
+const NODES = [
+  // Core API (center)
+  { id: 'engine', name: 'lunaos-engine', tech: 'Hono + Cloudflare Workers',
+    desc: 'Core API gateway. Auth, billing, agents, chains, RAG, teams. 30+ D1 tables. Central nervous system.',
+    color: 0x34d399, pos: [0, 0, 0], size: 1.8, type: 'api' },
+
+  // Frontend layer
+  { id: 'dashboard', name: 'lunaos-dashboard', tech: 'Next.js 16 + Zustand',
+    desc: 'Admin & team dashboard. Agent management, analytics, billing UI, user accounts.',
+    color: 0x4a9eff, pos: [-4, 3.5, 2], size: 1.2, type: 'frontend' },
+  { id: 'studio', name: 'lunaos-studio', tech: 'Vite + ReactFlow + Three.js',
+    desc: 'Visual workflow IDE. Drag-and-drop node editor, pipeline builder, real-time execution.',
+    color: 0x4a9eff, pos: [0, 4, -1], size: 1.2, type: 'frontend' },
+  { id: 'mobile', name: 'lunaos-mobile', tech: 'Expo 52 + React Native',
+    desc: 'Native mobile app. View workflows, trigger runs, monitor logs on the go.',
+    color: 0x4a9eff, pos: [4, 3.5, 2], size: 1.0, type: 'frontend' },
+  { id: 'docs', name: 'lunaos-docs', tech: 'VitePress',
+    desc: 'Documentation site. Guides, API reference, examples, troubleshooting.',
+    color: 0x4a9eff, pos: [5, 2, -3], size: 0.8, type: 'frontend' },
+  { id: 'marketing', name: 'lunaos-marketing', tech: 'Static HTML/CSS/JS',
+    desc: 'Landing page. Hero, features, pricing, CTAs. No build step.',
+    color: 0x4a9eff, pos: [-5, 2, -3], size: 0.8, type: 'frontend' },
+
+  // CLI / IDE layer
+  { id: 'agents', name: 'luna-agents', tech: 'Node.js + MCP + WebSocket',
+    desc: 'Claude Code plugin & CLI. 143 skills, 55 agents. Development lifecycle orchestration.',
+    color: 0xf472b6, pos: [-5, 0, 3], size: 1.4, type: 'cli' },
+
+  // Execution layer
+  { id: 'openclaw', name: 'openclaw-skills', tech: 'TypeScript + D1',
+    desc: 'Skill library. 53+ tools (HTTP, email, webhook, DB). Marketplace-ready.',
+    color: 0xa78bfa, pos: [5, 0, 3], size: 1.2, type: 'ai' },
+  { id: 'openhands', name: 'OpenHands', tech: 'Python + FastAPI + Docker',
+    desc: 'Autonomous AI coding agent. Code gen, review, DevSecOps in sandboxed containers.',
+    color: 0xa78bfa, pos: [5, -1, -2], size: 1.1, type: 'ai' },
+
+  // Infrastructure
+  { id: 'infra', name: 'lunaos-infra', tech: 'Docker + K8s + Terraform',
+    desc: 'Infrastructure layer. CI/CD, monitoring, deployment automation, security scanning.',
+    color: 0x6b7280, pos: [0, -4, 0], size: 1.0, type: 'infra' },
+
+  // External services
+  { id: 'llms', name: 'LLM Providers', tech: 'OpenAI + Anthropic + DeepSeek',
+    desc: 'AI model backends. GPT-4, Claude, DeepSeek for agent intelligence.',
+    color: 0x475569, pos: [3, -2, -5], size: 0.7, type: 'external' },
+  { id: 'lemon', name: 'LemonSqueezy', tech: 'Billing API',
+    desc: 'Payment processor. Pro $29/mo, Team $79/mo. Webhooks for subscription events.',
+    color: 0x475569, pos: [-3, -2, -5], size: 0.7, type: 'external' },
+  { id: 'github', name: 'GitHub', tech: 'OAuth + API',
+    desc: 'Source control. OAuth login, repo indexing, PR automation.',
+    color: 0x475569, pos: [0, -2.5, -5], size: 0.7, type: 'external' },
+  { id: 'd1', name: 'Cloudflare D1', tech: 'SQLite (Edge)',
+    desc: 'Primary database. 30+ tables: orgs, workflows, runs, billing, skills.',
+    color: 0xfbbf24, pos: [-2, -2, 4], size: 0.9, type: 'data' },
+  { id: 'kv', name: 'Cloudflare KV', tech: 'Key-Value Store',
+    desc: 'Cache layer. API keys, sessions, rate limits, feature flags.',
+    color: 0xfbbf24, pos: [2, -2, 4], size: 0.7, type: 'data' },
+];
+
+// --- Connections ---
+const CONNECTIONS = [
+  // Frontends -> Engine
+  { from: 'dashboard', to: 'engine', strength: 1.0 },
+  { from: 'studio', to: 'engine', strength: 1.0 },
+  { from: 'mobile', to: 'engine', strength: 0.8 },
+  // CLI -> Engine
+  { from: 'agents', to: 'engine', strength: 0.9 },
+  // Skills -> Engine
+  { from: 'openclaw', to: 'engine', strength: 0.9 },
+  // OpenHands -> Engine
+  { from: 'openhands', to: 'engine', strength: 0.7 },
+  // Engine -> Data
+  { from: 'engine', to: 'd1', strength: 1.0 },
+  { from: 'engine', to: 'kv', strength: 0.8 },
+  // Engine -> External
+  { from: 'engine', to: 'llms', strength: 0.8 },
+  { from: 'engine', to: 'lemon', strength: 0.6 },
+  { from: 'engine', to: 'github', strength: 0.6 },
+  // Infra -> Engine
+  { from: 'infra', to: 'engine', strength: 0.5 },
+  // Studio -> Agents (via MCP)
+  { from: 'agents', to: 'openclaw', strength: 0.5 },
+  // Studio uses Three.js (self)
+  { from: 'studio', to: 'agents', strength: 0.3 },
+];
+
+// --- Scene setup ---
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0a0f, 0.025);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(8, 6, 12);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.4;
+controls.maxDistance = 30;
+controls.minDistance = 5;
+
+// --- Bloom ---
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(
+  new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.4, 0.85
+);
+composer.addPass(bloom);
+
+// --- Lights ---
+const ambient = new THREE.AmbientLight(0x404060, 0.6);
+scene.add(ambient);
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(10, 15, 10);
+scene.add(dirLight);
+const pointLight = new THREE.PointLight(0x4a9eff, 1.5, 30);
+pointLight.position.set(0, 5, 0);
+scene.add(pointLight);
+
+// --- Starfield ---
+const starGeo = new THREE.BufferGeometry();
+const starPositions = new Float32Array(3000);
+for (let i = 0; i < 3000; i++) {
+  starPositions[i] = (Math.random() - 0.5) * 100;
+}
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.08, transparent: true, opacity: 0.5 });
+scene.add(new THREE.Points(starGeo, starMat));
+
+// --- Grid plane ---
+const gridHelper = new THREE.GridHelper(40, 40, 0x1a1a2e, 0x0f0f1a);
+gridHelper.position.y = -5;
+scene.add(gridHelper);
+
+// --- Create nodes ---
+const nodeObjects = [];
+const nodeMeshMap = {};
+const nodeDataMap = {};
+
+function createNode(node) {
+  const group = new THREE.Group();
+  group.position.set(...node.pos);
+
+  // Main sphere
+  const geo = new THREE.IcosahedronGeometry(node.size * 0.4, 2);
+  const mat = new THREE.MeshStandardMaterial({
+    color: node.color,
+    emissive: node.color,
+    emissiveIntensity: 0.3,
+    metalness: 0.4,
+    roughness: 0.3,
+    transparent: true,
+    opacity: 0.9,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  group.add(mesh);
+
+  // Glow ring
+  const ringGeo = new THREE.RingGeometry(node.size * 0.5, node.size * 0.55, 64);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: node.color,
+    transparent: true,
+    opacity: 0.15,
+    side: THREE.DoubleSide,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  group.add(ring);
+
+  // Outer glow sphere
+  const glowGeo = new THREE.SphereGeometry(node.size * 0.6, 16, 16);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: node.color,
+    transparent: true,
+    opacity: 0.06,
+  });
+  group.add(new THREE.Mesh(glowGeo, glowMat));
+
+  // Label sprite
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 512; canvas.height = 64;
+  ctx.fillStyle = 'transparent';
+  ctx.fillRect(0, 0, 512, 64);
+  ctx.font = 'bold 28px -apple-system, BlinkMacSystemFont, SF Pro, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(node.name, 256, 38);
+  const tex = new THREE.CanvasTexture(canvas);
+  const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.85 });
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(3, 0.4, 1);
+  sprite.position.y = node.size * 0.55 + 0.3;
+  group.add(sprite);
+
+  scene.add(group);
+  nodeMeshMap[node.id] = mesh;
+  nodeDataMap[node.id] = node;
+  nodeObjects.push({ group, mesh, node, ring, mat });
+
+  return group;
+}
+
+NODES.forEach(createNode);
+
+// --- Create connections ---
+const connectionLines = [];
+const particleSystems = [];
+
+function createConnection(conn) {
+  const fromNode = NODES.find(n => n.id === conn.from);
+  const toNode = NODES.find(n => n.id === conn.to);
+  if (!fromNode || !toNode) return;
+
+  const fromColor = new THREE.Color(fromNode.color);
+  const toColor = new THREE.Color(toNode.color);
+
+  // Curved line
+  const start = new THREE.Vector3(...fromNode.pos);
+  const end = new THREE.Vector3(...toNode.pos);
+  const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+  mid.y += 1.2;
+
+  const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+  const points = curve.getPoints(40);
+  const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+
+  const colors = new Float32Array(points.length * 3);
+  for (let i = 0; i < points.length; i++) {
+    const t = i / (points.length - 1);
+    const c = new THREE.Color().lerpColors(fromColor, toColor, t);
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  lineGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const lineMat = new THREE.LineBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.15 + conn.strength * 0.2,
+    linewidth: 1,
+  });
+  const line = new THREE.Line(lineGeo, lineMat);
+  scene.add(line);
+  connectionLines.push(line);
+
+  // Flowing particles
+  const particleCount = Math.floor(3 + conn.strength * 4);
+  const pGeo = new THREE.BufferGeometry();
+  const pPositions = new Float32Array(particleCount * 3);
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+
+  const pMat = new THREE.PointsMaterial({
+    color: fromColor.clone().lerp(toColor, 0.5),
+    size: 0.08 + conn.strength * 0.06,
+    transparent: true,
+    opacity: 0.7,
+  });
+  const particles = new THREE.Points(pGeo, pMat);
+  scene.add(particles);
+
+  const offsets = Array.from({ length: particleCount }, () => Math.random());
+  particleSystems.push({ particles, curve, offsets, speed: 0.003 + conn.strength * 0.004 });
+}
+
+CONNECTIONS.forEach(createConnection);
+
+// --- Raycaster for hover ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tooltip = document.getElementById('node-tooltip');
+let hoveredNode = null;
+
+function onMouseMove(e) {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const meshes = nodeObjects.map(o => o.mesh);
+  const intersects = raycaster.intersectObjects(meshes);
+
+  if (intersects.length > 0) {
+    const hit = intersects[0].object;
+    const entry = nodeObjects.find(o => o.mesh === hit);
+    if (entry) {
+      const n = entry.node;
+      const colorHex = '#' + new THREE.Color(n.color).getHexString();
+      tooltip.innerHTML = `
+        <div class="tt-name"><span class="tt-dot" style="background:${colorHex}"></span>${n.name}</div>
+        <div class="tt-tech">${n.tech}</div>
+        <div class="tt-desc">${n.desc}</div>
+      `;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 16) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+
+      if (hoveredNode !== entry) {
+        if (hoveredNode) {
+          hoveredNode.mat.emissiveIntensity = 0.3;
+          hoveredNode.mat.opacity = 0.9;
+        }
+        entry.mat.emissiveIntensity = 0.8;
+        entry.mat.opacity = 1.0;
+        hoveredNode = entry;
+      }
+      document.body.style.cursor = 'pointer';
+    }
+  } else {
+    tooltip.style.display = 'none';
+    if (hoveredNode) {
+      hoveredNode.mat.emissiveIntensity = 0.3;
+      hoveredNode.mat.opacity = 0.9;
+      hoveredNode = null;
+    }
+    document.body.style.cursor = 'default';
+  }
+}
+
+addEventListener('mousemove', onMouseMove);
+
+// --- Animation ---
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // Animate nodes
+  nodeObjects.forEach((obj, i) => {
+    const y = obj.node.pos[1] + Math.sin(t * 0.6 + i * 1.2) * 0.15;
+    obj.group.position.y = y;
+    obj.mesh.rotation.y = t * 0.2 + i;
+    obj.mesh.rotation.x = Math.sin(t * 0.3 + i) * 0.1;
+    obj.ring.rotation.z = t * 0.15 + i;
+  });
+
+  // Animate particles along connections
+  particleSystems.forEach(ps => {
+    const positions = ps.particles.geometry.attributes.position.array;
+    for (let i = 0; i < ps.offsets.length; i++) {
+      ps.offsets[i] = (ps.offsets[i] + ps.speed) % 1;
+      const p = ps.curve.getPointAt(ps.offsets[i]);
+      positions[i * 3] = p.x;
+      positions[i * 3 + 1] = p.y;
+      positions[i * 3 + 2] = p.z;
+    }
+    ps.particles.geometry.attributes.position.needsUpdate = true;
+  });
+
+  // Pulse the central engine node
+  const engineObj = nodeObjects.find(o => o.node.id === 'engine');
+  if (engineObj) {
+    const pulse = 0.3 + Math.sin(t * 2) * 0.1;
+    engineObj.mat.emissiveIntensity = hoveredNode === engineObj ? 0.8 : pulse;
+  }
+
+  controls.update();
+  composer.render();
+}
+
+animate();
+
+// --- Resize ---
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

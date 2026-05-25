@@ -1,0 +1,86 @@
+"on":
+    - push
+    - pull_request
+stages:
+    - name: node-install
+      checks:
+        - name: npm-install
+          run: npm install
+    - name: node-build
+      checks:
+        - name: build
+          run: npm run build
+      depends_on:
+        - node-install
+    - name: node-test
+      checks:
+        - name: test
+          run: npm test
+      depends_on:
+        - node-install
+      parallel: true
+    - name: node-lint
+      checks:
+        - name: lint
+          run: npm run lint
+      depends_on:
+        - node-install
+      parallel: true
+    - name: orchestrator-install
+      dir: orchestrator
+      checks:
+        - name: pip-install
+          run: pip install -r requirements.txt
+    - name: orchestrator-build
+      dir: orchestrator
+      checks:
+        - name: py-build
+          run: python -m build
+      depends_on:
+        - orchestrator-install
+    - name: orchestrator-test
+      dir: orchestrator
+      checks:
+        - name: pytest
+          run: pytest
+      depends_on:
+        - orchestrator-install
+      parallel: true
+    - name: orchestrator-lint
+      dir: orchestrator
+      checks:
+        - name: py-lint
+          run: python -m compileall -q .
+      depends_on:
+        - orchestrator-install
+      parallel: true
+    - name: archive/old-features/QestroDesktop-build
+      dir: archive/old-features/QestroDesktop
+      checks:
+        - name: swift-build
+          run: swift build
+    - name: archive/old-features/QestroDesktop-test
+      dir: archive/old-features/QestroDesktop
+      checks:
+        - name: swift-test
+          run: swift test
+      parallel: true
+deploy:
+    - name: cloudflare-workers
+      trigger: push
+      run: npx wrangler deploy
+      only_on:
+        - main
+        - master
+    - name: cloudflare-pages
+      trigger: push
+      run: cd frontend && npm run build && npx wrangler pages deploy dist
+      only_on:
+        - main
+        - master
+    - name: render
+      trigger: push
+      run: echo 'Render deploys via Git push'
+      only_on:
+        - main
+        - master

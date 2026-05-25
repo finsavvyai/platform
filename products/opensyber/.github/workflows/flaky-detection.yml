@@ -1,0 +1,53 @@
+name: flaky-detection
+
+# Runs every test suite five times in a row each night. A flake on any
+# iteration emits a warning and fails the matrix entry so the dashboard
+# surfaces it. Keep an eye on the Actions tab — a green night means the
+# suite is stable across runs, a yellow/red night flags an intermittent
+# failure that would otherwise hide in regular CI.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 06:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  stress:
+    name: stress (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - "@opensyber/tokenforge"
+          - "@opensyber/tokenforge-api"
+          - "@opensyber/api"
+          - "@opensyber/web"
+          - "@opensyber/db"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Stress (5 iterations)
+        run: |
+          set -e
+          PKG='${{ matrix.package }}'
+          for i in 1 2 3 4 5; do
+            echo "::group::Iteration $i — $PKG"
+            if ! pnpm --filter "$PKG" test --run; then
+              echo "::warning::Flake detected on iteration $i for $PKG"
+              exit 1
+            fi
+            echo "::endgroup::"
+          done

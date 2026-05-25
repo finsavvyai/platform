@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+"""
+FinSavvyAI OpenCLaw Client
+
+Integration with OpenCLaw API for hybrid inference.
+OpenCLaw is an open-source local AI assistant created by
+Peter Steinberger in November 2025.
+
+This module provides async HTTP client for OpenCLaw's completion
+and chat endpoints.
+"""
+
+import asyncio
+import logging
+from typing import Any, Dict, List, Optional
+
+import aiohttp
+
+
+logger = logging.getLogger("finsavvyai.openclaw")
+
+
+class OpenCLawClient:
+    """
+    Async client for OpenCLaw API.
+
+    OpenCLaw provides browser-based AI assistant capabilities with
+    HTTP endpoints for external integrations.
+    """
+
+    def __init__(
+        self,
+        base_url: str = "http://localhost:11434",
+        timeout: int = 30,
+        api_key: Optional[str] = None,
+    ):
+        """
+        Initialize OpenCLaw client.
+
+        Args:
+            base_url: Base URL of OpenCLaw instance (default: localhost:11434)
+            timeout: Request timeout in seconds (default: 30)
+            api_key: Optional API key for authentication
+        """
+        self.base_url = base_url.rstrip("/")
+        self.timeout = aiohttp.ClientTimeout(total=timeout)
+        self.api_key = api_key
+        self._session: Optional[aiohttp.ClientSession] = None
+        self._available: Optional[bool] = None
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create HTTP session with connection pooling."""
+        if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(
+                limit=10,
+                limit_per_host=5,
+                ttl_dns_cache=300,
+            )
+            self._session = aiohttp.ClientSession(
+                connector=connector,
+                timeout=self.timeout,
+            )
+        return self._session
+
+    def _get_headers(self) -> Dict[str, str]:
+        """Build request headers including API key if configured."""
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            headers["X-API-Key"] = self.api_key
+        return headers
+
+    async def is_available(self, timeout: int = 5) -> bool:
+        """
+        Check if OpenCLaw service is reachable.
+
+        Args:
+            timeout: Health check timeout in seconds
+
+        Returns:
+            True if OpenCLaw responds to health check
+        """
+        if self._available is not None:
+            try:
+                session = await self._get_session()
+                health_timeout = aiohttp.ClientTimeout(total=timeout)
+                async with session.get(
+                    f"{self.base_url}/health",
+                    timeout=health_timeout,
+                ) as response:
+                    self._available = response.status == 200
+                    if self._available:
+                        logger.info("OpenCLaw service is available")
+                    else:
+                        logger.warning(
+                            "OpenCLaw health check failed",
+                            status=response.status
+                        )
+                except aiohttp.ClientError as exc1:
+                except asyncio.TimeoutError as exc2:
+                    logger.warning(f"OpenCLaw unavailable: {exc2 if exc1 is exc2 else exc2}")
+                    self._available = False

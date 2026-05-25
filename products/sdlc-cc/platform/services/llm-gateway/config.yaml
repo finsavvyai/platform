@@ -1,0 +1,176 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "release" # debug, release, test
+  read_timeout: 30 # seconds
+  write_timeout: 30 # seconds
+  idle_timeout: 60 # seconds
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+
+database:
+  url: "postgres://user:password@localhost:5432/llm_gateway?sslmode=disable"
+  max_connections: 20
+  min_connections: 5
+  conn_max_lifetime: "1h"
+  conn_max_idle_time: "30m"
+
+default_provider: "openai"
+
+# ReasoningBank — KV-backed prompt caching (~30% token savings).
+# Set REASONING_BANK_ENABLED=false to disable at runtime.
+reasoning_bank_ttl: 86400 # seconds (24h)
+
+# LiteLLM sidecar. When true, the gateway delegates all upstream LLM
+# traffic to the LiteLLM proxy (OpenAI-compatible API on LITELLM_PROXY_URL)
+# instead of calling provider SDKs directly. The native openai / anthropic /
+# ollama providers remain loaded so flipping this to false at runtime is a
+# zero-downtime rollback. See deployments/litellm/ for the sidecar config.
+litellm_enabled: false
+litellm:
+  proxy_url: "${LITELLM_PROXY_URL:-http://litellm:4000}"
+  master_key: "${LITELLM_MASTER_KEY}"
+  timeout: 60 # seconds
+  priority: 0 # 0 = highest; routes ahead of native providers when enabled
+  models:
+    - { id: "gpt-4",          name: "GPT-4 via LiteLLM",            max_tokens: 8192,   enabled: true }
+    - { id: "gpt-3.5-turbo",  name: "GPT-3.5 Turbo via LiteLLM",    max_tokens: 16384,  enabled: true }
+    - { id: "claude-3-opus",  name: "Claude 3 Opus via LiteLLM",    max_tokens: 200000, enabled: true }
+    - { id: "claude-3-haiku", name: "Claude 3 Haiku via LiteLLM",   max_tokens: 200000, enabled: true }
+
+providers:
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    base_url: "" # Leave empty for default OpenAI API
+    models: ["gpt-4", "gpt-4-turbo-preview", "gpt-3.5-turbo"]
+    priority: 1
+    timeout: 30 # seconds
+    retry_count: 3
+    retry_delay: 1 # seconds
+    rate_limit:
+      requests_per_second: 60
+      tokens_per_second: 10000
+    custom: {}
+
+  anthropic:
+    api_key: "${ANTHROPIC_API_KEY}"
+    base_url: "" # Leave empty for default Anthropic API
+    models:
+      [
+        "claude-3-opus-20240229",
+        "claude-3-sonnet-20240229",
+        "claude-3-haiku-20240307",
+      ]
+    priority: 2
+    timeout: 30 # seconds
+    retry_count: 3
+    retry_delay: 1 # seconds
+    rate_limit:
+      requests_per_second: 50
+      tokens_per_second: 10000
+    custom: {}
+
+  # Ollama - local LLMs (OpenAI-compatible at http://localhost:11434/v1)
+  ollama:
+    name: ollama
+    type: ollama
+    api_key: "ollama" # placeholder, Ollama ignores it
+    base_url: "http://localhost:11434/v1"
+    models: ["llama2", "codellama", "mistral"]
+    priority: 3
+    enabled: false # Set true when Ollama is running locally
+
+pricing:
+  openai:
+    gpt-4:
+      prompt_token_cost: 0.03 # $0.03 per 1K prompt tokens
+      completion_token_cost: 0.06 # $0.06 per 1K completion tokens
+    gpt-4-turbo-preview:
+      prompt_token_cost: 0.01
+      completion_token_cost: 0.03
+    gpt-3.5-turbo:
+      prompt_token_cost: 0.0015
+      completion_token_cost: 0.002
+    gpt-3.5-turbo-16k:
+      prompt_token_cost: 0.003
+      completion_token_cost: 0.004
+
+  anthropic:
+    claude-3-opus-20240229:
+      prompt_token_cost: 0.015
+      completion_token_cost: 0.075
+    claude-3-sonnet-20240229:
+      prompt_token_cost: 0.003
+      completion_token_cost: 0.015
+    claude-3-haiku-20240307:
+      prompt_token_cost: 0.00025
+      completion_token_cost: 0.00125
+    claude-2.1:
+      prompt_token_cost: 0.008
+      completion_token_cost: 0.024
+    claude-2.0:
+      prompt_token_cost: 0.008
+      completion_token_cost: 0.024
+
+monitoring:
+  # Langfuse LLM observability (opt-in). When enabled=false or the public/secret
+  # keys are empty, the TraceGeneration call is a no-op — zero runtime cost.
+  langfuse:
+    enabled: "${LANGFUSE_ENABLED:-false}"
+    host: "${LANGFUSE_HOST:-https://cloud.langfuse.com}"
+    public_key: "${LANGFUSE_PUBLIC_KEY}"
+    secret_key: "${LANGFUSE_SECRET_KEY}"
+  prometheus:
+    enabled: true
+    path: "/metrics"
+    port: 9090
+  jaeger:
+    enabled: true
+    endpoint: "http://jaeger:14268/api/traces"
+    service_name: "llm-gateway"
+  tracing:
+    enabled: true
+    sampling_rate: 0.1 # 10% sampling
+    export_timeout: 5 # seconds
+
+security:
+  api_key: "${GATEWAY_API_KEY}"
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 60
+    burst_size: 10
+    window: "1m"
+  cors:
+    enabled: true
+    allowed_origins: ["*"]
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["*"]
+    exposed_headers: []
+    allow_credentials: false
+    max_age: 86400
+  authentication:
+    enabled: true
+    type: "jwt" # jwt, apikey, oauth
+    jwt:
+      secret: "${JWT_SECRET}"
+      expiration_time: "24h"
+      issuer: "sdlc-llm-gateway"
+      audience: "sdlc-platform"
+    apikey:
+      header_name: "X-API-Key"
+      query_param: "api_key"
+  prompt_injection_detection: true
+  response_sanitization: true
+
+logging:
+  level: "info" # debug, info, warn, error
+  format: "json" # json, text
+  output: "stdout" # stdout, stderr, file
+  file:
+    path: "/app/logs/llm-gateway.log"
+    max_size: 100 # MB
+    max_backups: 3
+    max_age: 28 # days
+    compress: true

@@ -1,0 +1,78 @@
+name: Monitoring & Health Checks
+
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    name: Production Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check health endpoint
+        run: |
+          response=$(curl -s https://dashboard.finsavvyai.com/health)
+          status=$(echo $response | jq -r '.status')
+
+          if [ "$status" != "healthy" ]; then
+            echo "❌ Health check failed!"
+            echo "Response: $response"
+            exit 1
+          fi
+
+          echo "✅ Health check passed"
+          echo "Response: $response"
+
+      - name: Check API endpoints
+        run: |
+          # Products status
+          curl -f https://dashboard.finsavvyai.com/api/v1/products/status || exit 1
+
+          # Metrics
+          curl -f https://dashboard.finsavvyai.com/api/v1/metrics/aggregate || exit 1
+
+          # Activity
+          curl -f https://dashboard.finsavvyai.com/api/v1/activity/recent || exit 1
+
+          echo "✅ All API endpoints are responding"
+
+      - name: Check response times
+        run: |
+          start_time=$(date +%s%N)
+          curl -s https://dashboard.finsavvyai.com/health > /dev/null
+          end_time=$(date +%s%N)
+
+          response_time=$(( ($end_time - $start_time) / 1000000 ))
+          echo "Response time: ${response_time}ms"
+
+          if [ $response_time -gt 1000 ]; then
+            echo "⚠️ Response time is high (>${response_time}ms)"
+          else
+            echo "✅ Response time is acceptable"
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "🚨 Health check failed!"
+          echo "Production dashboard may be down or experiencing issues"
+          # Add notification logic here (Slack, PagerDuty, etc.)
+
+  performance-check:
+    name: Performance Monitoring
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            https://dashboard.finsavvyai.com
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Check Core Web Vitals
+        run: |
+          echo "📊 Checking Core Web Vitals..."
+          # Add custom performance checks here

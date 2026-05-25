@@ -1,0 +1,56 @@
+# Auto-bump "Last reviewed:" / "Last updated:" lines on docs that change in a PR.
+# Drift-resistance: docs without recent dates fail an auditor's "is this current?"
+# check. This workflow keeps the dates honest by tying them to actual content changes.
+
+name: Auto-bump doc dates
+
+on:
+  pull_request:
+    paths:
+      - "docs/**.md"
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump dates on changed docs
+        run: |
+          set -e
+          today=$(date -u +"%Y-%m-%d")
+          changed=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD -- 'docs/*.md' || true)
+          if [ -z "$changed" ]; then
+            echo "No docs changed."; exit 0
+          fi
+          dirty=0
+          for f in $changed; do
+            [ -f "$f" ] || continue
+            # Match "Last updated:" OR "Last reviewed:" with optional date.
+            if grep -qE "^(Last (updated|reviewed):|> Last (updated|reviewed):)" "$f"; then
+              before=$(sha1sum "$f" | awk '{print $1}')
+              # macOS-compatible sed swap; runs on Ubuntu so -i works directly.
+              sed -i -E "s|^(Last updated:).*|\1 ${today}|; s|^(Last reviewed:).*|\1 ${today}|; s|^(> Last updated:).*|\1 ${today}|; s|^(> Last reviewed:).*|\1 ${today}|" "$f"
+              after=$(sha1sum "$f" | awk '{print $1}')
+              if [ "$before" != "$after" ]; then
+                echo "Bumped $f"; dirty=1
+              fi
+            fi
+          done
+          echo "DIRTY=$dirty" >> "$GITHUB_ENV"
+
+      - name: Commit + push if anything changed
+        if: env.DIRTY == '1'
+        run: |
+          git config user.name "tenantiq-bot"
+          git config user.email "info@finsavvyai.com"
+          git add docs/
+          git commit -m "chore(docs): auto-bump Last reviewed dates"
+          git push

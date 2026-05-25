@@ -1,0 +1,426 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "infra-overview",
+    "title": "Infrastructure Health",
+    "description": "PostgreSQL, Redis, and Kubernetes infrastructure metrics",
+    "tags": ["sdlc", "infrastructure", "database", "redis"],
+    "timezone": "browser",
+    "editable": true,
+    "refresh": "30s",
+    "time": { "from": "now-1h", "to": "now" },
+    "panels": [
+      {
+        "id": 100,
+        "title": "PostgreSQL",
+        "type": "row",
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+        "collapsed": false
+      },
+      {
+        "id": 1,
+        "title": "Active Connections",
+        "type": "gauge",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "pg_stat_activity_count{datname=\"sdlc\"}",
+            "legendFormat": "Active"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 60 },
+                { "color": "red", "value": 85 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 4, "x": 0, "y": 1 }
+      },
+      {
+        "id": 2,
+        "title": "Transaction Rate",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(pg_stat_database_xact_commit{datname=\"sdlc\"}[5m]) + rate(pg_stat_database_xact_rollback{datname=\"sdlc\"}[5m])",
+            "legendFormat": "TPS"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "ops" } },
+        "gridPos": { "h": 6, "w": 4, "x": 4, "y": 1 }
+      },
+      {
+        "id": 3,
+        "title": "Cache Hit Ratio",
+        "type": "gauge",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "pg_stat_database_blks_hit{datname=\"sdlc\"} / (pg_stat_database_blks_hit{datname=\"sdlc\"} + pg_stat_database_blks_read{datname=\"sdlc\"})",
+            "legendFormat": "Hit Ratio"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0.9,
+            "max": 1,
+            "decimals": 4,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "red", "value": null },
+                { "color": "yellow", "value": 0.95 },
+                { "color": "green", "value": 0.99 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 4, "x": 8, "y": 1 }
+      },
+      {
+        "id": 4,
+        "title": "Database Size",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "pg_database_size_bytes{datname=\"sdlc\"}",
+            "legendFormat": "Size"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "bytes" } },
+        "gridPos": { "h": 6, "w": 4, "x": 12, "y": 1 }
+      },
+      {
+        "id": 5,
+        "title": "Replication Lag",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "pg_replication_lag",
+            "legendFormat": "Lag"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 1 },
+                { "color": "red", "value": 5 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 4, "x": 16, "y": 1 }
+      },
+      {
+        "id": 6,
+        "title": "Deadlocks",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(pg_stat_database_deadlocks{datname=\"sdlc\"}[5m])",
+            "legendFormat": "Deadlocks/s"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "red", "value": 0.01 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 4, "x": 20, "y": 1 }
+      },
+      {
+        "id": 7,
+        "title": "Query Duration (P95)",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(pg_stat_statements_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(pg_stat_statements_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "s", "custom": { "lineWidth": 2, "fillOpacity": 10 } }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 }
+      },
+      {
+        "id": 8,
+        "title": "Connections Over Time",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "pg_stat_activity_count{datname=\"sdlc\", state=\"active\"}",
+            "legendFormat": "Active"
+          },
+          {
+            "expr": "pg_stat_activity_count{datname=\"sdlc\", state=\"idle\"}",
+            "legendFormat": "Idle"
+          },
+          {
+            "expr": "pg_settings_max_connections",
+            "legendFormat": "Max"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 10 } }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 }
+      },
+      {
+        "id": 200,
+        "title": "Redis",
+        "type": "row",
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+        "collapsed": false
+      },
+      {
+        "id": 9,
+        "title": "Memory Usage",
+        "type": "gauge",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes / redis_memory_max_bytes",
+            "legendFormat": "Memory %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.7 },
+                { "color": "red", "value": 0.9 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 4, "x": 0, "y": 16 }
+      },
+      {
+        "id": 10,
+        "title": "Hit Rate",
+        "type": "gauge",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))",
+            "legendFormat": "Hit Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0.8,
+            "max": 1,
+            "decimals": 3,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "red", "value": null },
+                { "color": "yellow", "value": 0.9 },
+                { "color": "green", "value": 0.95 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 4, "x": 4, "y": 16 }
+      },
+      {
+        "id": 11,
+        "title": "Connected Clients",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "redis_connected_clients",
+            "legendFormat": "Clients"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "short" } },
+        "gridPos": { "h": 6, "w": 4, "x": 8, "y": 16 }
+      },
+      {
+        "id": 12,
+        "title": "Commands/sec",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(redis_commands_processed_total[5m])",
+            "legendFormat": "cmd/s"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "ops" } },
+        "gridPos": { "h": 6, "w": 4, "x": 12, "y": 16 }
+      },
+      {
+        "id": 13,
+        "title": "Evicted Keys",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(redis_evicted_keys_total[5m])",
+            "legendFormat": "Evictions/s"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 1 },
+                { "color": "red", "value": 10 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 4, "x": 16, "y": 16 }
+      },
+      {
+        "id": 14,
+        "title": "Keys Count",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(redis_db_keys)",
+            "legendFormat": "Keys"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "short" } },
+        "gridPos": { "h": 6, "w": 4, "x": 20, "y": 16 }
+      },
+      {
+        "id": 15,
+        "title": "Redis Operations Over Time",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(redis_commands_processed_total[5m])",
+            "legendFormat": "Commands"
+          },
+          {
+            "expr": "rate(redis_keyspace_hits_total[5m])",
+            "legendFormat": "Hits"
+          },
+          {
+            "expr": "rate(redis_keyspace_misses_total[5m])",
+            "legendFormat": "Misses"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "ops", "custom": { "lineWidth": 2, "fillOpacity": 10 } }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 }
+      },
+      {
+        "id": 16,
+        "title": "Redis Memory Over Time",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes",
+            "legendFormat": "Used"
+          },
+          {
+            "expr": "redis_memory_max_bytes",
+            "legendFormat": "Max"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "bytes", "custom": { "lineWidth": 2, "fillOpacity": 10 } }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 }
+      },
+      {
+        "id": 300,
+        "title": "Kubernetes",
+        "type": "row",
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+        "collapsed": false
+      },
+      {
+        "id": 17,
+        "title": "Pod Status",
+        "type": "table",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "kube_pod_status_phase{namespace=\"sdlc-platform\"} == 1",
+            "legendFormat": "{{pod}} - {{phase}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 }
+      },
+      {
+        "id": 18,
+        "title": "Container Restarts",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "increase(kube_pod_container_status_restarts_total{namespace=\"sdlc-platform\"}[1h])",
+            "legendFormat": "{{pod}}/{{container}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": { "lineWidth": 2, "drawStyle": "bars", "fillOpacity": 50 },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "red", "value": 3 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 }
+      }
+    ]
+  },
+  "overwrite": true
+}

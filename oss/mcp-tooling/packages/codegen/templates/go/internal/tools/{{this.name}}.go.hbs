@@ -1,0 +1,224 @@
+package tools
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
+	"go.uber.org/zap"
+)
+
+type {{pascalCase this.name}}Tool struct {
+	logger *zap.Logger
+}
+
+func (t *{{pascalCase this.name}}Tool) Name() string {
+	return "{{this.name}}"
+}
+
+func (t *{{pascalCase this.name}}Tool) Description() string {
+	return "{{this.description}}"
+}
+
+func (t *{{pascalCase this.name}}Tool) InputSchema() map[string]interface{} {
+	return CreateInputSchema(
+		[]string{ {{#each this.parameters}}{{#if this.required}}"{{this.name}}"{{#unless @last}}, {{/unless}}{{/if}}{{/each}} },
+		map[string]interface{}{
+			{{#each this.parameters}}
+			"{{this.name}}": CreateProperty("{{this.type}}", "{{this.description}}", {{this.required}}),
+			{{/each}}
+		},
+	)
+}
+
+func (t *{{pascalCase this.name}}Tool) Execute(args map[string]interface{}) (interface{}, error) {
+	// Extract parameters
+	{{#each this.parameters}}
+	var {{camelCase this.name}} {{#if (eq this.type "string")}}string{{else if (eq this.type "integer")}}int{{else if (eq this.type "number")}}float64{{else if (eq this.type "boolean")}}bool{{else}}interface{}{{/if}}
+	{{#if this.required}}
+	if val, ok := args["{{this.name}}"]; ok {
+		{{camelCase this.name}} = val.({{#if (eq this.type "string")}}string{{else if (eq this.type "integer")}}int{{else if (eq this.type "number")}}float64{{else if (eq this.type "boolean")}}bool{{else}}interface{}{{/if}})
+	} else {
+		return nil, fmt.Errorf("{{this.name}} is required")
+	}
+	{{else}}
+	if val, ok := args["{{this.name}}"]; ok {
+		{{camelCase this.name}} = val.({{#if (eq this.type "string")}}string{{else if (eq this.type "integer")}}int{{else if (eq this.type "number")}}float64{{else if (eq this.type "boolean")}}bool{{else}}interface{}{{/if}})
+	}
+	{{/if}}
+	{{/each}}
+
+	{{#if (eq this.endpoint.method "GET")}}
+	// Build query parameters
+	queryParams := []string{}
+	{{#each this.endpoint.parameters}}
+	{{#if (eq this.in "query")}}
+	if {{camelCase this.name}} != "" {
+		queryParams = append(queryParams, "{{this.name}}=" + fmt.Sprintf("%v", {{camelCase this.name}}))
+	}
+	{{/if}}
+	{{/each}}
+
+	url := "{{this.endpoint.path}}"
+	{{#each this.endpoint.parameters}}
+	{{#if (eq this.in "path")}}
+	url = strings.ReplaceAll(url, "{ {{this.name}} }", fmt.Sprintf("%v", {{camelCase this.name}}))
+	{{/if}}
+	{{/each}}
+
+	if len(queryParams) > 0 {
+		url += "?" + strings.Join(queryParams, "&")
+	}
+
+	// Make HTTP GET request
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("API returned error status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse JSON response
+	var result interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return string(body), nil // Return raw string if not JSON
+	}
+
+	return result, nil
+	{{else}}
+	// Build request URL
+	url := "{{this.endpoint.path}}"
+	{{#each this.endpoint.parameters}}
+	{{#if (eq this.in "path")}}
+	url = strings.ReplaceAll(url, "{ {{this.name}} }", fmt.Sprintf("%v", {{camelCase this.name}}))
+	{{/if}}
+	{{/each}}
+
+	{{#if this.endpoint.requestBody}}
+	// Create request body
+	requestBody := map[string]interface{}{
+		{{#each this.parameters}}
+		{{#if (eq this.name "body")}}
+		{{#if this.schema.properties}}
+		{{#each this.schema.properties}}
+		"{{this}}": {{camelCase ../this.name}}.{{pascalCase this}},
+		{{/each}}
+		{{else}}
+		{{camelCase ../this.name}},
+		{{/if}}
+		{{/if}}
+		{{/each}}
+	}
+	{{/if}}
+
+	{{#if (eq this.endpoint.method "POST")}}
+	// Make HTTP POST request
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %v", err)
+	}
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("API returned error status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse JSON response
+	var result interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return string(body), nil // Return raw string if not JSON
+	}
+
+	return result, nil
+	{{else if (eq this.endpoint.method "PUT")}}
+	// Make HTTP PUT request
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %v", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("API returned error status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse JSON response
+	var result interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return string(body), nil // Return raw string if not JSON
+	}
+
+	return result, nil
+	{{else if (eq this.endpoint.method "DELETE")}}
+	// Make HTTP DELETE request
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("API returned error status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse JSON response
+	var result interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return string(body), nil // Return raw string if not JSON
+	}
+
+	return result, nil
+	{{else}}
+	return nil, fmt.Errorf("HTTP method {{this.endpoint.method}} not yet implemented")
+	{{/if}}
+	{{/if}}
+}

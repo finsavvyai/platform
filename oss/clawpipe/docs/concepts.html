@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How It Works - ClawPipe Docs</title>
+  <meta name="description" content="Deep dive into each ClawPipe pipeline stage: Booster, Packer, Cache, Router, Swarm, Gateway, and Learner.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="docs-layout">
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Documentation">
+    <a href="/" class="logo">ClawPipe</a>
+    <nav>
+      <a href="index.html">Getting Started</a>
+      <a href="concepts.html" class="active">How It Works</a>
+      <div class="sep"></div>
+      <a href="typescript.html">TypeScript SDK</a>
+      <a href="python.html">Python SDK</a>
+      <a href="go.html">Go SDK</a>
+      <div class="sep"></div>
+      <a href="integrations.html">Integrations</a>
+      <a href="api.html">Gateway API</a>
+      <a href="oauth-setup.html">OAuth Setup</a>
+      <a href="migration.html">Migration</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="doc-header">
+      <div>
+        <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Toggle menu">&#9776;</button>
+        <span class="breadcrumb">Docs / How It Works</span>
+      </div>
+      <div class="links">
+        <a href="https://github.com/finsavvyai/clawpipe">GitHub</a>
+        <a href="https://clawpipe.ai">Home</a>
+      </div>
+    </header>
+    <main id="main-content" class="content">
+      <h1>How <span>ClawPipe</span> Works</h1>
+      <p>Every prompt passes through a pipeline of optimization stages. Each stage independently reduces cost, latency, or both. Stages that are not needed are skipped automatically.</p>
+
+      <div class="pipe-steps" role="list">
+        <div class="pipe-step" role="listitem">Booster</div><span class="pipe-arrow" aria-hidden="true">&rarr;</span>
+        <div class="pipe-step" role="listitem">RAG</div><span class="pipe-arrow" aria-hidden="true">&rarr;</span>
+        <div class="pipe-step" role="listitem">Pack</div><span class="pipe-arrow" aria-hidden="true">&rarr;</span>
+        <div class="pipe-step" role="listitem">Cache</div><span class="pipe-arrow" aria-hidden="true">&rarr;</span>
+        <div class="pipe-step" role="listitem">Route</div><span class="pipe-arrow" aria-hidden="true">&rarr;</span>
+        <div class="pipe-step" role="listitem">Swarm</div><span class="pipe-arrow" aria-hidden="true">&rarr;</span>
+        <div class="pipe-step" role="listitem">Call</div><span class="pipe-arrow" aria-hidden="true">&rarr;</span>
+        <div class="pipe-step" role="listitem">Learn</div>
+      </div>
+
+      <h2>1. Agent Booster</h2>
+      <div class="card">
+        <h3>Skip the LLM entirely</h3>
+        <p>The Booster applies deterministic transforms to resolve prompts that don't need AI. Math expressions, date calculations, JSON formatting, unit conversions, and UUID generation are handled instantly at zero cost.</p>
+      </div>
+      <p><strong>When it fires:</strong> Every request passes through the Booster first. If it can resolve the prompt, the pipeline short-circuits and returns immediately.</p>
+      <p><strong>Cost impact:</strong> 100% savings on boosted requests. Typical apps see 5-15% of prompts resolved by the Booster.</p>
+
+      <h2>2. RAG Pipeline</h2>
+      <div class="card">
+        <h3>Retrieval-augmented generation</h3>
+        <p>Retrieves relevant documents from a pluggable vector store and prepends them as context. Supports any embedding provider and configurable document limits.</p>
+      </div>
+      <p><strong>When it fires:</strong> When a RAG retriever is configured. Runs before packing to ensure retrieved documents are also compressed.</p>
+      <p><strong>Cost impact:</strong> Increases input tokens but dramatically improves response quality, reducing the need for follow-up calls.</p>
+
+      <h2>3. Context Packer</h2>
+      <div class="card">
+        <h3>Compress context windows</h3>
+        <p>Removes redundancy, deduplicates repeated content, strips boilerplate, and compresses the prompt. Typical savings: 20-60% fewer input tokens.</p>
+      </div>
+      <p><strong>When it fires:</strong> On every request where <code>enablePacker</code> is true (default). Runs after RAG so retrieved documents are also compressed.</p>
+      <p><strong>Cost impact:</strong> 20-60% reduction in input tokens. The savings percentage is reported in <code>result.meta.contextSavings</code>.</p>
+
+      <h2>4. Semantic Cache</h2>
+      <div class="card">
+        <h3>Prompt deduplication</h3>
+        <p>Two-layer cache: hash-based exact matching and embedding-based semantic matching. Similar prompts return cached results in milliseconds. Configurable TTL and LRU eviction.</p>
+      </div>
+      <p><strong>When it fires:</strong> After packing, before routing. Checks both local in-memory cache and optional KV-backed persistent cache.</p>
+      <p><strong>Cost impact:</strong> 100% savings on cache hits. Cache hit rates of 15-40% are typical for production workloads.</p>
+
+      <h2>5. Self-Learning Router</h2>
+      <div class="card">
+        <h3>Smart model selection</h3>
+        <p>Analyzes prompt complexity and selects the cheapest model that meets quality requirements. Considers cost, latency, and quality scores. Routing weights are updated after every call based on actual outcomes.</p>
+      </div>
+      <p><strong>When it fires:</strong> On every non-cached, non-boosted request. Uses learned weights from the Learner stage.</p>
+      <p><strong>Cost impact:</strong> 30-70% savings by routing simple prompts to cheaper models. Complex prompts still go to premium models.</p>
+
+      <h2>6. Swarm Orchestration</h2>
+      <div class="card">
+        <h3>Multi-model consensus</h3>
+        <p>Fans out a prompt to N models in parallel. Four strategies: <code>first</code> (fastest response), <code>vote</code> (majority consensus), <code>best</code> (highest quality score), <code>merge</code> (combine responses).</p>
+      </div>
+      <p><strong>When it fires:</strong> Only when explicitly configured with a Swarm instance. Used for high-stakes prompts where accuracy matters more than cost.</p>
+      <p><strong>Cost impact:</strong> Increases cost (N model calls) but improves reliability and accuracy for critical decisions.</p>
+
+      <h2>7. Multi-Provider Gateway</h2>
+      <div class="card">
+        <h3>One API, every provider</h3>
+        <p>Dispatches to OpenAI, Anthropic, DeepSeek, Groq, Mistral, and local models through a unified interface. Includes circuit breaker protection with configurable failure thresholds and automatic recovery.</p>
+      </div>
+      <p><strong>When it fires:</strong> On every request that reaches the call stage. Handles provider-specific API formats, streaming, and error handling.</p>
+      <p><strong>Cost impact:</strong> No direct savings, but automatic failover prevents downtime-related costs.</p>
+
+      <h2>8. Learner</h2>
+      <div class="card">
+        <h3>Continuous improvement</h3>
+        <p>Tracks every call's outcome (latency, token usage, cost) and updates the Router's weights. Weights are persisted to D1 so routing improves across sessions and deployments.</p>
+      </div>
+      <p><strong>When it fires:</strong> After every successful gateway call. Updates are batched and persisted periodically.</p>
+      <p><strong>Cost impact:</strong> Indirect savings through improved routing accuracy over time. Routing quality improves with volume.</p>
+
+      <h2>Enterprise Controls</h2>
+      <p>In addition to the pipeline stages, ClawPipe provides enterprise-grade controls that run alongside the pipeline:</p>
+      <ul>
+        <li><strong>Budget caps</strong> — hard and soft USD limits that reject or warn on exceeded budgets</li>
+        <li><strong>Rate limiting</strong> — per-project daily call limits matching your pricing tier</li>
+        <li><strong>Circuit breaker</strong> — automatic provider isolation on repeated failures</li>
+        <li><strong>Allowlist / denylist</strong> — restrict which providers and models can be used</li>
+        <li><strong>Audit logging</strong> — timestamped logs of every action for compliance</li>
+        <li><strong>Pipeline tracing</strong> — stage-by-stage timing data exportable as Perfetto JSON</li>
+      </ul>
+    </main>
+  </div>
+</div>
+</body>
+</html>

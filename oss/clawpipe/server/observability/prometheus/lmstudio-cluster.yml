@@ -1,0 +1,61 @@
+# Prometheus configuration for FinSavvyAI LM Studio cluster monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'finsavvyai-lmstudio'
+    environment: 'production'
+
+# AlertManager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+
+# Rule files
+rule_files:
+  - 'alertmanager/cluster-alerts.yaml'
+
+# Scrape configurations
+scrape_configs:
+  # FinSavvyAI API Gateway
+  - job_name: 'finsavvyai-gateway'
+    static_configs:
+      - targets: ['gateway:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # FinSavvyAI Cluster Manager
+  - job_name: 'finsavvyai-cluster'
+    static_configs:
+      - targets: ['cluster-manager:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # LM Studio instances (discovered dynamically)
+  - job_name: 'lmstudio-instances'
+    static_configs:
+      - targets: ['localhost:1234']  # Default LM Studio port
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 5s
+    honor_labels: true
+    honor_timestamps: true
+
+# Service discovery for LM Studio nodes
+scrape_configs:
+  - job_name: 'lmstudio-discovery'
+    dns_sd_configs:
+      - names:
+          - 'lmstudio._tcp.local'
+        type: 'A'
+        port: 1234
+    refresh_interval: 30s
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 5s
+    honor_labels: true

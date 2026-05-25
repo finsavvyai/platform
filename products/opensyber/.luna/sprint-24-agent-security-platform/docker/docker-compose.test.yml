@@ -1,0 +1,41 @@
+# Docker Compose configuration for running tests
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.test.yml run --rm web pnpm test
+
+version: '3.8'
+
+services:
+  web:
+    environment:
+      - NODE_ENV=test
+      - CI=true
+    volumes:
+      - ../../apps/web:/app/apps/web:delegated
+      - ../../packages:/app/packages:delegated
+    command: pnpm test
+    # Override restart policy for tests
+    restart: "no"
+
+  tokenforge-web:
+    environment:
+      - NODE_ENV=test
+      - CI=true
+    volumes:
+      - ../../tokenforge/apps/web:/app/tokenforge/apps/web:delegated
+      - ../../packages:/app/packages:delegated
+    command: pnpm test
+    restart: "no"
+
+  # Add test dependencies
+  db-test:
+    image: node:22-alpine
+    container_name: opensyber-test-db
+    volumes:
+      - ../../apps/api:/app/apps/api:ro
+      - ../../packages:/app/packages:ro
+    working_dir: /app
+    environment:
+      - NODE_ENV=test
+    command: sh -c "pnpm install --frozen-lockfile && pnpm --filter @opensyber/api test"
+    networks:
+      - opensyber-network
+    restart: "no"

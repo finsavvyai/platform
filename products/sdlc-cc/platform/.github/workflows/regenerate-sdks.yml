@@ -1,0 +1,81 @@
+name: Regenerate SDKs
+
+on:
+  schedule:
+    # Nightly at 03:00 UTC
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  regenerate:
+    name: Regenerate SDKs from OpenAPI
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Fern CLI
+        run: npm install -g fern-api
+
+      - name: Verify OpenAPI spec exists
+        run: |
+          if [ ! -f services/gateway/api/openapi.yaml ]; then
+            echo "::error::OpenAPI spec not found at services/gateway/api/openapi.yaml"
+            exit 1
+          fi
+
+      - name: Regenerate SDKs
+        working-directory: fern
+        run: fern generate --local
+
+      - name: Detect SDK changes
+        id: diff
+        run: |
+          if [ -n "$(git status --porcelain packages/sdk-ts packages/sdk-py packages/sdk-go)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git status --short packages/sdk-ts packages/sdk-py packages/sdk-go
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No SDK changes detected."
+          fi
+
+      - name: Create pull request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/regenerate-sdks
+          base: main
+          delete-branch: true
+          commit-message: "chore: regenerate SDKs from OpenAPI"
+          title: "chore: regenerate SDKs from OpenAPI"
+          labels: auto-generated
+          add-paths: |
+            packages/sdk-ts/**
+            packages/sdk-py/**
+            packages/sdk-go/**
+          body: |
+            Automated SDK regeneration from `services/gateway/api/openapi.yaml`
+            via Fern.
+
+            **Review checklist**
+            - [ ] No unintended breaking changes (removed endpoints / renamed fields)
+            - [ ] Generated diffs match expected OpenAPI changes
+            - [ ] CI green across all SDK packages
+
+            Triggered by `.github/workflows/regenerate-sdks.yml`.
+            See `.luna/sdlc-platform/boost-project/wave-6-fern-setup.md` for
+            the human-in-the-loop review process.

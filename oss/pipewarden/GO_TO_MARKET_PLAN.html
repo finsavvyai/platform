@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PipeWarden — Go-To-Market Plan · May 2026</title>
+<style>
+:root{
+  --bg:#0b0f17; --panel:#121826; --panel-2:#182033; --line:#22304a;
+  --text:#e6ecf5; --muted:#9aa9c2; --accent:#7cc4ff;
+  --good:#1f9d6b; --good-bg:#0f2a21; --good-line:#1f6b50;
+  --warn:#d49a26; --warn-bg:#2a2110; --warn-line:#6b551f;
+  --bad:#e0524d; --bad-bg:#2a1212; --bad-line:#6b1f1f;
+  --crit:#ff3a35; --crit-bg:#3a0e0e; --crit-line:#8a1f1f;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+code{background:#0d1320;padding:1px 6px;border-radius:4px;font-size:12.5px;color:#bcd0ee}
+pre{background:#0d1320;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;font-size:12px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 24px 96px}
+header.hero{padding:34px 28px;background:linear-gradient(135deg,#0f1626 0%,#16223a 100%);border:1px solid var(--line);border-radius:16px}
+h1{margin:0 0 6px;font-size:30px;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:15px}
+.tag-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.tag{display:inline-block;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#0f1626;font-size:12px;color:var(--muted)}
+section{margin-top:38px}
+h2{font-size:20px;margin:0 0 12px;letter-spacing:-.005em}
+h2 .h-sub{color:var(--muted);font-weight:400;font-size:14px;margin-left:8px}
+h3{font-size:15px;margin:14px 0 6px;color:#cfe0fa}
+.block{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-top:10px}
+.block p{margin:0 0 8px}
+.block.warn{background:var(--warn-bg);border-color:var(--warn-line)}
+.block.good{background:var(--good-bg);border-color:var(--good-line)}
+.block.crit{background:var(--crit-bg);border-color:var(--crit-line)}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:18px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi .n{font-size:22px;font-weight:600}
+.kpi .l{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+ul.steps, ol.steps {margin:6px 0;padding-left:0;list-style:none}
+ul.steps li, ol.steps li {position:relative;padding:8px 8px 8px 32px;border-bottom:1px solid var(--line)}
+ul.steps li:last-child, ol.steps li:last-child {border-bottom:none}
+ul.steps li::before {content:"▸";position:absolute;left:10px;color:var(--accent);font-weight:bold}
+ul.crit-list li::before {content:"◉";color:var(--crit)}
+ol.steps {counter-reset:step}
+ol.steps li {counter-increment:step}
+ol.steps li::before {content:counter(step);position:absolute;left:8px;top:8px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#0b0f17;font-size:11px;text-align:center;line-height:20px;font-weight:700}
+.cols-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px}
+.cols-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:12px}
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:10px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);background:#0f1626}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid;white-space:nowrap}
+.b-good{color:#7be0b1;background:var(--good-bg);border-color:var(--good-line)}
+.b-warn{color:#f3c777;background:var(--warn-bg);border-color:var(--warn-line)}
+.b-bad{color:#ff8b87;background:var(--bad-bg);border-color:var(--bad-line)}
+.b-crit{color:#ffd1d0;background:var(--crit-bg);border-color:var(--crit-line)}
+.b-mute{color:var(--muted);background:#161e30;border-color:var(--line)}
+.price-card{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.price-card.featured{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.price-card h3{margin:0 0 6px;font-size:16px;color:var(--text)}
+.price-card .price{font-size:28px;font-weight:700;color:#fff;margin:4px 0}
+.price-card .price .per{font-size:13px;color:var(--muted);font-weight:400}
+.price-card ul{margin:10px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+.price-card li{margin:3px 0}
+.price-card .target{color:var(--accent);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.timeline{display:grid;grid-template-columns:80px 1fr;gap:14px;margin-top:8px}
+.timeline .when{color:var(--accent);font-weight:600;font-size:13px;padding-top:10px}
+.timeline .what{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:6px}
+.timeline .what h4{margin:0 0 4px;font-size:13.5px;color:#cfe0fa}
+.timeline .what p{margin:0;font-size:13px;color:var(--muted)}
+.competitor-pill{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;background:#161e30;color:var(--muted);margin-right:4px;border:1px solid var(--line)}
+.win {color:#7be0b1;font-weight:600}
+.lose {color:#ff8b87}
+hr.sep{border:none;border-top:1px solid var(--line);margin:18px 0}
+.callout{padding:12px 16px;border-left:4px solid var(--accent);background:var(--panel-2);border-radius:0 8px 8px 0;font-size:13px;margin:10px 0}
+.callout strong{color:#fff}
+footer{margin-top:48px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:18px}
+@media (max-width:880px){
+  .kpi-row,.cols-3{grid-template-columns:repeat(2,1fr)}
+  .cols-2{grid-template-columns:1fr}
+  .timeline{grid-template-columns:60px 1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>PipeWarden → Market</h1>
+  <div class="sub">A focused 30-day plan to convert a polished engineering substrate into a self-serve product that an indie dev or 10-person team will swipe a credit card for.<br>The engineering substance is strong. The go-to-market surface is a marketing page in front of nothing live. This plan closes that gap.</div>
+  <div class="tag-row">
+    <span class="tag">Audience: indie devs + 5–50 person teams</span>
+    <span class="tag">Model: freemium SaaS, MIT-licensed CLI</span>
+    <span class="tag">Timeline: 30 days to public launch</span>
+    <span class="tag">Distribution: Claude Code skill + HN + GitHub Marketplace</span>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="n">$0–19–49</div><div class="l">Price wedge / dev</div></div>
+    <div class="kpi"><div class="n">15</div><div class="l">Concrete launch tasks</div></div>
+    <div class="kpi"><div class="n">7</div><div class="l">Critical fixes (week 1)</div></div>
+    <div class="kpi"><div class="n">D30</div><div class="l">Public launch target</div></div>
+  </div>
+</header>
+
+<!-- ====================================================== -->
+<section>
+  <h2>The 60-second pitch <span class="h-sub">positioning that wins May 2026</span></h2>
+  <div class="block">
+    <p style="font-size:16px;line-height:1.6"><b>PipeWarden is the AI-aware AppSec layer for the way developers actually code in 2026</b> — Cursor, Claude Code, and Copilot writing 70% of the diff, MCP servers in the loop, dependencies invented in hallucinations.</p>
+    <p style="font-size:16px;line-height:1.6">Snyk's CEO just stepped down and their pricing hard-caps at 10 devs. Aikido raised at $1B and is chasing mid-market. Semgrep got forked by its own community. <b>The "$0 free → $19/dev self-serve → $49/dev small-team" lane is wide open</b>, and nobody owns the Claude Code distribution surface — which is now where the work happens.</p>
+    <p style="font-size:16px;line-height:1.6">PipeWarden ships as <b>(1) a single Go binary you can <code>brew install</code> in 10 seconds</b>, <b>(2) a GitHub Action that comments findings inline</b>, and <b>(3) a Claude Code skill + hook that blocks insecure code at write-time</b>, not PR-time. One yearly invoice. No procurement deck.</p>
+  </div>
+</section>
+
+<!-- ====================================================== -->
+<section>
+  <h2>🚨 STOP-THE-BLEED · Week 0 (do today) <span class="h-sub">these are legal/security liabilities, not roadmap items</span></h2>
+  <div class="block crit">
+    <p><b>The audit surfaced 7 things that have to be fixed before any public launch.</b> Some are security incidents in waiting; others are misrepresentations that would blow up trust the first time an enterprise buyer asked for evidence.</p>
+    <ul class="steps crit-list">
+      <li>
+        <b>Rotate the leaked Anthropic API key</b> — <code>.env</code> on disk has a live-looking <code>sk-ant-api03-eWq0hmO…mp2fnQAA</code> key. It's gitignored and never tracked, but it's exposed to any process on the dev machine. <b>Rotate in Anthropic Console → revoke old key → store new in 1Password / direnv.</b>
+      </li>
+      <li>
+        <b>Rotate the Cloudflare API token</b> — same <code>.env</code> file has <code>cfat_lVVhoF3xVKtPwUkBIiDtNYhGj1BvD7QPKjUUMKQC065557b4</code>. Generate a fresh token in CF dashboard with least-privilege scope; delete the old one.
+      </li>
+      <li>
+        <b>Rotate the master vault key</b> — <code>PIPEWARDEN_VAULT_KEY</code> is the AES-256-GCM master that decrypts every stored credential. Rotate, re-encrypt the vault, document the rotation procedure.
+      </li>
+      <li>
+        <b>Make the GitHub repo public</b> — <code>github.com/finsavvyai/pipewarden</code> returns 404. Your GitHub Action downloads the release tarball from there. <b>Today no external user can install pipewarden.</b> The action is broken until this is fixed.
+      </li>
+      <li>
+        <b>Remove SOC 2 Type II + ISO 27001 claims from the homepage FAQ</b> — these strings exist nowhere in the codebase outside marketing copy. No audit, no Trust Center, no <code>security.txt</code>. Replace with "SOC 2 Type I report in progress (Q3 2026)" or remove entirely. This is the kind of claim that ends deals when procurement Googles it.
+      </li>
+      <li>
+        <b>Remove unsupported customer claims</b> — the FAQ says "Teams from 3 to 3,000+ engineers" with no logos, no testimonials, no case studies. Reframe as honest: "We're building with early-access teams — <a href="#">join the design partner program</a>." Authenticity converts indie devs better than fake social proof.
+      </li>
+      <li>
+        <b>Fix the pricing inconsistency</b> — <code>internal/payment/plans.go</code> defines Team at $99 but Professional at $49 (Professional is cheaper than Team). The website shows only 4 tiers and hides Professional + Enterprise+. Pick 3 tiers, ship them publicly, kill the rest. (See pricing recommendation below.)
+      </li>
+    </ul>
+  </div>
+</section>
+
+<!-- ====================================================== -->
+<section>
+  <h2>Pricing recommendation <span class="h-sub">3 tiers, transparent, swipeable</span></h2>
+  <div class="block">
+    <p>Today the code defines 6 plans (Community/Starter/Team/Professional/Enterprise/Enterprise+); the site shows 4; Professional is cheaper than Team. <b>Collapse to 3 tiers</b>, mirror Aikido's wedge but undercut it, and publish to the homepage. No sales call required for the first two.</p>
+
+    <div class="cols-3">
+      <div class="price-card">
+        <div class="target">For individuals + OSS</div>
+        <h3>Free</h3>
+        <div class="price">$0<span class="per"> / forever</span></div>
+        <ul>
+          <li>Unlimited public repos</li>
+          <li>1 private repo</li>
+          <li>CLI + GitHub Action</li>
+          <li>Cheap-mode AI (Haiku / Gemini Flash / DeepSeek)</li>
+          <li>20 secret patterns · 22 OPA policies · Semgrep ruleset</li>
+          <li>Community Discord support</li>
+        </ul>
+      </div>
+      <div class="price-card featured">
+        <div class="target">⭐ For solo founders + small teams</div>
+        <h3>Pro</h3>
+        <div class="price">$19<span class="per"> / dev / month</span></div>
+        <ul>
+          <li>Unlimited private repos</li>
+          <li>Sonnet-tier AI on high/critical</li>
+          <li>Claude Code skill + hook (write-time blocks)</li>
+          <li>Cursor MCP plugin</li>
+          <li>SARIF history + trend charts</li>
+          <li>Slack + email notifications</li>
+          <li>Email support, 48h</li>
+        </ul>
+      </div>
+      <div class="price-card">
+        <div class="target">For teams 10–50</div>
+        <h3>Team</h3>
+        <div class="price">$49<span class="per"> / dev / month</span></div>
+        <ul>
+          <li>Everything in Pro</li>
+          <li>Opus-tier AI on critical paths</li>
+          <li>Compliance packs (SOC 2 · HIPAA · PCI · GDPR)</li>
+          <li>SSO (Google + GitHub)</li>
+          <li>Custom OPA policies</li>
+          <li>Audit log export</li>
+          <li>Priority support, 24h</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout"><b>Enterprise</b> ("contact us") is a 4th tier for SSO/SAML/SCIM/on-prem/dedicated support — but don't show pricing or feature it on the homepage. The whole game in year 1 is bottom-up self-serve.</div>
+
+    <h3>Why these numbers</h3>
+    <table>
+      <thead><tr><th>Competitor</th><th>Their entry price</th><th>The hated cliff</th><th>PipeWarden's answer</th></tr></thead>
+      <tbody>
+        <tr><td>Snyk Team</td><td>$25/dev/mo</td><td>Hard cap at 10 devs → $1,260/dev/yr at dev #11</td><td class="win">No cliff. $19 → $49 is linear, predictable.</td></tr>
+        <tr><td>Aikido</td><td>$350/mo flat block</td><td>Whole-block pricing kills solo founders</td><td class="win">$19/dev means dev #1 costs $19, not $350.</td></tr>
+        <tr><td>Semgrep Team</td><td>$35/contributor/mo</td><td>"Contributor" definition is fuzzy + upsell</td><td class="win">Bill per dev who opens a PR in the month. Like CodeRabbit.</td></tr>
+        <tr><td>CodeRabbit Pro</td><td>$24/dev/mo</td><td>Review-noisy; not security-focused</td><td class="win">Security-first; AI-aware diff scanning.</td></tr>
+        <tr><td>DryRun Security</td><td>"Contact sales"</td><td>Bottom-up impossible</td><td class="win">Self-serve checkout, 60 seconds.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ====================================================== -->
+<section>
+  <h2>30-day launch sprint <span class="h-sub">week-by-week, what ships when</span></h2>
+
+  <h3>Week 1 · Stop-the-bleed + foundations</h3>
+  <div class="timeline">
+    <div class="when">Day 1</div>
+    <div class="what">
+      <h4>Critical security + legal fixes (the 7 above)</h4>
+      <p>Rotate the 3 leaked credentials. Make GitHub repo public. Remove SOC 2 / ISO claims. Remove unsupported customer claims. Pricing rationalization.</p>
+    </div>
+    <div class="when">Day 2</div>
+    <div class="what">
+      <h4>Cut public release v1.0.0</h4>
+      <p>Tag, push, let goreleaser publish darwin/amd64 + darwin/arm64 + linux/amd64 + linux/arm64 + Docker. (Current goreleaser only does linux — add darwin + windows builds. Solo devs are on macOS first.)</p>
+    </div>
+    <div class="when">Day 3</div>
+    <div class="what">
+      <h4>Ship Homebrew tap + install.sh</h4>
+      <p>Create <code>finsavvyai/homebrew-pipewarden</code>; add formula. <code>curl pipewarden.com/install | sh</code> as alternative. This is the difference between "interesting" and "I'm trying it right now."</p>
+    </div>
+    <div class="when">Day 4</div>
+    <div class="what">
+      <h4>Deploy the SaaS backend</h4>
+      <p><code>app.pipewarden.com</code> is NXDOMAIN today. Deploy the Cloudflare Worker (wrangler config exists), wire DNS, get <code>/api/v1/scan</code> + <code>/api/v1/badge/global.svg</code> responding. Without this, every "live" button on the landing page lies.</p>
+    </div>
+    <div class="when">Day 5</div>
+    <div class="what">
+      <h4>Verify GitHub Action end-to-end</h4>
+      <p>Set up a test repo. Add the action. Open a PR with a known-bad pattern. Confirm inline comments appear. Take screenshots — these become the landing page hero.</p>
+    </div>
+  </div>
+
+  <h3>Week 2 · Claude Code skill + Cursor MCP (the unfair distribution lane)</h3>
+  <div class="timeline">
+    <div class="when">Day 6–7</div>
+    <div class="what">
+      <h4>Build the Claude Code skill</h4>
+      <p>Ship <code>pipewarden-skill</code>: install via <code>claude-code skills add pipewarden</code>. Adds <code>/pw-scan</code>, <code>/pw-review</code>, <code>/pw-fix</code> slash commands. This is uncontested distribution — none of Snyk/Aikido/Semgrep/CodeRabbit own this surface yet.</p>
+    </div>
+    <div class="when">Day 8–9</div>
+    <div class="what">
+      <h4>Build the Claude Code hook</h4>
+      <p><code>preToolUse</code> hook intercepts shell commands containing dangerous patterns; <code>postToolUse</code> scans freshly-written files. The pitch: "Claude can't write you a SQL injection." Demo video material is here.</p>
+    </div>
+    <div class="when">Day 10</div>
+    <div class="what">
+      <h4>Cursor MCP plugin</h4>
+      <p>Same logic, MCP server flavor. Cursor users add to <code>.cursor/mcp.json</code>. Add a "from the makers of cursor-mcp" referral in README to ride existing MCP marketplace traffic.</p>
+    </div>
+  </div>
+
+  <h3>Week 3 · The "AI-commit-aware" headline feature</h3>
+  <div class="timeline">
+    <div class="when">Day 11–12</div>
+    <div class="what">
+      <h4>AI-author detection</h4>
+      <p>Detect commits authored by Cursor / Claude Code / Copilot / Codex via co-author trailers, commit signatures, MCP fingerprints. Tag findings with <code>ai_authored: true</code>. This is the headline that gets HN traction.</p>
+    </div>
+    <div class="when">Day 13</div>
+    <div class="what">
+      <h4>Hallucinated-dependency check</h4>
+      <p>For every new <code>package.json</code> / <code>requirements.txt</code> / <code>go.mod</code> entry: verify it exists on the registry. Hallucinated deps are the new typosquat vector (GitGuardian: AI commits leak secrets at 2× baseline). Be the only tool that catches this on day 1.</p>
+    </div>
+    <div class="when">Day 14</div>
+    <div class="what">
+      <h4>Lemonsqueezy checkout live</h4>
+      <p>Wire Pro + Team tiers. Test full flow: signup → trial → conversion → invoice. Don't gate the free tier behind anything.</p>
+    </div>
+    <div class="when">Day 15</div>
+    <div class="what">
+      <h4>Trust posture page</h4>
+      <p>Ship <code>pipewarden.com/security</code>: what we collect (nothing by default), what we don't (your source code never leaves your machine for Free + Pro), how vault encryption works, where to email security disclosures. Replaces the unsupported SOC2 claim with honesty.</p>
+    </div>
+  </div>
+
+  <h3>Week 4 · Launch week</h3>
+  <div class="timeline">
+    <div class="when">Day 16–19</div>
+    <div class="what">
+      <h4>Content sprint</h4>
+      <p>3 blog posts: (1) "We scanned 1,000 AI-generated PRs — here's what we found" (data piece). (2) "Why we don't have SOC 2 yet" (anti-fake-compliance honesty post). (3) "The Snyk cliff: when 10 developers becomes $12,600/year" (anti-incumbent post). Plus a 90-second demo video.</p>
+    </div>
+    <div class="when">Day 20</div>
+    <div class="what">
+      <h4>Soft launch to your network</h4>
+      <p>Email 50 indie devs + 20 small-team CTOs. Ask for 30-minute install sessions. Offer Pro free for life to the first 25 who give product feedback. This is your design partner cohort.</p>
+    </div>
+    <div class="when">Day 21–25</div>
+    <div class="what">
+      <h4>Iterate based on install sessions</h4>
+      <p>Watch 10 first-time installs. Fix every confusion point. Update the README and the install flow. This is your highest-leverage week.</p>
+    </div>
+    <div class="when">Day 26</div>
+    <div class="what">
+      <h4>Show HN: PipeWarden — AI-aware AppSec for Cursor &amp; Claude Code</h4>
+      <p>Tuesday or Wednesday, 9am Pacific. Title is the post. Lead the comment thread with "we built this because [story]" + the data piece linked. Don't promote — engage every reply for 24h.</p>
+    </div>
+    <div class="when">Day 27</div>
+    <div class="what">
+      <h4>GitHub Marketplace listing</h4>
+      <p>Submit the Action to <code>marketplace.github.com</code>. CodeRabbit's playbook: become a top AI app on Marketplace and you get 100k installs free.</p>
+    </div>
+    <div class="when">Day 28–29</div>
+    <div class="what">
+      <h4>Outbound to newsletter authors</h4>
+      <p>Pitch Pragmatic Engineer, Console.dev, Bytes, TLDR, The New Stack. Lead with the data piece, not the product. "Hey, I scanned 1,000 AI PRs and found X — would your readers want this?"</p>
+    </div>
+    <div class="when">Day 30</div>
+    <div class="what">
+      <h4>Measure + retro</h4>
+      <p>KPIs: signups, free→paid conversion, install completion rate, GitHub stars, Marketplace installs, HN points, MRR. Set the next 30-day sprint.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ====================================================== -->
+<section>
+  <h2>Distribution channels <span class="h-sub">where the first 1,000 users come from</span></h2>
+  <table>
+    <thead><tr><th>Channel</th><th>Expected users (90d)</th><th>Cost</th><th>Why it works in 2026</th></tr></thead>
+    <tbody>
+      <tr><td><b>Claude Code skill marketplace</b></td><td>2,000–5,000 installs</td><td>$0</td><td>Uncontested — no AppSec vendor ships here yet. Anthropic actively promotes new skills.</td></tr>
+      <tr><td><b>GitHub Marketplace (Action)</b></td><td>3,000–10,000 installs</td><td>$0</td><td>CodeRabbit precedent: 100k installs from top placement. Free + good name = compounds.</td></tr>
+      <tr><td><b>Cursor MCP directory</b></td><td>500–2,000</td><td>$0</td><td>MCP marketplace traffic is exploding (97M downloads/mo).</td></tr>
+      <tr><td><b>Show HN launch</b></td><td>200–1,500 signups in 48h</td><td>$0</td><td>Story-driven posts (data + honesty) consistently land. Avoid pure product posts.</td></tr>
+      <tr><td><b>Homebrew tap + install.sh</b></td><td>Compounds</td><td>$0</td><td>The 10-second install removes the #1 trial dropoff.</td></tr>
+      <tr><td><b>r/cursor + r/ClaudeAI</b></td><td>300–1,000</td><td>$0</td><td>Native audience for "secure your AI-generated code." Lead with the demo GIF.</td></tr>
+      <tr><td><b>Pragmatic Engineer guest piece</b></td><td>1,000–5,000</td><td>Time</td><td>~1M readers, recently covered Claude Code adoption. Pitch a data deep-dive.</td></tr>
+      <tr><td><b>OSS sponsorship (Opengrep)</b></td><td>Credibility</td><td>$0 + governance time</td><td>Joining the Opengrep consortium = free PR + battle-tested taint engine.</td></tr>
+      <tr><td><b>SEO long-tail</b></td><td>Slow burn → 6 months</td><td>Time</td><td>"Snyk alternative pricing", "Aikido alternative SMB", "Claude Code security review", "Cursor secure coding".</td></tr>
+      <tr class="b-mute"><td>Paid ads (Google / X)</td><td>Skip in year 1</td><td>$$$</td><td>Indie devs ignore ads. Spend the budget on content + Claude Code skill polish.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ====================================================== -->
+<section>
+  <h2>First 10 customers playbook <span class="h-sub">specific tactics, not generic advice</span></h2>
+  <div class="cols-2">
+    <div class="block">
+      <h3>Who they are (the persona)</h3>
+      <ul class="steps">
+        <li><b>Solo founder</b> using Cursor or Claude Code, shipping a paid SaaS, no security person, has had at least one "oh god what did the AI just write" moment.</li>
+        <li><b>Startup CTO at 5–15 devs</b>, previously evaluated Snyk and bounced off the 10-dev cliff, currently using nothing or just Dependabot.</li>
+        <li><b>Indie OSS maintainer</b> running a popular repo (>1k stars) who wants security badges + auto-scanning without paying enterprise prices.</li>
+      </ul>
+    </div>
+    <div class="block">
+      <h3>Where to find them today</h3>
+      <ul class="steps">
+        <li><b>YC Bookface</b> if you have access — "we just shipped X for Cursor/Claude Code users, want to be a design partner?"</li>
+        <li><b>r/cursor, r/ClaudeAI, r/ExperiencedDevs</b> — answer questions about secure AI coding for 2 weeks before posting your tool.</li>
+        <li><b>Indie Hackers</b> — milestone posts every week. "Day X of building AI AppSec — here's what I learned." Indie founders love that genre.</li>
+        <li><b>GitHub search</b>: <code>filename:cursorrules</code> + <code>filename:.claude</code> finds repos using AI tools. DM owners offering free Pro for feedback.</li>
+        <li><b>Anthropic Discord</b> + <b>Cursor Discord</b> — be visibly helpful; mention pipewarden only when relevant.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout"><b>The ask isn't "buy this."</b> The ask for the first 10 is: "30 minutes, screen-share, install it, tell me where it breaks. Free Pro for life either way." Conversion to paid will follow when their team grows. You're trading future MRR for current product feedback + testimonials.</div>
+</section>
+
+<!-- ====================================================== -->
+<section>
+  <h2>Trust &amp; security posture <span class="h-sub">what to actually have ready (not what to claim)</span></h2>
+  <table>
+    <thead><tr><th>Item</th><th>Status today</th><th>Ship by D30</th></tr></thead>
+    <tbody>
+      <tr><td>Privacy policy + ToS</td><td><span class="badge b-warn">Unclear</span></td><td><span class="badge b-good">Use Termly or Iubenda — $10/mo</span></td></tr>
+      <tr><td><code>security.txt</code> at <code>pipewarden.com/.well-known/security.txt</code></td><td><span class="badge b-bad">Missing</span></td><td><span class="badge b-good">Ship</span></td></tr>
+      <tr><td>Public security disclosure email</td><td><span class="badge b-bad">Missing</span></td><td><span class="badge b-good">Ship — <code>security@pipewarden.com</code></span></td></tr>
+      <tr><td>Trust Center page</td><td><span class="badge b-bad">Missing</span></td><td><span class="badge b-good">Ship <code>/security</code> page (honest version)</span></td></tr>
+      <tr><td>Data flow diagram</td><td><span class="badge b-bad">Missing</span></td><td><span class="badge b-good">"Your code never leaves your machine on Free + Pro"</span></td></tr>
+      <tr><td>SOC 2 Type I</td><td><span class="badge b-crit">FALSELY CLAIMED</span></td><td><span class="badge b-warn">Start with Vanta/Drata when MRR &gt; $10k</span></td></tr>
+      <tr><td>SOC 2 Type II</td><td><span class="badge b-crit">FALSELY CLAIMED</span></td><td><span class="badge b-mute">Year 2 target</span></td></tr>
+      <tr><td>ISO 27001</td><td><span class="badge b-crit">FALSELY CLAIMED</span></td><td><span class="badge b-mute">Year 2 target</span></td></tr>
+      <tr><td>SBOM published (cosign keyless)</td><td><span class="badge b-good">Already in CI</span></td><td><span class="badge b-good">Surface on /security</span></td></tr>
+      <tr><td>Bug bounty</td><td><span class="badge b-bad">Missing</span></td><td><span class="badge b-warn">Defer until launch — Hacker1 or BugCrowd</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ====================================================== -->
+<section>
+  <h2>Engineering work to close in 30 days <span class="h-sub">what the audit found, prioritized</span></h2>
+
+  <h3>Now · Week 1 (must close)</h3>
+  <div class="block crit">
+    <ul class="steps">
+      <li><b>OSV.dev integration</b> — README/LAUNCH_KIT claim CVE detection via OSV. <code>grep osv internal/</code> returns nothing. Wire it (it's free, well-documented). Without it, the SCA story is hollow.</li>
+      <li><b>Default-model docs vs reality</b> — README implies Sonnet/Haiku tier-switching by default. Actual code uses <code>claude-sonnet-4-20250514</code> for every call unless <code>PIPEWARDEN_CHEAP_MODE=1</code> + <code>CLAW_API_KEY</code> are set. Either flip the default or update the docs.</li>
+      <li><b>darwin + windows binaries</b> — goreleaser only builds linux today. Indie devs are on macOS first. Add the targets, regenerate the install.sh logic.</li>
+      <li><b>Pricing tier rationalization in <code>plans.go</code></b> — collapse 6 plans to 3 (Free / Pro $19 / Team $49). Delete Professional + Enterprise+ from the code.</li>
+      <li><b>Telemetry decision</b> — current state is "no phone home" which is honest but also blind. Ship opt-in anonymous usage telemetry (PostHog) so you can see install funnel + scan volume.</li>
+    </ul>
+  </div>
+
+  <h3>Next · Weeks 2–3 (differentiators)</h3>
+  <div class="block">
+    <ul class="steps">
+      <li><b>Claude Code skill</b> — <code>/pw-scan</code>, <code>/pw-review</code>, <code>/pw-fix</code>. Ship via the Anthropic Skills directory.</li>
+      <li><b>Claude Code preToolUse / postToolUse hooks</b> — block insecure code at write-time. This is the demo video.</li>
+      <li><b>Cursor MCP server</b> — same scanning logic via MCP protocol. Add to mcp.so / Smithery / Glama directories.</li>
+      <li><b>AI-author detection</b> — tag commits authored by Cursor/Copilot/Claude. Treat as separate risk class.</li>
+      <li><b>Hallucinated-dependency check</b> — verify each new dep exists on registry. Headline feature.</li>
+      <li><b>Embed Opengrep</b> — join the consortium; bundle their engine. Frees you from maintaining a SAST core.</li>
+      <li><b>Plan limit enforcement</b> — limits exist in <code>Plan</code> struct but unclear if enforced. Verify and enforce at request time.</li>
+    </ul>
+  </div>
+
+  <h3>Later · Quarter 2+ (depth)</h3>
+  <div class="block">
+    <ul class="steps">
+      <li><b>IaC scanning</b> — Terraform / K8s / CloudFormation. Marketing implies coverage; code has none.</li>
+      <li><b>Runtime/IAST</b> — Aikido is missing this; could be a differentiator at the SMB tier.</li>
+      <li><b>SOC 2 Type I with Vanta/Drata</b> — kick off when MRR > $10k or first enterprise prospect asks.</li>
+      <li><b>SDK for popular auth providers (Auth0 / Clerk / Supabase)</b> — one-liner integrations.</li>
+      <li><b>Team dashboard</b> — historical scan trends, who introduced what vulnerability, team leaderboard ("most-flagged dev" makes everyone laugh + click).</li>
+      <li><b>Enterprise: SSO/SAML/SCIM/on-prem</b> — only when sales-led customer pulls you there.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ====================================================== -->
+<section>
+  <h2>Metrics &amp; success criteria <span class="h-sub">what "launched" actually means</span></h2>
+  <table>
+    <thead><tr><th>Metric</th><th>Day 30 target</th><th>Day 60</th><th>Day 90</th></tr></thead>
+    <tbody>
+      <tr><td>GitHub repo stars</td><td>500</td><td>2,000</td><td>5,000</td></tr>
+      <tr><td>Marketplace Action installs</td><td>200</td><td>1,500</td><td>5,000</td></tr>
+      <tr><td>Claude Code skill installs</td><td>100</td><td>1,000</td><td>3,000</td></tr>
+      <tr><td>Free signups</td><td>250</td><td>1,200</td><td>3,500</td></tr>
+      <tr><td>Free → Pro conversion</td><td>—</td><td>2%</td><td>4%</td></tr>
+      <tr><td>Paid customers (Pro)</td><td>5 (founder-sold)</td><td>30</td><td>120</td></tr>
+      <tr><td>Paid customers (Team)</td><td>1</td><td>4</td><td>12</td></tr>
+      <tr><td>MRR</td><td>$200</td><td>$2,000</td><td>$8,000</td></tr>
+      <tr><td>Public install scripts (brew + install.sh)</td><td><span class="badge b-good">Both live</span></td><td>—</td><td>—</td></tr>
+      <tr><td>Trust posture page</td><td><span class="badge b-good">Live</span></td><td>—</td><td>—</td></tr>
+      <tr><td>Show HN appearance</td><td><span class="badge b-good">Done D26</span></td><td>—</td><td>—</td></tr>
+      <tr><td>Pragmatic Engineer / Console.dev mention</td><td>—</td><td>1</td><td>2</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">If at D30 you have <b>200+ Marketplace installs + 5 paying customers + 1 honest case study</b>, you've launched. If you have <b>0 paying customers but 1,500 installs</b>, you've validated the product but mispriced — talk to 10 users about willingness to pay before raising prices.</div>
+</section>
+
+<!-- ====================================================== -->
+<section>
+  <h2>What to <em>not</em> do <span class="h-sub">explicit no-goes</span></h2>
+  <div class="cols-2">
+    <div class="block warn">
+      <h3>Don't pretend</h3>
+      <ul class="steps">
+        <li>Don't claim SOC 2 / ISO 27001 you don't have. One Trust Center missing audit doc = dead deal + Twitter screenshots.</li>
+        <li>Don't fake customer logos. Indie devs sniff this faster than enterprise buyers.</li>
+        <li>Don't claim feature coverage you don't have (OSV, IaC). Future-tense is fine; present-tense is fraud.</li>
+      </ul>
+    </div>
+    <div class="block warn">
+      <h3>Don't dilute focus</h3>
+      <ul class="steps">
+        <li>Don't build IDE plugins for VSCode/JetBrains in month 1. Cursor + Claude Code first — that's where mindshare is.</li>
+        <li>Don't add features the top 3 customers don't request. Resist the urge to copy every Aikido bullet point.</li>
+        <li>Don't pivot to enterprise in month 1. The whole moat is "self-serve sub-$50/dev" — going upmarket too early breaks it.</li>
+      </ul>
+    </div>
+    <div class="block warn">
+      <h3>Don't burn cash</h3>
+      <ul class="steps">
+        <li>Don't run paid ads in year 1. Indie/SMB devs ignore them. Content + distribution wins.</li>
+        <li>Don't hire sales before $20k MRR. Founder-led sales for the first 20 customers — you'll learn what the script is.</li>
+        <li>Don't raise money in month 1. Get to $10k MRR first; the round is 10× easier with that traction.</li>
+      </ul>
+    </div>
+    <div class="block warn">
+      <h3>Don't be Snyk</h3>
+      <ul class="steps">
+        <li>Don't put a hard cap on the cheap tier. Linear scaling, no cliff. Ever.</li>
+        <li>Don't require a sales call for $5k ACV. That's the bottoms-up funnel killer.</li>
+        <li>Don't gate "AI" behind the expensive tier. AI is table stakes in 2026, not a premium.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p><b>Methodology.</b> This plan was built from (1) a real deep-audit of the pipewarden codebase (binary built and run, marketing site curl'd, secrets scanned), (2) fresh May-2026 competitive intel on Aikido/Snyk/Semgrep/Endor/DryRun/CodeRabbit/Greptile pricing + recent news, and (3) the documented "indie-dev distribution playbook" that CodeRabbit, Aikido (pre-Series-B), and Cursor used to reach their first 10k users. Numbers in the metrics table are conservative-aggressive — calibrated against CodeRabbit's actual trajectory and the audited indie SaaS launch data from the Indie Hackers benchmarks.</p>
+  <p><b>What this plan deliberately omits.</b> Hiring plan, fundraising plan, capitalization, equity. Those come after you hit $10k MRR. The whole point of the 30-day sprint is to get there with one founder, one product, one positioning.</p>
+</footer>
+
+</div>
+</body>
+</html>

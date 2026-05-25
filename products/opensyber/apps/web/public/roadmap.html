@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roadmap — OpenSyber | What We're Building and Why</title>
+  <meta name="description" content="Real features. Real dates. Real threat context for why each one matters. No vaporware.">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --void: #09090b; --panel: #18181b; --border: #27272a; --wire: #3f3f46;
+      --signal: #00e5c3; --signal-hover: #00ffda; --text: #fafafa;
+      --text-secondary: #a1a1aa; --text-dim: #71717a;
+      --green: #10b981; --blue: #3b82f6; --amber: #f59e0b; --purple: #a78bfa;
+      --red: #ef4444;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--void); color: var(--text); line-height: 1.7; }
+    a { color: var(--signal); text-decoration: none; }
+    a:hover { color: var(--signal-hover); }
+    .container { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+
+    nav { padding: 20px 24px; border-bottom: 1px solid var(--border); background: rgba(9,9,11,0.92); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 50; }
+    nav .inner { max-width: 860px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+    .logo { font-size: 20px; font-weight: 700; color: var(--signal); letter-spacing: 0.05em; }
+    .nav-links { display: flex; gap: 24px; }
+    .nav-links a { color: var(--text-secondary); font-size: 14px; font-weight: 500; }
+
+    /* Hero */
+    .hero { padding: 80px 0 24px; text-align: center; }
+    .hero h1 { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 16px; }
+    .hero h1 span { color: var(--signal); }
+    .hero p { color: var(--text-secondary); font-size: 18px; max-width: 580px; margin: 0 auto; }
+    .hero .meta { display: flex; justify-content: center; gap: 24px; margin-top: 16px; }
+    .hero .meta-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-dim); }
+    .hero .meta-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .hero .meta-dot.green { background: var(--green); }
+    .hero .meta-dot.blue { background: var(--blue); }
+
+    /* Threat context banner */
+    .threat-context { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.15); border-radius: 12px; padding: 24px 28px; margin: 32px 0 48px; }
+    .threat-context h3 { font-size: 14px; font-weight: 700; color: var(--red); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
+    .threat-context p { color: var(--text-secondary); font-size: 14px; margin-bottom: 8px; }
+    .threat-context p:last-child { margin-bottom: 0; }
+    .threat-context strong { color: var(--text); }
+
+    /* Phases */
+    .phases { padding: 0 0 80px; }
+    .phase { margin-bottom: 56px; }
+    .phase-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+    .phase-badge { padding: 5px 16px; border-radius: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    .phase-badge.shipped { background: rgba(16,185,129,0.15); color: var(--green); }
+    .phase-badge.now { background: rgba(59,130,246,0.15); color: var(--blue); }
+    .phase-badge.next { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .phase-badge.later { background: rgba(167,139,250,0.15); color: var(--purple); }
+    .phase-title { font-size: 24px; font-weight: 700; }
+    .phase-date { color: var(--text-dim); font-size: 13px; margin-left: auto; }
+
+    .items { display: grid; gap: 12px; }
+    .item { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; display: flex; align-items: flex-start; gap: 16px; transition: border-color 0.2s; }
+    .item:hover { border-color: var(--wire); }
+    .item-icon { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; margin-top: 1px; }
+    .item-icon.done { background: rgba(16,185,129,0.15); color: var(--green); }
+    .item-icon.wip { background: rgba(59,130,246,0.12); color: var(--blue); border: 2px solid var(--blue); font-size: 10px; }
+    .item-icon.planned { background: var(--wire); color: var(--text-dim); }
+    .item-body h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .item-body p { color: var(--text-secondary); font-size: 13px; }
+    .item-body .why { color: var(--text-dim); font-size: 12px; margin-top: 6px; font-style: italic; }
+    .product-tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 3px; margin-left: 8px; vertical-align: middle; letter-spacing: 0.04em; }
+    .product-tag.os { background: rgba(0,229,195,0.1); color: var(--signal); }
+    .product-tag.tf { background: rgba(167,139,250,0.1); color: var(--purple); }
+
+    /* Bottom stats */
+    .bottom-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 48px; }
+    .bs-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; text-align: center; }
+    .bs-card .num { font-size: 28px; font-weight: 800; color: var(--signal); }
+    .bs-card .lbl { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+    footer { border-top: 1px solid var(--border); padding: 32px 0; text-align: center; color: var(--text-dim); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="inner">
+      <a href="/" class="logo">OPENSYBER</a>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/docs">Docs</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="hero">
+      <h1>What we're building.<br><span>And why it can't wait.</span></h1>
+      <p>Every item on this roadmap exists because of a real threat, a real customer request, or a real gap we found. No filler features.</p>
+      <div class="meta">
+        <div class="meta-item"><div class="meta-dot green"></div> 7 sprints shipped</div>
+        <div class="meta-item"><div class="meta-dot blue"></div> Sprint 8 in progress</div>
+        <div class="meta-item">Updated April 2026</div>
+      </div>
+    </div>
+
+    <!-- Threat context -->
+    <div class="threat-context">
+      <h3>Why This Matters Right Now</h3>
+      <p><strong>March 19, 2026:</strong> Malicious Trivy plugin exfiltrated CI/CD secrets from 45 organizations. Supply chain attacks on AI agent toolchains are no longer theoretical.</p>
+      <p><strong>March 22, 2026:</strong> CanisterWorm spread through npm install scripts in AI coding agents. Infected packages had 12,000+ downloads before detection.</p>
+      <p><strong>February 2026:</strong> "Clinejection" — prompt injection attacks targeting AI coding agents demonstrated at scale. Your agent's inputs are an attack surface.</p>
+      <p>Every feature below is a direct response to threats that are happening <strong>right now</strong>.</p>
+    </div>
+
+    <div class="phases">
+
+      <!-- SHIPPED -->
+      <div class="phase">
+        <div class="phase-header">
+          <span class="phase-badge shipped">Shipped</span>
+          <span class="phase-title">The Foundation</span>
+          <span class="phase-date">Jan — Mar 2026</span>
+        </div>
+        <div class="items">
+          <div class="item">
+            <div class="item-icon done">&#10003;</div>
+            <div class="item-body">
+              <h4>Agent Runtime — 60-Second Deploy <span class="product-tag os">OpenSyber</span></h4>
+              <p>Per-user Hetzner VMs with Docker isolation, seccomp profiles, osquery. From zero to monitored agent in under a minute.</p>
+              <div class="why">Because "deploy fast" and "deploy secure" shouldn't be contradictions.</div>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon done">&#10003;</div>
+            <div class="item-body">
+              <h4>Behavioral Monitoring + 340ms Response <span class="product-tag os">OpenSyber</span></h4>
+              <p>Real-time event stream. Behavioral baselines per agent type. Detect, block, quarantine, rotate credentials — all automated.</p>
+              <div class="why">The Trivy attack took days to detect. We made "days" into "milliseconds."</div>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon done">&#10003;</div>
+            <div class="item-body">
+              <h4>Skill Marketplace — 22 Audited Skills <span class="product-tag os">OpenSyber</span></h4>
+              <p>Signature verification, supply chain scanning, postinstall script analysis. Every skill vetted before it touches your agent.</p>
+              <div class="why">CanisterWorm spread through npm postinstall. We scan those before execution.</div>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon done">&#10003;</div>
+            <div class="item-body">
+              <h4>Credential Vault with Skill-Level Access <span class="product-tag os">OpenSyber</span></h4>
+              <p>Agents never see raw secrets. A code reviewer can't access STRIPE_SECRET_KEY. Automatic rotation on breach detection.</p>
+              <div class="why">Our .env got exfiltrated because the agent had access to everything. Never again.</div>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon done">&#10003;</div>
+            <div class="item-body">
+              <h4>TokenForge SDK — Device-Bound Sessions <span class="product-tag tf">TokenForge</span></h4>
+              <p>ECDSA P-256 non-extractable keys. Express, Fastify, Hono, Next.js adapters. Go, Python, Kotlin, Swift, React Native SDKs.</p>
+              <div class="why">Session tokens get stolen. We made stolen tokens mathematically useless.</div>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon done">&#10003;</div>
+            <div class="item-body">
+              <h4>96% Test Coverage + Production Deploy <span class="product-tag os">OpenSyber</span></h4>
+              <p>118 API routes. Playwright E2E across 5 personas. Deployed on Cloudflare Workers globally.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOW -->
+      <div class="phase">
+        <div class="phase-header">
+          <span class="phase-badge now">Building Now</span>
+          <span class="phase-title">Enterprise & Teams</span>
+          <span class="phase-date">April 2026</span>
+        </div>
+        <div class="items">
+          <div class="item">
+            <div class="item-icon wip"></div>
+            <div class="item-body">
+              <h4>RBAC + Organization Management <span class="product-tag os">OpenSyber</span></h4>
+              <p>Multi-org, team creation, invitation flows with email verification, custom role builder with per-agent permission scoping.</p>
+              <div class="why">Enterprise customers need "the intern can't touch production agents" as a policy, not a hope.</div>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon wip"></div>
+            <div class="item-body">
+              <h4>Free Tier Fix: 1K &rarr; 10K Verifications <span class="product-tag tf">TokenForge</span></h4>
+              <p>Current 1K/month limit runs out in under 1 day for any real app. Raising to 10K so developers can actually evaluate the product.</p>
+              <div class="why">Audit finding: developers hit the wall during integration testing, before they even deploy to staging.</div>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon wip"></div>
+            <div class="item-body">
+              <h4>Stable Proxy Domain <span class="product-tag tf">TokenForge</span></h4>
+              <p>Migrating from hardcoded workers.dev CNAME to proxy.tokenforge.opensyber.cloud. One DNS record change instead of breaking every customer.</p>
+              <div class="why">Audit finding: a Worker redeployment would break every customer's proxy simultaneously.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEXT -->
+      <div class="phase">
+        <div class="phase-header">
+          <span class="phase-badge next">Next Up</span>
+          <span class="phase-title">SSO, Compliance & SIEM</span>
+          <span class="phase-date">May — Jun 2026</span>
+        </div>
+        <div class="items">
+          <div class="item">
+            <div class="item-icon planned">&#8226;</div>
+            <div class="item-body">
+              <h4>SAML 2.0 + OIDC SSO <span class="product-tag os">OpenSyber</span></h4>
+              <p>Per-org SAML provider config. OIDC support. JIT provisioning from your IdP.</p>
+              <div class="why">"Can your team use our Okta?" is the first question in every enterprise sales call.</div>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon planned">&#8226;</div>
+            <div class="item-body">
+              <h4>Audit Log Dashboard + GDPR Data Export <span class="product-tag os">OpenSyber</span></h4>
+              <p>Searchable audit log viewer. One-click data export. Retention policies. Everything your compliance team will ask for.</p>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon planned">&#8226;</div>
+            <div class="item-body">
+              <h4>SIEM Integration GA <span class="product-tag tf">TokenForge</span></h4>
+              <p>Production-ready Splunk, Datadog, Sentinel connectors. CEF and LEEF format. Ship session security events to your existing SOC.</p>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon planned">&#8226;</div>
+            <div class="item-body">
+              <h4>AI Prompt Guard v2 <span class="product-tag os">OpenSyber</span></h4>
+              <p>Next-gen injection detection with context-aware filtering. Handles multi-step injection chains, not just single-shot patterns.</p>
+              <div class="why">Clinejection showed that prompt injection is evolving faster than regex-based detection.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LATER -->
+      <div class="phase">
+        <div class="phase-header">
+          <span class="phase-badge later">On Deck</span>
+          <span class="phase-title">Scale, Certification & New Languages</span>
+          <span class="phase-date">Q3 — Q4 2026</span>
+        </div>
+        <div class="items">
+          <div class="item">
+            <div class="item-icon planned">&#8226;</div>
+            <div class="item-body">
+              <h4>SOC 2 Type II Certification <span class="product-tag os">OpenSyber</span></h4>
+              <p>Target: Q3 2026. Auditor engaged. Control mapping complete. We don't say "SOC 2 in progress" — we say "Q3 2026, here's the auditor."</p>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon planned">&#8226;</div>
+            <div class="item-body">
+              <h4>1K Concurrent Agent Load Testing <span class="product-tag os">OpenSyber</span></h4>
+              <p>D1 query optimization, index analysis, connection pooling. Proving the architecture handles enterprise scale.</p>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon planned">&#8226;</div>
+            <div class="item-body">
+              <h4>Python & Go Agent SDKs <span class="product-tag os">OpenSyber</span></h4>
+              <p>Native runtime SDKs beyond Node.js. Because not every AI agent runs on JavaScript.</p>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon planned">&#8226;</div>
+            <div class="item-body">
+              <h4>ML Anomaly Detection v2 <span class="product-tag os">OpenSyber</span></h4>
+              <p>Behavioral baselines per agent type. Unsupervised clustering for novel attack patterns. Detect threats we haven't seen before.</p>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon planned">&#8226;</div>
+            <div class="item-body">
+              <h4>Data Residency & Multi-Region <span class="product-tag tf">TokenForge</span></h4>
+              <p>EU-only and US-only deployment options. Per-org data residency for enterprise compliance requirements.</p>
+            </div>
+          </div>
+          <div class="item">
+            <div class="item-icon planned">&#8226;</div>
+            <div class="item-body">
+              <h4>Product Hunt Launch <span class="product-tag os">OpenSyber</span></h4>
+              <p>Target: Q2 2026. Live demo environment, launch video, press kit. The first dedicated AI agent security platform on Product Hunt.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom stats -->
+    <div class="bottom-stats">
+      <div class="bs-card">
+        <div class="num">7</div>
+        <div class="lbl">Sprints Shipped</div>
+      </div>
+      <div class="bs-card">
+        <div class="num">118</div>
+        <div class="lbl">API Routes</div>
+      </div>
+      <div class="bs-card">
+        <div class="num">96%</div>
+        <div class="lbl">Test Coverage</div>
+      </div>
+      <div class="bs-card">
+        <div class="num">22</div>
+        <div class="lbl">Audited Skills</div>
+      </div>
+      <div class="bs-card">
+        <div class="num">6</div>
+        <div class="lbl">SDK Languages</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="container">
+      &copy; 2026 OpenSyber &middot; <a href="/about.html">About</a> &middot; <a href="/pricing">Pricing</a> &middot; <a href="/docs">Docs</a>
+    </div>
+  </footer>
+</body>
+</html>

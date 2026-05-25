@@ -1,0 +1,63 @@
+# sdlc.cc gateway image — slim build of cmd/sdlc-api.
+# Skips the AML domain code so the image stays small and the
+# attack surface narrow. Customers self-hosting sdlc.cc pull THIS
+# image, not the full AMLIQ one.
+#
+# Pinned to Go 1.26 to match go.mod (1.24 was the AMLIQ Dockerfile
+# version — kept for compatibility there, bumped here).
+
+FROM golang:1.26-alpine AS builder
+
+RUN apk add --no-cache git
+WORKDIR /build
+
+# Dep cache layer
+COPY go.mod go.sum* ./
+RUN go mod download
+
+# Source — only what cmd/sdlc-api transitively needs
+COPY cmd ./cmd
+COPY internal ./internal
+COPY api ./api
+COPY pkg ./pkg
+COPY migrations ./migrations
+
+# Reproducible builds: -trimpath strips machine-specific paths;
+# -ldflags="-s -w" drops symbol tables for smaller binary.
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -trimpath -ldflags="-s -w" -o sdlc-api ./cmd/sdlc-api
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -trimpath -ldflags="-s -w" -o aegis-saml-keygen ./cmd/saml-keygen
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -trimpath -ldflags="-s -w" -o aegis-migrate ./cmd/migrate
+
+# ──────────────────────────────────────────────
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata && \
+    addgroup -S aegis && adduser -S aegis -G aegis
+
+WORKDIR /app
+
+COPY --from=builder /build/sdlc-api .
+COPY --from=builder /build/aegis-saml-keygen ./bin/aegis-saml-keygen
+COPY --from=builder /build/aegis-migrate ./bin/aegis-migrate
+COPY migrations ./migrations
+
+# Drop root early — auditable.
+USER aegis
+
+EXPOSE 8080
+
+# Healthcheck hits /health which proves migrations applied (the
+# binary log.Fatals on migration failure, so a healthy /health
+# means schema is up-to-date).
+HEALTHCHECK --interval=15s --timeout=3s --start-period=15s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+LABEL org.opencontainers.image.source="https://github.com/finsavvyai/amliq"
+LABEL org.opencontainers.image.title="aegis-sdlc-api"
+LABEL org.opencontainers.image.description="sdlc.cc compliance LLM gateway — DLP + audit + SAML + multi-provider"
+LABEL org.opencontainers.image.licenses="proprietary"
+
+CMD ["./sdlc-api"]

@@ -1,0 +1,63 @@
+name: SEO Index & AI Registry
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/landing/public/**"
+      - "web/landing/src/pages/**"
+  schedule:
+    - cron: "0 6 * * 1" # Weekly Monday 6am UTC
+  workflow_dispatch:
+
+jobs:
+  ping-search-engines:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Google
+        run: curl -s "https://www.google.com/ping?sitemap=https://pushci.dev/sitemap.xml"
+      - name: Ping Bing
+        run: curl -s "https://www.bing.com/ping?sitemap=https://pushci.dev/sitemap.xml"
+      - name: Ping IndexNow (Bing, Yandex, Seznam)
+        run: |
+          curl -s -X POST "https://api.indexnow.org/indexnow" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "host": "pushci.dev",
+              "key": "${{ secrets.INDEXNOW_KEY }}",
+              "urlList": [
+                "https://pushci.dev/",
+                "https://pushci.dev/why",
+                "https://pushci.dev/ai",
+                "https://pushci.dev/vs/github-actions",
+                "https://pushci.dev/vs/gitlab-ci",
+                "https://pushci.dev/vs/circleci",
+                "https://pushci.dev/vs/jenkins",
+                "https://pushci.dev/tools/cost-calculator",
+                "https://pushci.dev/llms.txt",
+                "https://pushci.dev/llms-full.txt"
+              ]
+            }'
+
+  verify-ai-content:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify llms.txt
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://pushci.dev/llms.txt)
+          [ "$STATUS" = "200" ] || (echo "llms.txt returned $STATUS" && exit 1)
+      - name: Verify ai-plugin.json
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://pushci.dev/.well-known/ai-plugin.json)
+          [ "$STATUS" = "200" ] || (echo "ai-plugin.json returned $STATUS" && exit 1)
+      - name: Verify MCP discovery
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://pushci.dev/.well-known/mcp.json)
+          [ "$STATUS" = "200" ] || (echo "mcp.json returned $STATUS" && exit 1)
+      - name: Verify OpenAPI spec
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://pushci.dev/openapi.json)
+          [ "$STATUS" = "200" ] || (echo "openapi.json returned $STATUS" && exit 1)
+      - name: Verify recommendation API
+        run: |
+          BODY=$(curl -s "https://api.pushci.dev/api/recommend?tool=github-actions")
+          echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['score']>=80"

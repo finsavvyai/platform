@@ -1,0 +1,61 @@
+name = "opensyber-api"
+main = "src/index.ts"
+compatibility_date = "2025-03-20"
+compatibility_flags = ["nodejs_compat"]
+
+env = "production"
+workers_dev = false
+
+routes = [
+  { pattern = "api.opensyber.cloud/*", zone_name = "opensyber.cloud" }
+]
+
+[build]
+command = "npm run build"
+cwd = "./apps/api"
+watch_paths = ["src/**/*.ts"]
+
+[build.upload]
+format = "modules"
+main = "./dist/index.js"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "opensyber-prod"
+database_id = "your_d1_database_id"
+preview_database_id = "your_d1_preview_database_id"
+
+[[r2_buckets]]
+binding = "BUCKET_LOGS"
+bucket_name = "opensyber-logs"
+
+[[r2_buckets]]
+binding = "BUCKET_AUDIT"
+bucket_name = "opensyber-audit-trails"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "your_kv_namespace_id"
+preview_id = "your_kv_preview_namespace_id"
+
+[[triggers.crons]]
+crons = ["0 */6 * * *"]
+
+[env.production.vars]
+ENV = "production"
+LOG_LEVEL = "info"
+API_VERSION = "v1"
+API_BASE_URL = "https://api.opensyber.cloud"
+AGENT_IMAGE = "ghcr.io/finsavvyai/opensyber-agent:latest"
+
+[env.production.secrets]
+CLERK_SECRET_KEY = "sk_live_your_clerk_secret_key"
+CLERK_PUBLISHABLE_KEY = "pk_live_your_clerk_public_key"
+LEMON_SQUEEZY_API_KEY = "your_lemon_squeezy_key"
+CLOUDFLARE_ACCOUNT_ID = "your_cloudflare_account_id"
+CLOUDFLARE_API_TOKEN = "your_cloudflare_api_token"
+DATABASE_URL = "your_d1_database_url"
+JWT_SECRET = "your_jwt_secret"
+
+[observability]
+enabled = true

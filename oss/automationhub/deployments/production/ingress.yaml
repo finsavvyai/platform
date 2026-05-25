@@ -1,0 +1,659 @@
+---
+# Production Ingress Configuration
+
+---
+# Ingress-Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    name: ingress-nginx
+    app: upm-plus
+    component: ingress
+
+---
+# NGINX Ingress Controller
+apiVersion: source.networking.k8s.io/v1beta1
+kind: IngressClass
+metadata:
+  name: nginx
+  labels:
+    app: upm-plus
+    component: ingress
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+    ingressclass.kubernetes.io/permitted-controllers: "k8s.io/ingress-nginx"
+spec:
+  controller: k8s.io/ingress-nginx
+  parameters:
+    globalRateLimit: "100"
+    globalRateLimitWindow: "1m"
+
+---
+# NGINX Ingress Controller Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/component: controller
+    app: upm-plus
+    component: ingress
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ingress-nginx
+      app.kubernetes.io/component: controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ingress-nginx
+        app.kubernetes.io/component: controller
+        app: upm-plus
+        component: ingress
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "10254"
+    spec:
+      serviceAccountName: nginx-ingress-serviceaccount
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
+      containers:
+      - name: nginx-ingress-controller
+        image: registry.k8s.io/ingress-nginx/controller:v1.9.1
+        args:
+        - /nginx-ingress-controller
+        - --election-lock-name=ingress-controller-leader
+        - --controller-class=nginx
+        - --configmap=$(POD_NAMESPACE)/nginx-configuration
+        - --tcp-services-configmap=$(POD_NAMESPACE)/tcp-services
+        - --udp-services-configmap=$(POD_NAMESPACE)/udp-services
+        - --publish-service=$(POD_NAMESPACE)/ingress-nginx-controller
+        - --annotations-prefix=nginx.ingress.kubernetes.io
+        - --default-backend-service=$(POD_NAMESPACE)/default-http-backend
+        - --enable-custom-metrics
+        - --v=2
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: LD_PRELOAD
+          value: /usr/local/lib/libmimalloc.so.2
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        - name: https
+          containerPort: 443
+          protocol: TCP
+        - name: prometheus
+          containerPort: 10254
+          protocol: TCP
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          successThreshold: 1
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1
+          successThreshold: 1
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: nginx-template-volume
+          mountPath: /etc/nginx/template
+          readOnly: true
+        - name: nginx-configuration-volume
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        - name: nginx-certs-volume
+          mountPath: /etc/nginx/certs
+          readOnly: true
+        - name: nginx-dhparam-volume
+          mountPath: /etc/nginx/dhparam
+        - name: custom-lua-scripts
+          mountPath: /etc/nginx/lua
+      volumes:
+      - name: nginx-template-volume
+        configMap:
+          name: nginx-template
+      - name: nginx-configuration-volume
+        configMap:
+          name: nginx-configuration
+      - name: nginx-certs-volume
+        secret:
+          secretName: nginx-tls
+      - name: nginx-dhparam-volume
+        secret:
+          secretName: nginx-dhparam
+      - name: custom-lua-scripts
+        configMap:
+          name: nginx-custom-lua
+          optional: true
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - ingress-nginx
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      - key: "node-role.kubernetes.io/master"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+
+---
+# NGINX Ingress Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/component: controller
+    app: upm-plus
+    component: ingress
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "10254"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: https
+    protocol: TCP
+  - name: prometheus
+    port: 10254
+    targetPort: prometheus
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/component: controller
+
+---
+# Default HTTP Backend
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: default-http-backend
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: default-http-backend
+    app: upm-plus
+    component: ingress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: default-http-backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: default-http-backend
+        app: upm-plus
+        component: ingress
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+      - name: default-http-backend
+        image: k8s.gcr.io/defaultbackend-amd64:1.5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: 10m
+            memory: 20Mi
+          requests:
+            cpu: 10m
+            memory: 20Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: default-http-backend
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: default-http-backend
+    app: upm-plus
+    component: ingress
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/name: default-http-backend
+
+---
+# NGINX Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-configuration
+  namespace: ingress-nginx
+  labels:
+    app: upm-plus
+    component: ingress
+data:
+  nginx.conf: |
+    # Production NGINX Configuration for UPM.Plus
+
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /run/nginx.pid;
+    worker_rlimit_nofile 65535;
+    worker_cpu_affinity auto;
+
+    events {
+        worker_connections 8192;
+        multi_accept on;
+        use epoll;
+        accept_mutex off;
+    }
+
+    http {
+        # Load modules
+        include /etc/nginx/modules-enabled/*.conf;
+
+        # Basic settings
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        server_tokens off;
+        server_name_in_redirect off;
+
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types
+            text/plain
+            text/css
+            text/xml
+            text/javascript
+            application/json
+            application/javascript
+            application/xml+rss
+            application/atom+xml
+            image/svg+xml;
+
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=login:10m rate=5r/s;
+        limit_req_zone $binary_remote_addr zone=upload:10m rate=2r/s;
+
+        # Include mime types
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+
+        # Logging format
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for" '
+                        '$request_time $upstream_response_time';
+
+        access_log /var/log/nginx/access.log main;
+        error_log /var/log/nginx/error.log warn;
+
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https:; connect-src 'self' https: wss:; frame-ancestors 'self';" always;
+
+        # HSTS (only for HTTPS)
+        map $scheme $hsts_header {
+            default "";
+            https "max-age=31536000; includeSubDomains; preload";
+        }
+        add_header Strict-Transport-Security $hsts_header always;
+
+        # Proxy settings
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Original-Forwarded-For $http_x_forwarded_for;
+        proxy_set_header X-Original-Proto $scheme;
+        proxy_set_header X-Original-Host $http_host;
+
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_http_version 1.1;
+        proxy_cache_bypass $http_upgrade;
+        proxy_no_cache $http_upgrade;
+
+        # Timeouts
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+
+        # SSL Settings
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256;
+        ssl_prefer_server_ciphers on;
+        ssl_session_cache shared:SSL:50m;
+        ssl_session_timeout 1d;
+        ssl_session_tickets off;
+        ssl_stapling on;
+        ssl_stapling_verify on;
+        resolver 8.8.8.8;
+
+        # Map for upstream servers
+        map $host $upstream_name {
+            api.upm.plus               upm-plus-api;
+            admin.upm.plus            upm-plus-admin;
+            grafana.upm.plus           upm-plus-grafana;
+            prometheus.upm.plus        upm-plus-prometheus;
+            alertmanager.upm.plus     upm-plus-alertmanager;
+            default                    upm-plus-api;
+        }
+
+        # Upstream servers
+        upstream upm-plus-api {
+            least_conn;
+            server upm-plus-api.upm-plus-prod.svc.cluster.local:8000 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+
+        upstream upm-plus-admin {
+            least_conn;
+            server upm-plus-admin.upm-plus-prod.svc.cluster.local:3001 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+
+        upstream upm-plus-grafana {
+            least_conn;
+            server grafana.upm-plus-prod.svc.cluster.local:3000 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+
+        upstream upm-plus-prometheus {
+            least_conn;
+            server prometheus.upm-plus-prod.svc.cluster.local:9090 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+
+        upstream upm-plus-alertmanager {
+            least_conn;
+            server alertmanager.upm-plus-prod.svc.cluster.local:9093 max_fails=3 fail_timeout=30s;
+            keepalive 32;
+        }
+
+        # Server blocks
+        server {
+            listen 80;
+            listen [::]:80;
+            server_name upm.plus *.upm.plus;
+
+            # Redirect HTTP to HTTPS
+            return 301 https://$host$request_uri;
+        }
+
+        server {
+            listen 443 ssl http2;
+            listen [::]:443 ssl http2;
+            server_name upm.plus *.upm.plus;
+
+            # SSL Certificates
+            ssl_certificate /etc/nginx/certs/tls.crt;
+            ssl_certificate_key /etc/nginx/certs/tls.key;
+
+            # Root location
+            location / {
+                proxy_pass http://$upstream_name;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+
+                # Security measures
+                limit_req zone=api burst=20 nodelay;
+            }
+
+            # API specific locations
+            location /api/ {
+                proxy_pass http://upm-plus-api;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+
+                # API rate limiting
+                limit_req zone=api burst=50 nodelay;
+            }
+
+            location /auth/ {
+                proxy_pass http://upm-plus-api;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+
+                # Authentication rate limiting (stricter)
+                limit_req zone=login burst=10 nodelay;
+            }
+
+            location /upload/ {
+                proxy_pass http://upm-plus-api;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection $connection_upgrade;
+
+                # Upload rate limiting (very strict)
+                limit_req zone=upload burst=5 nodelay;
+
+                # File upload settings
+                client_max_body_size 100M;
+                proxy_request_buffering off;
+                proxy_read_timeout 300s;
+                proxy_send_timeout 300s;
+            }
+
+            # Health checks
+            location /health {
+                proxy_pass http://upm-plus-api/health;
+                access_log off;
+            }
+
+            location /ready {
+                proxy_pass http://upm-plus-api/ready;
+                access_log off;
+            }
+
+            # Monitoring endpoints
+            location /metrics {
+                proxy_pass http://upm-plus-api/metrics;
+                allow 127.0.0.1;
+                allow 10.0.0.0/8;
+                allow 172.16.0.0/12;
+                allow 192.168.0.0/16;
+                deny all;
+                access_log off;
+            }
+
+            # Grafana
+            location /grafana/ {
+                proxy_pass http://upm-plus-grafana/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            }
+
+            location /grafana/api/ {
+                proxy_pass http://upm-plus-grafana/api/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            }
+
+            # Prometheus
+            location /prometheus/ {
+                proxy_pass http://upm-plus-prometheus/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                allow 127.0.0.1;
+                allow 10.0.0.0/8;
+                allow 172.16.0.0/12;
+                allow 192.168.0.0/16;
+                deny all;
+            }
+
+            # Static files cache
+            location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                proxy_pass http://$upstream_name;
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+                access_log off;
+            }
+
+            # Block common attacks
+            location ~* \.(aspx|jsp|cgi|php|asp)$ {
+                deny all;
+            }
+
+            location ~ /\. {
+                deny all;
+            }
+        }
+    }
+
+  # TCP/UDP Services
+    stream {
+        upstream prometheus_tcp {
+            server prometheus.upm-plus-prod.svc.cluster.local:9090;
+        }
+
+        upstream grafana_tcp {
+            server grafana.upm-plus-prod.svc.cluster.local:3000;
+        }
+
+        server {
+            listen 9090;
+            listen [::]:9090;
+            proxy_pass prometheus_tcp;
+            proxy_timeout 1s;
+            proxy_responses 1;
+        }
+
+        server {
+            listen 3000;
+            listen [::]:3000;
+            proxy_pass grafana_tcp;
+            proxy_timeout 1s;
+            proxy_responses 1;
+        }
+    }
+
+---
+# NGINX Template
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-template
+  namespace: ingress-nginx
+  labels:
+    app: upm-plus
+    component: ingress
+data:
+  nginx.tmpl: |
+    # Production NGINX template
+    # This file will be processed by the NGINX controller
+    # Custom modifications for UPM.Plus production environment
+
+    # Enhanced SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384';
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+
+    # Performance optimizations
+    tcp_nodelay on;
+    sendfile on;
+    tcp_nopush on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+    # Custom proxy settings for better performance
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_http_version 1.1;
+    proxy_cache_bypass $http_upgrade;
+    proxy_no_cache $http_upgrade;

@@ -1,0 +1,130 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pushci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+      - name: Install pushci
+        run: go install github.com/finsavvyai/pushci/cmd/pushci@latest || go build -o /usr/local/bin/pushci ./cmd/pushci
+      - name: Install tools
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+      - name: Install gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+      - name: gitleaks scan
+        run: gitleaks detect --no-banner --redact --exit-code 1
+      - name: Install license scanner
+        run: go install github.com/google/go-licenses@latest
+      - name: License compliance scan (Go)
+        run: |
+          go-licenses check ./cmd/pushci \
+            --disallowed_types=forbidden,restricted \
+            --ignore github.com/finsavvyai
+      - name: Run pipeline
+        run: pushci run
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.out
+      - name: Coverage threshold gate (>=90%)
+        if: hashFiles('coverage.out') != ''
+        run: |
+          pct=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+          echo "total coverage: ${pct}%"
+          awk -v p="$pct" 'BEGIN { if (p+0 < 90) { exit 1 } }' \
+            || { echo "::error::coverage ${pct}% below 90% gate"; exit 1; }
+
+  mobile:
+    name: mobile (Expo + Maestro lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Maestro lint flows
+        run: |
+          for f in .maestro/*.yaml; do
+            echo "::group::lint $f"
+            maestro test --no-ansi --shard-all 1 --dry-run "$f" || exit 1
+            echo "::endgroup::"
+          done
+      - name: Upload Maestro artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-artifacts
+          path: mobile/.maestro/
+
+  api:
+    name: api (Workers + vitest coverage)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - name: Test with coverage (>=90% line, >=85% branch)
+        run: npx vitest run --coverage
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: api/coverage/
+
+  rust:
+    name: agent-platform (Rust workspace)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent-platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: agent-platform
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --workspace --no-fail-fast

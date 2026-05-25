@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pipewarden.fullname" . }}
+  labels: {{- include "pipewarden.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels: {{- include "pipewarden.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "pipewarden.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "pipewarden.serviceAccountName" . }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: pipewarden
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PIPEWARDEN_VAULT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pipewarden.vaultSecretName" . }}
+                  key: vault-key
+            - name: PIPEWARDEN_DATABASE_DRIVER
+              value: {{ .Values.database.driver | quote }}
+            {{- if eq .Values.database.driver "sqlite" }}
+            - name: PIPEWARDEN_DATABASE_PATH
+              value: {{ .Values.database.sqlite.path | quote }}
+            {{- else if eq .Values.database.driver "postgres" }}
+            - name: PIPEWARDEN_DATABASE_HOST
+              value: {{ .Values.database.postgres.host | quote }}
+            - name: PIPEWARDEN_DATABASE_PORT
+              value: {{ .Values.database.postgres.port | quote }}
+            - name: PIPEWARDEN_DATABASE_NAME
+              value: {{ .Values.database.postgres.database | quote }}
+            - name: PIPEWARDEN_DATABASE_USER
+              value: {{ .Values.database.postgres.user | quote }}
+            - name: PIPEWARDEN_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "database.postgres.existingSecret is required when driver=postgres" .Values.database.postgres.existingSecret }}
+                  key: password
+            {{- end }}
+            {{- if .Values.airGap.enabled }}
+            - name: PIPEWARDEN_AIRGAP
+              value: "true"
+            - name: CLAWPIPE_OFFLINE_PROVIDER
+              value: {{ .Values.airGap.offlineLLM.provider | quote }}
+            - name: CLAWPIPE_OFFLINE_ENDPOINT
+              value: {{ .Values.airGap.offlineLLM.endpoint | quote }}
+            - name: CLAWPIPE_OFFLINE_MODEL
+              value: {{ .Values.airGap.offlineLLM.model | quote }}
+            {{- end }}
+            {{- if .Values.tailscale.enabled }}
+            - name: PIPEWARDEN_MESH_ENABLED
+              value: "true"
+            - name: PIPEWARDEN_MESH_PROVIDER
+              value: "tailscale"
+            - name: PIPEWARDEN_MESH_HOSTNAME
+              value: {{ .Values.tailscale.hostname | quote }}
+            - name: PIPEWARDEN_MESH_STATE_DIR
+              value: {{ .Values.tailscale.stateDir | quote }}
+            - name: TAILSCALE_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "tailscale.existingSecret required when tailscale.enabled" .Values.tailscale.existingSecret }}
+                  key: authkey
+            {{- end }}
+            {{- if .Values.rvector.enabled }}
+            - name: PIPEWARDEN_RUVECTOR_URL
+              value: {{ .Values.rvector.url | quote }}
+            - name: PIPEWARDEN_RUVECTOR_COLLECTION
+              value: {{ .Values.rvector.collection | quote }}
+            {{- if .Values.rvector.existingSecret }}
+            - name: PIPEWARDEN_RUVECTOR_APIKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.rvector.existingSecret }}
+                  key: apikey
+            {{- end }}
+            {{- end }}
+          {{- if .Values.claude.enabled }}
+            - name: CLAUDE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "claude.existingSecret required" .Values.claude.existingSecret }}
+                  key: api-key
+          {{- end }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          livenessProbe: {{- toYaml .Values.probes.liveness | nindent 12 }}
+          readinessProbe: {{- toYaml .Values.probes.readiness | nindent 12 }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            - name: tmp
+              mountPath: /tmp
+        {{- if .Values.llamafile.enabled }}
+        - name: llamafile
+          image: "{{ .Values.llamafile.image.repository }}:{{ .Values.llamafile.image.tag }}"
+          imagePullPolicy: {{ .Values.llamafile.image.pullPolicy }}
+          ports:
+            - name: llm
+              containerPort: 8080
+          resources: {{- toYaml .Values.llamafile.resources | nindent 12 }}
+          readinessProbe:
+            httpGet: { path: /v1/models, port: llm }
+            initialDelaySeconds: 60
+            periodSeconds: 10
+        {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "pipewarden.fullname" . }}
+        {{- else }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

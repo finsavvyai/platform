@@ -1,0 +1,154 @@
+name: Browser Tests
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'tests/browser/**'
+      - 'lunaos-studio/**'
+      - 'lunaos-dashboard/**'
+      - 'lunaos-marketing/**'
+      - '.github/workflows/browser-tests.yml'
+  pull_request:
+    paths:
+      - 'tests/browser/**'
+      - 'lunaos-studio/**'
+      - 'lunaos-dashboard/**'
+      - 'lunaos-marketing/**'
+  workflow_dispatch:
+
+concurrency:
+  group: browser-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ai-agent:
+    name: AI Browser Agent (self-contained)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tests/browser/package-lock.json
+      - name: Install suite deps
+        working-directory: tests/browser
+        run: npm ci || npm install --no-audit --no-fund
+      - name: Install Chromium
+        working-directory: tests/browser
+        run: npx playwright install --with-deps chromium
+      - name: Run AI-agent project
+        working-directory: tests/browser
+        env:
+          AUTO_SERVE: 'false'
+        run: npx playwright test --project=ai-agent
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-agent-results
+          path: |
+            tests/browser/test-results
+            tests/browser/playwright-report
+          if-no-files-found: ignore
+
+  marketing:
+    name: Marketing + Visual Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: tests/browser/package-lock.json
+      - name: Install suite deps
+        working-directory: tests/browser
+        run: npm ci || npm install --no-audit --no-fund
+      - name: Install Chromium
+        working-directory: tests/browser
+        run: npx playwright install --with-deps chromium
+      - name: Serve marketing site
+        run: npx --yes serve -l 4000 -s lunaos-marketing &
+      - name: Wait for marketing server
+        run: npx --yes wait-on http://localhost:4000 -t 30000
+      - name: Run marketing + visual projects
+        working-directory: tests/browser
+        env:
+          AUTO_SERVE: 'false'
+          MARKETING_URL: http://localhost:4000
+        run: npx playwright test --project=marketing --project=visual
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketing-results
+          path: |
+            tests/browser/test-results
+            tests/browser/playwright-report
+          if-no-files-found: ignore
+
+  studio-dashboard:
+    name: Studio + Dashboard (optional)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install suite deps
+        working-directory: tests/browser
+        run: npm install --no-audit --no-fund
+      - name: Install studio deps
+        working-directory: lunaos-studio
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+      - name: Install dashboard deps
+        working-directory: lunaos-dashboard
+        run: npm install --no-audit --no-fund --legacy-peer-deps
+      - name: Install Chromium
+        working-directory: tests/browser
+        run: npx playwright install --with-deps chromium
+      - name: Run studio + dashboard projects (auto-serve)
+        working-directory: tests/browser
+        env:
+          AUTO_SERVE: 'true'
+          CI: 'true'
+        run: npx playwright test --project=studio --project=dashboard
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-dashboard-results
+          path: |
+            tests/browser/test-results
+            tests/browser/playwright-report
+          if-no-files-found: ignore
+
+  heal-summary:
+    name: Heal Summary
+    needs: [ai-agent, marketing]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-results'
+          merge-multiple: true
+          path: tests/browser/test-results
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Generate heal proposals
+        working-directory: tests/browser
+        run: node scripts/heal-to-fix.mjs --dry-run || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: heal-proposals
+          path: tests/browser/test-results/ll-fix-*.{jsonl,sh}
+          if-no-files-found: ignore

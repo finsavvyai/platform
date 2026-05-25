@@ -1,0 +1,27 @@
+name: Test LunaOS Action
+
+on:
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: 'Agent to run'
+        required: false
+        default: 'code-review'
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      # We need to test the action located in this repo
+      # Since we are inside the repo, we can reference it by path
+      - name: Run LunaOS Action
+        uses: ./.github/actions/luna
+        with:
+          agent: ${{ inputs.agent }}
+          provider: 'google' # Use Google (Gemini) as it has a free tier and is good for testing
+          api-key: ${{ secrets.GOOGLE_API_KEY }} # Assumes this secret exists in the repo
+          comment: 'false' # Don't post comment for test run
+          fail-on-critical: 'false'
+          files: 'false' # Run on full codebase for test

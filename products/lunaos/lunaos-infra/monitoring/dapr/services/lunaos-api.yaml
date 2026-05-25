@@ -1,0 +1,48 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: lunaos-api-config
+  namespace: default
+spec:
+  appId: lunaos-api
+  appPort: 8001
+  daprHttpPort: 3500
+  daprGrpcPort: 50001
+  config: lunaos-config
+  components:
+    - name: statestore
+      type: state.redis
+      version: v1
+    - name: pubsub
+      type: pubsub.redis
+      version: v1
+  subscriptions:
+    - pubsubname: pubsub
+      topic: agent-events
+      route: /api/events/agents
+    - pubsubname: pubsub
+      topic: plugin-events
+      route: /api/events/plugins
+    - pubsubname: pubsub
+      topic: system-events
+      route: /api/events/system
+  httpPipeline:
+    handlers:
+      - name: oauth2
+        type: middleware.http.oauth2
+      - name: ratelimit
+        type: middleware.http.ratelimit
+  accessControl:
+    defaultAction: allow
+    trustDomain: "public"
+    policies:
+      - appId: lunaos-api
+        defaultAction: allow
+        trustDomain: "public"
+        operations:
+          - name: /health
+            httpVerb: ["GET"]
+            action: allow
+          - name: /api/*
+            httpVerb: ["GET", "POST", "PUT", "DELETE"]
+            action: allow

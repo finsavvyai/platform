@@ -1,0 +1,21 @@
+FROM node:20-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+# Workspaces support: copy potentially all package.jsons? 
+# For simplicity in integration test, we install everything.
+# COPY packages/ ./packages/
+# COPY apps/ ./apps/
+# COPY tools/ ./tools/
+# COPY services/ ./services/
+# But Step 88 shows generic package.json with workspaces.
+# Copying everything first is easier for Dockerfile.dev
+
+COPY . .
+
+RUN npm install --legacy-peer-deps
+
+# Expose ports for various services
+EXPOSE 3000
+
+# Start dev server
+CMD ["npm", "run", "dev"]

@@ -1,0 +1,85 @@
+# LunaOS Engine API — Cloudflare Worker
+# api.lunaos.ai
+
+name = "lunaos-engine"
+main = "src/worker.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = ["* * * * *"]
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "lunaos-engine-db"
+database_id = "38ff1ff7-8f09-482a-b348-ca4c76b7f5d5"
+migrations_dir = "migrations"
+
+# KV Namespace (sessions, cache)
+[[kv_namespaces]]
+binding = "KV"
+id = "81f628c9709045f4b9151f29ea6b75be"
+preview_id = "77db46cd05e7405b915114a87fba71fb"
+
+# Cloudflare AI (embeddings)
+[ai]
+binding = "AI"
+
+# Vectorize (vector search)
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "luna-code-index"
+
+[vars]
+ENVIRONMENT = "development"
+LEMONSQUEEZY_STORE_ID = "214097"
+
+# ── Production ──────────────────────────────
+[env.production]
+name = "lunaos-engine"
+routes = [{ pattern = "api.lunaos.ai/*", zone_name = "lunaos.ai" }]
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "lunaos-engine-db"
+database_id = "38ff1ff7-8f09-482a-b348-ca4c76b7f5d5"
+migrations_dir = "migrations"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "81f628c9709045f4b9151f29ea6b75be"
+
+[env.production.ai]
+binding = "AI"
+
+[[env.production.vectorize]]
+binding = "VECTORIZE"
+index_name = "luna-code-index"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+# ── Staging ─────────────────────────────────
+[env.staging]
+name = "lunaos-engine-staging"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "lunaos-engine-db"
+database_id = "38ff1ff7-8f09-482a-b348-ca4c76b7f5d5"
+migrations_dir = "migrations"
+
+[[env.staging.kv_namespaces]]
+binding = "KV"
+id = "81f628c9709045f4b9151f29ea6b75be"
+
+[env.staging.ai]
+binding = "AI"
+
+[[env.staging.vectorize]]
+binding = "VECTORIZE"
+index_name = "luna-code-index"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"

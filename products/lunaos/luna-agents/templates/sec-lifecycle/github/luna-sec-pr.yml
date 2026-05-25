@@ -1,0 +1,59 @@
+name: Luna Security — PR
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  security-events: write   # SARIF upload to Code Scanning
+  pull-requests: write     # post summary comment
+
+concurrency:
+  group: luna-sec-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  luna-sec-pr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # gitleaks history scan
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+
+      - name: Install luna-agents
+        run: npm install -g luna-agents
+
+      - name: Run security PR bundle
+        run: npx luna-agents ll-sec-pr --post_pr_comment true --upload_sarif true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload aggregate SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: .luna/${{ github.event.repository.name }}/security/pr-aggregate.sarif
+          category: luna-sec-pr
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: luna-sec-pr-report
+          path: |
+            .luna/*/security/pr-summary.md
+            .luna/*/security/raw/*
+          retention-days: 14

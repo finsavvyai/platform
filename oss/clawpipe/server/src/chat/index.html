@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FinSavvyAI Chat</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg2:#f5f5f7;--bg3:#e8e8ed;
+  --text:#1d1d1f;--text2:#6e6e73;--text3:#aeaeb2;
+  --blue:#007AFF;--blue2:#0066d6;--blue-light:#e3f0ff;
+  --green:#30d158;--red:#ff3b30;
+  --bubble-user:#007AFF;--bubble-user-text:#fff;
+  --bubble-ai:#f0f0f5;--bubble-ai-text:#1d1d1f;
+  --border:#d2d2d7;--shadow:0 1px 3px rgba(0,0,0,0.08);
+  --radius:18px;--radius-sm:12px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"SF Mono",SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+  --header-h:52px;--input-h:72px;
+  --max-w:780px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1c1c1e;--bg2:#2c2c2e;--bg3:#3a3a3c;
+    --text:#f5f5f7;--text2:#98989d;--text3:#636366;
+    --blue:#0a84ff;--blue2:#409cff;--blue-light:#1c3a5c;
+    --bubble-user:#0a84ff;--bubble-user-text:#fff;
+    --bubble-ai:#2c2c2e;--bubble-ai-text:#f5f5f7;
+    --border:#48484a;--shadow:0 1px 3px rgba(0,0,0,0.3);
+  }
+}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.47;-webkit-font-smoothing:antialiased}
+
+/* Header */
+.header{position:fixed;top:0;left:0;right:0;height:var(--header-h);background:var(--bg);border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:100;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.header-left{display:flex;align-items:center;gap:12px}
+.logo{font-size:17px;font-weight:600;letter-spacing:-0.3px}
+.logo span{color:var(--blue)}
+.header-center{position:absolute;left:50%;transform:translateX(-50%)}
+.model-select{appearance:none;-webkit-appearance:none;background:var(--bg2);border:0.5px solid var(--border);border-radius:8px;padding:6px 28px 6px 12px;font:inherit;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236e6e73'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;min-width:160px}
+.model-select:hover{border-color:var(--text3)}
+.model-select:focus{border-color:var(--blue)}
+.header-right{display:flex;align-items:center;gap:8px}
+.btn-icon{background:none;border:none;cursor:pointer;padding:6px;border-radius:8px;color:var(--text2);display:flex;align-items:center;justify-content:center;transition:background 0.15s}
+.btn-icon:hover{background:var(--bg2)}
+.btn-icon:active{transform:scale(0.9)}
+.btn-icon svg{width:20px;height:20px}
+.btn-settings{font-size:13px;font-weight:500;color:var(--text2);background:none;border:none;cursor:pointer;padding:6px 10px;border-radius:8px;transition:background 0.15s}
+.btn-settings:hover{background:var(--bg2)}
+
+/* Chat area */
+.chat-area{position:fixed;top:var(--header-h);bottom:var(--input-h);left:0;right:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 16px}
+.chat-inner{max-width:var(--max-w);margin:0 auto}
+.welcome{text-align:center;padding:60px 20px}
+.welcome h2{font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:8px}
+.welcome p{color:var(--text2);font-size:14px;line-height:1.5;max-width:400px;margin:0 auto}
+.welcome .suggestions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px}
+.welcome .suggestion{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;font-size:13px;color:var(--text);cursor:pointer;transition:all 0.15s;max-width:240px;text-align:left;line-height:1.4}
+.welcome .suggestion:hover{background:var(--bg3);border-color:var(--blue)}
+.welcome .suggestion:active{transform:scale(0.98)}
+
+/* Messages */
+.msg{display:flex;margin-bottom:16px;animation:fadeIn 0.2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.msg-user{justify-content:flex-end}
+.msg-ai{justify-content:flex-start}
+.msg-bubble{max-width:85%;padding:10px 16px;line-height:1.5;font-size:15px;white-space:pre-wrap;word-break:break-word}
+.msg-user .msg-bubble{background:var(--bubble-user);color:var(--bubble-user-text);border-radius:var(--radius) var(--radius) 4px var(--radius)}
+.msg-ai .msg-bubble{background:var(--bubble-ai);color:var(--bubble-ai-text);border-radius:var(--radius) var(--radius) var(--radius) 4px}
+.msg-ai .provider-badge{display:inline-block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:4px}
+.msg-bubble code{font-family:var(--mono);font-size:13px;background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:4px}
+@media(prefers-color-scheme:dark){.msg-bubble code{background:rgba(255,255,255,0.1)}}
+.msg-bubble pre{background:var(--bg3);border-radius:8px;padding:12px;margin:8px 0;overflow-x:auto}
+.msg-bubble pre code{background:none;padding:0;font-size:12.5px}
+.typing-indicator{display:inline-flex;gap:4px;padding:4px 0}
+.typing-indicator span{width:6px;height:6px;border-radius:50%;background:var(--text3);animation:blink 1.4s infinite both}
+.typing-indicator span:nth-child(2){animation-delay:0.2s}
+.typing-indicator span:nth-child(3){animation-delay:0.4s}
+@keyframes blink{0%,80%,100%{opacity:0.3}40%{opacity:1}}
+
+/* Input */
+.input-area{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:0.5px solid var(--border);padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.input-inner{max-width:var(--max-w);margin:0 auto;display:flex;gap:8px;align-items:flex-end}
+.input-wrap{flex:1;position:relative}
+.chat-input{width:100%;resize:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;font:inherit;font-size:15px;line-height:1.4;color:var(--text);background:var(--bg2);outline:none;min-height:44px;max-height:160px;transition:border-color 0.15s}
+.chat-input:hover:not(:focus){border-color:var(--text3)}
+.chat-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,0.15)}
+.chat-input::placeholder{color:var(--text3)}
+.btn-send{width:44px;height:44px;border-radius:50%;border:none;background:var(--blue);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;flex-shrink:0}
+.btn-send:hover{background:var(--blue2)}
+.btn-send:disabled{background:var(--bg3);cursor:default}
+.btn-send:active:not(:disabled){transform:scale(0.92)}
+.btn-send svg{width:20px;height:20px}
+
+/* Settings modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;display:flex;align-items:center;justify-content:center;animation:fadeIn 0.15s;backdrop-filter:blur(4px)}
+.modal{background:var(--bg);border-radius:var(--radius);padding:24px;width:90%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+.modal h3{font-size:19px;font-weight:600;margin-bottom:4px;letter-spacing:-0.3px}
+.modal p{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.4}
+.modal label{display:block;font-size:13px;font-weight:500;color:var(--text2);margin-bottom:6px;margin-top:16px}
+.modal input{width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:8px;font:inherit;font-size:14px;color:var(--text);background:var(--bg2);outline:none}
+.modal input:hover:not(:focus){border-color:var(--text3)}
+.modal input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,122,255,0.15)}
+.modal-actions{display:flex;gap:8px;margin-top:24px;justify-content:flex-end}
+.btn-primary{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 20px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background 0.15s}
+.btn-primary:hover{background:var(--blue2)}
+.btn-primary:active{transform:scale(0.97)}
+.btn-secondary{background:var(--bg2);color:var(--text);border:0.5px solid var(--border);border-radius:8px;padding:8px 20px;font:inherit;font-size:14px;font-weight:500;cursor:pointer;transition:background 0.15s}
+.btn-secondary:hover{background:var(--bg3)}
+.btn-secondary:active{transform:scale(0.97)}
+.error-toast{position:fixed;top:calc(var(--header-h) + 12px);left:50%;transform:translateX(-50%);background:var(--red);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:300;animation:fadeIn 0.2s ease;box-shadow:0 4px 12px rgba(255,59,48,0.3)}
+.error-toast.dismissing{animation:fadeOut 0.3s ease forwards}
+@keyframes fadeOut{from{opacity:1;transform:translateX(-50%)}to{opacity:0;transform:translateX(-50%) translateY(-8px)}}
+.spinner{width:16px;height:16px;border:2px solid var(--bg3);border-top-color:var(--blue);border-radius:50%;animation:spin 0.6s linear infinite;display:inline-block;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-inline{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)}
+.hidden{display:none!important}
+
+/* Mobile */
+@media(max-width:600px){
+  .header-center{position:static;transform:none}
+  .header{flex-wrap:wrap;height:auto;padding:8px 12px;gap:4px}
+  .header-left{width:auto}
+  .header-right{margin-left:auto}
+  .model-select{width:100%;margin-top:2px;min-width:unset}
+  .msg-bubble{max-width:92%}
+  .welcome h2{font-size:22px}
+}
+
+/* Focus-visible for keyboard navigation */
+.btn-icon:focus-visible,.btn-settings:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.suggestion:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+/* Reduced motion */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">Fin<span>Savvy</span>AI</div>
+  </div>
+  <div class="header-center">
+    <select id="model-select" class="model-select">
+      <option value="">Loading models...</option>
+    </select>
+  </div>
+  <div class="header-right">
+    <button class="btn-icon" id="btn-new" title="New Chat" aria-label="New Chat">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    </button>
+    <button class="btn-settings" id="btn-settings">Settings</button>
+  </div>
+</div>
+
+<div class="chat-area" id="chat-area" aria-label="Chat messages">
+  <div class="chat-inner" id="chat-inner" role="log" aria-live="polite">
+    <div class="welcome" id="welcome">
+      <h2>FinSavvyAI Chat</h2>
+      <p>Your AI gateway to OpenAI, Anthropic, and OpenCLaw models. Fast, private, streaming.</p>
+      <div class="suggestions">
+        <div class="suggestion" tabindex="0" onclick="useSuggestion(this)" onkeydown="if(event.key==='Enter')useSuggestion(this)">Explain how compound interest works for a savings account</div>
+        <div class="suggestion" tabindex="0" onclick="useSuggestion(this)" onkeydown="if(event.key==='Enter')useSuggestion(this)">Write a Python function to calculate portfolio returns</div>
+        <div class="suggestion" tabindex="0" onclick="useSuggestion(this)" onkeydown="if(event.key==='Enter')useSuggestion(this)">Compare ETFs vs index funds for long-term investing</div>
+        <div class="suggestion" tabindex="0" onclick="useSuggestion(this)" onkeydown="if(event.key==='Enter')useSuggestion(this)">Help me draft a financial summary email to a client</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="input-area">
+  <div class="input-inner">
+    <div class="input-wrap">
+      <textarea id="chat-input" class="chat-input" placeholder="Message FinSavvyAI..." rows="1"></textarea>
+    </div>
+    <button id="btn-send" class="btn-send" disabled aria-label="Send message">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<div id="settings-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h3>Settings</h3>
+    <p>Configure your API key to start chatting.</p>
+    <label for="api-key-input">API Key</label>
+    <input id="api-key-input" type="password" placeholder="fsa_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn-secondary" id="btn-cancel-settings">Cancel</button>
+      <button class="btn-primary" id="btn-save-settings">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="error-toast" class="error-toast hidden"></div>
+
+<script>
+(function(){
+  // State
+  const state = {
+    apiKey: localStorage.getItem("fsa_apiKey") || "",
+    model: localStorage.getItem("fsa_model") || "gpt-4o-mini",
+    messages: JSON.parse(localStorage.getItem("fsa_messages") || "[]"),
+    models: [],
+    streaming: false
+  };
+
+  // DOM
+  const $chatArea = document.getElementById("chat-area");
+  const $chatInner = document.getElementById("chat-inner");
+  const $welcome = document.getElementById("welcome");
+  const $input = document.getElementById("chat-input");
+  const $send = document.getElementById("btn-send");
+  const $modelSelect = document.getElementById("model-select");
+  const $settingsModal = document.getElementById("settings-modal");
+  const $apiKeyInput = document.getElementById("api-key-input");
+  const $errorToast = document.getElementById("error-toast");
+
+  // Init
+  function init() {
+    if (!state.apiKey) showSettings(true);
+    else loadModels();
+    renderMessages();
+    $input.addEventListener("input", onInputChange);
+    $input.addEventListener("keydown", onInputKeydown);
+    $send.addEventListener("click", sendMessage);
+    document.getElementById("btn-new").addEventListener("click", newChat);
+    document.getElementById("btn-settings").addEventListener("click", () => showSettings(false));
+    document.getElementById("btn-save-settings").addEventListener("click", saveSettings);
+    document.getElementById("btn-cancel-settings").addEventListener("click", hideSettings);
+    $modelSelect.addEventListener("change", (e) => {
+      state.model = e.target.value;
+      localStorage.setItem("fsa_model", state.model);
+    });
+  }
+
+  // Auto-resize textarea
+  function onInputChange() {
+    $input.style.height = "auto";
+    $input.style.height = Math.min($input.scrollHeight, 160) + "px";
+    $send.disabled = !$input.value.trim() || state.streaming;
+  }
+
+  function onInputKeydown(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if ($input.value.trim() && !state.streaming) sendMessage();
+    }
+  }
+
+  // Settings
+  function showSettings(first) {
+    $apiKeyInput.value = state.apiKey;
+    $settingsModal.classList.remove("hidden");
+    if (first) document.getElementById("btn-cancel-settings").style.display = "none";
+    else document.getElementById("btn-cancel-settings").style.display = "";
+    setTimeout(() => $apiKeyInput.focus(), 100);
+  }
+
+  function hideSettings() {
+    $settingsModal.classList.add("hidden");
+  }
+
+  function saveSettings() {
+    const key = $apiKeyInput.value.trim();
+    if (!key) { showError("Please enter an API key"); return; }
+    state.apiKey = key;
+    localStorage.setItem("fsa_apiKey", key);
+    hideSettings();
+    loadModels();
+  }
+
+  // Models
+  async function loadModels() {
+    $modelSelect.innerHTML = '<option value="">Loading...</option>';
+    $modelSelect.disabled = true;
+    try {
+      const resp = await fetch("/v1/models");
+      const data = await resp.json();
+      state.models = data.data || [];
+      renderModelSelect();
+    } catch (e) {
+      $modelSelect.innerHTML = '<option value="gpt-4o-mini">gpt-4o-mini</option>';
+    } finally {
+      $modelSelect.disabled = false;
+    }
+  }
+
+  function renderModelSelect() {
+    const groups = {};
+    state.models.forEach(m => {
+      const provider = m.owned_by || m.provider || "other";
+      if (!groups[provider]) groups[provider] = [];
+      groups[provider].push(m);
+    });
+    const order = ["openai", "anthropic", "openclaw", "ollama", "other"];
+    const labels = { openai: "OpenAI", anthropic: "Anthropic", openclaw: "OpenCLaw", ollama: "OpenCLaw/Ollama", other: "Other" };
+    let html = "";
+    order.forEach(p => {
+      const ms = groups[p];
+      if (!ms || !ms.length) return;
+      html += '<optgroup label="' + (labels[p] || p) + '">';
+      ms.forEach(m => {
+        const sel = m.id === state.model ? " selected" : "";
+        html += '<option value="' + m.id + '"' + sel + '>' + m.id + '</option>';
+      });
+      html += '</optgroup>';
+    });
+    if (!html) html = '<option value="gpt-4o-mini">gpt-4o-mini</option>';
+    $modelSelect.innerHTML = html;
+    if (!$modelSelect.value) {
+      $modelSelect.value = state.model;
+      if (!$modelSelect.value && state.models.length) {
+        state.model = state.models[0].id;
+        $modelSelect.value = state.model;
+      }
+    }
+  }
+
+  // Messages
+  function renderMessages() {
+    // Clear existing messages (keep welcome)
+    const msgs = $chatInner.querySelectorAll(".msg");
+    msgs.forEach(m => m.remove());
+
+    if (state.messages.length === 0) {
+      $welcome.classList.remove("hidden");
+      return;
+    }
+    $welcome.classList.add("hidden");
+    state.messages.forEach(m => appendMessageEl(m.role, m.content, m.provider));
+    scrollToBottom();
+  }
+
+  function appendMessageEl(role, content, provider) {
+    const div = document.createElement("div");
+    div.className = "msg msg-" + (role === "user" ? "user" : "ai");
+    let inner = "";
+    if (role !== "user" && provider) {
+      inner += '<div class="provider-badge">' + escHtml(provider) + '</div>';
+    }
+    inner += '<div>' + renderMarkdown(content) + '</div>';
+    div.innerHTML = '<div class="msg-bubble">' + inner + '</div>';
+    $chatInner.appendChild(div);
+    return div;
+  }
+
+  function appendStreamingEl(provider) {
+    $welcome.classList.add("hidden");
+    const div = document.createElement("div");
+    div.className = "msg msg-ai";
+    div.id = "streaming-msg";
+    let badge = provider ? '<div class="provider-badge">' + escHtml(provider) + '</div>' : '';
+    div.innerHTML = '<div class="msg-bubble">' + badge + '<div id="streaming-content"><div class="typing-indicator"><span></span><span></span><span></span></div></div></div>';
+    $chatInner.appendChild(div);
+    scrollToBottom();
+    return document.getElementById("streaming-content");
+  }
+
+  // Send
+  async function sendMessage() {
+    const text = $input.value.trim();
+    if (!text || state.streaming) return;
+
+    // Add user message
+    state.messages.push({ role: "user", content: text });
+    appendMessageEl("user", text);
+    $input.value = "";
+    $input.style.height = "auto";
+    $send.disabled = true;
+    state.streaming = true;
+    $send.innerHTML = '<span class="spinner"></span>';
+    scrollToBottom();
+    saveMessages();
+
+    // Determine provider for badge
+    const provider = resolveProviderName(state.model);
+    const $streamEl = appendStreamingEl(provider);
+
+    try {
+      const resp = await fetch("/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + state.apiKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: state.model,
+          messages: state.messages.slice(-20).map(m => ({ role: m.role, content: m.content })),
+          stream: true
+        })
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || "Request failed (" + resp.status + ")");
+      }
+
+      let fullContent = "";
+      const contentType = resp.headers.get("content-type") || "";
+
+      if (contentType.includes("text/event-stream")) {
+        // SSE streaming
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith("data: ")) continue;
+            const data = trimmed.slice(6);
+            if (data === "[DONE]") break;
+            try {
+              const chunk = JSON.parse(data);
+              const delta = chunk.choices?.[0]?.delta?.content || "";
+              if (delta) {
+                fullContent += delta;
+                $streamEl.innerHTML = renderMarkdown(fullContent);
+                scrollToBottom();
+              }
+            } catch (e) { /* skip malformed chunks */ }
+          }
+        }
+      } else {
+        // Non-streaming fallback
+        const data = await resp.json();
+        fullContent = data.choices?.[0]?.message?.content || data.response || "No response";
+        $streamEl.innerHTML = renderMarkdown(fullContent);
+      }
+
+      // Save assistant message
+      state.messages.push({ role: "assistant", content: fullContent, provider });
+      saveMessages();
+
+      // Replace streaming element with final
+      const streamMsg = document.getElementById("streaming-msg");
+      if (streamMsg) streamMsg.remove();
+      appendMessageEl("assistant", fullContent, provider);
+      scrollToBottom();
+
+    } catch (err) {
+      const streamMsg = document.getElementById("streaming-msg");
+      if (streamMsg) streamMsg.remove();
+      showError(err.message);
+      // Remove the user message if request failed completely
+      if (state.messages.length && state.messages[state.messages.length - 1].role === "user") {
+        state.messages.pop();
+        saveMessages();
+      }
+    } finally {
+      state.streaming = false;
+      $send.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+      $send.disabled = !$input.value.trim();
+    }
+  }
+
+  function resolveProviderName(model) {
+    if (/^(gpt-|o[134]-|chatgpt-)/i.test(model)) return "OpenAI";
+    if (/^claude-/i.test(model)) return "Anthropic";
+    return "OpenCLaw";
+  }
+
+  // New chat
+  function newChat() {
+    state.messages = [];
+    saveMessages();
+    renderMessages();
+  }
+
+  function useSuggestion(el) {
+    $input.value = el.textContent;
+    onInputChange();
+    $input.focus();
+  }
+  window.useSuggestion = useSuggestion;
+
+  // Helpers
+  function saveMessages() {
+    localStorage.setItem("fsa_messages", JSON.stringify(state.messages.slice(-50)));
+  }
+
+  function scrollToBottom() {
+    requestAnimationFrame(() => { $chatArea.scrollTop = $chatArea.scrollHeight; });
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function renderMarkdown(text) {
+    if (!text) return "";
+    let html = escHtml(text);
+    // Code blocks
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, function(_, lang, code) {
+      return '<pre><code>' + code.trim() + '</code></pre>';
+    });
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Bold
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // Italic
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    // Line breaks
+    html = html.replace(/\n/g, '<br>');
+    return html;
+  }
+
+  function showError(msg) {
+    $errorToast.textContent = msg;
+    $errorToast.classList.remove("hidden", "dismissing");
+    setTimeout(() => {
+      $errorToast.classList.add("dismissing");
+      setTimeout(() => $errorToast.classList.add("hidden"), 300);
+    }, 3700);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

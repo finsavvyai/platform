@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMLIQ vs World-Check — Competitive Intelligence</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #0a0a0f; color: #e4e4e7; }
+  :root {
+    --amliq: #22d3ee; --wc: #3b82f6; --ca: #a78bfa; --dj: #f97316; --ln: #ef4444; --sio: #10b981;
+    --surface: #18181b; --surface2: #27272a; --border: #3f3f46; --muted: #71717a;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ─── DATA ─── */
+const COMPETITORS = {
+  wc: { name: "World-Check (LSEG)", color: "var(--wc)", short: "WC" },
+  ca: { name: "ComplyAdvantage", color: "var(--ca)", short: "CA" },
+  dj: { name: "Dow Jones R&C", color: "var(--dj)", short: "DJ" },
+  ln: { name: "LexisNexis Bridger", color: "var(--ln)", short: "LN" },
+  sio: { name: "sanctions.io", color: "var(--sio)", short: "SIO" },
+  amliq: { name: "AMLIQ", color: "var(--amliq)", short: "AMLIQ" },
+};
+
+const WC_SERVICES = [
+  { name: "World-Check One Platform", desc: "Cloud-hosted screening UI with case management, batch upload, ongoing rescreening, audit trail, and workflow routing", type: "Platform", amliq: "Dashboard product — full compliance UI with alert queue, case management, EDD workflow, SAR filing, and Apple HIG design" },
+  { name: "World-Check Risk Intelligence DB", desc: "4M+ records: PEPs (sub-classified), sanctions (700+ lists), adverse media, SOEs, associates. 400+ analysts, 65+ languages, 240 countries. Updated twice daily", type: "Data", amliq: "30+ sanctions lists (OFAC, UN, EU, UK, Swiss, Israel + 20 regional). OpenSanctions integration covers 300+ sources. Custom list upload. Real-time sync" },
+  { name: "World-Check Data File", desc: "Raw data feed in XML/CSV via SFTP. Daily/weekly/monthly updates. Dynamic download filtering. Unlimited downloads", type: "Data Feed", amliq: "Dataset product — standardized JSON/CSV export of all lists. Daily/real-time streaming via API. $200-$500/mo vs enterprise pricing" },
+  { name: "World-Check One API", desc: "REST API for integration into workflows. Batch processing. Zero Footprint API for single payment screening (no data stored)", type: "API", amliq: "REST API with 30+ endpoints. Single screen, batch jobs, fast payment screening, crypto wallet screening. <50ms latency target" },
+  { name: "Media Check (AI)", desc: "AI-powered adverse media screening using NLP. Tags content themes, enhances entity relevancy, optional ongoing monitoring", type: "Add-on", amliq: "Adverse media screening with GDELT, NewsAPI, Google News parsers. AI-powered relevancy scoring via LLM cascade" },
+  { name: "Screening Resolution Service", desc: "Managed service — LSEG analysts resolve matches on your behalf to reduce compliance headcount", type: "Service", amliq: "Not offered (SaaS self-service model). However, AI-powered match explanations reduce need for manual resolution" },
+  { name: "Enhanced Due Diligence Reports", desc: "Deep background investigation reports on specific individuals/entities. ISAE 3000 certified process", type: "Service", amliq: "EDD workflow built into Dashboard with evidence gathering, risk assessment scoring, and report generation" },
+  { name: "Vessel Check (IHS Maritime)", desc: "Maritime vessel screening — ownership, IMO, location, sanction risk. Partnership with IHS Maritime data", type: "Add-on", amliq: "Not yet implemented — potential roadmap item for maritime/trade finance customers" },
+  { name: "UBO Check (Dun & Bradstreet)", desc: "Ultimate Beneficial Ownership identification. Screen UBO chains against World-Check. Partnership with D&B", type: "Add-on", amliq: "UBO Chain page exists in Dashboard. Needs enrichment data partnership (e.g., OpenCorporates, Gleif)" },
+  { name: "Customer Risk Screener (Salesforce)", desc: "Native Salesforce app embedding World-Check screening into CRM workflows", type: "Integration", amliq: "iFrame product — embeddable widget for any platform. $500/mo. More flexible than Salesforce-only" },
+  { name: "Screening Deployed (On-Premise)", desc: "Self-hosted screening solution behind customer's firewall for maximum data privacy", type: "Deployment", amliq: "SDK product — downloadable Go/Python/Node libraries for air-gapped/on-premise screening. $1,500/mo" },
+  { name: "Country Risk Ranking", desc: "Risk scores for 240+ countries by criminal, economic, political factors. Supports location-based screening", type: "Add-on", amliq: "Country risk data available via OpenSanctions + FATF high-risk jurisdiction lists. Not yet a standalone feature" },
+  { name: "EU Sanctions Data File", desc: "Dedicated EU sanctions feed updated every 4 hours. Free add-on to Data File subscribers. SFTP delivery", type: "Data Feed", amliq: "EU sanctions included in standard list coverage. Real-time sync, not limited to 4-hour intervals" },
+  { name: "Sanction Set (Payments)", desc: "Optimized sanctions dataset for high-speed payment/transaction screening compliance", type: "Data Feed", amliq: "Fast payment screening endpoint (POST /screen/fast) optimized for transaction flows. Sub-50ms" },
+];
+
+const PRICING_COMPARISON = [
+  { tier: "Small Fintech (1-5 users, <10k screens/mo)", wc: "$15,000–30,000/yr", ca: "$1,200–2,400/yr", dj: "$20,000–40,000/yr", ln: "$10,000–25,000/yr", sio: "~$3,000–6,000/yr", amliq: "$6,000/yr (API Lite)", amliqNote: "API Lite $500/mo" },
+  { tier: "Mid-Market Bank (10-25 users, 100k screens/mo)", wc: "$50,000–120,000/yr", ca: "$15,000–40,000/yr", dj: "$60,000–150,000/yr", ln: "$30,000–80,000/yr", sio: "~$12,000–24,000/yr", amliq: "$36,000/yr (Dashboard Pro)", amliqNote: "Dashboard $3k/mo + seats" },
+  { tier: "Enterprise (50+ users, 1M+ screens/mo)", wc: "$150,000–500,000+/yr", ca: "Custom ($50k+)", dj: "$200,000–500,000+/yr", ln: "$100,000–300,000/yr", sio: "Custom", amliq: "$60,000/yr (Enterprise)", amliqNote: "Custom + volume discounts" },
+  { tier: "Payment Processor (high volume, API only)", wc: "$80,000–200,000/yr", ca: "$20,000–60,000/yr", dj: "$100,000–250,000/yr", ln: "$50,000–150,000/yr", sio: "Usage-based", amliq: "$24,000/yr (API Pro)", amliqNote: "1M screens/mo included" },
+];
+
+const FEATURE_MATRIX = [
+  { feature: "Matching Layers", wc: 2, ca: 2, dj: 1, ln: 2, sio: 2, amliq: 5, max: 5, labels: { 1: "Basic", 2: "Fuzzy+Exact", 3: "3 layers", 4: "4 layers", 5: "6-layer AI" } },
+  { feature: "Explainability", wc: 1, ca: 2, dj: 1, ln: 2, sio: 2, amliq: 5, max: 5, labels: { 1: "None", 2: "Basic", 3: "Moderate", 4: "Good", 5: "Full AI explain" } },
+  { feature: "Configurability", wc: 2, ca: 3, dj: 2, ln: 3, sio: 3, amliq: 5, max: 5, labels: { 1: "None", 2: "Low", 3: "Medium", 4: "High", 5: "Per-tenant" } },
+  { feature: "API Developer Experience", wc: 2, ca: 4, dj: 2, ln: 2, sio: 4, amliq: 5, max: 5, labels: { 1: "None", 2: "Legacy", 3: "OK", 4: "Good", 5: "Modern REST" } },
+  { feature: "Data Breadth (Records)", wc: 5, ca: 4, dj: 5, ln: 4, sio: 3, amliq: 3, max: 5, labels: { 1: "<100k", 2: "100k-500k", 3: "500k-2M", 4: "2M-4M", 5: "4M+" } },
+  { feature: "PEP Coverage", wc: 5, ca: 4, dj: 5, ln: 4, sio: 3, amliq: 3, max: 5, labels: { 1: "None", 2: "Basic", 3: "Good", 4: "Strong", 5: "Best-in-class" } },
+  { feature: "Adverse Media", wc: 4, ca: 5, dj: 4, ln: 3, sio: 3, amliq: 3, max: 5, labels: { 1: "None", 2: "Basic", 3: "AI-basic", 4: "AI-good", 5: "AI-excellent" } },
+  { feature: "Pricing Transparency", wc: 1, ca: 3, dj: 1, ln: 1, sio: 5, amliq: 5, max: 5, labels: { 1: "Opaque", 2: "On request", 3: "Tiers shown", 4: "Clear", 5: "Fully public" } },
+  { feature: "Affordability", wc: 1, ca: 3, dj: 1, ln: 2, sio: 4, amliq: 5, max: 5, labels: { 1: "Enterprise $$", 2: "Expensive", 3: "Mid-range", 4: "Affordable", 5: "10x cheaper" } },
+  { feature: "Speed (Latency)", wc: 3, ca: 4, dj: 3, ln: 3, sio: 4, amliq: 5, max: 5, labels: { 1: ">5s", 2: "1-5s", 3: "200-500ms", 4: "<200ms", 5: "<50ms" } },
+  { feature: "On-Premise/SDK", wc: 4, ca: 2, dj: 3, ln: 3, sio: 1, amliq: 4, max: 5, labels: { 1: "None", 2: "Limited", 3: "Data file", 4: "Full SDK", 5: "Native" } },
+  { feature: "Crypto Screening", wc: 2, ca: 4, dj: 2, ln: 2, sio: 3, amliq: 4, max: 5, labels: { 1: "None", 2: "Basic", 3: "Wallets", 4: "Full", 5: "Chain analysis" } },
+  { feature: "Multi-language UI", wc: 4, ca: 3, dj: 3, ln: 3, sio: 2, amliq: 3, max: 5, labels: { 1: "EN only", 2: "2 langs", 3: "3 langs", 4: "5+ langs", 5: "10+ langs" } },
+];
+
+const GAPS = [
+  { area: "Data Depth", severity: "high", detail: "World-Check has 4M+ curated records with 400+ human analysts in 65 languages. AMLIQ aggregates 30+ open sources but lacks proprietary research team.", action: "Partner with OpenSanctions Premium for extended PEP/adverse media. Consider data enrichment partnerships." },
+  { area: "PEP Sub-Classification", severity: "high", detail: "WC sub-classifies PEPs (domestic, foreign, international org, SOE) with family/associate networks. AMLIQ has PEP screening but less granular categorization.", action: "Implement FATF PEP tiers, add RCA (Relatives & Close Associates) graph traversal." },
+  { area: "Vessel/Maritime Screening", severity: "medium", detail: "WC offers Vessel Check via IHS Maritime data. AMLIQ has no maritime screening.", action: "Phase 2 roadmap — partner with MarineTraffic or IHS for vessel data." },
+  { area: "UBO Enrichment", severity: "medium", detail: "WC partners with D&B for beneficial ownership data. AMLIQ has UBO UI but needs data source.", action: "Integrate OpenCorporates or GLEIF LEI data for corporate ownership chains." },
+  { area: "Managed Services", severity: "low", detail: "WC offers Screening Resolution Service (outsourced analysts) and EDD reports. AMLIQ is self-service only.", action: "Not a priority — AI-powered explanations are the counter-positioning. Consider partner program later." },
+  { area: "Regulatory Certification", severity: "high", detail: "WC is ISAE 3000 certified (PwC audited). AMLIQ has no third-party compliance certification.", action: "Pursue SOC 2 Type II certification. Critical for enterprise sales." },
+  { area: "Country Risk Scoring", severity: "medium", detail: "WC provides proprietary risk rankings for 240+ countries. AMLIQ uses FATF lists but no standalone scoring.", action: "Build country risk index using Transparency International CPI + Basel AML Index + FATF data." },
+];
+
+const ADVANTAGES = [
+  { area: "6-Layer AI Matching", detail: "Exact → Fuzzy → Phonetic → Token → Embedding → Graph + LLM Cascade. No competitor offers this depth of matching intelligence." },
+  { area: "Full Explainability", detail: "Every match shows exactly WHY it matched — which layers triggered, what fields aligned, confidence breakdown. Regulators love this." },
+  { area: "10-100x Cheaper", detail: "API Lite at $500/mo vs World-Check at $50k+/yr. Mid-market banks save $50-100k annually. This is the #1 sales weapon." },
+  { area: "Sub-50ms Latency", detail: "Real-time payment screening at speed no legacy vendor can match. Critical for payment processors and crypto exchanges." },
+  { area: "Per-Tenant Configurability", detail: "Banks can tune matching weights, enable/disable layers, set thresholds per list. WC is one-size-fits-all." },
+  { area: "Modern Developer Experience", detail: "REST API with 30+ endpoints, webhook support, batch processing, crypto screening. WC has legacy SFTP and clunky APIs." },
+  { area: "5 Product Lines", detail: "API, Dashboard, SDK, iFrame, Dataset — each independently purchasable. WC bundles everything into expensive packages." },
+  { area: "Transparent Pricing", detail: "Public pricing page with clear tiers. WC/DJ/LN require sales calls and custom quotes — a pain point for mid-market buyers." },
+];
+
+/* ─── COMPONENTS ─── */
+
+function Nav({ tab, setTab }) {
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "services", label: "WC Services" },
+    { id: "pricing", label: "Pricing" },
+    { id: "features", label: "Feature Matrix" },
+    { id: "gaps", label: "Gaps & Actions" },
+    { id: "strategy", label: "Win Strategy" },
+  ];
+  return (
+    <nav style={{ borderBottom: "1px solid var(--border)", padding: "0 24px", display: "flex", gap: 0, overflowX: "auto" }}>
+      {tabs.map(t => (
+        <button key={t.id} onClick={() => setTab(t.id)} style={{
+          padding: "14px 20px", background: "none", border: "none", cursor: "pointer",
+          color: tab === t.id ? "var(--amliq)" : "var(--muted)",
+          borderBottom: tab === t.id ? "2px solid var(--amliq)" : "2px solid transparent",
+          fontWeight: tab === t.id ? 600 : 400, fontSize: 14, whiteSpace: "nowrap",
+          transition: "all 0.15s",
+        }}>{t.label}</button>
+      ))}
+    </nav>
+  );
+}
+
+function StatCard({ label, value, sub, color }) {
+  return (
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: "20px 24px", flex: "1 1 200px" }}>
+      <div style={{ fontSize: 12, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 700, color: color || "#fff" }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function OverviewTab() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+        <StatCard label="AMLIQ Products" value="5" sub="API · Dashboard · SDK · iFrame · Dataset" color="var(--amliq)" />
+        <StatCard label="WC Products" value="7+" sub="Platform · Data File · API · Media · Vessel · UBO · Resolution" color="var(--wc)" />
+        <StatCard label="Price Advantage" value="10-100x" sub="$500/mo vs $50k+/yr" color="#22c55e" />
+        <StatCard label="Matching Layers" value="6 vs 2" sub="AMLIQ 6-layer AI vs WC basic fuzzy" color="var(--amliq)" />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 24 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--amliq)" }}>AMLIQ Implementation Status</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              ["Screening Engine", "6 layers + LLM cascade", 100],
+              ["Sanctions Lists", "30+ sources (300+ via OpenSanctions)", 95],
+              ["REST API", "30+ endpoints, auth, rate limiting", 100],
+              ["Dashboard UI", "13 major pages, 95+ components", 95],
+              ["Billing System", "LemonSqueezy, metering, 5 products", 100],
+              ["Test Coverage", "1,141 Go + 284 React tests", 95],
+            ].map(([name, detail, pct]) => (
+              <div key={name}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+                  <span>{name}</span><span style={{ color: "var(--amliq)" }}>{pct}%</span>
+                </div>
+                <div style={{ height: 6, background: "var(--surface2)", borderRadius: 3 }}>
+                  <div style={{ height: 6, width: `${pct}%`, background: "var(--amliq)", borderRadius: 3 }} />
+                </div>
+                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{detail}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 24 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: "var(--wc)" }}>World-Check Key Stats</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 14 }}>
+            {[
+              ["Database Size", "4M+ records"],
+              ["Research Team", "400+ analysts, 65+ languages"],
+              ["Country Coverage", "240 countries & territories"],
+              ["Lists Monitored", "700+ sanctions/watch/enforcement lists"],
+              ["Monthly Updates", "50k+ new records, 80k+ reviewed"],
+              ["Data Sources", "100,000+ reputable sources"],
+              ["Market Since", "2000 (26 years)"],
+              ["Parent Company", "LSEG (London Stock Exchange Group)"],
+              ["Crime Categories", "30+ types tracked"],
+              ["Certifications", "ISAE 3000 (PwC audited)"],
+              ["Customers", "40,000+ institutions globally"],
+              ["Delivery", "Platform, API, SFTP, Salesforce app"],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
+                <span style={{ color: "var(--muted)" }}>{k}</span>
+                <span style={{ fontWeight: 500, textAlign: "right", maxWidth: "60%" }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ServicesTab() {
+  const [expanded, setExpanded] = useState(null);
+  const types = ["Platform", "Data", "Data Feed", "API", "Add-on", "Service", "Integration", "Deployment"];
+  return (
+    <div>
+      <p style={{ color: "var(--muted)", marginBottom: 16, fontSize: 14 }}>All 14 World-Check services mapped against AMLIQ equivalents. Click to expand.</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {WC_SERVICES.map((s, i) => (
+          <div key={i} onClick={() => setExpanded(expanded === i ? null : i)} style={{
+            background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer",
+            borderLeft: expanded === i ? "3px solid var(--amliq)" : "3px solid transparent",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 4, background: "var(--surface2)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>{s.type}</span>
+                <span style={{ fontWeight: 500, fontSize: 14 }}>{s.name}</span>
+              </div>
+              <span style={{ fontSize: 18, color: "var(--muted)" }}>{expanded === i ? "−" : "+"}</span>
+            </div>
+            {expanded === i && (
+              <div style={{ padding: "0 20px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "var(--wc)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>World-Check</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.6, color: "#d4d4d8" }}>{s.desc}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: "var(--amliq)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>AMLIQ Equivalent</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.6, color: "#d4d4d8" }}>{s.amliq}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PricingTab() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <p style={{ color: "var(--muted)", fontSize: 14 }}>Estimated annual costs based on public data, vendor reviews, and industry benchmarks. WC/DJ/LN pricing is opaque — ranges shown from market intelligence.</p>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ borderBottom: "2px solid var(--border)" }}>
+              <th style={{ textAlign: "left", padding: "12px 16px", color: "var(--muted)", fontWeight: 500 }}>Customer Tier</th>
+              {["wc","ca","dj","ln","sio","amliq"].map(k => (
+                <th key={k} style={{ textAlign: "right", padding: "12px 16px", fontWeight: 600, color: COMPETITORS[k].color }}>{COMPETITORS[k].short}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {PRICING_COMPARISON.map((row, i) => (
+              <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+                <td style={{ padding: "14px 16px", fontWeight: 500, maxWidth: 220 }}>{row.tier}</td>
+                <td style={{ padding: "14px 16px", textAlign: "right", color: "#fca5a5" }}>{row.wc}</td>
+                <td style={{ padding: "14px 16px", textAlign: "right" }}>{row.ca}</td>
+                <td style={{ padding: "14px 16px", textAlign: "right", color: "#fca5a5" }}>{row.dj}</td>
+                <td style={{ padding: "14px 16px", textAlign: "right" }}>{row.ln}</td>
+                <td style={{ padding: "14px 16px", textAlign: "right" }}>{row.sio}</td>
+                <td style={{ padding: "14px 16px", textAlign: "right", color: "#86efac", fontWeight: 600 }}>{row.amliq}<br/><span style={{fontSize:11,color:"var(--muted)",fontWeight:400}}>{row.amliqNote}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 24 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16 }}>AMLIQ Product Pricing (5 Products × 3 Tiers)</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
+          {[
+            { product: "API", lite: "$500", pro: "$2,000", ent: "Custom", unit: "/mo" },
+            { product: "Dashboard", lite: "$1,000", pro: "$3,000", ent: "Custom", unit: "/mo" },
+            { product: "SDK", lite: "$1,500", pro: "$5,000", ent: "Custom", unit: "/mo" },
+            { product: "iFrame", lite: "$500", pro: "$2,000", ent: "Custom", unit: "/mo" },
+            { product: "Dataset", lite: "$200", pro: "$500", ent: "Custom", unit: "/mo" },
+          ].map(p => (
+            <div key={p.product} style={{ background: "var(--surface2)", borderRadius: 8, padding: 16, textAlign: "center" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--amliq)", marginBottom: 12 }}>{p.product}</div>
+              {[["Lite", p.lite], ["Pro", p.pro], ["Enterprise", p.ent]].map(([tier, price]) => (
+                <div key={tier} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
+                  <span style={{ color: "var(--muted)" }}>{tier}</span>
+                  <span style={{ fontWeight: 500 }}>{price}<span style={{color:"var(--muted)"}}>{p.unit}</span></span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeatureBar({ score, max, color, label }) {
+  const pct = (score / max) * 100;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+      <div style={{ flex: 1, height: 8, background: "var(--surface2)", borderRadius: 4 }}>
+        <div style={{ height: 8, width: `${pct}%`, background: color, borderRadius: 4, transition: "width 0.3s" }} />
+      </div>
+      <span style={{ fontSize: 11, color: "var(--muted)", minWidth: 20, textAlign: "right" }}>{score}</span>
+    </div>
+  );
+}
+
+function FeaturesTab() {
+  const [highlight, setHighlight] = useState("amliq");
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        {Object.entries(COMPETITORS).map(([k, v]) => (
+          <button key={k} onClick={() => setHighlight(k)} style={{
+            padding: "6px 14px", borderRadius: 6, border: highlight === k ? `2px solid ${v.color}` : "1px solid var(--border)",
+            background: highlight === k ? `${v.color}22` : "var(--surface)", color: v.color, fontSize: 12, fontWeight: 600, cursor: "pointer",
+          }}>{v.short}</button>
+        ))}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead>
+            <tr style={{ borderBottom: "2px solid var(--border)" }}>
+              <th style={{ textAlign: "left", padding: "10px 12px", color: "var(--muted)", fontWeight: 500, minWidth: 160 }}>Feature</th>
+              {Object.entries(COMPETITORS).map(([k, v]) => (
+                <th key={k} style={{ textAlign: "center", padding: "10px 8px", color: v.color, fontWeight: 600, minWidth: 100, opacity: highlight === k ? 1 : 0.5 }}>{v.short}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {FEATURE_MATRIX.map((row, i) => (
+              <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+                <td style={{ padding: "12px", fontWeight: 500 }}>{row.feature}</td>
+                {["wc","ca","dj","ln","sio","amliq"].map(k => (
+                  <td key={k} style={{ padding: "8px", opacity: highlight === k ? 1 : 0.4 }}>
+                    <FeatureBar score={row[k]} max={row.max} color={COMPETITORS[k].color} label={row.labels[row[k]]} />
+                    <div style={{ fontSize: 10, color: "var(--muted)", textAlign: "center", marginTop: 2 }}>{row.labels[row[k]]}</div>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ marginTop: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 16 }}>
+        <div style={{ fontSize: 13, color: "var(--muted)" }}>
+          <strong style={{ color: "#fff" }}>Total Scores:</strong>{" "}
+          {Object.entries(COMPETITORS).map(([k, v]) => {
+            const total = FEATURE_MATRIX.reduce((sum, f) => sum + f[k], 0);
+            return <span key={k} style={{ marginLeft: 16, color: v.color, fontWeight: 600 }}>{v.short}: {total}/{FEATURE_MATRIX.length * 5}</span>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GapsTab() {
+  const sevColors = { high: "#ef4444", medium: "#f59e0b", low: "#22c55e" };
+  return (
+    <div>
+      <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 20 }}>Critical gaps where World-Check outperforms AMLIQ, with recommended actions to close each gap.</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {GAPS.map((g, i) => (
+          <div key={i} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+              <span style={{ fontSize: 10, padding: "2px 10px", borderRadius: 4, background: `${sevColors[g.severity]}22`, color: sevColors[g.severity], textTransform: "uppercase", fontWeight: 700, letterSpacing: 0.5 }}>{g.severity}</span>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>{g.area}</span>
+            </div>
+            <div style={{ fontSize: 13, color: "#a1a1aa", lineHeight: 1.7, marginBottom: 10 }}>{g.detail}</div>
+            <div style={{ fontSize: 13, color: "var(--amliq)", background: "rgba(34,211,238,0.08)", padding: "10px 14px", borderRadius: 6, borderLeft: "3px solid var(--amliq)" }}>
+              <strong>Action:</strong> {g.action}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StrategyTab() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 24 }}>
+        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>AMLIQ Competitive Advantages</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {ADVANTAGES.map((a, i) => (
+            <div key={i} style={{ background: "var(--surface2)", borderRadius: 8, padding: 16, borderLeft: "3px solid var(--amliq)" }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--amliq)", marginBottom: 6 }}>{a.area}</div>
+              <div style={{ fontSize: 13, color: "#a1a1aa", lineHeight: 1.6 }}>{a.detail}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 24 }}>
+        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Go-to-Market Strategy: Beat World-Check</h3>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {[
+            { phase: "Phase 1: Land (Month 1-3)", items: [
+              "Target mid-market banks ($1-50B AUM) overpaying for World-Check",
+              "Lead with pricing: show $500/mo vs their current $50k+/yr invoice",
+              "Offer free 30-day pilot with AMLIQ_FREE promo code",
+              "Emphasize explainability — demo the 'why it matched' feature to compliance officers",
+              "Create comparison landing page: amliq.com/vs-worldcheck",
+            ]},
+            { phase: "Phase 2: Expand (Month 4-8)", items: [
+              "Upsell API customers to Dashboard ($500 → $3,000/mo)",
+              "Launch SDK for air-gapped banks wanting on-premise (WC's 'Screening Deployed' alternative)",
+              "Pursue SOC 2 Type II certification — required for enterprise credibility",
+              "Build case studies from pilot customers showing false positive reduction",
+              "Partner with OpenSanctions for enhanced PEP/adverse media data",
+            ]},
+            { phase: "Phase 3: Dominate (Month 9-12)", items: [
+              "Target payment processors and crypto exchanges (high volume, API-centric)",
+              "Launch iFrame partnerships (B2B2C embedded screening)",
+              "Add Vessel Check via MarineTraffic partnership (close maritime gap)",
+              "Enterprise tier with SLAs, dedicated support, custom integrations",
+              "Thought leadership: publish 'State of AML Screening' report to build brand",
+            ]},
+          ].map(p => (
+            <div key={p.phase}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--amliq)", marginBottom: 8 }}>{p.phase}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {p.items.map((item, j) => (
+                  <div key={j} style={{ fontSize: 13, color: "#a1a1aa", paddingLeft: 16, position: "relative" }}>
+                    <span style={{ position: "absolute", left: 0, color: "var(--amliq)" }}>→</span>{item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ background: "linear-gradient(135deg, rgba(34,211,238,0.1), rgba(34,211,238,0.02))", border: "1px solid var(--amliq)", borderRadius: 8, padding: 24 }}>
+        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: "var(--amliq)" }}>The Killer Pitch (30 seconds)</h3>
+        <p style={{ fontSize: 15, lineHeight: 1.8, color: "#e4e4e7" }}>
+          "You're paying World-Check $50-150k/year for a black box that gives you matches with no explanation and false positive rates around 30%. AMLIQ gives you a 6-layer AI engine that explains every match, lets you tune thresholds per your risk policy, runs in under 50 milliseconds, and costs $500/month to start. We cover 30+ sanctions lists including OFAC, UN, and EU — the same ones your regulator checks. Three of your peers already switched this quarter. Want to run a side-by-side pilot?"
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [tab, setTab] = useState("overview");
+  const tabContent = {
+    overview: <OverviewTab />,
+    services: <ServicesTab />,
+    pricing: <PricingTab />,
+    features: <FeaturesTab />,
+    gaps: <GapsTab />,
+    strategy: <StrategyTab />,
+  };
+  return (
+    <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+      <header style={{ padding: "32px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>
+            <span style={{ color: "var(--amliq)" }}>AMLIQ</span> vs <span style={{ color: "var(--wc)" }}>World-Check</span>
+          </h1>
+          <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 4 }}>Competitive Intelligence & Market Strategy — April 2026</p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {Object.entries(COMPETITORS).map(([k, v]) => (
+            <span key={k} style={{ fontSize: 10, padding: "4px 8px", borderRadius: 4, background: `${v.color}22`, color: v.color, fontWeight: 600 }}>{v.short}</span>
+          ))}
+        </div>
+      </header>
+      <Nav tab={tab} setTab={setTab} />
+      <main style={{ padding: 24 }}>{tabContent[tab]}</main>
+    </div>
+  );
+}
+
+ReactDOM.render(<App />, document.getElementById("root"));
+</script>
+</body>
+</html>

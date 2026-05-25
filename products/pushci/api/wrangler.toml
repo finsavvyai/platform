@@ -1,0 +1,77 @@
+name = "pushci-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+ENVIRONMENT = "production"
+APP_URL = "https://app.pushci.dev"
+GITHUB_CLIENT_ID = "Ov23lisTZxabv8sBdx8Y"
+GITLAB_CLIENT_ID = "d52f55e4d68fbee7df7737694658d81552245c10ccf8427ab5258e4875de2a63"
+GITLAB_BASE_URL = "https://gitlab.com"
+
+# Social login — set client IDs here, secrets via: wrangler secret put <KEY>
+# GOOGLE_CLIENT_SECRET, LINKEDIN_CLIENT_SECRET, FACEBOOK_CLIENT_SECRET
+# BITBUCKET_CLIENT_SECRET, MICROSOFT_CLIENT_SECRET
+GOOGLE_CLIENT_ID = ""
+LINKEDIN_CLIENT_ID = ""
+FACEBOOK_CLIENT_ID = ""
+BITBUCKET_CLIENT_ID = ""
+MICROSOFT_CLIENT_ID = ""
+MICROSOFT_TENANT_ID = "common"
+
+# Set via: wrangler secret put ANTHROPIC_API_KEY
+# Bound automatically as c.env.ANTHROPIC_API_KEY
+
+# Cepien integration runner-only callback secret. The PushCI pipeline
+# runner POSTs /api/integrations/cepien/callback with:
+#   Authorization: Bearer ${PUSHCI_RUNNER_CALLBACK_SECRET}
+# Anything else → 401. SSRF guard in cepien-callback-guard.ts restricts
+# the downstream callback_url fetch to *.cepien.ai over HTTPS.
+# Set via: wrangler secret put PUSHCI_RUNNER_CALLBACK_SECRET
+#
+# Cepien integration feature flag (v1.6.6 audit I-001). Routes at
+# /api/integrations/cepien/* return 404 unless ENABLE_CEPIEN is set to
+# "1" or "true". Default OFF — Cepien's production webhook schema is
+# still in flux, so we don't want to accept traffic in production until
+# the integration is stable. Flip on in [vars] below or via a secret:
+#   ENABLE_CEPIEN = "1"
+
+# Stripe — set via: wrangler secret put <KEY>
+# STRIPE_SECRET_KEY
+# STRIPE_WEBHOOK_SECRET
+# STRIPE_PRICE_PRO_MONTHLY
+# STRIPE_PRICE_PRO_ANNUAL
+# STRIPE_PRICE_TEAM_MONTHLY
+# STRIPE_PRICE_TEAM_ANNUAL
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pushci"
+database_id = "0393e8e8-89ef-4d77-8a39-cd961be9879b"
+# EU-West region pin — required for Norlys pilot DPO sign-off and EU
+# data-residency claim on /norlys-pilot. Cloudflare D1 honours
+# location_hint at provision time for new databases; existing
+# databases keep their original placement. For the Norlys pilot
+# tenant, provision a fresh D1 with this hint set.
+location_hint = "weur"
+
+[[kv_namespaces]]
+binding = "RUNNERS"
+id = "513d7a5e5d4f48c4954f0f4a658e19c1"
+
+# Rate-limit Durable Object (I-002 fix).
+# KV is eventually consistent (~60s global), so the legacy middleware
+# can be bypassed by hitting different CF pops. DOs give a single
+# strongly-consistent actor per IP, which closes that gap.
+# Applied to bridge/webhook/runs/aws routes — see api/src/index.ts.
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiterDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RateLimiterDO"]
+
+# SEO cron — ping search engines and verify AI discovery weekly
+[triggers]
+crons = ["0 6 * * 1"]

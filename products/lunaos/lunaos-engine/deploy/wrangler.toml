@@ -1,0 +1,107 @@
+# LunaOS Engine — Deployment Wrangler Config
+# Mirrors packages/api/wrangler.toml with deploy-specific paths
+
+name = "lunaos-engine"
+main = "src/worker.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = ["* * * * *"]
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "lunaos-engine-db"
+database_id = "38ff1ff7-8f09-482a-b348-ca4c76b7f5d5"
+migrations_dir = "migrations"
+
+# KV Namespace (sessions, cache)
+[[kv_namespaces]]
+binding = "KV"
+id = "81f628c9709045f4b9151f29ea6b75be"
+preview_id = "77db46cd05e7405b915114a87fba71fb"
+
+# Cloudflare AI (embeddings)
+[ai]
+binding = "AI"
+
+# Vectorize (vector search)
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "luna-code-index"
+
+# R2 bucket for workflow exports and run artifacts
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "luna-assets-prod"
+preview_bucket_name = "luna-assets-preview"
+
+[vars]
+ENVIRONMENT = "development"
+CLAW_ENDPOINT = "https://claw-gateway.broad-dew-49ad.workers.dev"
+CLAW_PROJECT_ID = "lunaos"
+
+[observability]
+enabled = true
+
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+
+[build]
+command = "npm run build"
+cwd = "./packages/workers"
+watch_paths = ["packages/workers/src/**/*.ts"]
+
+# ── Production ──────────────────────────────
+[env.production]
+name = "lunaos-engine"
+routes = [{ pattern = "api.lunaos.ai/*", zone_name = "lunaos.ai" }]
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "lunaos-engine-db"
+database_id = "38ff1ff7-8f09-482a-b348-ca4c76b7f5d5"
+migrations_dir = "migrations"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "81f628c9709045f4b9151f29ea6b75be"
+
+[env.production.ai]
+binding = "AI"
+
+[[env.production.vectorize]]
+binding = "VECTORIZE"
+index_name = "luna-code-index"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+API_BASE = "https://api.lunaos.ai"
+LOG_LEVEL = "info"
+
+# ── Staging ─────────────────────────────────
+[env.staging]
+name = "lunaos-engine-staging"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "lunaos-engine-db"
+database_id = "38ff1ff7-8f09-482a-b348-ca4c76b7f5d5"
+migrations_dir = "migrations"
+
+[[env.staging.kv_namespaces]]
+binding = "KV"
+id = "81f628c9709045f4b9151f29ea6b75be"
+
+[env.staging.ai]
+binding = "AI"
+
+[[env.staging.vectorize]]
+binding = "VECTORIZE"
+index_name = "luna-code-index"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+API_BASE = "https://staging-api.lunaos.ai"
+LOG_LEVEL = "debug"

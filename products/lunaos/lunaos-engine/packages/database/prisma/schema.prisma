@@ -1,0 +1,933 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// Core Models
+// ============================================================================
+
+// User Management
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  username  String     @unique
+  firstName String?
+  lastName  String?
+  avatar    String?
+  password  String
+  role      UserRole   @default(USER)
+  status    UserStatus @default(ACTIVE)
+  profile   Json? // User profile settings and preferences
+  metadata  Json? // Additional user metadata
+
+  // Security fields
+  emailVerified          Boolean   @default(false)
+  emailVerificationToken String?
+  passwordResetToken     String?
+  passwordResetExpires   DateTime?
+  failedLoginAttempts    Int       @default(0)
+  lockedUntil            DateTime?
+
+  // MFA fields
+  mfaEnabled          Boolean  @default(false)
+  mfaSecret           String? // TOTP secret
+  backupCodes         String[] // Backup codes for MFA
+  webauthnCredentials Json[] // WebAuthn credentials
+
+  // OAuth fields
+  oauthProviders Json? // Store OAuth provider info
+  lastLoginAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  projects      ProjectUser[]
+  apiKeys       ApiKey[]
+  sessions      UserSession[]
+  auditLogs     AuditLog[]
+  oauthAccounts OAuthAccount[]
+  Project       Project[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  DEVELOPER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+  LOCKED
+}
+
+// OAuth Account Management
+model OAuthAccount {
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     OAuthProvider
+  providerId   String // Provider-specific user ID
+  accessToken  String? // OAuth access token
+  refreshToken String? // OAuth refresh token
+  expiresAt    DateTime? // Token expiration
+  scopes       String[] // Granted scopes
+  metadata     Json? // Provider-specific metadata
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([provider, providerId])
+  @@map("oauth_accounts")
+}
+
+enum OAuthProvider {
+  GOOGLE
+  GITHUB
+  MICROSOFT
+}
+
+// Project Management
+model Project {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  slug        String        @unique
+  owner       User          @relation(fields: [userId], references: [id])
+  ownerId     String
+  status      ProjectStatus @default(ACTIVE)
+  settings    Json? // Project-specific settings
+  metadata    Json? // Additional project metadata
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  members      ProjectUser[]
+  agents       Agent[]
+  tasks        Task[]
+  ragContexts  RAGContext[]
+  tokenBudgets TokenBudget[]
+  deployments  Deployment[]
+  repositories Repository[]
+  userId       String
+  ApiKey       ApiKey[]
+  RAGQuery     RAGQuery[]
+  TokenUsage   TokenUsage[]
+
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+  SUSPENDED
+  DELETING
+}
+
+model ProjectUser {
+  id        String       @id @default(uuid())
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  role      ProjectRole  @default(MEMBER)
+  status    MemberStatus @default(ACTIVE)
+  joinedAt  DateTime     @default(now())
+  metadata  Json? // Role-specific metadata
+
+  @@unique([projectId, userId])
+  @@map("project_users")
+}
+
+enum ProjectRole {
+  OWNER
+  ADMIN
+  DEVELOPER
+  MEMBER
+  VIEWER
+}
+
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  INVITED
+  REMOVED
+}
+
+// Authentication & Security
+model ApiKey {
+  id          String     @id @default(uuid())
+  name        String
+  key         String     @unique @default(cuid())
+  hashedKey   String     @unique
+  permissions Json // API permissions and scopes
+  rateLimit   RateLimit? @relation(fields: [rateLimitId], references: [id]) // Rate limiting configuration
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  project     Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String?
+  isActive    Boolean    @default(true)
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  rateLimitId String?
+
+  @@map("api_keys")
+}
+
+model RateLimit {
+  id          String   @id @default(uuid())
+  windowMs    Int // Time window in milliseconds
+  maxRequests Int // Maximum requests per window
+  strategy    String   @default("sliding-window") // Rate limiting strategy
+  ApiKey      ApiKey[]
+
+  @@map("rate_limits")
+}
+
+model UserSession {
+  id           String   @id @default(uuid())
+  token        String   @unique
+  refreshToken String?  @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  deviceInfo   Json? // Device and browser information
+  ipAddress    String?
+  userAgent    String?
+  isActive     Boolean  @default(true)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("user_sessions")
+}
+
+// ============================================================================
+// Agent Management
+// ============================================================================
+
+model Agent {
+  id            String         @id @default(uuid())
+  name          String
+  type          String // Agent type (task-executor, requirements-analyzer, etc.)
+  version       String         @default("1.0.0")
+  description   String?
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId     String
+  config        Json // Agent configuration
+  resourceQuota ResourceQuota? @relation(fields: [resourceQuotaId], references: [id]) // Resource allocation limits
+  health        AgentHealth    @default(HEALTHY)
+  status        AgentStatus    @default(STOPPED)
+  capabilities  Json // Agent capabilities
+  dependencies  Json // Required dependencies and tools
+  metadata      Json // Additional agent metadata
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  tasks                     Task[]
+  healthChecks              HealthCheck[]
+  executions                AgentExecution[]
+  versions                  AgentVersion[]
+  lifecycleState            AgentLifecycleState?
+  statusTransitions         AgentStatusTransition[]
+  healthCheckHistory        AgentHealthCheckHistory[]
+  resourceUsageHistory      ResourceUsageHistory[]
+  metricsSummary            AgentMetricsSummary[]
+  configHistory             AgentConfigHistory[]
+  agentDependencies         AgentDependency[]
+  resourceQuotaId           String?
+
+  @@unique([projectId, name])
+  @@map("agents")
+}
+
+enum AgentHealth {
+  HEALTHY
+  DEGRADED
+  UNHEALTHY
+  UNKNOWN
+}
+
+enum AgentStatus {
+  RUNNING
+  STOPPED
+  STARTING
+  STOPPING
+  ERROR
+}
+
+model ResourceQuota {
+  id                 String  @id @default(uuid())
+  cpuCores           Float? // CPU cores allocated
+  memoryMB           Int? // Memory in MB
+  diskMB             Int? // Disk space in MB
+  maxConcurrentTasks Int? // Maximum concurrent tasks
+  tokenLimit         Int? // Token usage limit
+  bandwidthMB        Int? // Network bandwidth limit in MB
+  Agent              Agent[]
+
+  @@map("resource_quotas")
+}
+
+model HealthCheck {
+  id        String      @id @default(uuid())
+  agent     Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId   String
+  status    AgentHealth
+  metrics   Json // Health metrics (cpu, memory, etc.)
+  message   String? // Health status message
+  timestamp DateTime    @default(now())
+
+  // Hot-path indexes for log/health-event scans by run
+  @@index([agentId, timestamp])
+  @@index([status, timestamp])
+  @@map("health_checks")
+}
+
+// Agent Version Management
+model AgentVersion {
+  id                String         @id @default(uuid())
+  version           String
+  agent             Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId           String
+  config            Json           // Agent configuration snapshot
+  changelog         String?        // Version changelog
+  isActive          Boolean        @default(false)
+  deploymentStatus  String         @default("draft")
+  deploymentMetadata Json?         // Deployment-specific metadata
+  isStable          Boolean        @default(false)
+  isProductionReady Boolean        @default(false)
+  backupPath        String?        // Backup file location
+  createdAt         DateTime       @default(now())
+  deployedAt        DateTime?
+
+  @@unique([version, agentId])
+  @@map("agent_versions")
+}
+
+// Agent Execution Tracking
+model AgentExecution {
+  id            String           @id @default(uuid())
+  agent         Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId       String
+  task          Task?            @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  taskId        String?
+  instanceId    String
+  status        ExecutionStatus  @default(PENDING)
+  startTime     DateTime?
+  endTime       DateTime?
+  duration      Int?             // Duration in milliseconds
+  result        Json?            // Execution result
+  error         String?          // Error information
+  logs          String?          // Execution logs
+  metrics       Json?            // Performance metrics
+  resourceUsage Json?            // Resource usage during execution
+  createdAt     DateTime         @default(now())
+
+  // Performance metrics
+  cpuTime            Int @default(0)
+  memoryUsage        Int @default(0)
+  diskUsage          Int @default(0)
+  networkIO          Int @default(0)
+  tokensUsed         Int @default(0)
+  requestsProcessed  Int @default(0)
+  errorsEncountered  Int @default(0)
+
+  // Hot-path indexes for run lookups (workflow execution)
+  @@index([agentId, status, createdAt])
+  @@index([taskId, status])
+  @@index([status, createdAt])
+  @@index([instanceId])
+  @@index([startTime, endTime])
+  @@map("agent_executions")
+}
+
+// Agent Lifecycle State Management
+model AgentLifecycleState {
+  id                String     @id @default(uuid())
+  agent             Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId           String
+  status            AgentStatus
+  pid               Int?
+  startTime         DateTime?
+  lastHealthCheck   DateTime?
+  restartCount      Int        @default(0)
+  maxRestarts       Int        @default(3)
+  restartDelay      Int        @default(5000)
+  isShuttingDown    Boolean    @default(false)
+  shutdownTimeoutId String?
+  startupTimeoutId  String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@unique([agentId])
+  @@map("agent_lifecycle_states")
+}
+
+// Agent Status Transition History
+model AgentStatusTransition {
+  id         String      @id @default(uuid())
+  agent      Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId    String
+  fromStatus String?
+  toStatus   String
+  timestamp  DateTime    @default(now())
+  reason     String?
+  triggeredBy String      @default("system")
+  metadata   Json?
+  execution  AgentExecution? @relation(fields: [executionId], references: [id], onDelete: SetNull)
+  executionId String?
+
+  // Hot-path indexes for run-step status transitions
+  @@index([agentId, timestamp])
+  @@index([executionId, timestamp])
+  @@index([toStatus, timestamp])
+  @@map("agent_status_transitions")
+}
+
+// Agent Health Check History
+model AgentHealthCheckHistory {
+  id           String      @id @default(uuid())
+  agent        Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId      String
+  checkName    String
+  checkType    String
+  status       String      // 'pass' | 'fail' | 'warn'
+  message      String?
+  timestamp    DateTime    @default(now())
+  timeout      Int
+  interval     Int         @default(0)
+  details      Json?
+  execution    AgentExecution? @relation(fields: [executionId], references: [id], onDelete: SetNull)
+  executionId  String?
+
+  // Hot-path indexes for run-log style scans
+  @@index([agentId, timestamp])
+  @@index([executionId, timestamp])
+  @@index([status, timestamp])
+  @@map("agent_health_check_history")
+}
+
+// Resource Usage History
+model ResourceUsageHistory {
+  id                    String    @id @default(uuid())
+  agent                 Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId               String
+  timestamp             DateTime  @default(now())
+
+  // CPU metrics
+  cpuUsage              Decimal?
+  cpuCores              Int?
+  cpuLoad1m             Decimal?
+  cpuLoad5m             Decimal?
+  cpuLoad15m            Decimal?
+
+  // Memory metrics
+  memoryUsed            Int?
+  memoryTotal           Int?
+  memoryPercentage      Decimal?
+  memoryHeapUsed        Int?
+  memoryHeapTotal       Int?
+
+  // Disk metrics
+  diskUsed              Int?
+  diskTotal             Int?
+  diskPercentage        Decimal?
+  diskReadOps           Int?
+  diskWriteOps          Int?
+
+  // Network metrics
+  networkBytesIn        BigInt?
+  networkBytesOut       BigInt?
+  networkConnections    Int?
+  networkRequests       Int?
+
+  // Task metrics
+  tasksRunning          Int?
+  tasksQueued           Int?
+  tasksCompleted        Int?
+  tasksFailed           Int?
+  tasksAvgDuration      Int?
+
+  // Token metrics
+  tokensUsed            Int?
+  tokensLimit           Int?
+  tokensRemaining       Int?
+  tokensCost            Decimal?
+
+  // Performance metrics
+  performanceResponseTime  Int?
+  performanceThroughput    Int?
+  performanceErrorRate     Decimal?
+
+  // Hot-path index for run-resource time-series scans
+  @@index([agentId, timestamp])
+  @@map("resource_usage_history")
+}
+
+// Agent Metrics Summary (Aggregated)
+model AgentMetricsSummary {
+  id                    String    @id @default(uuid())
+  agent                 Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId               String
+  periodType            String    // 'hourly', 'daily', 'weekly', 'monthly'
+  periodStart           DateTime
+  periodEnd             DateTime
+
+  // Execution metrics
+  totalExecutions       Int       @default(0)
+  successfulExecutions  Int       @default(0)
+  failedExecutions      Int       @default(0)
+  successRate           Decimal   @default(1.0)
+
+  // Duration metrics
+  avgDuration           Int       @default(0)
+  maxDuration           Int       @default(0)
+  minDuration           Int       @default(0)
+
+  // Resource metrics
+  avgCpuUsage           Decimal   @default(0)
+  maxCpuUsage           Decimal   @default(0)
+  avgMemoryUsage        Int       @default(0)
+  maxMemoryUsage        Int       @default(0)
+
+  // Token metrics
+  totalTokensUsed       Int       @default(0)
+  totalCost             Decimal   @default(0)
+
+  // Availability metrics
+  uptimeSeconds         Int       @default(0)
+  downtimeSeconds       Int       @default(0)
+
+  createdAt             DateTime  @default(now())
+
+  @@unique([agentId, periodType, periodStart])
+  @@map("agent_metrics_summary")
+}
+
+// Agent Configuration History
+model AgentConfigHistory {
+  id           String   @id @default(uuid())
+  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId      String
+  version      String
+  config       Json
+  changes      Json?    // Array of changed fields
+  changedBy    String   @default("system")
+  changeReason String?
+  createdAt    DateTime @default(now())
+
+  @@map("agent_config_history")
+}
+
+// Agent Dependencies
+model AgentDependency {
+  id                 String  @id @default(uuid())
+  agent              Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agentId            String
+  dependencyName     String
+  dependencyType     String  // 'agent', 'service', 'package', 'external'
+  dependencyVersion  String?
+  isRequired         Boolean @default(true)
+  dependencyConfig   Json?
+  status             String  @default("pending") // 'pending', 'resolved', 'failed'
+  lastChecked        DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([agentId, dependencyName, dependencyType])
+  @@map("agent_dependencies")
+}
+
+// ============================================================================
+// Task Management
+// ============================================================================
+
+model Task {
+  id          String       @id @default(uuid())
+  type        TaskType
+  priority    TaskPriority @default(NORMAL)
+  payload     Json // Task-specific data and parameters
+  agent       Agent?       @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  agentId     String?
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  status      TaskStatus   @default(PENDING)
+  progress    Json? // Task progress data (flexible structure)
+  result      Json? // Task result data
+  error       String? // Error information
+  config      Json? // Task execution configuration
+  metadata    Json? // Additional task metadata
+  createdAt   DateTime     @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  // Relations
+  dependencies     TaskDependency[] @relation("TaskDependsOn")
+  dependents       TaskDependency[] @relation("TaskDependent")
+  executions       TaskExecution[]
+  agentExecutions  AgentExecution[]
+
+  @@index([status, priority, createdAt])
+  @@index([agentId, status])
+  @@index([projectId, status])
+  @@index([projectId, createdAt])
+  @@index([projectId, status, createdAt])
+  @@map("tasks")
+}
+
+enum TaskType {
+  CODE_ANALYSIS
+  REQUIREMENTS_GENERATION
+  DESIGN_ARCHITECTURE
+  APP_GENERATION_OPENAI
+  APP_GENERATION_GOOGLE
+  MOBILE_GENERATION_EXPO
+  MOBILE_GENERATION_SWIFT
+  CLOUD_MIGRATION_CLOUDFLARE
+  PROJECT_ORGANIZATION
+  AI_INTEGRATION
+  RAG_CONTEXT_EXTRACTION
+  TOKEN_OPTIMIZATION
+  SECURITY_AUDIT
+  PERFORMANCE_TESTING
+  DOCUMENTATION_GENERATION
+}
+
+enum TaskPriority {
+  CRITICAL // 1
+  HIGH // 2
+  NORMAL // 3
+  LOW // 4
+  BACKGROUND // 5
+}
+
+enum TaskStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+
+// Task Progress tracking is now handled via JSON field in Task model
+model TaskDependency {
+  id              String @id @default(uuid())
+  dependentTask   Task   @relation("TaskDependent", fields: [dependentTaskId], references: [id], onDelete: Cascade)
+  dependentTaskId String
+  dependsOnTask   Task   @relation("TaskDependsOn", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+  dependsOnTaskId String
+
+  @@unique([dependentTaskId, dependsOnTaskId])
+  @@map("task_dependencies")
+}
+
+model TaskExecution {
+  id        String          @id @default(uuid())
+  task      Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId    String
+  attempt   Int             @default(1)
+  status    ExecutionStatus @default(PENDING)
+  startTime DateTime?
+  endTime   DateTime?
+  duration  Int? // Duration in milliseconds
+  result    Json? // Execution result
+  error     String? // Error information
+  logs      String? // Execution logs
+  metrics   Json? // Performance metrics
+  createdAt DateTime        @default(now())
+
+  // Hot-path indexes for run-step lookups
+  @@index([taskId, attempt])
+  @@index([taskId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([startTime, endTime])
+  @@map("task_executions")
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ============================================================================
+// RAG and Context Management
+// ============================================================================
+
+model RAGContext {
+  id             String   @id @default(uuid())
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String
+  content        String // Context content
+  contentType    String   @default("text") // text, code, image, audio
+  metadata       Json // Context metadata (source, author, etc.)
+  embeddings     Json? // Vector embeddings
+  relevanceScore Float? // Context relevance score
+  tokenCount     Int? // Token count for context
+  hash           String   @unique // Content hash for deduplication
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  queries RAGQuery[]
+
+  @@index([projectId, isActive])
+  @@index([projectId, relevanceScore])
+  @@map("rag_contexts")
+}
+
+model RAGQuery {
+  id         String     @id @default(uuid())
+  project    Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId  String
+  query      String // Search query
+  context    RAGContext @relation(fields: [contextId], references: [id], onDelete: Cascade)
+  contextId  String
+  results    Json // Search results
+  tokensUsed Int? // Tokens consumed by query
+  cost       Float? // Query cost
+  timestamp  DateTime   @default(now())
+
+  @@index([projectId, timestamp])
+  @@map("rag_queries")
+}
+
+// ============================================================================
+// Token Management and Optimization
+// ============================================================================
+
+model TokenUsage {
+  id        String    @id @default(uuid())
+  timestamp DateTime  @default(now())
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  provider  String // openai, anthropic, deepseek, gemini
+  model     String // Model name
+  tokens    Int // Number of tokens used
+  cost      Decimal   @db.Decimal(10, 6) // Cost in USD
+  taskType  TaskType?
+  optimized Boolean   @default(false)
+  savings   Decimal?  @db.Decimal(10, 6) // Cost savings from optimization
+  metadata  Json? // Additional usage metadata
+
+  @@index([timestamp, provider])
+  @@index([projectId, timestamp])
+  @@map("token_usage")
+}
+
+model TokenBudget {
+  id                  String   @id @default(uuid())
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId           String
+  monthlyLimit        Decimal  @db.Decimal(10, 2) // Monthly budget in USD
+  currentUsage        Decimal  @default(0) @db.Decimal(10, 2)
+  periodStart         DateTime
+  periodEnd           DateTime
+  alertThreshold      Float    @default(0.8) // Alert threshold (0.8 = 80%)
+  alertEnabled        Boolean  @default(true)
+  optimizationEnabled Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([projectId, periodStart])
+  @@map("token_budgets")
+}
+
+// ============================================================================
+// Deployment and Infrastructure
+// ============================================================================
+
+model Deployment {
+  id             String           @id @default(uuid())
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId      String
+  name           String
+  environment    DeploymentEnv    @default(DEVELOPMENT)
+  type           DeploymentType   @default(MANUAL)
+  status         DeploymentStatus @default(PENDING)
+  config         Json // Deployment configuration
+  infrastructure Json? // Infrastructure specification
+  rollbackConfig Json? // Rollback configuration
+  startedAt      DateTime?
+  completedAt    DateTime?
+  success        Boolean?
+  logs           String? // Deployment logs
+  error          String? // Error information
+  metadata       Json? // Additional deployment metadata
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@map("deployments")
+}
+
+enum DeploymentEnv {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+}
+
+enum DeploymentType {
+  MANUAL
+  AUTOMATIC
+  BLUE_GREEN
+  CANARY
+  ROLLING
+}
+
+enum DeploymentStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+  ROLLING_BACK
+  ROLLED_BACK
+}
+
+// ============================================================================
+// Code Repository Management
+// ============================================================================
+
+model Repository {
+  id          String    @id @default(uuid())
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId   String
+  name        String
+  url         String
+  provider    String // github, gitlab, bitbucket, etc.
+  branch      String    @default("main")
+  accessToken String? // Encrypted access token
+  isActive    Boolean   @default(true)
+  lastSyncAt  DateTime?
+  syncStatus  String    @default("pending")
+  metadata    Json? // Repository metadata
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([projectId, url])
+  @@map("repositories")
+}
+
+// ============================================================================
+// Audit and Logging
+// ============================================================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  action     String // Action performed
+  resource   String? // Resource type
+  resourceId String? // Resource ID
+  metadata   Json? // Additional audit data
+  ipAddress  String?
+  userAgent  String?
+  timestamp  DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([action, timestamp])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// System Configuration
+// ============================================================================
+
+model SystemConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json // Configuration value
+  category  String // Configuration category
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
+// ============================================================================
+// Views and Indexes (for performance optimization)
+// ============================================================================
+
+/**
+ * Additional Indexes for Performance:
+ * - tasks: (status, priority, createdAt)
+ * - tasks: (agentId, status)
+ * - tasks: (projectId, status)
+ * - rag_contexts: (projectId, isActive)
+ * - rag_contexts: (projectId, relevanceScore)
+ * - token_usage: (timestamp, provider)
+ * - token_usage: (projectId, timestamp)
+ * - token_budgets: (projectId, periodStart)
+ * - audit_logs: (userId, timestamp)
+ * - audit_logs: (action, timestamp)
+ */
+
+// ============================================================================
+// SSO — Identity Providers (SAML / OIDC) and SSO sessions
+// ============================================================================
+
+model IdentityProvider {
+  id          String  @id @default(cuid())
+  orgId       String
+  type        String // "saml" | "oidc"
+  name        String
+  enabled     Boolean @default(true)
+  emailDomain String?
+  jitEnabled  Boolean @default(true)
+  defaultRole String  @default("member")
+
+  oidcIssuer       String?
+  oidcClientId     String?
+  oidcClientSecret String? // encrypted via secret-vault
+  oidcDiscoveryUrl String?
+  oidcScopes       String? // CSV, default "openid email profile"
+
+  samlEntityId    String?
+  samlSsoUrl      String?
+  samlCertificate String? // X.509 PEM
+  samlSloUrl      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, name])
+  @@index([emailDomain])
+  @@map("identity_providers")
+}
+
+model SsoSession {
+  id           String   @id @default(cuid())
+  userId       String
+  orgId        String
+  idpId        String
+  nameId       String
+  sessionIndex String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sso_sessions")
+}

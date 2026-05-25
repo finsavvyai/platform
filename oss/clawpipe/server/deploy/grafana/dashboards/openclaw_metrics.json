@@ -1,0 +1,158 @@
+{
+  "dashboard": {
+    "title": "FinSavvyAI + OpenCLaw Metrics",
+    "uid": "finsavvy-openclaw",
+    "tags": ["finsavvyai", "openclaw", "production"],
+    "timezone": "browser",
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "OpenCLaw Request Latency (ms)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(openclaw_request_duration_seconds_bucket[5m]))*1000",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(openclaw_request_duration_seconds_bucket[5m]))*1000",
+            "legendFormat": "p50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 500 },
+                { "color": "red", "value": 2000 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Success Rate (%)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(openclaw_requests_total{status=\"success\"}[5m]) / rate(openclaw_requests_total[5m]) * 100",
+            "legendFormat": "success_rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": null },
+                { "color": "yellow", "value": 95 },
+                { "color": "green", "value": 99 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Estimated Cost ($)",
+        "type": "timeseries",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "targets": [
+          {
+            "expr": "sum(increase(openclaw_tokens_total[1h])) * 0.00001",
+            "legendFormat": "hourly_cost"
+          }
+        ],
+        "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+      },
+      {
+        "id": 4,
+        "title": "Request Throughput (req/s)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "rate(openclaw_requests_total[1m])",
+            "legendFormat": "total"
+          },
+          {
+            "expr": "rate(openclaw_requests_total{backend=\"openclaw\"}[1m])",
+            "legendFormat": "openclaw"
+          },
+          {
+            "expr": "rate(openclaw_requests_total{backend=\"local\"}[1m])",
+            "legendFormat": "local"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Fallback Chain Events",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "rate(openclaw_fallback_total[5m])",
+            "legendFormat": "{{ backend }}"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Connection Health",
+        "type": "gauge",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
+        "targets": [
+          {
+            "expr": "openclaw_health_uptime_pct",
+            "legendFormat": "uptime"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                { "color": "red", "value": null },
+                { "color": "yellow", "value": 90 },
+                { "color": "green", "value": 99 }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Active Workers",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 16 },
+        "targets": [
+          {
+            "expr": "count(up{job=\"finsavvyai-worker\"} == 1)",
+            "legendFormat": "workers"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Token Usage by Model",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+        "targets": [
+          {
+            "expr": "sum by (model) (increase(openclaw_tokens_total[24h]))",
+            "legendFormat": "{{ model }}"
+          }
+        ]
+      }
+    ]
+  }
+}

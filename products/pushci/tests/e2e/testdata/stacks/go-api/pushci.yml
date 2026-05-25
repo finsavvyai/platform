@@ -1,0 +1,28 @@
+"on":
+    - push
+    - pull_request
+stages:
+    - name: install
+      checks:
+        - name: go-install
+          run: go mod download
+    - name: build
+      checks:
+        - name: go-build
+          run: go build ./...
+      depends_on:
+        - install
+    - name: test
+      checks:
+        - name: go-test
+          run: go test ./...
+      depends_on:
+        - install
+      parallel: true
+    - name: lint
+      checks:
+        - name: go-vet
+          run: go vet ./...
+      depends_on:
+        - install
+      parallel: true

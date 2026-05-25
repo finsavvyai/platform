@@ -1,0 +1,36 @@
+name: DR drill (weekly)
+
+on:
+  schedule:
+    - cron: "0 8 * * MON" # Mondays 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  staging-restore:
+    name: Restore staging from latest backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 75 # RTO budget + 15 min headroom
+    environment: staging-dr
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run staging restore
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.PG_BACKUP_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.PG_BACKUP_AWS_SECRET_ACCESS_KEY }}
+          PGBACKREST_STANZA: sdlc-staging
+          SLACK_DR_WEBHOOK: ${{ secrets.SLACK_DR_WEBHOOK }}
+        run: |
+          # Drill runs in a clean staging VPC; the actual host is
+          # accessed via SSM run-command from the action runner.
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:role,Values=postgres-staging" \
+            --parameters 'commands=["bash /opt/sdlc/deployments/scripts/restore.sh staging"]' \
+            --comment "weekly DR drill from gh actions"
+
+      - name: Verify drill log updated
+        run: |
+          if ! grep -q "$(date +%Y-%m-%d)" docs/runbooks/rto-rpo-drill-log.md; then
+            echo "::warning::drill log not updated — runbook owner should append a row"
+          fi

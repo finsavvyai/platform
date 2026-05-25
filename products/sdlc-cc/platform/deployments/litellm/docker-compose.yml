@@ -1,0 +1,74 @@
+# LiteLLM sidecar for the SDLC platform llm-gateway.
+#
+# Run:  docker compose -f deployments/litellm/docker-compose.yml up -d
+# Logs: docker compose -f deployments/litellm/docker-compose.yml logs -f litellm
+#
+# The Go llm-gateway talks to http://litellm:4000 when running inside the
+# same compose network, or http://localhost:4000 from the host.
+
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: sdlc-litellm
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
+    environment:
+      # Master key used by the Go gateway as a Bearer token.
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in your .env}
+      LITELLM_DATABASE_URL: ${LITELLM_DATABASE_URL:-}
+      # Provider credentials — passed through to config.yaml via os.environ.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AWS_BEDROCK_ACCESS_KEY_ID: ${AWS_BEDROCK_ACCESS_KEY_ID:-}
+      AWS_BEDROCK_SECRET_ACCESS_KEY: ${AWS_BEDROCK_SECRET_ACCESS_KEY:-}
+      AWS_BEDROCK_REGION: ${AWS_BEDROCK_REGION:-us-east-1}
+      AZURE_API_KEY: ${AZURE_API_KEY:-}
+      AZURE_API_BASE: ${AZURE_API_BASE:-}
+      AZURE_API_VERSION: ${AZURE_API_VERSION:-2024-02-15-preview}
+      COHERE_API_KEY: ${COHERE_API_KEY:-}
+      # Redis cache (shared with rest of SDLC platform).
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sdlc-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: sdlc-litellm-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - litellm-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - sdlc-net
+
+volumes:
+  litellm-redis-data:
+
+networks:
+  sdlc-net:
+    name: sdlc-net
+    driver: bridge

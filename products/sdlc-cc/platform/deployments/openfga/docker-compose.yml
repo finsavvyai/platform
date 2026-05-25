@@ -1,0 +1,71 @@
+version: "3.9"
+
+# OpenFGA relationship-based authorization service.
+# Complements the existing OPA deployment (services/opa/) which handles
+# policy rules. OpenFGA handles relationships (ownership, sharing,
+# delegated admin) using a Google Zanzibar-inspired model.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: openfga-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: openfga
+      POSTGRES_PASSWORD: openfga
+      POSTGRES_DB: openfga
+    volumes:
+      - openfga_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openfga -d openfga"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - openfga-net
+
+  migrate:
+    image: openfga/openfga:latest
+    container_name: openfga-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: migrate
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: "postgres://openfga:openfga@postgres:5432/openfga?sslmode=disable"
+    networks:
+      - openfga-net
+
+  openfga:
+    image: openfga/openfga:latest
+    container_name: openfga
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: run
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: "postgres://openfga:openfga@postgres:5432/openfga?sslmode=disable"
+      OPENFGA_LOG_FORMAT: json
+      OPENFGA_PLAYGROUND_ENABLED: "true"
+      OPENFGA_METRICS_ENABLED: "true"
+    ports:
+      - "8080:8080"   # HTTP API
+      - "8081:8081"   # gRPC API
+      - "3000:3000"   # Playground UI
+      - "2112:2112"   # Prometheus metrics
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=openfga:8081"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - openfga-net
+
+volumes:
+  openfga_pgdata:
+
+networks:
+  openfga-net:
+    driver: bridge

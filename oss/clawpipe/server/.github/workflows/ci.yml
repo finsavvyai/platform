@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install lint dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Check formatting (black)
+        run: black --check src/ tests/
+      - name: Check imports (isort)
+        run: isort --check-only src/ tests/
+      - name: Lint (flake8)
+        run: flake8 src/ --max-line-length=120 --ignore=E501,W503
+
+  file-length-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enforce max file length
+        run: |
+          BASE_REF_NAME="${{ github.base_ref || 'main' }}"
+          git fetch origin "${BASE_REF_NAME}" --depth=1 || true
+          CHANGED_ONLY=1 BASE_REF="origin/${BASE_REF_NAME}" MAX_LINES=200 ./scripts/ci/check_file_length.sh
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [lint, file-length-gate]
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install pytest-aiohttp
+      - name: Run unit tests with coverage gate
+        run: |
+          pytest tests/unit/ -v --tb=short \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=60
+      - name: Enforce critical module coverage
+        if: matrix.python-version == '3.11'
+        run: |
+          python3 scripts/ci/check_critical_coverage.py \
+            --coverage-xml coverage.xml \
+            --threshold 70 \
+            --critical \
+            src/core/auth.py \
+            src/core/config.py \
+            src/core/circuit_breaker.py \
+            src/core/rate_limiter.py \
+            src/api/routes/openclaw.py \
+            src/api/routes/governance.py \
+            src/api/routes/agent_decision.py
+      - name: Run integration tests
+        run: pytest tests/integration/test_request_flow.py -v --tb=short
+      - name: Run load tests
+        run: pytest tests/load/ -v --tb=short
+      - name: Verify imports
+        run: python3 -c "from src.core.config import ClusterConfig; from src.core.master_server import MasterServer; print('Imports OK')"
+      - name: Upload coverage
+        if: matrix.python-version == '3.11'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  security:
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install security tooling
+        run: |
+          pip install -r requirements-dev.txt
+          pip install pip-audit
+      - name: Python dependency audit
+        run: pip-audit
+      - name: Python static security scan (bandit)
+        run: bandit -r src -ll
+      - name: Check for hardcoded secrets
+        run: |
+          FOUND=$(grep -rn \
+            --include="*.py" --include="*.js" --include="*.ts" --include="*.yml" --include="*.yaml" \
+            -E "(password|secret|api_key|token)\s*=\s*['\"][^'\"]{8,}" \
+            src/ cloudflare-api/ scripts/ observability/ packages/ \
+            | grep -v "\.example" | grep -v "test" | grep -v "changeme" | grep -v "# " || true)
+          if [ -n "$FOUND" ]; then
+            echo "Potential hardcoded secrets found:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "No hardcoded secrets found"
+      - name: Check for dangerous patterns
+        run: |
+          FOUND=$(grep -rn --include="*.py" \
+            -E "eval\(|exec\(|os\.system\(|subprocess\..*shell=True" \
+            src/ scripts/ || true)
+          if [ -n "$FOUND" ]; then
+            echo "Potentially dangerous patterns detected:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "No dangerous patterns detected"
+      - name: npm audit (all lockfiles)
+        run: |
+          set -euo pipefail
+          mapfile -t locks < <(find . -name package-lock.json -not -path "*/node_modules/*")
+          for lock in "${locks[@]}"; do
+            dir="$(dirname "$lock")"
+            echo "Running npm audit in $dir"
+            (cd "$dir" && npm audit --audit-level=high --omit=dev)
+          done
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [security]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t finsavvyai:test .
+      - name: Start services
+        run: |
+          docker compose up -d
+          sleep 10
+      - name: Run production smoke tests
+        run: |
+          pip install pytest requests
+          pytest tests/production/test_production_smoke.py -v --tb=short \
+            -k "not test_auth_required and not test_cluster_has_nodes and not test_worker_health"
+      - name: Stop services
+        if: always()
+        run: docker compose down

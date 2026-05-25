@@ -1,0 +1,281 @@
+# Prometheus Alerting Rules for SDLC Platform Gateway
+# These rules define when alerts should be triggered
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gateway-alerts
+  namespace: sdlc-platform
+  labels:
+    app: gateway
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  # API Availability and Health
+  - name: gateway_availability
+    interval: 30s
+    rules:
+    - alert: GatewayServiceDown
+      expr: up{job="gateway", namespace="sdlc-platform"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        component: gateway
+      annotations:
+        summary: Gateway service is down
+        description: "Gateway service has been down for more than 1 minute on {{ $labels.instance }}"
+
+    - alert: GatewayHighErrorRate
+      expr: |
+        (
+          sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform",status_code=~"5.."}[5m]))
+          /
+          sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform"}[5m]))
+        ) > 0.05
+      for: 5m
+      labels:
+        severity: warning
+        component: gateway
+      annotations:
+        summary: High error rate detected
+        description: "Gateway error rate is {{ $value | humanizePercentage }} (above 5% threshold)"
+
+    - alert: GatewayVeryHighErrorRate
+      expr: |
+        (
+          sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform",status_code=~"5.."}[5m]))
+          /
+          sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform"}[5m]))
+        ) > 0.15
+      for: 2m
+      labels:
+        severity: critical
+        component: gateway
+      annotations:
+        summary: Very high error rate detected
+        description: "Gateway error rate is {{ $value | humanizePercentage }} (above 15% threshold)"
+
+  # Performance Metrics
+  - name: gateway_performance
+    interval: 30s
+    rules:
+    - alert: GatewayHighLatency
+      expr: |
+        histogram_quantile(0.95,
+          sum(rate(sdlc_gateway_http_request_duration_seconds_bucket{namespace="sdlc-platform"}[5m])) by (le)
+        ) > 1
+      for: 10m
+      labels:
+        severity: warning
+        component: gateway
+      annotations:
+        summary: High API latency detected
+        description: "95th percentile latency is {{ $value }}s (above 1s threshold)"
+
+    - alert: GatewayVeryHighLatency
+      expr: |
+        histogram_quantile(0.95,
+          sum(rate(sdlc_gateway_http_request_duration_seconds_bucket{namespace="sdlc-platform"}[5m])) by (le)
+        ) > 3
+      for: 5m
+      labels:
+        severity: critical
+        component: gateway
+      annotations:
+        summary: Very high API latency detected
+        description: "95th percentile latency is {{ $value }}s (above 3s threshold)"
+
+    - alert: GatewaySlowRequests
+      expr: |
+        sum(rate(sdlc_gateway_http_request_duration_seconds_bucket{namespace="sdlc-platform",le="+Inf"}[5m])) -
+        sum(rate(sdlc_gateway_http_request_duration_seconds_bucket{namespace="sdlc-platform",le="1"}[5m]))
+        > 0
+      for: 10m
+      labels:
+        severity: info
+        component: gateway
+      annotations:
+        summary: Slow requests detected
+        description: "{{ $value }} requests/sec are taking longer than 1 second"
+
+  # Security Alerts
+  - name: gateway_security
+    interval: 30s
+    rules:
+    - alert: GatewayHighAuthFailureRate
+      expr: |
+        (
+          sum(rate(sdlc_gateway_authentication_attempts_total{namespace="sdlc-platform",status="failed"}[5m]))
+          /
+          sum(rate(sdlc_gateway_authentication_attempts_total{namespace="sdlc-platform"}[5m]))
+        ) > 0.3
+      for: 5m
+      labels:
+        severity: warning
+        component: gateway
+      annotations:
+        summary: High authentication failure rate
+        description: "{{ $value | humanizePercentage }} of authentication attempts are failing"
+
+    - alert: GatewayPossibleBruteForce
+      expr: |
+        sum(rate(sdlc_gateway_authentication_attempts_total{namespace="sdlc-platform",status="failed"}[1m])) by (tenant_id)
+        > 10
+      for: 2m
+      labels:
+        severity: critical
+        component: gateway
+      annotations:
+        summary: Possible brute force attack
+        description: "Tenant {{ $labels.tenant_id }} has {{ $value }} failed auth attempts/sec"
+
+    - alert: GatewaySecurityViolationSpike
+      expr: |
+        rate(sdlc_gateway_security_violations_total{namespace="sdlc-platform",severity="critical"}[5m])
+        > 1
+      for: 2m
+      labels:
+        severity: critical
+        component: gateway
+      annotations:
+        summary: Critical security violations detected
+        description: "{{ $value }} critical security violations per second"
+
+    - alert: GatewayHighAuthorizationFailures
+      expr: |
+        sum(rate(sdlc_gateway_authorization_failures_total{namespace="sdlc-platform"}[5m])) by (reason)
+        > 5
+      for: 5m
+      labels:
+        severity: warning
+        component: gateway
+      annotations:
+        summary: High authorization failures
+        description: "{{ $value }} authorization failures/sec for reason: {{ $labels.reason }}"
+
+  # Rate Limiting Alerts
+  - name: gateway_rate_limiting
+    interval: 30s
+    rules:
+    - alert: GatewayHighRateLimitHits
+      expr: |
+        sum(rate(sdlc_gateway_rate_limit_hits_total{namespace="sdlc-platform"}[5m])) by (tenant_id)
+        > 50
+      for: 5m
+      labels:
+        severity: info
+        component: gateway
+      annotations:
+        summary: High rate limit hits for tenant
+        description: "Tenant {{ $labels.tenant_id }} hitting rate limits {{ $value }} times/sec"
+
+    - alert: GatewayExcessiveRateLimitHits
+      expr: |
+        sum(rate(sdlc_gateway_rate_limit_hits_total{namespace="sdlc-platform"}[1m])) by (tenant_id)
+        > 200
+      for: 2m
+      labels:
+        severity: warning
+        component: gateway
+      annotations:
+        summary: Excessive rate limit hits
+        description: "Tenant {{ $labels.tenant_id }} hitting rate limits excessively: {{ $value }} times/sec"
+
+  # Database and Infrastructure
+  - name: gateway_infrastructure
+    interval: 30s
+    rules:
+    - alert: GatewayHighDatabaseConnections
+      expr: |
+        sdlc_gateway_database_connections_active{namespace="sdlc-platform"}
+        > 15
+      for: 10m
+      labels:
+        severity: warning
+        component: gateway
+      annotations:
+        summary: High database connection usage
+        description: "{{ $value }} active database connections (threshold: 15)"
+
+    - alert: GatewayDatabaseConnectionExhausted
+      expr: |
+        sdlc_gateway_database_connections_active{namespace="sdlc-platform"}
+        >= 18
+      for: 2m
+      labels:
+        severity: critical
+        component: gateway
+      annotations:
+        summary: Database connection pool nearly exhausted
+        description: "{{ $value }} active database connections (max: 20)"
+
+    - alert: GatewayLowCacheHitRatio
+      expr: |
+        sdlc_gateway_cache_hit_ratio{namespace="sdlc-platform",cache_type="redis"}
+        < 0.7
+      for: 15m
+      labels:
+        severity: info
+        component: gateway
+      annotations:
+        summary: Low cache hit ratio
+        description: "Redis cache hit ratio is {{ $value | humanizePercentage }} (below 70%)"
+
+  # Business Metrics
+  - name: gateway_business
+    interval: 1m
+    rules:
+    - alert: GatewayLowActiveUsers
+      expr: |
+        sdlc_gateway_active_users_total{namespace="sdlc-platform"} == 0
+      for: 1h
+      labels:
+        severity: info
+        component: gateway
+      annotations:
+        summary: No active users detected
+        description: "No active users for the past hour"
+
+    - alert: GatewayUnusualTrafficDrop
+      expr: |
+        sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform"}[5m]))
+        <
+        (sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform"}[5m] offset 1h)) * 0.5)
+      for: 15m
+      labels:
+        severity: warning
+        component: gateway
+      annotations:
+        summary: Unusual traffic drop detected
+        description: "Current request rate is less than 50% of the rate 1 hour ago"
+
+  # DLP and Compliance
+  - name: gateway_compliance
+    interval: 30s
+    rules:
+    - alert: GatewayHighDLPViolationRate
+      expr: |
+        (
+          sum(rate(sdlc_gateway_dlp_violations_total{namespace="sdlc-platform"}[5m]))
+          /
+          sum(rate(sdlc_gateway_dlp_scans_total{namespace="sdlc-platform"}[5m]))
+        ) > 0.1
+      for: 10m
+      labels:
+        severity: warning
+        component: gateway
+      annotations:
+        summary: High DLP violation rate
+        description: "{{ $value | humanizePercentage }} of scanned documents contain DLP violations"
+
+    - alert: GatewayHighPIIDetectionRate
+      expr: |
+        sum(rate(sdlc_gateway_pii_detections_total{namespace="sdlc-platform"}[5m]))
+        > 10
+      for: 10m
+      labels:
+        severity: info
+        component: gateway
+      annotations:
+        summary: High PII detection rate
+        description: "{{ $value }} PII detections per second - review data handling practices"

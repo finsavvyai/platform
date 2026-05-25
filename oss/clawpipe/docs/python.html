@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Python SDK - ClawPipe Docs</title>
+  <meta name="description" content="ClawPipe Python SDK guide: async and sync usage, configuration, and examples.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="docs-layout">
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Documentation">
+    <a href="/" class="logo">ClawPipe</a>
+    <nav>
+      <a href="index.html">Getting Started</a>
+      <a href="concepts.html">How It Works</a>
+      <div class="sep"></div>
+      <a href="typescript.html">TypeScript SDK</a>
+      <a href="python.html" class="active">Python SDK</a>
+      <a href="go.html">Go SDK</a>
+      <div class="sep"></div>
+      <a href="integrations.html">Integrations</a>
+      <a href="api.html">Gateway API</a>
+      <a href="oauth-setup.html">OAuth Setup</a>
+      <a href="migration.html">Migration</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="doc-header">
+      <div>
+        <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Toggle menu">&#9776;</button>
+        <span class="breadcrumb">Docs / Python SDK</span>
+      </div>
+      <div class="links">
+        <a href="https://github.com/finsavvyai/clawpipe">GitHub</a>
+        <a href="https://clawpipe.ai">Home</a>
+      </div>
+    </header>
+    <main id="main-content" class="content">
+      <h1><span>Python</span> SDK Guide</h1>
+      <p>The ClawPipe Python SDK mirrors the TypeScript API with Pythonic conventions. Supports both async and sync usage.</p>
+
+      <h2>Install</h2>
+<pre><code>pip install clawpipe-ai</code></pre>
+      <p>Requires Python 3.9+. For async support, use Python 3.10+ with <code>asyncio</code>.</p>
+
+      <h2>Async Usage (Recommended)</h2>
+<pre><code><span class="code-accent">import</span> asyncio
+<span class="code-accent">from</span> clawpipe <span class="code-accent">import</span> ClawPipe
+
+<span class="code-accent">async def</span> main():
+    pipe = ClawPipe(
+        api_key=<span class="code-green">"cp_xxx"</span>,
+        project_id=<span class="code-green">"my-app"</span>,
+        enable_booster=<span class="code-accent">True</span>,
+        enable_packer=<span class="code-accent">True</span>,
+        enable_cache=<span class="code-accent">True</span>,
+    )
+
+    result = <span class="code-accent">await</span> pipe.prompt(
+        <span class="code-green">"Explain recursion in simple terms"</span>,
+        system=<span class="code-green">"You are a helpful tutor"</span>,
+        max_tokens=2000,
+    )
+
+    print(result.text)
+    print(result.meta.context_savings)  <span class="code-dim"># '42%'</span>
+    print(result.meta.estimated_cost_usd)  <span class="code-dim"># 0.003</span>
+
+asyncio.run(main())</code></pre>
+
+      <h2>Sync Usage</h2>
+<pre><code><span class="code-accent">from</span> clawpipe <span class="code-accent">import</span> ClawPipeSync
+
+pipe = ClawPipeSync(
+    api_key=<span class="code-green">"cp_xxx"</span>,
+    project_id=<span class="code-green">"my-app"</span>,
+)
+
+result = pipe.prompt(<span class="code-green">"What is 2+2?"</span>)
+print(result.text)  <span class="code-dim"># "4" (resolved by Booster, zero cost)</span></code></pre>
+
+      <h2>Streaming</h2>
+<pre><code><span class="code-accent">async for</span> chunk <span class="code-accent">in</span> pipe.stream(<span class="code-green">"Analyze this code"</span>, system=<span class="code-green">"..."</span>):
+    print(chunk, end=<span class="code-green">""</span>, flush=<span class="code-accent">True</span>)</code></pre>
+
+      <h2>Configuration Options</h2>
+      <p>All config options use <code>snake_case</code> Python conventions. They map 1:1 with the TypeScript SDK.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>api_key</td><td>str</td><td>required</td><td>Your ClawPipe API key</td></tr>
+            <tr><td>project_id</td><td>str</td><td>required</td><td>Project identifier</td></tr>
+            <tr><td>gateway_url</td><td>str</td><td>https://api.clawpipe.ai/v1</td><td>Gateway endpoint</td></tr>
+            <tr><td>cache_ttl_ms</td><td>int</td><td>300000</td><td>Cache TTL in milliseconds</td></tr>
+            <tr><td>enable_booster</td><td>bool</td><td>True</td><td>Enable Agent Booster</td></tr>
+            <tr><td>enable_packer</td><td>bool</td><td>True</td><td>Enable Context Packer</td></tr>
+            <tr><td>enable_cache</td><td>bool</td><td>True</td><td>Enable Semantic Cache</td></tr>
+            <tr><td>enable_trace</td><td>bool</td><td>False</td><td>Enable pipeline tracing</td></tr>
+            <tr><td>local_model_url</td><td>str</td><td>None</td><td>URL of a local LLM server</td></tr>
+            <tr><td>enable_local_fallback</td><td>bool</td><td>False</td><td>Auto-detect local models</td></tr>
+            <tr><td>budget_cap_usd</td><td>float</td><td>None</td><td>Hard budget cap in USD</td></tr>
+            <tr><td>budget_warn_usd</td><td>float</td><td>None</td><td>Soft budget warning</td></tr>
+            <tr><td>rate_limit_per_day</td><td>int</td><td>tier default</td><td>Max calls per day</td></tr>
+            <tr><td>allowlist</td><td>list[dict]</td><td>None</td><td>Permitted providers/models</td></tr>
+            <tr><td>denylist</td><td>list[dict]</td><td>None</td><td>Blocked providers/models</td></tr>
+            <tr><td>enable_audit</td><td>bool</td><td>False</td><td>Enable audit logging</td></tr>
+            <tr><td>audit_transport</td><td>callable</td><td>None</td><td>Custom audit log handler</td></tr>
+            <tr><td>circuit_breaker_threshold</td><td>int</td><td>5</td><td>Failures before circuit opens</td></tr>
+            <tr><td>circuit_breaker_recovery_ms</td><td>int</td><td>30000</td><td>Recovery time in ms</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Swarm Orchestration</h2>
+<pre><code><span class="code-accent">from</span> clawpipe <span class="code-accent">import</span> Swarm, Gateway
+
+swarm = Swarm(
+    models=[
+        {<span class="code-green">"provider"</span>: <span class="code-green">"openai"</span>, <span class="code-green">"model"</span>: <span class="code-green">"gpt-4o"</span>, <span class="code-green">"quality_score"</span>: 0.94},
+        {<span class="code-green">"provider"</span>: <span class="code-green">"anthropic"</span>, <span class="code-green">"model"</span>: <span class="code-green">"claude-sonnet-4"</span>, <span class="code-green">"quality_score"</span>: 0.95},
+    ],
+    strategy=<span class="code-green">"vote"</span>,  <span class="code-dim"># 'first' | 'vote' | 'best' | 'merge'</span>
+)
+
+result = <span class="code-accent">await</span> swarm.run(<span class="code-green">"Is this code safe?"</span>, {}, gateway)</code></pre>
+
+      <h2>Observability</h2>
+<pre><code>pipe.stats()            <span class="code-dim"># Telemetry snapshot</span>
+pipe.budget_status()    <span class="code-dim"># Budget: spent, cap, remaining</span>
+pipe.rate_limit_status()<span class="code-dim"># Rate limits: remaining, reset time</span>
+pipe.circuit_status()   <span class="code-dim"># Provider health per provider</span>
+pipe.audit_logs()       <span class="code-dim"># Timestamped action log</span></code></pre>
+
+      <h2>Error Handling</h2>
+<pre><code><span class="code-accent">from</span> clawpipe <span class="code-accent">import</span> BudgetExceededError, RateLimitError, GatewayError
+
+<span class="code-accent">try</span>:
+    result = <span class="code-accent">await</span> pipe.prompt(<span class="code-green">"Hello"</span>)
+<span class="code-accent">except</span> BudgetExceededError:
+    print(<span class="code-green">"Budget cap reached"</span>)
+<span class="code-accent">except</span> RateLimitError:
+    print(<span class="code-green">"Rate limit exceeded"</span>)
+<span class="code-accent">except</span> GatewayError <span class="code-accent">as</span> e:
+    print(f<span class="code-green">"Provider error: {e}"</span>)</code></pre>
+    </main>
+  </div>
+</div>
+</body>
+</html>

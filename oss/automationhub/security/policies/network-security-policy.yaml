@@ -1,0 +1,257 @@
+# Network Security Policies for UPM.Plus AutomationHub
+# Kubernetes NetworkPolicy configurations for secure communication
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: upm-plus-deny-all-ingress
+  namespace: upm-plus-production
+  labels:
+    app: upm-plus
+    component: network-policy
+    environment: production
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: upm-plus-deny-all-egress
+  namespace: upm-plus-production
+  labels:
+    app: upm-plus
+    component: network-policy
+    environment: production
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: upm-plus-frontend-network-policy
+  namespace: upm-plus-production
+  labels:
+    app: upm-plus
+    component: frontend
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: upm-plus
+      component: frontend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-production
+      podSelector:
+        matchLabels:
+          app: upm-plus
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 80
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-production
+      podSelector:
+        matchLabels:
+          app: upm-plus
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 80
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS for external APIs
+    - protocol: TCP
+      port: 53   # DNS
+    - protocol: UDP
+      port: 53   # DNS
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: upm-plus-backend-network-policy
+  namespace: upm-plus-production
+  labels:
+    app: upm-plus
+    component: backend
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: upm-plus
+      component: backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-production
+      podSelector:
+        matchLabels:
+          app: upm-plus
+          component: frontend
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-production
+      podSelector:
+        matchLabels:
+          app: upm-plus
+          component: celery-worker
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  # Database access
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-production
+      podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Redis access
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-production
+      podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # External services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS for external APIs (OpenAI, etc.)
+    - protocol: TCP
+      port: 53   # DNS
+    - protocol: UDP
+      port: 53   # DNS
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: upm-plus-celery-network-policy
+  namespace: upm-plus-production
+  labels:
+    app: upm-plus
+    component: celery-worker
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: upm-plus
+      component: celery-worker
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from: []  # No ingress needed for workers
+  egress:
+  # Database access
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-production
+      podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Redis access
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-production
+      podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  # Backend API access
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-production
+      podSelector:
+        matchLabels:
+          app: upm-plus
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 8000
+  # External services
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS for external APIs
+    - protocol: TCP
+      port: 53   # DNS
+    - protocol: UDP
+      port: 53   # DNS
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: upm-plus-monitoring-network-policy
+  namespace: upm-plus-production
+  labels:
+    app: upm-plus
+    component: monitoring
+    environment: production
+spec:
+  podSelector:
+    matchLabels:
+      app: upm-plus
+      component: monitoring
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  egress:
+  # Allow scraping metrics from all pods
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-production
+    ports:
+    - protocol: TCP
+      port: 9090  # Metrics port
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53   # DNS
+    - protocol: UDP
+      port: 53   # DNS

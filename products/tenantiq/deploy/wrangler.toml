@@ -1,0 +1,105 @@
+name = "tenantiq"
+type = "javascript"
+main = "dist/index.js"
+compatibility_date = "2026-03-20"
+
+# Environment configuration
+env = "production"
+node_compat = true
+
+# Triggers & Queues
+triggers = { crons = ["0 */6 * * *"] }
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "tenantiq_prod"
+database_id = "d1-db-prod"
+
+# KV Namespaces for caching & state
+[[kv_namespaces]]
+binding = "CACHE"
+id = "kv-cache-prod"
+preview_id = "kv-cache-preview"
+
+[[kv_namespaces]]
+binding = "STATE"
+id = "kv-state-prod"
+preview_id = "kv-state-preview"
+
+[[kv_namespaces]]
+binding = "AUDIT_LOG"
+id = "kv-audit-prod"
+preview_id = "kv-audit-preview"
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "REMEDIATION_QUEUE"
+class_name = "RemediationQueue"
+environment = "production"
+
+[[durable_objects.bindings]]
+name = "TENANT_STATE"
+class_name = "TenantState"
+environment = "production"
+
+# Environment variables & secrets (from .env)
+[env.production]
+vars = { ENVIRONMENT = "production", LOG_LEVEL = "info" }
+
+[env.production.secrets]
+# MS Graph API credentials
+AZURE_TENANT_ID = "from .env"
+AZURE_CLIENT_ID = "from .env"
+AZURE_CLIENT_SECRET = "from .env"
+
+# Claude AI API
+ANTHROPIC_API_KEY = "from .env"
+
+# PostgreSQL (Neon)
+DATABASE_URL = "from .env"
+
+# Application secrets
+JWT_SECRET = "from .env"
+ENCRYPTION_KEY = "from .env"
+
+# Cloudflare API
+CLOUDFLARE_ACCOUNT_ID = "from .env"
+CLOUDFLARE_API_TOKEN = "from .env"
+
+[env.preview]
+vars = { ENVIRONMENT = "preview", LOG_LEVEL = "debug" }
+
+[env.preview.d1_databases]
+DB = { database_name = "tenantiq_preview", database_id = "d1-db-preview" }
+
+[env.preview.kv_namespaces]
+CACHE = { id = "kv-cache-preview", preview_id = "kv-cache-prev-local" }
+STATE = { id = "kv-state-preview", preview_id = "kv-state-prev-local" }
+AUDIT_LOG = { id = "kv-audit-preview", preview_id = "kv-audit-prev-local" }
+
+# Build configuration
+[build]
+command = "npm run build"
+cwd = "."
+main = "dist/index.js"
+
+[build.upload]
+format = "service-worker"
+
+# Routes
+[[routes]]
+pattern = "api.tenantiq.io/*"
+zone_name = "tenantiq.io"
+
+[[routes]]
+pattern = "app.tenantiq.io/*"
+zone_name = "tenantiq.io"
+
+[[routes]]
+pattern = "*.tenantiq.io/*"
+zone_name = "tenantiq.io"
+
+# Observability
+[observability]
+enabled = true

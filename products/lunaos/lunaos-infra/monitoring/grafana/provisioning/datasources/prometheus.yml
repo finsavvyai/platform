@@ -1,0 +1,106 @@
+# Grafana Prometheus Datasource Configuration
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+      prometheusVersion: 2.48.1
+      cacheLevel: 'High'
+      disableRecordingRules: false
+      incrementalQueryOverlapWindow: 10m
+      queryTimeout: 60s
+      timeInterval: 15s
+      tlsSkipVerify: true
+    secureJsonData: {}
+    uid: prometheus
+
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: true
+    jsonData:
+      tracesToLogs:
+        datasourceUid: 'loki'
+        tags: ['job', 'instance', 'pod', 'namespace']
+        mappedTags: [{ key: 'service.name', value: 'service' }]
+        mapTagNamesEnabled: false
+        spanStartTimeShift: '1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: false
+        filterBySpanID: false
+      tracesToMetrics:
+        datasourceUid: 'prometheus'
+        tags: [{ key: 'service.name', value: 'service' }]
+        queries:
+          - name: 'Sample query'
+            query: 'sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m])) by (le)'
+        disabled: false
+      serviceMap:
+        datasourceUid: 'prometheus'
+      nodeGraph:
+        enabled: true
+    secureJsonData: {}
+    uid: jaeger
+
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: claude_agent
+    user: claude_user
+    password: claude_password
+    editable: true
+    jsonData:
+      sslmode: 'disable'
+      postgresVersion: 1600
+      timescaledb: false
+      tlsSkipVerify: true
+    secureJsonData:
+      password: claude_password
+    uid: postgresql
+
+  - name: Elasticsearch
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    database: logstash-*
+    jsonData:
+      esVersion: 8.11.0
+      logMessageField: 'message'
+      logLevelField: 'level'
+      timeField: '@timestamp'
+      maxConcurrentShardRequests: 5
+      tlsSkipVerify: true
+    secureJsonData: {}
+    uid: elasticsearch
+
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis:6379
+    jsonData:
+      password: redis_password
+      tlsSkipVerify: true
+    secureJsonData:
+      password: redis_password
+    uid: redis
+
+  - name: Loki (Optional - for logs)
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: true
+    jsonData:
+      maxLines: 1000
+    secureJsonData: {}
+    uid: loki
+    enabled: false

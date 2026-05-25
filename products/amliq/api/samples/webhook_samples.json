@@ -1,0 +1,45 @@
+{
+  "get_secret": {
+    "description": "Retrieve current webhook signing secret",
+    "endpoint": "GET /api/v1/webhooks/incoming/secret",
+    "response_example": {
+      "secret": "whsec_a1b2c3d4e5f6...",
+      "instructions": "Include header X-AMLIQ-Signature: t=<unix>,v1=<hex-hmac-sha256>"
+    }
+  },
+
+  "rotate_secret": {
+    "description": "Rotate secret (invalidates previous)",
+    "endpoint": "POST /api/v1/webhooks/incoming/secret/rotate",
+    "response_example": {
+      "secret": "whsec_new_secret_here...",
+      "rotated": true,
+      "instructions": "Previous secret is now invalid. Update all integrations."
+    }
+  },
+
+  "outgoing_webhook_payload": {
+    "description": "What AMLIQ sends to your webhook URL (automation action)",
+    "sent_to": "your webhook URL",
+    "headers": {
+      "Content-Type": "application/json",
+      "X-AMLIQ-Signature": "t=1744728000,v1=abc123...",
+      "User-Agent": "AMLIQ-Webhook/1.0"
+    },
+    "payload": {
+      "event": "match.high_risk",
+      "monitor_id": "mon_abc123",
+      "entity_name": "Hassan Ali Mohammad",
+      "previous_status": "clear",
+      "new_status": "match",
+      "confidence": 0.94,
+      "matched_list": "OFAC SDN",
+      "timestamp": "2026-04-14T10:30:00Z"
+    }
+  },
+
+  "verify_signature_example_node": {
+    "description": "Node.js HMAC verification example",
+    "code": "const crypto = require('crypto');\n\nfunction verifyAmliqSignature(secret, body, sigHeader) {\n  const parts = Object.fromEntries(sigHeader.split(',').map(p => p.split('=')));\n  const ts = parseInt(parts.t);\n  if (Math.abs(Date.now()/1000 - ts) > 300) throw new Error('expired');\n  const signed = `${ts}.${body}`;\n  const expected = crypto.createHmac('sha256', secret).update(signed).digest('hex');\n  if (!crypto.timingSafeEqual(Buffer.from(parts.v1), Buffer.from(expected))) {\n    throw new Error('invalid signature');\n  }\n}"
+  }
+}

@@ -1,0 +1,45 @@
+export const plans = [
+  {
+    name: 'Free',
+    price: '$0',
+    period: 'forever',
+    desc: 'Perfect for solo developers and open source projects.',
+    features: [
+      '1 repository',
+      'Self-hosted runner',
+      'Unlimited pipeline runs',
+      'AI stack detection',
+      'GitHub, GitLab, Bitbucket',
+      'Community support',
+    ],
+  },
+  {
+    name: 'Pro',
+    price: '$9',
+    period: '/month',
+    desc: 'For developers shipping across multiple projects.',
+    features: [
+      'Unlimited repositories',
+      'Web dashboard',
+      'Slack & Discord notifications',
+      'Priority support',
+      'Build analytics',
+      'Custom deploy targets',
+    ],
+    highlight: true,
+  },
+  {
+    name: 'Team',
+    price: '$29',
+    period: '/month',
+    desc: 'For teams that need shared infrastructure.',
+    features: [
+      'Everything in Pro',
+      'Shared runners',
+      'Team dashboard',
+      'SSO / SAML',
+      'Audit logs',
+      'SLA guarantee',
+    ],
+  },
+]

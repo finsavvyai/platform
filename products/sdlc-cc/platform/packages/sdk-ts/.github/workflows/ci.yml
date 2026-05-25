@@ -1,0 +1,223 @@
+# GitHub Actions CI workflow
+
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Prettier check
+        run: npm run format:check
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run TypeScript compiler
+        run: npm run typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test:coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        if: matrix.node-version == 20
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Check dist files
+        run: |
+          echo "Checking dist files..."
+          ls -la dist/
+
+          # Check essential files exist
+          test -f dist/cjs/index.js || exit 1
+          test -f dist/esm/index.js || exit 1
+          test -f dist/types/index.d.ts || exit 1
+          test -f dist/browser/index.js || exit 1
+
+  size:
+    name: Bundle Size
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Check bundle size
+        run: |
+          echo "Checking bundle sizes..."
+
+          # Browser bundle
+          BROWSER_SIZE=$(gzip -c dist/browser/index.js | wc -c)
+          echo "Browser bundle (gzipped): ${BROWSER_SIZE} bytes"
+
+          if [ $BROWSER_SIZE -gt 51200 ]; then
+            echo "❌ Browser bundle exceeds 50KB limit"
+            exit 1
+          else
+            echo "✅ Browser bundle size OK"
+          fi
+
+          # ESM bundle
+          ESM_SIZE=$(du -sh dist/esm | cut -f1)
+          echo "ESM bundle: ${ESM_SIZE}"
+
+          # CJS bundle
+          CJS_SIZE=$(du -sh dist/cjs | cut -f1)
+          echo "CJS bundle: ${CJS_SIZE}"
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+
+    services:
+      mock-api:
+        image: mockserver/mockserver:latest
+        ports:
+          - 1080:1080
+        env:
+          MOCKSERVER_PROPERTY_FILE: /config/mockserver.properties
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: dist
+          path: dist/
+
+      - name: Setup Mock API
+        run: |
+          curl -X PUT http://localhost:1080/mockserver/expectation \
+            -H "Content-Type: application/json" \
+            -d '{
+              "httpRequest": {
+                "method": "POST",
+                "path": "/auth/login"
+              },
+              "httpResponse": {
+                "statusCode": 200,
+                "body": {
+                  "user": {
+                    "id": "test-user",
+                    "email": "test@example.com"
+                  },
+                  "tokens": {
+                    "accessToken": "test-token",
+                    "refreshToken": "test-refresh"
+                  }
+                }
+              }
+            }'
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          TEST_API_URL: http://localhost:1080

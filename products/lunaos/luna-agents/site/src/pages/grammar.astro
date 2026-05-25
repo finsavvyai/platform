@@ -1,0 +1,124 @@
+---
+import Book from "../layouts/Book.astro";
+import ChapterOpener from "../components/ChapterOpener.astro";
+import Production from "../components/grammar/Production.astro";
+import OperatorEntry from "../components/grammar/OperatorEntry.astro";
+---
+
+<Book title="Grammar" chapter="grammar" description="The full grammar of Luna Pipes, five operators, four primitives, one production tree.">
+  <ChapterOpener
+    num="02"
+    word="Grammar"
+    subtitle="Five operators, four primitives, one production tree. The whole language fits on a postcard."
+    example={'<pipe> ::= <stage> ( ">>" <stage> )*'}
+  />
+
+  <section class="wrap intro">
+    <p>
+      Luna Pipes is a concatenative expression language. A program is a
+      sequence of <em>stages</em> separated by operators. There are no
+      statements, no blocks, no return values to track. The value flows
+      left-to-right; each operator decides how the next stage receives it.
+    </p>
+    <p>
+      The grammar below is given in EBNF. The semantics follow in plain
+      English, with one runnable example per operator. Whitespace is
+      insignificant; identifiers are case-sensitive; the operator
+      <code>&gt;&gt;</code> is right-associative.
+    </p>
+  </section>
+
+  <section class="wrap ebnf">
+    <h2>Production rules.</h2>
+    <div class="prod-list">
+      <Production name="pipe" rule={'<stage> ( ">>" <stage> )*'} note="A pipe is one or more stages chained with the pipe operator." />
+      <Production name="stage" rule={'<verb> <arg>* <modifier>?'} note="A stage is a verb followed by zero or more arguments and an optional modifier." />
+      <Production name="verb" rule={'"/" <identifier>'} note="A verb is a leading slash followed by an identifier. Identifiers may contain a-z, 0-9, hyphen." />
+      <Production name="arg" rule={'<string> | <number> | <flag>'} note="An argument is a quoted string, a number, or a flag of the form --name or --name=value." />
+      <Production name="flag" rule={'"--" <identifier> ( "=" <value> )?'} />
+      <Production name="modifier" rule={'<repeat> | <parallel> | <conditional> | <sink>'} note="A stage can carry one modifier. Modifiers attach to the stage they follow." />
+      <Production name="repeat" rule={'"*" <integer>'} note="Repeat the preceding stage N times, in parallel." />
+      <Production name="parallel" rule={'"||" <stage>'} note="Fan out: run the previous stage and this stage concurrently; join the results." />
+      <Production name="conditional" rule={'"?" <flag> ">>" <pipe> ":" <pipe>'} note="Branch on a truthy flag." />
+      <Production name="sink" rule={'"!"'} note="Run the preceding stage for effect; discard its output." />
+    </div>
+    <p>
+      That is the full grammar. The runtime is responsible for resolving
+      verbs to skills, for marshaling arguments, and for serializing the
+      output of one stage as the input of the next. See
+      <a href="https://github.com/lunaos/luna-agents">the source</a> for the parser.
+    </p>
+  </section>
+
+  <section class="wrap ops">
+    <h2>Operators.</h2>
+
+    <OperatorEntry
+      glyph=">>"
+      name="pipe"
+      arity="binary, left input feeds right input"
+      semantics="The pipe operator passes the output of the left stage as the input of the right stage. It is the only required operator: a Luna Pipes program with no operators is one stage, executed alone."
+      example={'/persona generate >> ghost "launch post"'}
+      output={['composed: 2 stages, sequential', '  /persona generate → 4 personas', '  ghost "launch post" → 4 drafts']}
+    />
+
+    <OperatorEntry
+      glyph="*"
+      name="repeat"
+      arity="unary postfix, takes an integer"
+      semantics="Repeat the preceding stage N times in parallel. The repeated stage receives the same input N times; outputs are joined into an array for the next stage."
+      example={'/persona generate >> ghost "post" *4 >> publish notion'}
+      output={['composed: 6 stages, ghost runs 4 times concurrently', 'join: 4 drafts → publish (1 stage)']}
+    />
+
+    <OperatorEntry
+      glyph="||"
+      name="fanout"
+      arity="binary, both stages run concurrently"
+      semantics="Run the left and right stages in parallel against the same input. Their outputs are joined as a tuple and passed to the next stage. Use for embarrassingly parallel work where the two branches do different things."
+      example={'/persona generate >> ghost "post" || imagine "hero" >> publish notion'}
+      output={['composed: 4 stages, fanout join', '  ghost   → text', '  imagine → image', 'join → publish']}
+    />
+
+    <OperatorEntry
+      glyph="?"
+      name="conditional"
+      arity="ternary, branches on a truthy flag"
+      semantics="Branch on the named flag from the input. The left sub-pipe runs if the flag is truthy; the right runs otherwise. Either side is a full pipe expression."
+      example={'/persona generate >> ? premium >> ghost "longform" : ghost "short"'}
+      output={['composed: branches on premium', '  premium=true  → longform path', '  premium=false → short path']}
+    />
+
+    <OperatorEntry
+      glyph="!"
+      name="sink"
+      arity="unary postfix, no input to the next stage"
+      semantics="Run the preceding stage for effect. The runtime executes it, awaits completion, then discards its output. Useful for notifications, logs, or side-effects that should not contaminate the value flowing through."
+      example={'/persona generate >> ghost "post" >> publish notion >> notify slack !'}
+      output={['composed: 4 stages, notify runs, output discarded']}
+    />
+  </section>
+
+  <section class="wrap closing">
+    <h2>Errata.</h2>
+    <p>
+      The grammar is closed for v1. The lexicon is open. New verbs ship in
+      every release; new operators do not. If you find yourself wanting one,
+      compose two existing ones first; if the composition is awkward, file
+      an issue with the example.
+    </p>
+  </section>
+</Book>
+
+<style>
+  .intro { padding: var(--t-6) 0 var(--t-4); }
+  .ebnf { padding: var(--t-6) 0 var(--t-8); }
+  .prod-list {
+    margin: var(--t-3) 0;
+    border-top: 1px solid var(--rule);
+    max-width: var(--measure-wide);
+  }
+  .ops { padding-top: var(--t-4); }
+  .closing { padding: var(--t-6) 0 var(--t-12); }
+  .closing p { max-width: var(--measure); }
+</style>

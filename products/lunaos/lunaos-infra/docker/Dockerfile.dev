@@ -1,0 +1,63 @@
+# Development Dockerfile for Claude Agent Platform
+# Optimized for hot reloading and development workflow
+
+FROM node:20-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    curl \
+    dumb-init \
+    tzdata \
+    ca-certificates \
+    git \
+    bash \
+    && rm -rf /var/cache/apk/*
+
+# Set timezone
+ENV TZ=UTC
+
+# Create app user
+RUN addgroup -g 1001 -S claude && \
+    adduser -S claude -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Install pnpm globally
+RUN npm install -g pnpm@8
+
+# Copy package files
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+
+# Copy source code
+COPY packages/ ./packages/
+COPY apps/ ./apps/
+COPY luna-agents/ ./luna-agents/
+COPY tsconfig.json ./
+COPY .env.example .env
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Generate Prisma client
+RUN pnpm --filter @claude-agent/database db:generate
+
+# Switch to non-root user
+USER claude
+
+# Create volume for source code
+VOLUME ["/app"]
+
+# Create volume for node_modules (to persist across rebuilds)
+VOLUME ["/app/node_modules"]
+
+# Expose ports
+EXPOSE 3000 3001 3002 3003 5555 9229
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3001/api/health || exit 1
+
+# Start development services with hot reload
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["pnpm", "run", "dev"]

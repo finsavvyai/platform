@@ -47,9 +47,19 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned · `[!]` blocked
 
 ## Cross-cutting (parallel to weeks 1-8)
 
-- [ ] Archive 22 off-thesis repos per inventory (single sweep, days 1-30 window)
+- [x] Archive 22 off-thesis repos per inventory (single sweep, days 1-30 window) — ARCHIVE-WEBSITE round 4: 22 archive-candidate manifests + 12 worktree-variant manifests + INDEX.md at `_archive/portfolio-snapshots/`. Two source snapshots (`pipewarden-real-archive-20260412/`, `queryflux/`); rest manifest-only (>100MB or worktree). Originals untouched in `/portfolio/`.
 - [ ] Open-source PipeWarden under new `oss/pipewarden/` structure (days 31-60)
 - [ ] Move PushCI + PipeWarden into monorepo (days 31-60)
 - [ ] Move Qestro and LunaOS (with lunaforge harvested) (days 31-60)
 - [ ] Move OpenSyber, SDLC.cc, TenantIQ (days 61-90)
-- [ ] Resolve inventory TODOs (a2a activity, automationhub-upm, coderailflow placement, flujo, queryflux dedupe, windsu overlap, resume removal)
+- [x] flujo activity check (per addendum: "ARCHIVE → or fold; if active, fold into LunaOS") — ARCHIVE-WEBSITE round 4: last commit 2025-03-14 (stale ~14mo) → **archived, not folded**. Manifest at `_archive/portfolio-snapshots/flujo/ARCHIVED.md`.
+- [x] queryflux dedupe (per addendum: "likely fold one into a product, archive duplicates") — ARCHIVE-WEBSITE round 4: queryflux (empty placeholder) → delete; querylens (predecessor) → archive; queryflux-git (substantive, on-thesis) → **escalated to founder** for fold-vs-archive call. Manifests in `_archive/portfolio-snapshots/queryflux*/`, `querylens/`.
+- [x] windsu overlap with PushCI (per addendum: "check overlap with PushCI, otherwise archive") — ARCHIVE-WEBSITE round 4: surface overlap exists but architecture incompatible (IDE-time human-author vs PR-time AI-author). **Archive, no fold-in.** Detail in `_archive/portfolio-snapshots/windsu-credit-manager/ARCHIVED.md`.
+- [ ] Resolve remaining inventory TODOs (a2a activity, automationhub-upm, coderailflow placement, resume removal)
+
+## Website rebuild
+
+- [x] Scaffold `websites/finsavvyai.com/` — Astro 4 + Tailwind + TS strict — ARCHIVE-WEBSITE round 4. Headline + subhead from master plan. `Default.astro` layout (skip link, semantic landmarks, color-scheme), `Hero.astro` component, `index.astro` page, robots.txt allow-all, tailwind palette (`ink.50`/`ink.900`), Apple-HIG sans stack. CLAUDE.md extends portfolio rules with Astro coverage exception (visual-regression + a11y audit + Lighthouse CI replace `.astro` unit tests). README documents Cloudflare Pages deploy.
+- [x] Add `websites/*` to `pnpm-workspace.yaml`.
+- [ ] Wire Playwright + axe + Lighthouse CI (future round)
+- [ ] Import `fintech-suite/landing-page/` into `websites/finsavvyai.com/legacy/` per addendum §1 Week 7

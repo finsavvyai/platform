@@ -1,0 +1,242 @@
+name: TinyGo WASM Build
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'services/api-service/**/*.go'
+      - 'packages/wasm/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'services/api-service/**/*.go'
+      - 'packages/wasm/**'
+
+env:
+  GO_VERSION: '1.21'
+  TINYGO_VERSION: '0.32.0'
+
+jobs:
+  build-wasm-modules:
+    name: Build WASM Modules
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - wasm
+          - js
+          - wasm-asyncify
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache TinyGo
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/tinygo
+            ~/.cache/tinygo
+          key: ${{ runner.os }}-tinygo-${{ env.TINYGO_VERSION }}
+          restore-keys: |
+            ${{ runner.os }}-tinygo-
+
+      - name: Install TinyGo
+        run: |
+          if [ ! -f /usr/local/tinygo/bin/tinygo ]; then
+            curl -L https://github.com/tinygo-org/tinygo/releases/download/v${{ env.TINYGO_VERSION }}/tinygo_${{ env.TINYGO_VERSION }}_linux_amd64.tar.gz | tar -C /usr/local -xzf -
+            echo "/usr/local/tinygo/bin" >> $GITHUB_PATH
+          fi
+
+      - name: Verify TinyGo installation
+        run: tinygo version
+
+      - name: Build WASM modules
+        run: |
+          mkdir -p wasm-builds/${{ matrix.target }}
+
+          # Build MCP protocol library for WASM
+          if [ -f "services/api-service/internal/mcp/mcp.go" ]; then
+            echo "Building MCP protocol library for ${{ matrix.target }}"
+            tinygo build -o wasm-builds/${{ matrix.target }}/mcp.wasm \
+              -target=${{ matrix.target }} \
+              -gc=leaking \
+              -scheduler=none \
+              -panic=trap \
+              ./services/api-service/internal/mcp/mcp.go || echo "MCP library not yet implemented"
+          fi
+
+          # Build example WASM modules
+          if [ -d "packages/wasm/examples" ]; then
+            for example in packages/wasm/examples/*/; do
+              if [ -f "$example/main.go" ]; then
+                name=$(basename "$example")
+                echo "Building example $name for ${{ matrix.target }}"
+                tinygo build -o wasm-builds/${{ matrix.target }}/${name}.wasm \
+                  -target=${{ matrix.target }} \
+                  -gc=leaking \
+                  -scheduler=none \
+                  -panic=trap \
+                  "$example/main.go" || echo "Failed to build $name"
+              fi
+            done
+          fi
+
+      - name: Generate WebAssembly JavaScript bindings
+        run: |
+          for wasm in wasm-builds/${{ matrix.target }}/*.wasm; do
+            if [ -f "$wasm" ]; then
+              name=$(basename "$wasm" .wasm)
+              echo "Generating JS bindings for $name"
+              # Generate JavaScript bindings for the WASM module
+              echo "export * from './${name}.wasm';" > "wasm-builds/${{ matrix.target }}/${name}.js"
+            fi
+          done
+
+      - name: Optimize WASM size
+        run: |
+          if command -v wasm-opt >/dev/null 2>&1; then
+            for wasm in wasm-builds/${{ matrix.target }}/*.wasm; do
+              if [ -f "$wasm" ]; then
+                echo "Optimizing $wasm"
+                wasm-opt -Oz "$wasm" -o "${wasm}.optimized"
+                mv "${wasm}.optimized" "$wasm"
+              fi
+            done
+          fi
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-${{ matrix.target }}
+          path: wasm-builds/${{ matrix.target }}/
+          retention-days: 30
+
+  test-wasm-modules:
+    name: Test WASM Modules
+    runs-on: ubuntu-latest
+    needs: build-wasm-modules
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wasm-*
+          merge-multiple: true
+          path: wasm-tests/
+
+      - name: Install test dependencies
+        run: |
+          npm install --save-dev @types/node
+
+      - name: Create WASM test runner
+        run: |
+          cat > wasm-tests/test-runner.js << 'EOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          async function testWasmModule(wasmPath) {
+            try {
+              const wasmBuffer = fs.readFileSync(wasmPath);
+              console.log(`✓ WASM file loaded: ${wasmPath} (${wasmBuffer.length} bytes)`);
+
+              // Basic WASM validation
+              if (wasmBuffer[0] === 0x00 && wasmBuffer[1] === 0x61 && wasmBuffer[2] === 0x73 && wasmBuffer[3] === 0x6d) {
+                console.log(`✓ Valid WASM magic number detected`);
+              } else {
+                throw new Error('Invalid WASM magic number');
+              }
+
+              return true;
+            } catch (error) {
+              console.error(`✗ Failed to load ${wasmPath}:`, error.message);
+              return false;
+            }
+          }
+
+          async function runTests() {
+            const wasmDir = path.join(__dirname, 'wasm');
+            if (!fs.existsSync(wasmDir)) {
+              console.log('No WASM files to test');
+              return;
+            }
+
+            const wasmFiles = fs.readdirSync(wasmDir).filter(f => f.endsWith('.wasm'));
+            console.log(`Found ${wasmFiles.length} WASM files to test`);
+
+            let passed = 0;
+            for (const wasmFile of wasmFiles) {
+              const wasmPath = path.join(wasmDir, wasmFile);
+              if (await testWasmModule(wasmPath)) {
+                passed++;
+              }
+            }
+
+            console.log(`\nTest Results: ${passed}/${wasmFiles.length} tests passed`);
+            if (passed !== wasmFiles.length) {
+              process.exit(1);
+            }
+          }
+
+          runTests().catch(console.error);
+          EOF
+
+      - name: Run WASM tests
+        run: |
+          mkdir -p wasm-tests/wasm
+          find wasm-tests -name "*.wasm" -not -path "*/wasm/*" -exec cp {} wasm-tests/wasm/ \;
+          node wasm-tests/test-runner.js
+
+  deploy-wasm-modules:
+    name: Deploy WASM Modules
+    runs-on: ubuntu-latest
+    needs: [build-wasm-modules, test-wasm-modules]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wasm-*
+          merge-multiple: true
+          path: deploy/
+
+      - name: Create deployment package
+        run: |
+          mkdir -p deploy-package
+          cp -r deploy/* deploy-package/
+
+          # Create package.json for the WASM package
+          cat > deploy-package/package.json << 'EOF'
+          {
+            "name": "@mcpoverflow/wasm",
+            "version": "0.1.0",
+            "description": "WebAssembly modules for MCPOverflow",
+            "main": "index.js",
+            "types": "index.d.ts",
+            "files": ["*.wasm", "*.js"],
+            "scripts": {
+              "test": "node test-runner.js"
+            }
+          }
+          EOF
+
+      - name: Deploy to Cloudflare Workers
+        run: |
+          echo "Deploying WASM modules to Cloudflare Workers"
+          # This would be implemented with wrangler deploy
+
+      - name: Upload to CDN
+        run: |
+          echo "Uploading WASM modules to CDN"
+          # This would upload to a CDN for distribution

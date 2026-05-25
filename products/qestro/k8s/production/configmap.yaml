@@ -1,0 +1,415 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: questro-config
+  namespace: qestro-prod
+  labels:
+    app: qestro
+    component: config
+    environment: production
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  LOG_LEVEL: "info"
+  CORS_ORIGIN: "https://qestro.app,https://app.qestro.app"
+  RATE_LIMIT_WINDOW_MS: "900000"
+  RATE_LIMIT_MAX_REQUESTS: "1000"
+  SESSION_SECRET: "qestro-prod-session-secret"
+  ENCRYPTION_KEY: "qestro-prod-encryption-key"
+  AI_MODEL_TIMEOUT: "30000"
+  MAX_CONCURRENT_AI_REQUESTS: "10"
+  CACHE_TTL: "3600"
+  UPLOAD_MAX_SIZE: "104857600"
+  ENABLE_ANALYTICS: "true"
+  ENABLE_METRICS: "true"
+  HEALTH_CHECK_INTERVAL: "30"
+  GRACEFUL_SHUTDOWN_TIMEOUT: "30"
+  WORKER_CONCURRENCY: "4"
+  REDIS_POOL_SIZE: "10"
+  DB_POOL_MIN: "5"
+  DB_POOL_MAX: "20"
+  DB_CONNECTION_TIMEOUT: "30000"
+  EMAIL_FROM: "noreply@qestro.app"
+  SUPPORT_EMAIL: "support@qestro.app"
+  BILLING_WEBHOOK_SECRET: "questro-billing-webhook-secret"
+  WEBHOOK_TIMEOUT: "10000"
+  PLUGIN_SANDBOX_TIMEOUT: "60000"
+  MAX_PLUGIN_MEMORY: "536870912"
+  MAX_PLUGIN_CPU: "80"
+  MOBILE_APP_BUNDLE_ID: "com.questro.mobile"
+  MOBILE_API_TIMEOUT: "30000"
+  VOICE_RECOGNITION_TIMEOUT: "10000"
+  VOICE_CONFIDENCE_THRESHOLD: "0.7"
+  PERFORMANCE_TEST_TIMEOUT: "300000"
+  SECURITY_SCAN_TIMEOUT: "120000"
+  REPORT_GENERATION_TIMEOUT: "60000"
+  NOTIFICATION_RETRY_ATTEMPTS: "3"
+  NOTIFICATION_RETRY_DELAY: "5000"
+  BACKUP_RETENTION_DAYS: "30"
+  CLEANUP_INTERVAL_HOURS: "24"
+  METRICS_RETENTION_DAYS: "90"
+  LOG_RETENTION_DAYS: "30"
+  AUDIT_LOG_RETENTION_DAYS: "365"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: qestro-prod
+  labels:
+    app: qestro
+    component: nginx
+    environment: production
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+
+        access_log /var/log/nginx/access.log main;
+
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        client_max_body_size 100M;
+
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types
+            text/plain
+            text/css
+            text/xml
+            text/javascript
+            application/json
+            application/javascript
+            application/xml+rss
+            application/atom+xml
+            image/svg+xml;
+
+        upstream qestro-api {
+            least_conn;
+            server qestro-api-1.qestro-prod.svc.cluster.local:3000 max_fails=3 fail_timeout=30s;
+            server qestro-api-2.qestro-prod.svc.cluster.local:3000 max_fails=3 fail_timeout=30s;
+        }
+
+        upstream qestro-ai-service {
+            least_conn;
+            server qestro-ai-service.qestro-prod.svc.cluster.local:3001 max_fails=3 fail_timeout=30s;
+        }
+
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/s;
+        limit_req_zone $binary_remote_addr zone=ai:10m rate=2r/s;
+
+        server {
+            listen 80;
+            server_name qestro.app app.qestro.app api.qestro.app ai.qestro.app;
+
+            # Security headers
+            add_header X-Frame-Options "SAMEORIGIN" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-XSS-Protection "1; mode=block" always;
+            add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.qestro.app https://ai.qestro.app wss://qestro.app; frame-ancestors 'none';" always;
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+            # Redirect HTTP to HTTPS
+            return 301 https://$server_name$request_uri;
+        }
+
+        server {
+            listen 443 ssl http2;
+            server_name qestro.app app.qestro.app;
+
+            ssl_certificate /etc/ssl/certs/questro-app.crt;
+            ssl_certificate_key /etc/ssl/private/questro-app.key;
+            ssl_protocols TLSv1.2 TLSv1.3;
+            ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+            ssl_prefer_server_ciphers off;
+            ssl_session_cache shared:SSL:10m;
+            ssl_session_timeout 10m;
+
+            root /usr/share/nginx/html;
+            index index.html;
+
+            # Frontend application
+            location / {
+                try_files $uri $uri/ /index.html;
+                expires 1h;
+                add_header Cache-Control "public, immutable";
+            }
+
+            # Static assets with longer cache
+            location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+                add_header X-Content-Type-Options nosniff;
+            }
+
+            # Health check
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+
+            # Security
+            location /.well-known/security.txt {
+                allow all;
+            }
+
+            location /.well-known/robots.txt {
+                allow all;
+            }
+
+            # Deny access to sensitive files
+            location ~ /\. {
+                deny all;
+            }
+
+            location ~ ^/(package\.json|\.env|\.git) {
+                deny all;
+            }
+        }
+
+        server {
+            listen 443 ssl http2;
+            server_name api.qestro.app;
+
+            ssl_certificate /etc/ssl/certs/qestro-api.crt;
+            ssl_certificate_key /etc/ssl/private/qestro-api.key;
+            ssl_protocols TLSv1.2 TLSv1.3;
+            ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+            ssl_prefer_server_ciphers off;
+            ssl_session_cache shared:SSL:10m;
+            ssl_session_timeout 10m;
+
+            # API rate limiting
+            location /api/ {
+                limit_req zone=api burst=20 nodelay;
+                proxy_pass http://qestro-api;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_connect_timeout 30s;
+                proxy_send_timeout 30s;
+                proxy_read_timeout 30s;
+                proxy_buffering off;
+            }
+
+            # Auth endpoints with stricter rate limiting
+            location /api/auth/ {
+                limit_req zone=auth burst=10 nodelay;
+                proxy_pass http://qestro-api;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_connect_timeout 30s;
+                proxy_send_timeout 30s;
+                proxy_read_timeout 30s;
+                proxy_buffering off;
+            }
+
+            # Health check
+            location /api/health {
+                access_log off;
+                proxy_pass http://qestro-api/api/health;
+                proxy_set_header Host $host;
+            }
+        }
+
+        server {
+            listen 443 ssl http2;
+            server_name ai.qestro.app;
+
+            ssl_certificate /etc/ssl/certs/questro-ai.crt;
+            ssl_certificate_key /etc/ssl/private/questro-ai.key;
+            ssl_protocols TLSv1.2 TLSv1.3;
+            ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+            ssl_prefer_server_ciphers off;
+            ssl_session_cache shared:SSL:10m;
+            ssl_session_timeout 10m;
+
+            # AI service rate limiting
+            location / {
+                limit_req zone=ai burst=5 nodelay;
+                proxy_pass http://qestro-ai-service;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 60s;
+                proxy_read_timeout 60s;
+                proxy_buffering off;
+                client_max_body_size 50M;
+            }
+
+            # Health check
+            location /health {
+                access_log off;
+                proxy_pass http://qestro-ai-service/health;
+                proxy_set_header Host $host;
+            }
+        }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: qestro-monitoring
+  labels:
+    app: prometheus
+    component: config
+    environment: production
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        monitor: 'qestro-prod'
+        cluster: 'qestro-production'
+        region: 'us-east-1'
+
+    rule_files:
+      - "/etc/prometheus/rules/*.yml"
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+
+    scrape_configs:
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+
+      - job_name: 'qestro-api'
+        kubernetes_sd_configs:
+          - role: endpoints
+          namespaces:
+            names:
+              - qestro-prod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_app]
+            action: keep
+            regex: qestro-api
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+        metrics_path: /metrics
+        scrape_interval: 30s
+        scrape_timeout: 10s
+
+      - job_name: 'qestro-ai-service'
+        kubernetes_sd_configs:
+          - role: endpoints
+          namespaces:
+            names:
+              - qestro-prod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_app]
+            action: keep
+            regex: qestro-ai-service
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+        metrics_path: /metrics
+        scrape_interval: 30s
+        scrape_timeout: 10s
+
+      - job_name: 'node-exporter'
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_k8s_app]
+            action: keep
+            regex: node-exporter
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+
+      - job_name: 'postgres-exporter'
+        kubernetes_sd_configs:
+          - role: endpoints
+          namespaces:
+            names:
+              - qestro-prod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_app]
+            action: keep
+            regex: postgres-exporter
+        metrics_path: /metrics
+        scrape_interval: 30s
+
+      - job_name: 'redis-exporter'
+        kubernetes_sd_configs:
+          - role: endpoints
+          namespaces:
+            names:
+              - qestro-prod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_app]
+            action: keep
+            regex: redis-exporter
+        metrics_path: /metrics
+        scrape_interval: 30s
+
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name

@@ -1,0 +1,117 @@
+SECURITY STACK DRIFT MONITORING IMPLEMENTATION
+==============================================
+
+OVERVIEW
+--------
+Added drift monitoring for Microsoft Security Stack in TenantIQ. The system detects when security configurations change (CA policies disabled, DLP rules removed, etc.) and alerts admins.
+
+FILES CREATED
+=============
+
+1. CORE SERVICE
+   /apps/api/src/lib/security-stack-monitor.ts (140 lines)
+   - captureSecuritySnapshot() - Gathers current state of CA, DLP, Identity, Email security
+   - detectSecurityDrifts() - Compares snapshots and identifies changes with severity
+   - Types: SecurityStackSnapshot, SecurityDrift
+
+2. CRON JOB
+   /apps/api/src/cron/security-stack-scan.ts (160 lines)
+   - scanSecurityStack() - Runs hourly on all active tenants
+   - triggerSecurityStackScan() - On-demand scan for single tenant
+   - Creates configSnapshots and configDrifts records
+   - Creates security alerts when drifts detected
+
+3. API ROUTES
+   /apps/api/src/routes/tenants/security-stack-monitor.ts (140 lines)
+   - GET /api/tenants/:id/security/stack/monitor
+   - POST /api/tenants/:id/security/stack/monitor/scan (manual trigger)
+   - POST /api/tenants/:id/security/stack/monitor/baseline (set baseline)
+   - PATCH /api/tenants/:id/security/stack/monitor/drifts/:driftId/acknowledge
+
+4. UI COMPONENTS
+   /apps/web/src/lib/components/security/DriftAlert.svelte (60 lines)
+   - Reusable component for displaying a single drift
+   - Shows product, field, previous/current values, severity
+   - Buttons: Acknowledge, Accept Change
+
+5. DATA TYPES
+   /packages/shared/src/types/security-drift.ts (40 lines)
+   - SecurityStackSnapshot interface
+   - SecurityDrift interface
+   - SecurityStackMonitorResponse interface
+
+6. UNIT TESTS
+   /apps/api/src/lib/security-stack-monitor.test.ts (130 lines)
+   - Tests for drift detection logic
+   - Coverage: 8 test cases
+   - Scenarios: CA changes, MFA, legacy auth, email security
+
+7. DOCUMENTATION
+   /DRIFT_MONITORING_INTEGRATION.md
+   - Integration guide with wrangler.toml setup
+   - API endpoint documentation
+   - Security considerations
+   - Graph API method requirements
+
+DATABASE USAGE
+==============
+Existing tables in schema-d1.ts:
+- configSnapshots: Stores security state snapshots
+- configDrifts: Stores detected differences between snapshots
+- securityAlerts: Creates alerts for critical drifts
+
+MONITORED COMPONENTS
+====================
+1. Conditional Access: policy count, MFA enabled, legacy auth blocked
+2. Data Loss Prevention: policy count, label count
+3. Identity Protection: MFA coverage %, risky users, sign-in risk policy
+4. Email Security: Safe Links, Safe Attachments, Anti-Phishing
+
+SEVERITY MAPPING
+================
+Critical: MFA disabled, Anti-phishing disabled
+High: CA policy changes, legacy auth changes, DLP policy changes
+Medium: MFA coverage decline, risk policy changes
+Low: Label/policy count increases
+
+KEY FEATURES
+============
+- Hourly automatic scans of all tenants
+- Manual on-demand scan trigger
+- Baseline management (set current as baseline, clear drifts)
+- Drift acknowledgment workflow
+- Detailed change comparison (before/after values)
+- Severity-based filtering and alerts
+
+INTEGRATION CHECKLIST
+======================
+[ ] Mount routes in API router index
+[ ] Register cron job in Cloudflare Workers handler
+[ ] Add trigger to wrangler.toml
+[ ] Create /security/stack page route
+[ ] Add nav link to Security Stack Monitor
+[ ] Run tests: npm run test
+[ ] Deploy to staging first
+[ ] Monitor Graph API quota impact
+[ ] Configure webhook notifications (optional)
+
+DESIGN PATTERNS FOLLOWED
+=========================
+- Max 200 lines per file
+- Single responsibility principle
+- Dependency injection (graph client passed as param)
+- Zod validation on API inputs
+- Toast notifications for UI feedback
+- Dark mode support via CSS variables
+- Keyboard navigation (component ready)
+- Multi-tenant scoping (WHERE org_id = ...)
+- Error handling with descriptive messages
+
+NEXT STEPS
+==========
+1. Implement GraphClient methods for security data collection
+2. Add webhook notifications for critical drifts
+3. Build auto-remediation workflows
+4. Add configuration diff viewer
+5. Create scheduled compliance reports
+6. Integrate with SIEM platform

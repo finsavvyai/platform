@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign up — PipeWarden</title>
+<meta name="description" content="Create a PipeWarden account. CI/CD pipeline security across GitHub, GitLab, Bitbucket, Jenkins, Azure DevOps, and CircleCI." />
+<link rel="stylesheet" href="/auth.css" />
+<link rel="icon" href="/favicon.svg" />
+</head>
+<body>
+<main class="auth-shell">
+  <section class="auth-card">
+    <a href="/" class="auth-brand"><span class="dot"></span>PipeWarden</a>
+    <h1 class="auth-title">Create your account</h1>
+    <p class="auth-sub">Free forever. No credit card. Self-hosted in 30 seconds.</p>
+
+    <div class="error" id="err"></div>
+
+    <a class="btn-secondary" href="/api/v1/auth/github/start" style="width:100%; margin-bottom: 16px; display: block; text-align: center; text-decoration: none;">Sign up with GitHub</a>
+
+    <div class="divider"><span>or with email</span></div>
+
+    <form id="signup-form" novalidate>
+      <div class="field">
+        <label for="email">Work email</label>
+        <input type="email" id="email" name="email" autocomplete="email" required placeholder="you@company.com" />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="new-password" required minlength="12" placeholder="At least 12 characters" />
+        <div class="hint">12+ characters. Use a passphrase you can remember.</div>
+      </div>
+      <button type="submit" class="btn-primary" id="submit-btn">Create account</button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="/login/">Sign in</a>
+    </div>
+  </section>
+</main>
+
+<script>
+const API_BASE = window.location.hostname === 'pipewarden.com' || window.location.hostname === 'pipewarden.io'
+  ? 'https://api.pipewarden.io'
+  : '';
+
+document.getElementById('signup-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const err = document.getElementById('err');
+  err.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Creating account…';
+
+  try {
+    const res = await fetch(API_BASE + '/api/v1/auth/signup', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error((data && data.error) || `Signup failed (HTTP ${res.status})`);
+    }
+    window.location.href = (data && data.next) || '/onboarding/';
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('visible');
+    btn.disabled = false;
+    btn.textContent = 'Create account';
+  }
+});
+</script>
+</body>
+</html>

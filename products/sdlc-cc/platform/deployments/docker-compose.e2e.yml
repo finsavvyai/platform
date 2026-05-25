@@ -1,0 +1,90 @@
+version: "3.9"
+
+# E2E stack for sdlc-platform: Postgres+pgvector, Redis, gateway, rag,
+# document-processor. Stand up with:
+#   docker compose -f deployments/docker-compose.e2e.yml up -d --wait
+#
+# The Day-8 test in services/gateway/tests/e2e/rag_roundtrip_test.go
+# uploads a PDF, polls processing, runs a RAG query, and asserts the
+# answer references the doc within a 5-second budget.
+
+networks:
+  e2e:
+    driver: bridge
+
+volumes:
+  pg-data:
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: sdlc
+      POSTGRES_PASSWORD: sdlc
+      POSTGRES_DB: sdlc
+    ports: ["5432:5432"]
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sdlc -d sdlc"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [e2e]
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [e2e]
+
+  gateway:
+    build:
+      context: ../services/gateway
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://sdlc:sdlc@postgres:5432/sdlc?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      RAG_URL: http://rag:8000
+      DOCUMENT_PROCESSOR_URL: http://document-processor:3000
+      LOG_LEVEL: info
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports: ["8080:8080"]
+    networks: [e2e]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  rag:
+    build:
+      context: ../services/rag
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sdlc:sdlc@postgres:5432/sdlc
+      REDIS_URL: redis://redis:6379/1
+    depends_on:
+      postgres: { condition: service_healthy }
+    ports: ["8000:8000"]
+    networks: [e2e]
+
+  document-processor:
+    build:
+      context: ../services/document-processor
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://sdlc:sdlc@postgres:5432/sdlc
+      REDIS_URL: redis://redis:6379/2
+      GATEWAY_URL: http://gateway:8080
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports: ["3000:3000"]
+    networks: [e2e]

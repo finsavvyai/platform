@@ -1,0 +1,240 @@
+version: '3.8'
+
+services:
+  # Main API service
+  api-service:
+    build:
+      context: ./services/api-service
+      dockerfile: Dockerfile
+    container_name: mcpoverflow-api
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=mcpoverflow
+      - DB_PASSWORD=mcpoverflow_password
+      - DB_NAME=mcpoverflow
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=super_secret_jwt_key_for_production
+      - DOMAIN_DEFAULT=marketing
+      - DOMAIN_SSL_ENABLED=true
+      - DOMAIN_CDN_ENABLED=true
+      - SEO_SITEMAP_ENABLED=true
+      - SEO_ROBOTS_ENABLED=true
+      - SEO_INDEXING_ENABLED=true
+      - SEO_STRUCTURED_DATA=true
+      - SEO_ANALYTICS_ID=GA_MEASUREMENT_ID
+      - SEO_TWITTER_SITE=@mcpoverflow
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mcpoverflow-network
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mcpoverflow-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=mcpoverflow
+      - POSTGRES_USER=mcpoverflow
+      - POSTGRES_PASSWORD=mcpoverflow_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - mcpoverflow-network
+    ports:
+      - "5432:5432"
+
+  # Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: mcpoverflow-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - mcpoverflow-network
+    ports:
+      - "6379:6379"
+
+  # Nginx reverse proxy with SSL termination
+  nginx:
+    image: nginx:alpine
+    container_name: mcpoverflow-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/ssl:ro
+      - ./www/marketing:/var/www/marketing:ro
+      - ./www/developer:/var/www/developer:ro
+      - ./www/ai:/var/www/ai:ro
+      - ./www/docs:/var/www/docs:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - api-service
+    networks:
+      - mcpoverflow-network
+
+  # Marketing website (mcpoverflow.com)
+  marketing-site:
+    build:
+      context: ./apps/marketing
+      dockerfile: Dockerfile
+    container_name: mcpoverflow-marketing
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=https://mcpoverflow.com/api
+      - VITE_DOMAIN_NAME=mcpoverflow.com
+      - VITE_THEME=marketing
+    networks:
+      - mcpoverflow-network
+    volumes:
+      - ./www/marketing:/app/dist:ro
+
+  # Developer platform (app.mcpoverflow.io)
+  developer-platform:
+    build:
+      context: ./apps/dev-platform
+      dockerfile: Dockerfile
+    container_name: mcpoverflow-developer
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=https://app.mcpoverflow.io/api
+      - VITE_DOMAIN_NAME=app.mcpoverflow.io
+      - VITE_THEME=developer
+    networks:
+      - mcpoverflow-network
+    volumes:
+      - ./www/developer:/app/dist:ro
+
+  # AI platform (mcpoverflow.ai)
+  ai-platform:
+    build:
+      context: ./apps/ai-platform
+      dockerfile: Dockerfile
+    container_name: mcpoverflow-ai
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=https://mcpoverflow.ai/api
+      - VITE_DOMAIN_NAME=mcpoverflow.ai
+      - VITE_THEME=ai
+      - VITE_WS_URL=wss://mcpoverflow.ai/ws
+    networks:
+      - mcpoverflow-network
+    volumes:
+      - ./www/ai:/app/dist:ro
+
+  # Documentation site (mcpoverflow.dev)
+  docs-site:
+    build:
+      context: ./apps/docs-site
+      dockerfile: Dockerfile
+    container_name: mcpoverflow-docs
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=https://mcpoverflow.dev/api
+      - VITE_DOMAIN_NAME=mcpoverflow.dev
+      - VITE_THEME=docs
+    networks:
+      - mcpoverflow-network
+    volumes:
+      - ./www/docs:/app/dist:ro
+
+  # SSL certificate management with Let's Encrypt
+  certbot:
+    image: certbot/certbot:latest
+    container_name: mcpoverflow-certbot
+    volumes:
+      - ./nginx/ssl:/etc/letsencrypt
+      - ./nginx/certbot-webroot:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - mcpoverflow-network
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mcpoverflow-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - mcpoverflow-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  # Monitoring with Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mcpoverflow-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - mcpoverflow-network
+    depends_on:
+      - prometheus
+
+  # Log aggregation with Loki
+  loki:
+    image: grafana/loki:latest
+    container_name: mcpoverflow-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - mcpoverflow-network
+    command: -config.file=/etc/loki/local-config.yaml
+
+  # Log collection with Promtail
+  promtail:
+    image: grafana/promtail:latest
+    container_name: mcpoverflow-promtail
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/promtail.yml:/etc/promtail/config.yml:ro
+      - ./logs:/var/log
+      - /var/log:/var/log/host:ro
+    networks:
+      - mcpoverflow-network
+    command: -config.file=/etc/promtail/config.yml
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+
+networks:
+  mcpoverflow-network:
+    driver: bridge

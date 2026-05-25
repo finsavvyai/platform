@@ -1,0 +1,279 @@
+# Development-specific Docker Compose configuration
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  # Development PostgreSQL with enhanced logging
+  postgres:
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_LOG_MIN_DURATION_STATEMENT: 100
+      POSTGRES_LOG_STATEMENT: 'all'
+      POSTGRES_LOG_ERROR_VERBOSITY: 'verbose'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+      - ./database/seeds:/seeds
+    ports:
+      - '5433:5432' # Additional port for external tools
+
+  # Redis with development memory limits and policies
+  redis:
+    command: redis-server --appendonly yes --requirepass redis_password --maxmemory 512mb --maxmemory-policy allkeys-lru --loglevel verbose
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.dev.conf:/usr/local/etc/redis/redis.conf:ro
+
+  # RabbitMQ with management UI and development configuration
+  rabbitmq:
+    environment:
+      RABBITMQ_MANAGEMENT_ENABLED: 'true'
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: '[{rabbitmq_management, [{load_definitions, "/etc/rabbitmq/definitions.json"}]}]'
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq/definitions.json:/etc/rabbitmq/definitions.json
+      - ./rabbitmq/rabbitmq.dev.conf:/etc/rabbitmq/rabbitmq.conf:ro
+
+  # Development API Server with hot reload
+  api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: claude-agent-api-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://claude_user:claude_password@postgres:5432/claude_agent
+      REDIS_URL: redis://:redis_password@redis:6379
+      RABBITMQ_URL: amqp://claude_user:claude_password@rabbitmq:5672/claude_vhost
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      QDRANT_URL: http://qdrant:6333
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: claude_user
+      MINIO_SECRET_KEY: claude_password
+      JWT_SECRET: development-jwt-secret-change-in-production
+      JWT_REFRESH_SECRET: development-refresh-secret-change-in-production
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
+      DEBUG: claude-agent:*
+      LOG_LEVEL: debug
+      LOG_FORMAT: dev
+      CORS_ORIGIN: http://localhost:3000,http://localhost:3001,http://localhost:3002
+    ports:
+      - '3001:3001'
+      - '5555:5555' # Prisma Studio
+      - '9229:9229' # Node.js debugging
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      - /app/dist
+    networks:
+      - claude-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3001/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Development Luna Agents Server
+  luna-agents-dev:
+    build:
+      context: ./luna-agents
+      dockerfile: Dockerfile.dev
+    container_name: claude-agent-luna-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3002
+      HOST: 0.0.0.0
+      API_BASE_URL: http://api-dev:3001
+      DATABASE_URL: postgresql://claude_user:claude_password@postgres:5432/claude_agent
+      REDIS_URL: redis://:redis_password@redis:6379
+      CLAUDE_PLUGIN_PATH: /app/.claude-plugin
+      MCP_SERVER_PATH: /app/mcp-servers
+      DEBUG: claude-agent:*
+      LOG_LEVEL: debug
+    ports:
+      - '3002:3002'
+      - '9230:9229' # Debug port for Luna Agents
+    volumes:
+      - ./luna-agents:/app
+      - /app/node_modules
+      - ./workspace:/workspace
+    networks:
+      - claude-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api-dev:
+        condition: service_healthy
+
+  # Development Web App
+  web-dev:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.dev
+    container_name: claude-agent-web-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      HOST: 0.0.0.0
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_WS_URL: ws://localhost:3001
+      NEXT_PUBLIC_ENV: development
+      DEBUG: next:*
+    ports:
+      - '3000:3000'
+      - '24678:24678' # HMR
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - claude-network
+    depends_on:
+      api-dev:
+        condition: service_healthy
+
+  # Development Tools container
+  dev-tools:
+    image: node:20-alpine
+    container_name: claude-agent-dev-tools
+    restart: unless-stopped
+    command: sh -c "apk add --no-cache curl && npm install && npm run dev:tools"
+    working_dir: /app
+    volumes:
+      - .:/app
+      - ~/.npmrc:/root/.npmrc
+    environment:
+      NODE_ENV: development
+      DEBUG: claude-agent:*
+    networks:
+      - claude-network
+    depends_on:
+      - postgres
+      - redis
+      - api-dev
+
+  # Database Exporter for Prometheus
+  postgres-exporter:
+    image: prom/prometheus-postgres-exporter:latest
+    container_name: claude-agent-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://claude_user:claude_password@postgres:5432/claude_agent?sslmode=disable
+      PG_EXPORTER_DISABLE_DEFAULT_METRICS: 'false'
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: 'false'
+    ports:
+      - '9187:9187'
+    networks:
+      - claude-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Redis Exporter for Prometheus
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: claude-agent-redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: redis_password
+      REDIS_EXPORTER_LOG_FORMAT: txt
+    ports:
+      - '9121:9121'
+    networks:
+      - claude-network
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # RabbitMQ Exporter for Prometheus
+  rabbitmq-exporter:
+    image: kbudde/rabbitmq-exporter:latest
+    container_name: claude-agent-rabbitmq-exporter
+    restart: unless-stopped
+    environment:
+      RABBIT_URL: http://claude_user:claude_password@rabbitmq:15672
+      RABBIT_USER: claude_user
+      RABBIT_PASSWORD: claude_password
+      PUBLISH_PORT: 9419
+      RABBIT_EXPORTER_CAPABILITIES: 'bert'
+    ports:
+      - '9419:9419'
+    networks:
+      - claude-network
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  # Elasticsearch Exporter for Prometheus
+  elasticsearch-exporter:
+    image: prometheuscommunity/elasticsearch-exporter:latest
+    container_name: claude-agent-elasticsearch-exporter
+    restart: unless-stopped
+    environment:
+      ES_URI: http://elasticsearch:9200
+      ES_ALL: 'true'
+      ES_SHARDS: 'true'
+    ports:
+      - '9114:9114'
+    networks:
+      - claude-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # Node Exporter for system metrics
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: claude-agent-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - '9100:9100'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - claude-network
+
+  # Docker Exporter for Docker metrics
+  docker-exporter:
+    image: prometheuscommunity/docker-exporter:latest
+    container_name: claude-agent-docker-exporter
+    restart: unless-stopped
+    environment:
+      DOCKER_EXPORTER_PORT: 9323
+      DOCKER_EXPORTER_PATH: '/var/run/docker.sock'
+    ports:
+      - '9323:9323'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - claude-network

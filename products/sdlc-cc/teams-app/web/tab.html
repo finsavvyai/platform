@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sdlc.cc — Teams scrub</title>
+<script src="https://res.cdn.office.net/teams-js/2.21.0/js/MicrosoftTeams.min.js"></script>
+<style>
+  :root { --bg: #fff; --panel: #f3f3f5; --text: #1c1c1f; --muted: #6c6c75; --line: #e1e1e4; --accent: #5b5fc7; --ok: #16a34a; --danger: #dc2626; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1f1f24; --panel: #17171b; --text: #ececef; --muted: #8b8b94; --line: #2a2a31; --accent: #9aa0e6; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 13px/1.5 ui-sans-serif, "Segoe UI", system-ui, sans-serif; }
+  .pane { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; min-height: 100vh; }
+  h1 { margin: 0; font-size: 14px; font-weight: 600; }
+  h1 .domain { color: var(--accent); }
+  .lead { font-size: 12px; color: var(--muted); margin: -4px 0 8px; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0; }
+  legend { padding: 0 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  label { display: block; font-size: 11px; color: var(--muted); margin: 6px 0 2px; }
+  input, textarea { width: 100%; padding: 7px 9px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 12px; }
+  textarea { min-height: 100px; resize: vertical; }
+  button { background: var(--accent); color: #fff; border: 0; padding: 9px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .status { font-size: 12px; color: var(--muted); }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--danger); }
+  pre.preview { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-family: var(--mono); font-size: 11px; max-height: 200px; overflow: auto; white-space: pre-wrap; word-wrap: break-word; }
+  .counts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .count { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  .count .n { font-size: 15px; font-weight: 600; }
+  .count .n.zero { color: var(--muted); }
+  .count .label { font-size: 10px; color: var(--muted); text-transform: uppercase; }
+  .count.hit { border-color: var(--ok); }
+</style>
+</head>
+<body>
+<div class="pane">
+<h1><span class="domain">sdlc.cc</span> — Sanitize for AI</h1>
+<p class="lead">Personal tab — paste anything, get the redacted version, copy it back into chats / Copilot / external AI.</p>
+
+<fieldset>
+  <legend>Gateway</legend>
+  <label>Endpoint</label>
+  <input id="endpoint" type="url" placeholder="https://api.sdlc.cc" />
+  <label>API key (sk_sdlc_*)</label>
+  <input id="apiKey" type="password" placeholder="sk_sdlc_..." autocomplete="off" />
+  <div class="row" style="margin-top:8px;">
+    <button id="save">Save</button>
+    <button id="test" class="secondary">Test</button>
+    <span id="cfg-status" class="status"></span>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>Input</legend>
+  <textarea id="input" placeholder="Paste a chat thread, email body, or any text…"></textarea>
+  <div class="row" style="margin-top: 8px;">
+    <button id="scrub">Scrub</button>
+    <button id="paste" class="secondary">Paste</button>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>Output (safe)</legend>
+  <pre class="preview" id="output">Scrubbed text appears here…</pre>
+  <div class="row" style="margin-top: 6px;">
+    <button id="copy" class="secondary">Copy clean text</button>
+    <span id="copy-status" class="status"></span>
+  </div>
+  <div class="counts" id="counts" style="margin-top: 8px;"></div>
+</fieldset>
+</div>
+
+<script src="tab.js"></script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+# FinSavvyAI AlertManager Configuration
+# Docs: https://prometheus.io/docs/alerting/latest/configuration/
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: "smtp.example.com:587"
+  smtp_from: "alerts@finsavvyai.com"
+  smtp_auth_username: "${SMTP_USERNAME}"
+  smtp_auth_password: "${SMTP_PASSWORD}"
+  smtp_require_tls: true
+
+# Notification templates
+templates:
+  - "/etc/alertmanager/templates/*.tmpl"
+
+# Inhibition rules - suppress lower-severity alerts when higher-severity fires
+inhibit_rules:
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal: ["service"]
+
+  - source_matchers:
+      - alertname = ServiceDown
+    target_matchers:
+      - alertname =~ "HighErrorRate|HighLatencyP95"
+    equal: ["service"]
+
+# Routing tree
+route:
+  group_by: ["alertname", "service"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: default-email
+
+  routes:
+    # Critical alerts -> Slack + PagerDuty + email immediately
+    - matchers:
+        - severity = critical
+      receiver: critical-multi
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: false
+
+    # Warning alerts -> Slack + email
+    - matchers:
+        - severity = warning
+      receiver: warning-slack
+      group_wait: 1m
+      repeat_interval: 4h
+      continue: false
+
+    # Info alerts -> email digest only
+    - matchers:
+        - severity = info
+      receiver: default-email
+      group_wait: 5m
+      repeat_interval: 12h
+
+# Receivers
+receivers:
+  - name: default-email
+    email_configs:
+      - to: "ops@finsavvyai.com"
+        send_resolved: true
+        headers:
+          Subject: "[FinSavvyAI] {{ .GroupLabels.alertname }} - {{ .Status }}"
+
+  - name: warning-slack
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#finsavvyai-alerts"
+        send_resolved: true
+        title: "{{ .GroupLabels.alertname }} [{{ .Status | toUpper }}]"
+        text: >-
+          {{ range .Alerts }}
+          *{{ .Labels.alertname }}* ({{ .Labels.severity }})
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+    email_configs:
+      - to: "ops@finsavvyai.com"
+        send_resolved: true
+
+  - name: critical-multi
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#finsavvyai-critical"
+        send_resolved: true
+        title: "CRITICAL: {{ .GroupLabels.alertname }}"
+        text: >-
+          {{ range .Alerts }}
+          *{{ .Labels.alertname }}* on {{ .Labels.service }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+    email_configs:
+      - to: "ops@finsavvyai.com,oncall@finsavvyai.com"
+        send_resolved: true
+        headers:
+          Subject: "[CRITICAL] {{ .GroupLabels.alertname }} - {{ .Status }}"
+    pagerduty_configs:
+      - service_key: "${PAGERDUTY_SERVICE_KEY}"
+        severity: critical
+        description: "{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}"

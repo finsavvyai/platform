@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawPipe vs Cloudflare AI Gateway — honest comparison</title>
+  <meta name="description" content="CF AI Gateway is free and fast, but it's a proxy. ClawPipe is a full pipeline: Booster, Packer, Semantic Cache, Learning Router, Swarm. Same CF runtime, more savings.">
+  <link rel="canonical" href="https://clawpipe.ai/vs/cloudflare">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/legal.css">
+</head>
+<body>
+<div class="container">
+  <header class="legal-header">
+    <a href="/" class="logo" style="text-decoration:none">ClawPipe</a>
+    <nav><a href="/#pricing">Pricing</a><a href="https://docs.clawpipe.ai">Docs</a><a href="https://app.clawpipe.ai/signup">Sign in</a></nav>
+  </header>
+  <main class="content">
+    <h1>ClawPipe vs Cloudflare AI Gateway</h1>
+    <p class="lead">Both run on Cloudflare Workers. One is a proxy. The other is a pipeline. Here's the honest difference.</p>
+
+    <h2>At a glance</h2>
+    <table class="compare-table">
+      <thead><tr><th>Capability</th><th>CF AI Gateway</th><th>ClawPipe</th></tr></thead>
+      <tbody>
+        <tr><td>Multi-provider dispatch</td><td>✅</td><td>✅</td></tr>
+        <tr><td>Request caching (exact-match)</td><td>✅</td><td>✅</td></tr>
+        <tr><td>Analytics &amp; logs</td><td>✅</td><td>✅</td></tr>
+        <tr><td>Rate limiting</td><td>✅</td><td>✅</td></tr>
+        <tr><td><strong>Agent Booster</strong> — skip LLM entirely for math/JSON/dates/encoding</td><td>❌</td><td>✅ 96 rules</td></tr>
+        <tr><td><strong>Context Packer</strong> — 20–60% token reduction</td><td>❌</td><td>✅</td></tr>
+        <tr><td><strong>Semantic Cache</strong> — embedding-based cache hits on rephrasings</td><td>❌</td><td>✅</td></tr>
+        <tr><td><strong>Self-learning Router</strong> — re-weights by real outcomes</td><td>❌</td><td>✅</td></tr>
+        <tr><td><strong>Swarm Orchestration</strong> — vote/best/merge across N models</td><td>❌</td><td>✅</td></tr>
+        <tr><td><strong>Prompt Guard</strong> — injection detection + PII redaction</td><td>❌</td><td>✅</td></tr>
+        <tr><td><strong>Budget caps + circuit breakers</strong> in SDK</td><td>❌</td><td>✅</td></tr>
+      </tbody>
+    </table>
+
+    <h2>When Cloudflare AI Gateway is the right call</h2>
+    <ul>
+      <li>You only need an observability proxy with per-model logs.</li>
+      <li>You do not want an SDK in your app process.</li>
+      <li>You're already deep in Workers AI and want tight native integration.</li>
+    </ul>
+
+    <h2>When ClawPipe wins</h2>
+    <ul>
+      <li>You want to <strong>skip LLM calls</strong> for deterministic tasks (math, JSON formatting, base64, date math, stats, tips, interest). Booster resolves these in microseconds at zero token cost.</li>
+      <li>You want <strong>real cache hits on rephrasings</strong> — "explain recursion" and "what is recursion" share an embedding hit in ClawPipe, miss in a hash-based proxy.</li>
+      <li>You want the router to <strong>get smarter over time</strong> based on your traffic, not stay static.</li>
+      <li>You want <strong>swarm voting</strong> for high-stakes calls — route to 3 models, return the consensus answer.</li>
+      <li>You need <strong>budget caps, circuit breakers, and allowlists</strong> enforced client-side before the request ever leaves your process.</li>
+    </ul>
+
+    <h2>Performance</h2>
+    <p>ClawPipe runs on the same Cloudflare Workers runtime. Latency overhead for the gateway hop is identical. The wins come from <em>what happens before and after</em> the provider call:</p>
+    <ul>
+      <li>Booster: −100% cost on deterministically resolved requests.</li>
+      <li>Packer: token compression per non-boosted request.</li>
+      <li>Semantic cache: additional hit rate on paraphrased queries.</li>
+      <li>Router: cost savings by shifting eligible traffic to cheaper models that meet quality bars.</li>
+    </ul>
+    <p>Combined effect pending public measured benchmark at <a href="https://github.com/finsavvyai/clawpipe-booster-benchmark">github.com/finsavvyai/clawpipe-booster-benchmark</a>. Methodology v1.0 locked 2026-05-18.</p>
+
+    <h2>Cost</h2>
+    <p>CF AI Gateway: free, metered by CF Workers usage.<br>
+    ClawPipe: <strong>$0 for 1K calls/day</strong>. $49/mo Pro (100K/day). <a href="/#pricing">Full pricing →</a></p>
+
+    <h2>Bottom line</h2>
+    <p>If your goal is a proxy with logs, Cloudflare AI Gateway is excellent and free. If your goal is to cut your OpenAI bill in half without changing application logic, ClawPipe's pipeline composition is what does the actual savings work — and it runs on the same CF runtime you're already paying for.</p>
+
+    <p><a class="cta" href="https://app.clawpipe.ai/signup">Start free →</a></p>
+  </main>
+  <footer class="legal-footer">
+    <div><a href="/">Home</a> · <a href="/vs/portkey">vs Portkey</a> · <a href="/vs/litellm">vs LiteLLM</a> · <a href="/vs/direct-api">vs Direct API</a></div>
+    <div>&copy; 2026 ClawPipe</div>
+  </footer>
+</div>
+</body>
+</html>

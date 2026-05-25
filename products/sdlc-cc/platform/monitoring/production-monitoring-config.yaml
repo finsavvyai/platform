@@ -1,0 +1,848 @@
+# =============================================================================
+# SDLC.ai Platform - Production Monitoring Configuration
+# =============================================================================
+# Comprehensive monitoring setup for real-time observability
+# Supports Cloudflare Analytics, Sentry, DataDog, and custom metrics
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# MONITORING STACK CONFIGURATION
+# -----------------------------------------------------------------------------
+monitoring:
+  platform: "cloudflare-workers"
+  environment: "production"
+  version: "1.0.0"
+
+  # Collection intervals (in seconds)
+  intervals:
+    metrics: 30          # Collect metrics every 30 seconds
+    health_checks: 60     # Health checks every minute
+    analytics: 300        # Analytics aggregation every 5 minutes
+    alerts: 10           # Alert evaluation every 10 seconds
+
+  # Retention periods
+  retention:
+    metrics: "30d"        # Keep raw metrics for 30 days
+    logs: "90d"          # Keep logs for 90 days
+    traces: "7d"         # Keep traces for 7 days
+    analytics: "1y"      # Keep aggregated analytics for 1 year
+
+# -----------------------------------------------------------------------------
+# CLOUDFLARE ANALYTICS CONFIGURATION
+# -----------------------------------------------------------------------------
+cloudflare_analytics:
+  # Real-time metrics collection
+  real_time:
+    enabled: true
+    sample_rate: 0.1      # 10% sampling for high-cardinality data
+
+  # Analytics datasets
+  datasets:
+    - name: "platform_analytics"
+      dimensions:
+        - "tenant_id"
+        - "user_id"
+        - "endpoint"
+        - "method"
+        - "status_code"
+        - "country"
+        - "device_type"
+        - "browser"
+      metrics:
+        - "request_count"
+        - "response_time"
+        - "error_rate"
+        - "throughput"
+        - "data_transfer"
+
+    - name: "business_metrics"
+      dimensions:
+        - "tenant_id"
+        - "operation_type"
+        - "service"
+      metrics:
+        - "api_calls"
+        - "documents_processed"
+        - "vector_searches"
+        - "ai_tokens_used"
+        - "storage_gb_used"
+
+    - name: "performance_metrics"
+      dimensions:
+        - "worker_name"
+        - "operation"
+      metrics:
+        - "cpu_time_ms"
+        - "memory_mb"
+        - "wall_time_ms"
+        - "queue_size"
+        - "cache_hit_rate"
+
+# -----------------------------------------------------------------------------
+# CUSTOM METRICS CONFIGURATION
+# -----------------------------------------------------------------------------
+custom_metrics:
+  # Application metrics
+  application:
+    # Request metrics
+    - name: "http_requests_total"
+      type: "counter"
+      labels: ["method", "endpoint", "status", "tenant"]
+      description: "Total number of HTTP requests"
+
+    - name: "http_request_duration_seconds"
+      type: "histogram"
+      buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+      labels: ["method", "endpoint", "tenant"]
+      description: "HTTP request duration in seconds"
+
+    - name: "http_response_size_bytes"
+      type: "histogram"
+      buckets: [100, 1000, 10000, 100000, 1000000, 10000000]
+      labels: ["method", "endpoint", "tenant"]
+      description: "HTTP response size in bytes"
+
+    # Business metrics
+    - name: "documents_processed_total"
+      type: "counter"
+      labels: ["tenant", "document_type", "status"]
+      description: "Total number of documents processed"
+
+    - name: "ai_tokens_total"
+      type: "counter"
+      labels: ["tenant", "model", "operation"]
+      description: "Total number of AI tokens used"
+
+    - name: "vector_searches_total"
+      type: "counter"
+      labels: ["tenant", "index", "result_count"]
+      description: "Total number of vector searches"
+
+    - name: "active_users_total"
+      type: "gauge"
+      labels: ["tenant"]
+      description: "Current number of active users"
+
+    # Database metrics
+    - name: "db_connections_active"
+      type: "gauge"
+      labels: ["database", "pool"]
+      description: "Active database connections"
+
+    - name: "db_query_duration_seconds"
+      type: "histogram"
+      buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5]
+      labels: ["database", "query_type", "table"]
+      description: "Database query duration in seconds"
+
+    # Cache metrics
+    - name: "cache_operations_total"
+      type: "counter"
+      labels: ["cache", "operation", "result"]
+      description: "Total cache operations"
+
+    - name: "cache_hit_ratio"
+      type: "gauge"
+      labels: ["cache"]
+      description: "Cache hit ratio (0-1)"
+
+    # Queue metrics
+    - name: "queue_messages_total"
+      type: "counter"
+      labels: ["queue", "status"]
+      description: "Total messages in queues"
+
+    - name: "queue_processing_duration_seconds"
+      type: "histogram"
+      buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 300]
+      labels: ["queue", "worker"]
+      description: "Queue processing duration in seconds"
+
+    # Security metrics
+    - name: "auth_attempts_total"
+      type: "counter"
+      labels: ["tenant", "method", "result"]
+      description: "Total authentication attempts"
+
+    - name: "security_events_total"
+      type: "counter"
+      labels: ["tenant", "event_type", "severity"]
+      description: "Total security events"
+
+# -----------------------------------------------------------------------------
+# HEALTH CHECKS CONFIGURATION
+# -----------------------------------------------------------------------------
+health_checks:
+  # Endpoint health checks
+  endpoints:
+    - name: "api_health"
+      url: "https://api.sdlc.cc/health"
+      method: "GET"
+      interval: 30
+      timeout: 5
+      expected_status: [200]
+      retries: 3
+
+    - name: "api_status"
+      url: "https://api.sdlc.cc/api/v1/status"
+      method: "GET"
+      interval: 60
+      timeout: 10
+      expected_status: [200]
+      body_contains: ["healthy", "ready"]
+
+    - name: "database_health"
+      url: "https://api.sdlc.cc/api/v1/health/database"
+      method: "GET"
+      interval: 30
+      timeout: 5
+      expected_status: [200]
+      response_time_threshold: 500  # ms
+
+    - name: "cache_health"
+      url: "https://api.sdlc.cc/api/v1/health/cache"
+      method: "GET"
+      interval: 60
+      timeout: 5
+      expected_status: [200]
+
+    - name: "vector_search_health"
+      url: "https://api.sdlc.cc/api/v1/health/vector"
+      method: "POST"
+      interval: 60
+      timeout: 10
+      expected_status: [200]
+      body: '{"test": "health_check", "vector": [0.1, 0.2, 0.3]}'
+
+    - name: "ai_service_health"
+      url: "https://api.sdlc.cc/api/v1/health/ai"
+      method: "GET"
+      interval: 60
+      timeout: 15
+      expected_status: [200]
+
+  # Synthetic transactions
+  synthetic_transactions:
+    - name: "user_login_flow"
+      steps:
+        - url: "https://api.sdlc.cc/api/v1/auth/login"
+          method: "POST"
+          body: '{"email": "test@sdlc.cc", "password": "test_password"}'
+          expected_status: [200]
+          extract: "token"
+        - url: "https://api.sdlc.cc/api/v1/user/profile"
+          method: "GET"
+          headers: {"Authorization": "Bearer ${token}"}
+          expected_status: [200]
+      interval: 300
+      timeout: 30
+
+    - name: "document_upload_flow"
+      steps:
+        - url: "https://api.sdlc.cc/api/v1/auth/login"
+          method: "POST"
+          body: '{"email": "test@sdlc.cc", "password": "test_password"}'
+          expected_status: [200]
+          extract: "token"
+        - url: "https://api.sdlc.cc/api/v1/documents/upload"
+          method: "POST"
+          headers: {"Authorization": "Bearer ${token}"}
+          body: '{"name": "test.pdf", "size": 1024}'
+          expected_status: [200]
+          extract: "document_id"
+        - url: "https://api.sdlc.cc/api/v1/documents/${document_id}/status"
+          method: "GET"
+          headers: {"Authorization": "Bearer ${token}"}
+          expected_status: [200]
+      interval: 600
+      timeout: 60
+
+# -----------------------------------------------------------------------------
+# ALERTING RULES CONFIGURATION
+# -----------------------------------------------------------------------------
+alerting:
+  # Notification channels
+  channels:
+    pagerduty:
+      service_key: "${PAGERDUTY_SERVICE_KEY}"
+      severity_mapping:
+        critical: "critical"
+        warning: "warning"
+        info: "info"
+
+    slack:
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#alerts-production"
+      mention_channels: true
+
+    email:
+      smtp_server: "smtp.sendgrid.net"
+      smtp_port: 587
+      username: "${SMTP_USERNAME}"
+      password: "${SMTP_PASSWORD}"
+      from: "alerts@sdlc.cc"
+      to: ["oncall@sdlc.cc", "devops@sdlc.cc"]
+
+    webhook:
+      url: "${WEBHOOK_URL}"
+      headers:
+        Authorization: "Bearer ${WEBHOOK_TOKEN}"
+
+  # Alert rules
+  rules:
+    # Service availability alerts
+    - name: "service_down"
+      condition: "up == 0"
+      for: "30s"
+      severity: "critical"
+      annotations:
+        summary: "Service is down"
+        description: "Service {{ $labels.instance }} has been down for more than 30 seconds"
+      labels:
+        team: "platform"
+        escalation: "immediate"
+
+    - name: "high_error_rate"
+      condition: "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) > 0.05"
+      for: "2m"
+      severity: "critical"
+      annotations:
+        summary: "High error rate detected"
+        description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+      labels:
+        team: "platform"
+
+    - name: "moderate_error_rate"
+      condition: "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) > 0.01"
+      for: "5m"
+      severity: "warning"
+      annotations:
+        summary: "Elevated error rate"
+        description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+      labels:
+        team: "platform"
+
+    # Performance alerts
+    - name: "high_response_time"
+      condition: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5"
+      for: "5m"
+      severity: "critical"
+      annotations:
+        summary: "High response time"
+        description: "95th percentile response time is {{ $value }}s on {{ $labels.instance }}"
+      labels:
+        team: "performance"
+
+    - name: "moderate_response_time"
+      condition: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2"
+      for: "5m"
+      severity: "warning"
+      annotations:
+        summary: "Elevated response time"
+        description: "95th percentile response time is {{ $value }}s on {{ $labels.instance }}"
+      labels:
+        team: "performance"
+
+    - name: "high_cpu_usage"
+      condition: "cpu_time_ms / 1000 > 40"
+      for: "2m"
+      severity: "warning"
+      annotations:
+        summary: "High CPU usage"
+        description: "CPU usage is {{ $value }}% on {{ $labels.worker }}"
+      labels:
+        team: "performance"
+
+    - name: "high_memory_usage"
+      condition: "memory_mb > 200"
+      for: "2m"
+      severity: "warning"
+      annotations:
+        summary: "High memory usage"
+        description: "Memory usage is {{ $value }}MB on {{ $labels.worker }}"
+      labels:
+        team: "performance"
+
+    # Database alerts
+    - name: "database_connection_issues"
+      condition: "db_connections_active > 15"
+      for: "2m"
+      severity: "critical"
+      annotations:
+        summary: "High database connection usage"
+        description: "Database has {{ $value }} active connections"
+      labels:
+        team: "database"
+
+    - name: "slow_database_queries"
+      condition: "histogram_quantile(0.95, rate(db_query_duration_seconds_bucket[5m])) > 1"
+      for: "5m"
+      severity: "warning"
+      annotations:
+        summary: "Slow database queries"
+        description: "95th percentile query time is {{ $value }}s"
+      labels:
+        team: "database"
+
+    # Cache alerts
+    - name: "low_cache_hit_rate"
+      condition: "cache_hit_ratio < 0.7"
+      for: "10m"
+      severity: "warning"
+      annotations:
+        summary: "Low cache hit rate"
+        description: "Cache hit rate is {{ $value | humanizePercentage }}"
+      labels:
+        team: "performance"
+
+    # Queue alerts
+    - name: "queue_backlog"
+      condition: "queue_messages_total{status=\"pending\"} > 1000"
+      for: "5m"
+      severity: "warning"
+      annotations:
+        summary: "Queue backlog building"
+        description: "Queue {{ $labels.queue }} has {{ $value }} pending messages"
+      labels:
+        team: "queue"
+
+    - name: "queue_processing_slow"
+      condition: "histogram_quantile(0.95, rate(queue_processing_duration_seconds_bucket[5m])) > 300"
+      for: "5m"
+      severity: "warning"
+      annotations:
+        summary: "Slow queue processing"
+        description: "95th percentile processing time is {{ $value }}s"
+      labels:
+        team: "queue"
+
+    # Security alerts
+    - name: "high_auth_failure_rate"
+      condition: "rate(auth_attempts_total{result=\"failure\"}[5m]) / rate(auth_attempts_total[5m]) > 0.1"
+      for: "2m"
+      severity: "warning"
+      annotations:
+        summary: "High authentication failure rate"
+        description: "Auth failure rate is {{ $value | humanizePercentage }}"
+      labels:
+        team: "security"
+
+    - name: "brute_force_detected"
+      condition: "rate(auth_attempts_total{result=\"failure\"}[1m]) > 10"
+      for: "1m"
+      severity: "critical"
+      annotations:
+        summary: "Possible brute force attack"
+        description: "{{ $value }} failed auth attempts per minute from {{ $labels.source_ip }}"
+      labels:
+        team: "security"
+        escalation: "immediate"
+
+    # Business metrics alerts
+    - name: "low_document_processing"
+      condition: "rate(documents_processed_total[1h]) < 10"
+      for: "15m"
+      severity: "warning"
+      annotations:
+        summary: "Low document processing rate"
+        description: "Only {{ $value }} documents processed in the last hour"
+      labels:
+        team: "business"
+
+    - name: "high_token_usage"
+      condition: "rate(ai_tokens_total[1h]) > 100000"
+      for: "5m"
+      severity: "warning"
+      annotations:
+        summary: "High AI token usage"
+        description: "{{ $value }} tokens used in the last hour"
+      labels:
+        team: "business"
+
+# -----------------------------------------------------------------------------
+# DASHBOARD CONFIGURATION
+# -----------------------------------------------------------------------------
+dashboards:
+  - name: "Platform Overview"
+    description: "High-level view of platform health and performance"
+    panels:
+      - title: "Request Rate"
+        type: "graph"
+        metrics:
+          - "rate(http_requests_total[5m])"
+        group_by: ["endpoint"]
+
+      - title: "Error Rate"
+        type: "single_stat"
+        metric: "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m])"
+
+      - title: "Response Time (p95)"
+        type: "graph"
+        metric: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"
+
+      - title: "Active Users"
+        type: "single_stat"
+        metric: "active_users_total"
+
+      - title: "Documents Processed"
+        type: "graph"
+        metric: "rate(documents_processed_total[1h])"
+
+      - title: "Health Status"
+        type: "status_grid"
+        services: ["api", "database", "cache", "vector_search", "ai_service"]
+
+  - name: "Performance Metrics"
+    description: "Detailed performance metrics and bottlenecks"
+    panels:
+      - title: "Response Time Distribution"
+        type: "heatmap"
+        metric: "rate(http_request_duration_seconds_bucket[5m])"
+
+      - title: "CPU Usage by Worker"
+        type: "graph"
+        metric: "cpu_time_ms / 1000"
+        group_by: ["worker_name"]
+
+      - title: "Memory Usage"
+        type: "graph"
+        metric: "memory_mb"
+        group_by: ["worker_name"]
+
+      - title: "Cache Hit Rates"
+        type: "graph"
+        metric: "cache_hit_ratio"
+        group_by: ["cache"]
+
+      - title: "Database Query Performance"
+        type: "graph"
+        metric: "histogram_quantile(0.95, rate(db_query_duration_seconds_bucket[5m]))"
+        group_by: ["query_type"]
+
+  - name: "Business Metrics"
+    description: "Business KPIs and usage analytics"
+    panels:
+      - title: "API Calls by Tenant"
+        type: "graph"
+        metric: "rate(api_calls[1h])"
+        group_by: ["tenant"]
+
+      - title: "AI Token Usage"
+        type: "graph"
+        metric: "rate(ai_tokens_total[1h])"
+        group_by: ["model"]
+
+      - title: "Vector Searches"
+        type: "graph"
+        metric: "rate(vector_searches_total[1h])"
+        group_by: ["index"]
+
+      - title: "Storage Usage"
+        type: "graph"
+        metric: "storage_gb_used"
+        group_by: ["tenant"]
+
+      - title: "Top Features by Usage"
+        type: "table"
+        metric: "api_calls"
+        group_by: ["endpoint"]
+        sort_by: "value desc"
+
+  - name: "Security Dashboard"
+    description: "Security events and authentication metrics"
+    panels:
+      - title: "Authentication Attempts"
+        type: "graph"
+        metric: "rate(auth_attempts_total[5m])"
+        group_by: ["result"]
+
+      - title: "Failed Auth Rate"
+        type: "single_stat"
+        metric: "rate(auth_attempts_total{result=\"failure\"}[5m]) / rate(auth_attempts_total[5m])"
+
+      - title: "Security Events"
+        type: "table"
+        metric: "security_events_total"
+        group_by: ["event_type", "severity"]
+
+      - title: "Blocked IPs"
+        type: "table"
+        metric: "auth_attempts_total{result=\"failure\"}"
+        group_by: ["source_ip"]
+        sort_by: "value desc"
+
+# -----------------------------------------------------------------------------
+# SLO/SLI DEFINITIONS
+# -----------------------------------------------------------------------------
+slo:
+  # Availability SLO
+  availability:
+    name: "API Availability"
+    description: "Percentage of successful API requests"
+    objective: 99.9
+    sli:
+      success_metric: "http_requests_total{status!~\"5..\"}"
+      total_metric: "http_requests_total"
+    alerting:
+      burn_rate_alerts:
+        - threshold: 2.0
+          window: "1h"
+          severity: "critical"
+        - threshold: 1.0
+          window: "6h"
+          severity: "warning"
+
+  # Latency SLO
+  latency:
+    name: "API Latency"
+    description: "95th percentile response time"
+    objective: 500  # milliseconds
+    sli:
+      metric: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"
+    alerting:
+      threshold: 1000  # milliseconds
+      severity: "warning"
+
+  # Throughput SLO
+  throughput:
+    name: "API Throughput"
+    description: "Requests per second"
+    objective: 1000  # RPS
+    sli:
+      metric: "rate(http_requests_total[5m])"
+    alerting:
+      threshold: 500  # RPS
+      severity: "warning"
+
+# -----------------------------------------------------------------------------
+# TRACING CONFIGURATION
+# -----------------------------------------------------------------------------
+tracing:
+  enabled: true
+  sample_rate: 0.01  # 1% sampling for production
+
+  # Trace collection
+  collector:
+    endpoint: "https://trace.cloudflare.com"
+    headers:
+      Authorization: "Bearer ${TRACE_TOKEN}"
+
+  # Spans to track
+  spans:
+    - name: "http_request"
+      tags: ["method", "endpoint", "status_code", "tenant_id"]
+
+    - name: "database_query"
+      tags: ["database", "table", "operation", "duration_ms"]
+
+    - name: "cache_operation"
+      tags: ["cache", "operation", "key", "hit"]
+
+    - name: "vector_search"
+      tags: ["index", "vector_count", "result_count", "duration_ms"]
+
+    - name: "ai_generation"
+      tags: ["model", "prompt_tokens", "completion_tokens", "duration_ms"]
+
+    - name: "document_processing"
+      tags: ["document_type", "size", "operations", "duration_ms"]
+
+# -----------------------------------------------------------------------------
+# LOGGING CONFIGURATION
+# -----------------------------------------------------------------------------
+logging:
+  # Log levels
+  levels:
+    default: "info"
+    services:
+      api: "info"
+      auth: "warn"
+      database: "error"
+
+  # Log format
+  format: "json"
+
+  # Log fields
+  fields:
+    required:
+      - "timestamp"
+      - "level"
+      - "service"
+      - "request_id"
+      - "tenant_id"
+      - "user_id"
+    optional:
+      - "duration_ms"
+      - "status_code"
+      - "error"
+      - "trace_id"
+
+  # Log sampling
+  sampling:
+    enabled: true
+    rate: 0.1  # Sample 10% of debug logs
+
+  # Log retention
+  retention:
+    info: "30d"
+    warn: "90d"
+    error: "1y"
+
+# -----------------------------------------------------------------------------
+# AUTOMATION CONFIGURATION
+# -----------------------------------------------------------------------------
+automation:
+  # Auto-scaling
+  auto_scaling:
+    enabled: true
+    metrics:
+      - metric: "rate(http_requests_total[5m])"
+        target: 1000  # Target RPS per worker
+        min_workers: 5
+        max_workers: 100
+        scale_up_threshold: 800
+        scale_down_threshold: 200
+        cooldown: 300  # 5 minutes
+
+      - metric: "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"
+        target: 500  # Target latency in ms
+        min_workers: 5
+        max_workers: 100
+        scale_up_threshold: 1000
+        scale_down_threshold: 200
+        cooldown: 300
+
+  # Auto-healing
+  auto_healing:
+    enabled: true
+    rules:
+      - name: "restart_worker_on_crash"
+        condition: "up == 0"
+        action: "restart_worker"
+        max_attempts: 3
+        cooldown: 600
+
+      - name: "clear_cache_on_corruption"
+        condition: "cache_hit_ratio < 0.1"
+        action: "clear_cache"
+        cooldown: 1800
+
+      - name: "rollback_on_high_error_rate"
+        condition: "rate(http_requests_total{status=~\"5..\"}[2m]) / rate(http_requests_total[2m]) > 0.5"
+        action: "rollback_deployment"
+        cooldown: 1800
+
+# -----------------------------------------------------------------------------
+# REPORTING CONFIGURATION
+# -----------------------------------------------------------------------------
+reporting:
+  # Daily reports
+  daily:
+    enabled: true
+    time: "09:00 UTC"
+    recipients: ["team@sdlc.cc"]
+    metrics:
+      - "total_requests"
+      - "error_rate"
+      - "avg_response_time"
+      - "active_users"
+      - "documents_processed"
+
+  # Weekly reports
+  weekly:
+    enabled: true
+    day: "Monday"
+    time: "09:00 UTC"
+    recipients: ["management@sdlc.cc", "team@sdlc.cc"]
+    metrics:
+      - "slo_compliance"
+      - "cost_analysis"
+      - "growth_metrics"
+      - "incident_summary"
+
+  # Monthly reports
+  monthly:
+    enabled: true
+    day: 1
+    time: "10:00 UTC"
+    recipients: ["executives@sdlc.cc"]
+    metrics:
+      - "sli_trends"
+      - "capacity_planning"
+      - "security_summary"
+      - "improvement_roadmap"
+
+# -----------------------------------------------------------------------------
+# TESTING CONFIGURATION
+# -----------------------------------------------------------------------------
+testing:
+  # Load testing
+  load_testing:
+    enabled: true
+    schedule: "0 2 * * 0"  # Sunday 2 AM UTC
+    scenarios:
+      - name: "api_load_test"
+        target: "https://api.sdlc.cc"
+        rps: 5000
+        duration: "10m"
+        users: 1000
+
+      - name: "stress_test"
+        target: "https://api.sdlc.cc"
+        rps: 10000
+        duration: "5m"
+        users: 2000
+
+  # Chaos testing
+  chaos_testing:
+    enabled: true
+    schedule: "0 3 * * 1"  # Monday 3 AM UTC
+    experiments:
+      - name: "latency_injection"
+        config:
+          delay: 100  # ms
+          probability: 0.1
+
+      - name: "error_injection"
+        config:
+          error_rate: 0.01
+          error_types: ["timeout", "connection_error"]
+
+      - name: "pod_deletion"
+        config:
+          probability: 0.05
+          max_pods: 1
+
+# -----------------------------------------------------------------------------
+# INTEGRATION CONFIGURATION
+# -----------------------------------------------------------------------------
+integrations:
+  # Sentry integration
+  sentry:
+    enabled: true
+    dsn: "${SENTRY_DSN}"
+    environment: "production"
+    sample_rate: 0.1
+    traces_sample_rate: 0.01
+
+  # DataDog integration
+  datadog:
+    enabled: true
+    api_key: "${DATADOG_API_KEY}"
+    site: "datadoghq.com"
+    metrics_prefix: "sdlc."
+
+  # Prometheus integration
+  prometheus:
+    enabled: true
+    endpoint: "https://metrics.sdlc.cc/metrics"
+    push_interval: 30
+
+  # PagerDuty integration
+  pagerduty:
+    enabled: true
+    service_key: "${PAGERDUTY_SERVICE_KEY}"
+    severity_mapping:
+      critical: "critical"
+      warning: "warning"
+      info: "info"

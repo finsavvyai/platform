@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Account settings — PipeWarden</title>
+<meta name="robots" content="noindex,nofollow" />
+<link rel="stylesheet" href="/auth.css" />
+<link rel="icon" href="/favicon.svg" />
+<style>
+  .auth-card { max-width: 640px; }
+  .section { padding: var(--s-5) 0; border-top: 1px solid var(--hairline); }
+  .section:first-of-type { border-top: 0; padding-top: 0; }
+  .section h2 { font-size: var(--fs-17); font-weight: var(--fw-semibold); margin: 0 0 var(--s-1); }
+  .section .desc { font-size: var(--fs-13); color: var(--text-secondary); margin: 0 0 var(--s-3); }
+  .row { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0; border-top: 1px solid var(--hairline); }
+  .row:first-of-type { border-top: 0; }
+  .row .meta { flex: 1; min-width: 0; }
+  .row .meta .name { font-size: var(--fs-13); font-weight: var(--fw-medium); }
+  .row .meta .sub { font-size: var(--fs-11); color: var(--text-tertiary); }
+  .badge { font-size: var(--fs-11); padding: 2px var(--s-2); border-radius: 999px; background: var(--bg-elev-2); color: var(--text-secondary); }
+  .badge.ok { background: color-mix(in oklab, var(--brand-green) 15%, transparent); color: var(--brand-green); }
+  .danger { background: color-mix(in oklab, #ff453a 15%, transparent); color: #ff453a; border-color: color-mix(in oklab, #ff453a 30%, transparent); }
+  .empty { padding: var(--s-3) 0; color: var(--text-tertiary); font-size: var(--fs-13); font-style: italic; }
+  .qr { display: flex; gap: var(--s-4); align-items: center; padding: var(--s-3); background: var(--bg); border: 1px solid var(--hairline); border-radius: var(--r-md); }
+  .qr code { font-family: var(--font-mono); font-size: var(--fs-11); word-break: break-all; }
+</style>
+</head>
+<body>
+<main class="auth-shell">
+  <section class="auth-card">
+    <a href="/dashboard/" class="auth-brand"><span class="dot"></span>PipeWarden</a>
+    <h1 class="auth-title">Account settings</h1>
+    <p class="auth-sub" id="user-email">Loading…</p>
+
+    <div class="error" id="err"></div>
+
+    <!-- Email verification -->
+    <div class="section">
+      <h2>Email verification</h2>
+      <p class="desc">Verify your email so you can recover your account if you lose access.</p>
+      <div id="email-status">Loading…</div>
+    </div>
+
+    <!-- Passkeys -->
+    <div class="section">
+      <h2>Passkeys</h2>
+      <p class="desc">Sign in without a password using your device's biometrics or security key.</p>
+      <div id="passkey-list"></div>
+      <button type="button" class="btn-secondary" id="add-passkey-btn" style="margin-top: var(--s-3);">+ Add passkey</button>
+    </div>
+
+    <!-- TOTP -->
+    <div class="section">
+      <h2>Two-factor authentication (TOTP)</h2>
+      <p class="desc">Authenticator-app codes as a second factor on email+password login.</p>
+      <div id="totp-status">Loading…</div>
+    </div>
+
+    <div class="section">
+      <a href="/dashboard/" style="color: var(--text-secondary); font-size: var(--fs-13); text-decoration: none;">← Back to dashboard</a>
+      <button type="button" class="btn-secondary" id="logout-btn" style="float: right; width: auto; padding: var(--s-2) var(--s-4);">Sign out</button>
+    </div>
+  </section>
+</main>
+
+<script>
+const API_BASE = window.location.hostname === 'pipewarden.com' || window.location.hostname === 'pipewarden.io'
+  ? 'https://api.pipewarden.io'
+  : '';
+
+function flash(msg, isErr) {
+  const el = document.getElementById('err');
+  el.textContent = msg;
+  el.classList.toggle('danger', !!isErr);
+  el.classList.add('visible');
+  setTimeout(() => el.classList.remove('visible'), 4000);
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(API_BASE + path, { credentials: 'include', ...opts });
+  if (res.status === 401) { window.location.href = '/login/?next=/settings/'; throw new Error('redirect'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+  return data;
+}
+
+async function load() {
+  const data = await api('/api/v1/auth/settings');
+  document.getElementById('user-email').textContent = data.user.email;
+  renderEmailStatus(data.user);
+  renderPasskeys(data.passkeys || []);
+  renderTOTP(!!data.totp_enabled);
+}
+
+function renderEmailStatus(user) {
+  const el = document.getElementById('email-status');
+  if (user.email_verified) {
+    el.innerHTML = '<span class="badge ok">Verified</span>';
+    return;
+  }
+  el.innerHTML = `<span class="badge">Not verified</span>`;
+  const btn = document.createElement('button');
+  btn.className = 'btn-secondary';
+  btn.style.marginTop = 'var(--s-3)';
+  btn.textContent = 'Send verification email';
+  btn.onclick = async () => {
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try { await api('/api/v1/auth/verify/request', { method: 'POST' }); btn.textContent = 'Sent — check your inbox'; }
+    catch (e) { flash(e.message, true); btn.disabled = false; btn.textContent = 'Send verification email'; }
+  };
+  el.appendChild(btn);
+}
+
+function renderPasskeys(passkeys) {
+  const el = document.getElementById('passkey-list');
+  el.innerHTML = '';
+  if (!passkeys.length) { el.innerHTML = '<div class="empty">No passkeys registered yet.</div>'; return; }
+  for (const p of passkeys) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<div class="meta"><div class="name">${escape(p.name)}</div><div class="sub">Added ${new Date(p.created_at).toLocaleDateString()}</div></div>`;
+    const del = document.createElement('button');
+    del.className = 'btn-secondary';
+    del.style.width = 'auto';
+    del.style.padding = 'var(--s-1) var(--s-3)';
+    del.textContent = 'Remove';
+    del.onclick = async () => {
+      if (!confirm(`Remove "${p.name}"?`)) return;
+      try { await api('/api/v1/auth/passkeys/' + p.id, { method: 'DELETE' }); load(); }
+      catch (e) { flash(e.message, true); }
+    };
+    row.appendChild(del);
+    el.appendChild(row);
+  }
+}
+
+function renderTOTP(enabled) {
+  const el = document.getElementById('totp-status');
+  el.innerHTML = '';
+  if (enabled) {
+    const badge = document.createElement('span');
+    badge.className = 'badge ok'; badge.textContent = 'Enabled';
+    el.appendChild(badge);
+    const disable = document.createElement('button');
+    disable.className = 'btn-secondary';
+    disable.style.marginTop = 'var(--s-3)';
+    disable.textContent = 'Disable TOTP';
+    disable.onclick = async () => {
+      const code = prompt('Enter your current 6-digit code to disable TOTP:');
+      if (!code) return;
+      try { await api('/api/v1/auth/totp/disable', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({code}) }); load(); }
+      catch (e) { flash(e.message, true); }
+    };
+    el.appendChild(disable);
+    return;
+  }
+  const setup = document.createElement('button');
+  setup.className = 'btn-secondary';
+  setup.textContent = 'Set up TOTP';
+  setup.onclick = async () => {
+    setup.disabled = true; setup.textContent = 'Generating…';
+    try {
+      const data = await api('/api/v1/auth/totp/setup', { method: 'POST' });
+      el.innerHTML = `<div class="qr"><div><div class="sub">Add this URL to your authenticator app:</div><code>${escape(data.otpauth)}</code></div></div>`;
+      const codeIn = document.createElement('input');
+      codeIn.placeholder = '123456'; codeIn.maxLength = 6;
+      codeIn.style.cssText = 'margin-top: var(--s-3); padding: var(--s-2); width: 120px; background: var(--bg); color: var(--text); border: 1px solid var(--hairline); border-radius: var(--r-sm); font-family: var(--font-mono);';
+      const verify = document.createElement('button');
+      verify.className = 'btn-primary'; verify.style.marginTop = 'var(--s-3)'; verify.textContent = 'Verify code';
+      verify.onclick = async () => {
+        try { await api('/api/v1/auth/totp/verify', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({code: codeIn.value}) }); load(); }
+        catch (e) { flash(e.message, true); }
+      };
+      el.appendChild(codeIn); el.appendChild(verify);
+    } catch (e) { flash(e.message, true); setup.disabled = false; setup.textContent = 'Set up TOTP'; }
+  };
+  el.appendChild(setup);
+}
+
+document.getElementById('add-passkey-btn').addEventListener('click', async () => {
+  if (!window.PublicKeyCredential) { flash('Passkeys not supported in this browser', true); return; }
+  try {
+    const begin = await api('/api/v1/auth/passkey/register/begin', { method: 'POST' });
+    const opts = begin.publicKey;
+    opts.challenge = b64uToBuf(opts.challenge);
+    opts.user.id = b64uToBuf(opts.user.id);
+    if (opts.excludeCredentials) opts.excludeCredentials.forEach(c => c.id = b64uToBuf(c.id));
+    const cred = await navigator.credentials.create({publicKey: opts});
+    const name = prompt('Name this passkey (e.g. "MacBook Touch ID"):') || '';
+    const finish = await fetch(API_BASE + '/api/v1/auth/passkey/register/finish?name=' + encodeURIComponent(name), {
+      method: 'POST', credentials: 'include', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        id: cred.id, rawId: bufToB64u(cred.rawId), type: cred.type,
+        response: {
+          attestationObject: bufToB64u(cred.response.attestationObject),
+          clientDataJSON: bufToB64u(cred.response.clientDataJSON),
+        },
+      }),
+    });
+    if (!finish.ok) throw new Error('Registration failed');
+    load();
+  } catch (e) { flash(e.message, true); }
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await api('/api/v1/auth/logout', { method: 'POST' }).catch(() => {});
+  window.location.href = '/login/';
+});
+
+function escape(s) { return String(s || '').replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":"&#39;"}[c])); }
+function b64uToBuf(s){s=s.replace(/-/g,'+').replace(/_/g,'/');const p='='.repeat((4-s.length%4)%4);const b=atob(s+p);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer;}
+function bufToB64u(b){return btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+
+load().catch(e => { if (e.message !== 'redirect') flash(e.message, true); });
+</script>
+</body>
+</html>

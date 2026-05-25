@@ -1,0 +1,212 @@
+{
+  "name": "luna-paddle",
+  "displayName": "Luna Paddle Payment Integration",
+  "description": "Integrate Paddle Billing as a Merchant of Record with fully embedded inline checkout using Paddle.js v2 — zero third-party branding, dark-theme compatible, works in Israel and most global markets",
+  "version": "1.0.0",
+  "category": "payments",
+  "type": "agent",
+  "capabilities": [
+    "paddle-billing-integration",
+    "embedded-checkout",
+    "subscription-management",
+    "webhook-verification",
+    "customer-portal",
+    "ed25519-signature-verification",
+    "cloudflare-workers-compatible",
+    "multi-plan-support"
+  ],
+  "parameters": [
+    {
+      "name": "paddle_api_key",
+      "type": "string",
+      "description": "Paddle API Key (server-side secret, starts with live_ or sandbox_)",
+      "required": true,
+      "sensitive": true,
+      "prompt": "Paddle API Key (from Paddle → Developer → API Keys):"
+    },
+    {
+      "name": "paddle_client_token",
+      "type": "string",
+      "description": "Paddle Client Token (public, for Paddle.js frontend)",
+      "required": true,
+      "prompt": "Paddle Client Token (from Paddle → Developer → Client-side tokens):"
+    },
+    {
+      "name": "paddle_webhook_public_key",
+      "type": "string",
+      "description": "Paddle webhook Ed25519 public key (hex) from Paddle → Developer → Notifications",
+      "required": true,
+      "sensitive": true,
+      "prompt": "Paddle Webhook Public Key (hex, from Paddle → Notifications):"
+    },
+    {
+      "name": "price_ids",
+      "type": "object",
+      "description": "Paddle Price IDs for each plan (format: pri_xxx)",
+      "required": true,
+      "prompt": "Enter Price IDs:\n  Pro (pri_xxx): _\n  Team (pri_xxx): _"
+    },
+    {
+      "name": "framework",
+      "type": "string",
+      "description": "Server framework",
+      "required": true,
+      "options": ["hono", "express", "next", "remix", "fastify"],
+      "default": "hono",
+      "prompt": "Server framework (hono/express/next/remix):"
+    },
+    {
+      "name": "db_type",
+      "type": "string",
+      "description": "Database type for storing customer/subscription IDs",
+      "required": true,
+      "options": ["d1", "postgres", "sqlite", "mysql"],
+      "default": "d1",
+      "prompt": "Database type (d1/postgres/sqlite/mysql):"
+    },
+    {
+      "name": "scope",
+      "type": "string",
+      "description": "Integration scope",
+      "required": false,
+      "options": ["full", "checkout", "webhooks", "portal", "migration"],
+      "default": "full",
+      "prompt": "Integration scope (full/checkout/webhooks/portal/migration):"
+    }
+  ],
+  "prompts": {
+    "system": "You are an expert payment integration specialist with deep knowledge of Paddle Billing v2, subscription management, and embedded checkout. You integrate Paddle as a Merchant of Record using Paddle.js v2 for fully embedded, zero-branding inline checkout. You understand Ed25519 webhook signature verification, Cloudflare Workers crypto APIs, and subscription lifecycle management.",
+    "execution": "🏓 Paddle Integration Setup\n\nPlease provide your Paddle credentials:\n\nPaddle API Key (secret):       _\nPaddle Client Token (public):  _\nPaddle Webhook Public Key:     _\nPro Price ID (pri_xxx):        _\nTeam Price ID (pri_xxx):       _\nFramework:                     _\nDB type:                       _\nScope (default: full):         _"
+  },
+  "workflow": [
+    "Collect and validate Paddle credentials",
+    "Generate server-side Paddle API client (createPaddleTransaction, createPaddlePortalSession)",
+    "Generate Ed25519 webhook signature verification utility",
+    "Create billing routes: POST /checkout, GET /portal, POST /webhook",
+    "Generate Paddle.js v2 frontend loader with eventCallback for checkout.completed",
+    "Create DB migration for paddle_customer_id and paddle_subscription_id columns",
+    "Wire environment variables in wrangler.toml or .env",
+    "Handle all subscription lifecycle events: transaction.completed, subscription.created, subscription.updated, subscription.canceled, subscription.past_due",
+    "Generate sandbox test checklist",
+    "Produce setup documentation with Paddle dashboard steps"
+  ],
+  "output": {
+    "files": [
+      {
+        "path": "api/src/billing-paddle.ts",
+        "description": "Paddle API client — createPaddleTransaction, createPaddlePortalSession, verifyPaddleSignature"
+      },
+      {
+        "path": "api/src/billing.ts",
+        "description": "Hono billing routes — /checkout, /portal, /webhook"
+      },
+      {
+        "path": "api/migrations/{date}_paddle.sql",
+        "description": "D1 migration adding paddle_customer_id and paddle_subscription_id to users table"
+      },
+      {
+        "path": "web/dashboard/src/pages/BillingPage.tsx",
+        "description": "Updated billing page using Paddle.js v2 inline checkout"
+      },
+      {
+        "path": "web/dashboard/src/config.ts",
+        "description": "VITE_PADDLE_CLIENT_TOKEN env var"
+      },
+      {
+        "path": ".luna/{project}/paddle-setup.md",
+        "description": "Step-by-step Paddle dashboard setup guide with price IDs, webhook configuration, and go-live checklist"
+      }
+    ]
+  },
+  "environment_variables": {
+    "server": [
+      {
+        "name": "PADDLE_API_KEY",
+        "description": "Paddle API secret key",
+        "how_to_set": "wrangler secret put PADDLE_API_KEY",
+        "where_to_get": "Paddle dashboard → Developer → API Keys"
+      },
+      {
+        "name": "PADDLE_WEBHOOK_PUBLIC_KEY",
+        "description": "Ed25519 public key (hex) for webhook signature verification",
+        "how_to_set": "wrangler secret put PADDLE_WEBHOOK_PUBLIC_KEY",
+        "where_to_get": "Paddle dashboard → Developer → Notifications → public key"
+      },
+      {
+        "name": "PUSHCI_PADDLE_PRICE_PRO",
+        "description": "Paddle Price ID for Pro plan",
+        "how_to_set": "wrangler secret put PUSHCI_PADDLE_PRICE_PRO",
+        "where_to_get": "Paddle dashboard → Catalog → Products → Pro plan price"
+      },
+      {
+        "name": "PUSHCI_PADDLE_PRICE_TEAM",
+        "description": "Paddle Price ID for Team plan",
+        "how_to_set": "wrangler secret put PUSHCI_PADDLE_PRICE_TEAM",
+        "where_to_get": "Paddle dashboard → Catalog → Products → Team plan price"
+      }
+    ],
+    "client": [
+      {
+        "name": "VITE_PADDLE_CLIENT_TOKEN",
+        "description": "Paddle client-side token (public, not secret)",
+        "how_to_set": "Add to .env file (VITE_ prefix for Vite projects)",
+        "where_to_get": "Paddle dashboard → Developer → Client-side tokens"
+      }
+    ]
+  },
+  "webhook_events": [
+    {
+      "event": "transaction.completed",
+      "action": "Upgrade user plan, store paddle_customer_id"
+    },
+    {
+      "event": "subscription.created",
+      "action": "Activate subscription, store paddle_subscription_id"
+    },
+    {
+      "event": "subscription.updated",
+      "action": "Update plan in DB based on new price ID"
+    },
+    {
+      "event": "subscription.canceled",
+      "action": "Downgrade user to free plan"
+    },
+    {
+      "event": "subscription.past_due",
+      "action": "Log payment failure, notify user"
+    }
+  ],
+  "paddle_setup_steps": [
+    "Sign up at paddle.com and complete KYC verification",
+    "Add pricing page URL, terms, privacy, and refund policy URLs for account verification",
+    "Catalog → Products → Create 'Pro' product at $9/mo recurring → copy Price ID (pri_xxx)",
+    "Catalog → Products → Create 'Team' product at $29/seat/mo recurring → copy Price ID (pri_xxx)",
+    "Developer → API Keys → Generate server-side API key",
+    "Developer → Client-side tokens → Generate public token",
+    "Developer → Notifications → Add webhook endpoint (https://your-api/api/billing/webhook)",
+    "Select events: transaction.completed, subscription.created, subscription.updated, subscription.canceled, subscription.past_due",
+    "Copy Ed25519 public key from Notifications page",
+    "Set all secrets via wrangler secret put",
+    "Run DB migration: wrangler d1 execute your-db --file=migrations/{date}_paddle.sql --remote",
+    "Test in sandbox mode before switching to production"
+  ],
+  "dependencies": [
+    "luna-cloudflare",
+    "luna-database",
+    "luna-deployment"
+  ],
+  "prerequisites": [
+    "Paddle account with KYC completed",
+    "Cloudflare Workers or compatible server runtime",
+    "D1 or compatible database with users table",
+    "Web Crypto API support (built into Cloudflare Workers)"
+  ],
+  "compatibility": {
+    "payment_processor": "Paddle Billing v2 (api.paddle.com)",
+    "not_compatible_with": "Paddle Classic (vendors.paddle.com/api/2.0)",
+    "countries": "Supports sellers in most countries except US-sanctioned territories. Works for Israeli businesses.",
+    "currencies": "USD, EUR, GBP, and 30+ currencies",
+    "merchant_of_record": true,
+    "tax_handling": "Automatic global tax compliance via Paddle MoR"
+  }
+}

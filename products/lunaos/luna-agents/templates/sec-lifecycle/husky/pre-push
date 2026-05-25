@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+# Luna security pre-push hook
+# Installed by: /ll-sec-lifecycle install --hooks pre-push
+# Bypass (logged): LUNA_SEC_BYPASS=1 git push ...
+
+. "$(dirname -- "$0")/_/husky.sh" 2>/dev/null || true
+
+if [ "$LUNA_SEC_BYPASS" = "1" ]; then
+  mkdir -p .luna/$(basename "$PWD")/security
+  echo "$(date -u +%FT%TZ) bypass: pre-push by ${USER:-unknown}" \
+    >> ".luna/$(basename "$PWD")/security/bypass.log"
+  exit 0
+fi
+
+# Full sweep in fast mode, ~45s budget
+npx --yes luna-agents ll-sec-push --mode fast || {
+  echo ""
+  echo "✗ luna-sec-push found Critical/High issues."
+  echo "  Review:  .luna/$(basename "$PWD")/security/PUSH_REPORT.md"
+  echo "  Bypass:  LUNA_SEC_BYPASS=1 git push ..."
+  exit 1
+}

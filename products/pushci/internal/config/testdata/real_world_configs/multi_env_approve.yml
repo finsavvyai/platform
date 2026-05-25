@@ -1,0 +1,48 @@
+# List-form deploy with approval gates + per-environment env
+# vars. Represents a real staging → production pipeline where
+# prod requires human approval. The legacy mapping form's
+# `approve: true` flag must survive the UnmarshalYAML flatten.
+on:
+  - push
+  - pull_request
+
+stages:
+  - name: ci
+    checks:
+      - name: test
+        run: cargo test --all
+      - name: fmt
+        run: cargo fmt -- --check
+      - name: clippy
+        run: cargo clippy -- -D warnings
+
+deploy:
+  - name: staging
+    trigger: push
+    only_on:
+      - develop
+      - main
+    env:
+      DEPLOY_ENV: staging
+    run: ./scripts/deploy-staging.sh
+    verify:
+      url: https://staging.example.com/health
+      expect: 200
+      retries: 10
+      interval: 3s
+
+  - name: production
+    trigger: push
+    only_on:
+      - main
+    depends_on:
+      - staging
+    approve: true
+    env:
+      DEPLOY_ENV: production
+    run: ./scripts/deploy-production.sh
+    verify:
+      url: https://example.com/health
+      expect: "ok|healthy"
+      retries: 20
+      interval: 5s

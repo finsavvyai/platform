@@ -1,0 +1,98 @@
+{
+  "alerts": [
+    {
+      "id": "uptime-studio",
+      "level": "critical",
+      "name": "Studio Uptime",
+      "type": "synthetics",
+      "url": "https://studio.lunaos.ai",
+      "frequency_seconds": 60,
+      "locations": ["aws:us-east-1", "aws:eu-west-1", "aws:ap-southeast-1"],
+      "notify": ["@slack-lunaos-ops", "@pagerduty-lunaos"],
+      "message": "🚨 LunaOS Studio is DOWN at {{url}}. Check Netlify deployment logs.",
+      "thresholds": { "warning": 1, "critical": 2 }
+    },
+    {
+      "id": "error-rate-critical",
+      "level": "critical",
+      "name": "Studio JS Error Rate > 5%",
+      "type": "metric",
+      "query": "sum(last_5m):sum:rum.error.count{service:lunaos-studio,env:production} / sum:rum.session.count{service:lunaos-studio,env:production} > 0.05",
+      "notify": ["@slack-lunaos-ops", "@pagerduty-lunaos"],
+      "message": "🚨 JS error rate is {{value}}% — investigate Sentry for recent errors.",
+      "recovery_message": "✅ JS error rate returned to normal."
+    },
+    {
+      "id": "error-rate-warning",
+      "level": "warning",
+      "name": "Studio JS Error Rate > 1%",
+      "type": "metric",
+      "query": "sum(last_15m):sum:rum.error.count{service:lunaos-studio,env:production} / sum:rum.session.count{service:lunaos-studio,env:production} > 0.01",
+      "notify": ["@slack-lunaos-alerts"],
+      "message": "⚠️ JS error rate is elevated at {{value}}%.",
+      "recovery_message": "✅ JS error rate normalised."
+    },
+    {
+      "id": "page-load-critical",
+      "level": "critical",
+      "name": "Studio Page Load P75 > 4s",
+      "type": "metric",
+      "query": "avg(last_10m):p75:rum.page_load_time{service:lunaos-studio,env:production} > 4000",
+      "notify": ["@slack-lunaos-ops"],
+      "message": "🚨 Page load P75 is {{value}}ms — performance degraded. Check CDN and bundle size."
+    },
+    {
+      "id": "page-load-warning",
+      "level": "warning",
+      "name": "Studio Page Load P75 > 2s",
+      "type": "metric",
+      "query": "avg(last_15m):p75:rum.page_load_time{service:lunaos-studio,env:production} > 2000",
+      "notify": ["@slack-lunaos-alerts"],
+      "message": "⚠️ Page load P75 is {{value}}ms — approaching threshold."
+    },
+    {
+      "id": "api-latency-critical",
+      "level": "critical",
+      "name": "API Latency P95 > 3s",
+      "type": "metric",
+      "query": "avg(last_5m):p95:rum.resource.duration{service:lunaos-studio,resource.url_host:api.lunaos.ai} > 3000",
+      "notify": ["@slack-lunaos-ops", "@pagerduty-lunaos"],
+      "message": "🚨 API P95 latency is {{value}}ms — check lunaos-engine Worker logs."
+    },
+    {
+      "id": "workflow-failure-spike",
+      "level": "warning",
+      "name": "Workflow Failure Rate Spike",
+      "type": "metric",
+      "query": "sum(last_10m):sum:rum.action.count{action.name:workflow.failed} > 10",
+      "notify": ["@slack-lunaos-alerts"],
+      "message": "⚠️ {{value}} workflow failures in the last 10 minutes — investigate chain executor."
+    },
+    {
+      "id": "no-traffic-info",
+      "level": "info",
+      "name": "Studio Zero Sessions (1h)",
+      "type": "metric",
+      "query": "sum(last_1h):sum:rum.session.count{service:lunaos-studio,env:production} < 1",
+      "notify": ["@slack-lunaos-alerts"],
+      "message": "ℹ️ Zero sessions recorded in the last hour — possible outage or deployment issue."
+    }
+  ],
+  "notification_channels": {
+    "slack-lunaos-ops": {
+      "type": "slack",
+      "channel": "#lunaos-ops",
+      "description": "Critical production incidents"
+    },
+    "slack-lunaos-alerts": {
+      "type": "slack",
+      "channel": "#lunaos-alerts",
+      "description": "Warnings and info alerts"
+    },
+    "pagerduty-lunaos": {
+      "type": "pagerduty",
+      "service_key": "${PAGERDUTY_SERVICE_KEY}",
+      "description": "On-call escalation for P0 incidents"
+    }
+  }
+}

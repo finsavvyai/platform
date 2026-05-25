@@ -1,0 +1,175 @@
+# Prometheus Configuration for Claude Agent Platform
+# Development environment
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: development
+    platform: claude-agent
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Rule files
+rule_files:
+  - "rules/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 5s
+    metrics_path: '/metrics'
+
+  # API Gateway Service
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:3001']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+    basic_auth:
+      username: 'admin'
+      password: 'claude_password'
+
+  # Luna Agents Service
+  - job_name: 'luna-agents'
+    static_configs:
+      - targets: ['luna-agents:3002']
+    scrape_interval: 10s
+    metrics_path: '/metrics'
+
+  # Web Application
+  - job_name: 'web-app'
+    static_configs:
+      - targets: ['web-app:3000']
+    scrape_interval: 15s
+    metrics_path: '/api/metrics'
+
+  # PostgreSQL Exporter
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 10s
+
+  # Redis Exporter
+  - job_name: 'redis-exporter'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 10s
+
+  # RabbitMQ Exporter
+  - job_name: 'rabbitmq-exporter'
+    static_configs:
+      - targets: ['rabbitmq-exporter:9419']
+    scrape_interval: 10s
+
+  # Elasticsearch Exporter
+  - job_name: 'elasticsearch-exporter'
+    static_configs:
+      - targets: ['elasticsearch-exporter:9114']
+    scrape_interval: 15s
+
+  # Qdrant Exporter
+  - job_name: 'qdrant-exporter'
+    static_configs:
+      - targets: ['qdrant:6333']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  # MinIO Exporter
+  - job_name: 'minio-exporter'
+    static_configs:
+      - targets: ['minio:9000']
+    scrape_interval: 15s
+    metrics_path: '/minio/v2/metrics/cluster'
+
+  # Node Exporter (System metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 10s
+
+  # Docker Metrics
+  - job_name: 'docker-exporter'
+    static_configs:
+      - targets: ['docker-exporter:9323']
+    scrape_interval: 10s
+
+  # Jaeger Metrics
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']
+    scrape_interval: 15s
+    metrics_path: '/metrics'
+
+  # Grafana Metrics
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+    basic_auth:
+      username: 'admin'
+      password: 'claude_password'
+
+  # Custom Application Metrics
+  - job_name: 'claude-agent-apps'
+    static_configs:
+      - targets:
+        - 'api-gateway:3001'
+        - 'luna-agents:3002'
+        - 'web-app:3000'
+    scrape_interval: 10s
+    metrics_path: '/api/v1/metrics'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+):([0-9]+)'
+        replacement: '${1}'
+
+# Remote write configuration (disabled for development)
+# remote_write:
+#   - url: "https://your-remote-storage/api/v1/write"
+#     basic_auth:
+#       username: user
+#       password: pass
+
+# Remote read configuration (disabled for development)
+# remote_read:
+#   - url: "https://your-remote-storage/api/v1/read"
+#     basic_auth:
+#       username: user
+#       password: pass
+
+# Storage configuration
+storage:
+  tsdb:
+    path: /prometheus
+    retention.time: 200h
+    retention.size: 10GB
+    wal-compression: true
+
+# Web configuration
+web:
+  enable_admin_api: true
+  page_title: "Claude Agent Platform - Prometheus"
+  external_url: http://localhost:9090
+
+# Feature flags
+enable_features:
+  - prometheus-external-labels
+  - extra-scrape-metrics
+  - expand-external-labels
+  - utf8-names
+
+# Tracing configuration (disabled for development)
+# tracing:
+#   endpoint: "http://jaeger:14268/api/traces"
+#   insecure: true

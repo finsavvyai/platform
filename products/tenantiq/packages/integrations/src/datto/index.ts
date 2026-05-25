@@ -1,0 +1,1 @@
+export { DattoClient } from './client';

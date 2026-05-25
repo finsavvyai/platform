@@ -1,0 +1,126 @@
+name: Coverage gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  gateway:
+    name: Gateway (Go) — coverage >=90%
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+      - name: Run tests with coverage
+        working-directory: services/gateway
+        run: make test-coverage
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-coverage
+          path: services/gateway/coverage.out
+
+  admin-ui:
+    name: Admin UI (Jest) — coverage >=90% line / >=85% branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: services/admin-ui/package-lock.json
+      - name: Install
+        working-directory: services/admin-ui
+        run: npm ci
+      - name: Test with coverage
+        working-directory: services/admin-ui
+        run: npm test -- --coverage --watchAll=false --silent
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-ui-coverage
+          path: services/admin-ui/coverage/
+
+  document-processor:
+    name: Document Processor (Jest) — coverage >=90% line / >=85% branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: services/document-processor/package-lock.json
+      - name: Install
+        working-directory: services/document-processor
+        run: npm ci
+      - name: Test with coverage
+        working-directory: services/document-processor
+        run: npm run test:coverage
+
+  rag:
+    name: RAG (pytest) — coverage >=90% line
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_USER: test
+          POSTGRES_DB: test
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 10s
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/rag/pyproject.toml
+      - name: Install
+        working-directory: services/rag
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]" || pip install -r requirements.txt -r requirements-dev.txt
+          pip install pytest pytest-cov pytest-asyncio pgvector
+      - name: Test with coverage (fail under 90%)
+        working-directory: services/rag
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+        run: pytest
+
+  vector-core:
+    name: Vector Core (cargo-llvm-cov) — coverage >=90% line
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/vector-core
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked
+      - name: Coverage
+        working-directory: services/vector-core
+        run: cargo llvm-cov --all-features --workspace --fail-under-lines 90 --lcov --output-path lcov.info
+      - name: Upload lcov
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vector-core-coverage
+          path: services/vector-core/lcov.info

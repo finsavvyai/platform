@@ -1,0 +1,69 @@
+"on":
+    - push
+    - pull_request
+stages:
+    - name: install
+      checks:
+        - name: go-install
+          run: go mod download
+        - name: npm-install
+          run: npm install
+          dir: api
+
+    - name: build
+      depends_on: [install]
+      checks:
+        - name: go-build
+          run: go build ./...
+
+    - name: test
+      depends_on: [install]
+      parallel: true
+      checks:
+        - name: go-test
+          run: go test -race -count=1 ./...
+        - name: e2e
+          run: go test -count=1 ./tests/e2e/...
+        - name: api-test
+          run: cd api && npx vitest run
+
+    - name: lint
+      depends_on: [install]
+      parallel: true
+      checks:
+        - name: go-vet
+          run: go vet ./...
+        - name: golangci
+          run: golangci-lint run --timeout=5m
+        - name: filesize
+          run: |
+            OVER=$(find internal/ cmd/ -name '*.go' ! -name '*_test.go' -exec wc -l {} + | awk '$1 > 100 && !/total/ {print}')
+            if [ -n "$OVER" ]; then echo "Files over 100 lines:" && echo "$OVER" && exit 1; fi
+
+    - name: coverage
+      depends_on: [install]
+      checks:
+        - name: go-coverage
+          run: |
+            go test ./... -coverprofile=coverage.out -covermode=atomic
+            PCT=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | tr -d '%')
+            echo "Total coverage: ${PCT}%"
+            awk "BEGIN { if ($PCT+0 < 48) { print \"FAIL: coverage \" $PCT \"% < 48%\"; exit 1 } }"
+
+    - name: security
+      depends_on: [install]
+      parallel: true
+      checks:
+        - name: govulncheck
+          run: govulncheck ./...
+        - name: gosec
+          run: gosec -severity high -exclude-dir=testdata -exclude-dir=tests ./...
+        - name: gitleaks
+          run: gitleaks detect --source=. --no-git --config=.gitleaks.toml
+
+deploy:
+    trigger: push
+    run: make deploy
+    only_on:
+        - main
+        - master

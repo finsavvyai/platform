@@ -1,0 +1,123 @@
+<idea-plugin>
+    <id>ai.lunaos.intellij</id>
+    <name>LunaOS</name>
+    <version>1.0.0</version>
+    <vendor email="hello@lunaos.ai" url="https://lunaos.ai">LunaOS</vendor>
+
+    <description><![CDATA[
+        <b>LunaOS</b> brings AI agent orchestration into your JetBrains IDE.
+        Browse, trigger, and monitor AI workflows without switching context.
+        Connect to the LunaOS platform and run agents against your code,
+        stream execution logs in real time, and track run status from
+        the status bar — all from a single tool window.
+        <br/><br/>
+
+        <b>Key Features</b>
+        <ul>
+            <li><b>Agent Browser</b> — search and filter agents by name or category, view descriptions, and launch runs with one click.</li>
+            <li><b>Workflow Execution</b> — fill in parameter forms and trigger workflows directly from the tool window or the Tools menu (<b>Ctrl+Alt+L</b>).</li>
+            <li><b>Real-Time Log Streaming</b> — watch execution output as it happens in a dedicated Logs panel with level filtering.</li>
+            <li><b>Run History</b> — review recent runs, their status, duration, and outputs in the Runs panel.</li>
+            <li><b>Code Analysis</b> — right-click any selection in the editor and send it to a LunaOS agent for review, refactoring suggestions, or security analysis.</li>
+            <li><b>Status Bar Widget</b> — always-visible indicator of active run count so you never lose track of in-flight work.</li>
+            <li><b>Configurable Connection</b> — point the plugin at any LunaOS API endpoint (cloud or self-hosted) and authenticate with your API key via <b>Settings &gt; Tools &gt; LunaOS</b>.</li>
+        </ul>
+        <br/>
+
+        <b>Getting Started</b>
+        <ul>
+            <li>Install the plugin and restart your IDE.</li>
+            <li>Open <b>Settings &gt; Tools &gt; LunaOS</b> and enter your API endpoint and key.</li>
+            <li>Open the <b>LunaOS</b> tool window on the right side bar.</li>
+            <li>Browse agents, pick one, and click <b>Run</b>.</li>
+        </ul>
+        <br/>
+
+        <b>Links</b><br/>
+        <a href="https://docs.lunaos.ai/integrations/intellij">Documentation</a> |
+        <a href="https://github.com/lunaos-ai/lunaos-intellij">GitHub</a> |
+        <a href="https://lunaos.ai">Website</a>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+            serviceImplementation="ai.lunaos.intellij.services.LunaApiClient"/>
+        <applicationService
+            serviceImplementation="ai.lunaos.intellij.settings.LunaSettingsState"/>
+        <projectService
+            serviceImplementation="ai.lunaos.intellij.services.RunStateService"/>
+
+        <applicationConfigurable
+            parentId="tools"
+            instance="ai.lunaos.intellij.settings.LunaSettingsConfigurable"
+            id="ai.lunaos.intellij.settings"
+            displayName="LunaOS"/>
+
+        <toolWindow
+            id="LunaOS"
+            anchor="right"
+            secondary="false"
+            icon="/icons/luna-13.svg"
+            factoryClass="ai.lunaos.intellij.toolwindow.LunaToolWindowFactory"/>
+
+        <statusBarWidgetFactory
+            id="ai.lunaos.intellij.StatusBar"
+            implementation="ai.lunaos.intellij.statusbar.LunaStatusBarFactory"
+            order="after Position"/>
+
+        <notificationGroup
+            id="LunaOS Notifications"
+            displayType="BALLOON"/>
+
+        <fileType name="Luna"
+                  implementationClass="ai.lunaos.intellij.language.LunaFileType"
+                  fieldName="INSTANCE"
+                  language="Luna"
+                  extensions="luna"/>
+
+        <lang.syntaxHighlighterFactory
+                  language="Luna"
+                  implementationClass="ai.lunaos.intellij.language.LunaSyntaxHighlighterFactory"/>
+
+        <configurationType
+                  implementation="ai.lunaos.intellij.language.LunaRunConfigurationType"/>
+    </extensions>
+
+    <actions>
+        <group id="ai.lunaos.intellij.ToolsMenuGroup"
+               text="LunaOS" description="LunaOS agent actions"
+               popup="true"
+               icon="/icons/luna-13.svg">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+
+            <action id="ai.lunaos.intellij.RunAgentAction"
+                    class="ai.lunaos.intellij.actions.RunAgentAction"
+                    text="Run Agent..."
+                    description="Select and run a LunaOS agent"
+                    icon="AllIcons.Actions.Execute">
+                <keyboard-shortcut keymap="$default"
+                                   first-keystroke="ctrl alt L"/>
+            </action>
+
+            <action id="ai.lunaos.intellij.ListAgentsAction"
+                    class="ai.lunaos.intellij.actions.ListAgentsAction"
+                    text="Browse Agents"
+                    description="Open the LunaOS agent browser"/>
+
+            <action id="ai.lunaos.intellij.ViewRunsAction"
+                    class="ai.lunaos.intellij.actions.ViewRunsAction"
+                    text="View Recent Runs"
+                    description="Show recent workflow execution runs"/>
+        </group>
+
+        <action id="ai.lunaos.intellij.AnalyzeWithAgentAction"
+                class="ai.lunaos.intellij.actions.AnalyzeWithAgentAction"
+                text="Analyze with LunaOS Agent"
+                description="Send selected code to a LunaOS agent for analysis"
+                icon="/icons/luna-13.svg">
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+        </action>
+    </actions>
+</idea-plugin>

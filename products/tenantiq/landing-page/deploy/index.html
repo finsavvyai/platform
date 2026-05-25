@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TenantIQ — AI-Powered Microsoft 365 Control for MSPs</title>
+<meta name="description" content="Secure, optimize, and manage every Microsoft 365 tenant from one AI-powered control plane. CIS benchmarks, compliance automation, and license optimization built for MSPs.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS — DARK & LIGHT
+═══════════════════════════════════════════ */
+:root {
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --blue: #1B6FFF;
+  --blue-bright: #4D94FF;
+  --cyan: #00D4FF;
+  --green: #00C985;
+  --amber: #F5A623;
+  --red: #E5484D;
+  --transition: 0.22s ease;
+}
+
+[data-theme="dark"] {
+  --bg:        #050B18;
+  --bg2:       #070E1C;
+  --bg3:       #0B1525;
+  --surface:   #0F1C32;
+  --surface2:  #152338;
+  --surface3:  #1B2C46;
+  --border:    rgba(255,255,255,0.07);
+  --border2:   rgba(255,255,255,0.13);
+  --border3:   rgba(255,255,255,0.20);
+  --text:      #EEF2FF;
+  --text2:     #8B9AB8;
+  --text3:     #546070;
+  --text4:     #3A4A5C;
+  --logo-filter: brightness(0) invert(1);
+  --grid-color: rgba(27,111,255,0.045);
+  --glow-hero: rgba(27,111,255,0.18);
+  --glow-cyan: rgba(0,212,255,0.08);
+  --shadow-card: 0 24px 80px rgba(0,0,0,0.55);
+  --shadow-sm: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+[data-theme="light"] {
+  --bg:        #FAFBFD;
+  --bg2:       #F2F5FA;
+  --bg3:       #E8ECF4;
+  --surface:   #FFFFFF;
+  --surface2:  #F6F8FC;
+  --surface3:  #EEF1F8;
+  --border:    rgba(15,30,65,0.08);
+  --border2:   rgba(15,30,65,0.12);
+  --border3:   rgba(15,30,65,0.20);
+  --text:      #0A1628;
+  --text2:     #3D5068;
+  --text3:     #6B7F96;
+  --text4:     #9CAFC4;
+  --logo-filter: none;
+  --grid-color: rgba(27,111,255,0.025);
+  --glow-hero: rgba(27,111,255,0.08);
+  --glow-cyan: rgba(0,212,255,0.04);
+  --shadow-card: 0 8px 32px rgba(10,22,40,0.08), 0 2px 8px rgba(10,22,40,0.04);
+  --shadow-sm: 0 1px 4px rgba(10,22,40,0.06);
+}
+
+/* ═══════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.65;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  transition: background var(--transition), color var(--transition);
+}
+
+/* Grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 56px 56px;
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity var(--transition);
+}
+
+[data-theme="light"] body::before { opacity: 0.4; }
+
+section, nav, footer { position: relative; z-index: 1; }
+
+/* ═══════════════════════════════════════════
+   LOGO SVG — inline, theme-aware
+═══════════════════════════════════════════ */
+.logo-svg .logo-dark-parts { fill: var(--text); }
+.logo-svg .logo-dark-stroke { stroke: var(--text); }
+.logo-svg .logo-iq-start { stop-color: var(--blue); }
+.logo-svg .logo-iq-end { stop-color: var(--blue-bright); }
+
+/* ═══════════════════════════════════════════
+   NAV — Mobile-first
+═══════════════════════════════════════════ */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(20px) saturate(160%);
+  border-bottom: 1px solid var(--border);
+  transition: background var(--transition), border-color var(--transition);
+  gap: 8px;
+  max-width: 100vw;
+  overflow: hidden;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.nav-logo svg {
+  height: 24px;
+  width: auto;
+  max-width: 110px;
+}
+
+/* Hide nav-links by default (mobile-first) — shown from tablet up */
+.nav-links {
+  display: none;
+  align-items: center;
+  gap: 2rem;
+  list-style: none;
+  margin: 0 auto;
+}
+
+.nav-links a {
+  color: var(--text2);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 400;
+  transition: color var(--transition);
+}
+.nav-links a:hover { color: var(--text); }
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+/* Hide Sign in on mobile — only show primary CTA */
+.nav-right .btn.btn-ghost { display: none !important; }
+
+.nav-right .btn.btn-primary {
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  height: 36px !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Theme toggle compact on mobile */
+.nav-right .theme-toggle {
+  width: 36px !important;
+  height: 36px !important;
+  flex-shrink: 0;
+}
+
+/* Tablet and up: show full nav */
+@media (min-width: 801px) {
+  nav {
+    padding: 0 2rem;
+    height: 64px;
+    gap: 0;
+    overflow: visible;
+  }
+  .nav-logo svg { height: 34px; max-width: none; }
+  .nav-links { display: flex; }
+  .nav-right { gap: 10px; margin-left: 0; }
+  .nav-right .btn.btn-ghost { display: inline-flex !important; }
+  .nav-right .btn.btn-primary { padding: 0 20px !important; font-size: 14px !important; height: auto !important; }
+  .nav-right .theme-toggle { width: 40px !important; height: 40px !important; }
+}
+
+/* Theme toggle */
+.theme-toggle {
+  width: 36px; height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  color: var(--text2);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.theme-toggle:hover { background: var(--surface2); color: var(--text); }
+
+/* ═══════════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════════ */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 20px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+}
+.btn-ghost:hover { background: var(--surface2); color: var(--text); border-color: var(--border3); }
+
+.btn-primary {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(27,111,255,0.25);
+}
+.btn-primary:hover {
+  background: var(--blue-bright);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(27,111,255,0.4);
+}
+.btn-linkedin {
+  background: #0a66c2;
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(10,102,194,0.25);
+}
+.btn-linkedin:hover {
+  background: #084c93;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(10,102,194,0.4);
+}
+.hero-actions-secondary {
+  margin-top: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.hero-actions-secondary .btn-ghost {
+  font-size: 13px;
+  padding: 10px 18px;
+}
+.btn-lg { padding: 13px 28px; font-size: 15px; border-radius: var(--radius-lg); }
+.btn-xl { padding: 16px 36px; font-size: 16px; border-radius: var(--radius-lg); }
+
+/* ═══════════════════════════════════════════
+   SHARED TYPOGRAPHY
+═══════════════════════════════════════════ */
+.section-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--blue-bright);
+  margin-bottom: 14px;
+}
+.section-eyebrow::before {
+  content: '';
+  width: 18px; height: 1.5px;
+  background: var(--blue);
+  border-radius: 2px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 46px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+.section-title em {
+  font-style: normal;
+  background: linear-gradient(135deg, var(--blue-bright) 0%, var(--cyan) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.section-sub {
+  font-size: 17px; color: var(--text2);
+  max-width: 540px; line-height: 1.7; font-weight: 300;
+}
+
+.container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+
+/* ═══════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════ */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  padding: 120px 2rem 80px;
+  overflow: hidden;
+}
+
+.hero-glow {
+  position: absolute;
+  top: -160px; left: 50%; transform: translateX(-50%);
+  width: 900px; height: 700px;
+  background: radial-gradient(ellipse at center, var(--glow-hero) 0%, transparent 65%);
+  pointer-events: none; z-index: 0;
+}
+.hero-glow2 {
+  position: absolute;
+  bottom: -60px; right: -200px;
+  width: 600px; height: 400px;
+  background: radial-gradient(ellipse, var(--glow-cyan) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 14px; border-radius: 100px;
+  border: 1px solid rgba(27,111,255,0.35);
+  background: rgba(27,111,255,0.08);
+  font-size: 11.5px; font-weight: 600;
+  color: var(--blue-bright);
+  margin-bottom: 28px;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  animation: fadeUp 0.5s ease both;
+}
+
+[data-theme="light"] .hero-badge {
+  background: rgba(27,111,255,0.07);
+  border-color: rgba(27,111,255,0.25);
+}
+
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+  animation: blink 1.6s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(42px, 7.5vw, 84px);
+  font-weight: 800;
+  line-height: 1.03;
+  letter-spacing: -0.045em;
+  max-width: 880px;
+  margin: 0 auto 22px;
+  animation: fadeUp 0.55s 0.08s ease both;
+}
+.hero h1 em {
+  font-style: normal;
+  background: linear-gradient(125deg, var(--blue-bright) 0%, var(--cyan) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-size: clamp(16px, 2vw, 19px);
+  color: var(--text2); max-width: 540px;
+  margin: 0 auto 36px;
+  font-weight: 300; line-height: 1.7;
+  animation: fadeUp 0.55s 0.16s ease both;
+}
+
+.hero-actions {
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+  margin-bottom: 40px;
+  animation: fadeUp 0.55s 0.24s ease both;
+}
+
+.hero-trust {
+  display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap; justify-content: center;
+  margin-bottom: 56px;
+  animation: fadeUp 0.55s 0.32s ease both;
+}
+.trust-sep { font-size: 11px; color: var(--text4); text-transform: uppercase; letter-spacing: 0.08em; }
+.trust-badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.trust-badge {
+  padding: 4px 11px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  font-size: 11.5px; font-weight: 500;
+  color: var(--text2);
+  transition: all var(--transition);
+}
+
+/* Dashboard preview */
+.dashboard-preview {
+  position: relative;
+  max-width: 980px; width: 100%;
+  margin: 0 auto;
+  animation: fadeUp 0.7s 0.42s ease both;
+}
+
+.db-frame {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-card), 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+[data-theme="light"] .db-frame {
+  box-shadow: 0 20px 80px rgba(13,27,62,0.12), 0 0 0 1px rgba(13,27,62,0.06);
+}
+
+.db-topbar {
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  padding: 11px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.dots { display: flex; gap: 5px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot-r { background: #FF5F56; } .dot-y { background: #FFBD2E; } .dot-g { background: #27C93F; }
+.url-bar {
+  flex: 1; background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 12px;
+  font-size: 12px; color: var(--text3); font-family: monospace;
+}
+
+.db-body { display: grid; grid-template-columns: 190px 1fr; min-height: 360px; }
+
+.db-sidebar {
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  padding: 14px 10px;
+}
+.db-org {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px; border-radius: var(--radius-md);
+  background: var(--surface); margin-bottom: 14px;
+}
+.db-org-av {
+  width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+}
+.db-org-name { font-size: 12px; font-weight: 500; color: var(--text); }
+.db-org-sub { font-size: 10px; color: var(--text3); }
+
+.db-nav-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: var(--radius-sm);
+  font-size: 12px; color: var(--text3);
+  margin-bottom: 2px; cursor: default;
+}
+.db-nav-item.active { background: rgba(27,111,255,0.1); color: var(--blue-bright); }
+.db-nav-ic { width: 12px; height: 12px; border-radius: 3px; background: currentColor; opacity:.4; flex-shrink:0; }
+
+.db-main { padding: 18px; }
+.db-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; margin-bottom: 14px;
+}
+.db-title { font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--text); }
+.db-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 100px;
+  font-size: 11px; font-weight: 500;
+}
+.pill-ok { background: rgba(0,201,133,0.1); color: var(--green); border: 1px solid rgba(0,201,133,0.2); }
+.pill-warn { background: rgba(245,166,35,0.1); color: var(--amber); border: 1px solid rgba(245,166,35,0.2); }
+.pill-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 14px; }
+.stat-c {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 10px 12px;
+}
+.stat-l { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing:.05em; margin-bottom:5px; }
+.stat-v { font-family: var(--font-display); font-size: 19px; font-weight: 700; color: var(--text); line-height:1; }
+.stat-d { font-size: 10px; margin-top: 3px; }
+.d-up { color: var(--green); } .d-dn { color: var(--red); }
+
+.tenant-list { display: flex; flex-direction: column; gap: 5px; }
+.th-row {
+  display: grid; grid-template-columns: 1fr 52px 68px 70px;
+  padding: 3px 10px; font-size: 10px; color: var(--text4);
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.t-row {
+  display: grid; grid-template-columns: 1fr 52px 68px 70px;
+  align-items: center; gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 11px;
+}
+.t-name { color: var(--text); font-weight: 500; }
+.t-score { font-family: var(--font-display); font-weight: 700; }
+.s-hi{color:var(--green);} .s-md{color:var(--amber);} .s-lo{color:var(--red);}
+.bar-w { height: 3px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
+.bar { height: 100%; border-radius: 2px; }
+.b-hi{background:var(--green);} .b-md{background:var(--amber);} .b-lo{background:var(--red);}
+.t-comp { font-size: 10px; }
+
+.frame-glow {
+  position: absolute; bottom: -50px; left: 50%; transform: translateX(-50%);
+  width: 500px; height: 80px;
+  background: radial-gradient(ellipse, rgba(27,111,255,0.22) 0%, transparent 70%);
+  pointer-events: none;
+}
+[data-theme="light"] .frame-glow { opacity: 0.4; }
+
+/* ═══════════════════════════════════════════
+   STATS BAR
+═══════════════════════════════════════════ */
+.stats-bar {
+  padding: 56px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.stats-inner { display: grid; grid-template-columns: repeat(4,1fr); }
+.stat-item {
+  text-align: center; padding: 16px 20px;
+  border-right: 1px solid var(--border);
+}
+.stat-item:last-child { border-right: none; }
+.stat-num {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 44px; font-weight: 800;
+  letter-spacing: -0.05em; line-height: 1;
+  background: linear-gradient(135deg, var(--text) 0%, var(--blue-bright) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 6px;
+}
+.stat-desc { font-size: 13px; color: var(--text3); }
+
+/* ═══════════════════════════════════════════
+   PILLARS
+═══════════════════════════════════════════ */
+.pillars { padding: 96px 0; }
+.pillars-header { margin-bottom: 52px; }
+
+.pillar-tabs {
+  display: flex; border: 1px solid var(--border2);
+  border-radius: var(--radius-lg); overflow: hidden;
+  background: var(--bg2); margin-bottom: 36px;
+}
+.p-tab {
+  flex: 1; padding: 15px 20px; cursor: pointer;
+  border: none; background: transparent;
+  color: var(--text2);
+  font-family: var(--font-display);
+  font-size: 13.5px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: all var(--transition);
+  border-right: 1px solid var(--border);
+}
+.p-tab:last-child { border-right: none; }
+.p-tab.active { background: var(--surface); color: var(--text); }
+.p-tab-ic {
+  width: 22px; height: 22px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+}
+.p-tab.active.t-sec .p-tab-ic { background: rgba(27,111,255,.15); }
+.p-tab.active.t-com .p-tab-ic { background: rgba(0,201,133,.12); }
+.p-tab.active.t-opt .p-tab-ic { background: rgba(245,166,35,.12); }
+
+.p-content { display: none; }
+.p-content.active {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 48px; align-items: start;
+  animation: fadeIn .28s ease;
+}
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+.feat-list { display: flex; flex-direction: column; gap: 12px; }
+.feat-item {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 15px 16px; border-radius: var(--radius-md);
+  border: 1px solid var(--border); background: var(--bg2);
+  transition: border-color var(--transition), background var(--transition);
+}
+.feat-item:hover { border-color: var(--border2); background: var(--surface); }
+.feat-ic {
+  width: 36px; height: 36px; border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.ic-b{background:rgba(27,111,255,.12);} .ic-g{background:rgba(0,201,133,.1);}
+.ic-a{background:rgba(245,166,35,.1);} .ic-c{background:rgba(0,212,255,.1);}
+.feat-name { font-weight: 500; font-size: 14px; color: var(--text); margin-bottom: 3px; }
+.feat-desc { font-size: 13px; color: var(--text3); line-height: 1.5; }
+
+/* Pillar visual */
+.p-visual { position: sticky; top: 88px; }
+.vis-card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.vis-head {
+  padding: 13px 16px; border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.vis-title { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--text); }
+.vis-body { padding: 16px; }
+
+/* CIS ring */
+.cis-ring-wrap { position: relative; width: 110px; height: 110px; margin: 8px auto 16px; }
+.cis-ring-wrap svg { transform: rotate(-90deg); }
+.ring-num {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.ring-big { font-family: var(--font-display); font-size: 26px; font-weight: 800; color: var(--green); line-height: 1; }
+.ring-sub { font-size: 10px; color: var(--text3); margin-top: 1px; }
+.cis-rows { display: flex; flex-direction: column; gap: 7px; }
+.cis-r { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+.cis-n { color: var(--text2); flex: 1; }
+.cis-p { color: var(--text); font-weight: 600; width: 34px; text-align: right; font-family: var(--font-display); font-size: 12px; }
+.cis-bw { flex: 1; height: 3px; background: var(--surface3); border-radius: 2px; overflow: hidden; }
+.cis-b { height: 100%; border-radius: 2px; }
+
+/* Framework grid */
+.fw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fw-card {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 12px;
+}
+.fw-name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+.fw-pct { font-family: var(--font-display); font-size: 22px; font-weight: 800; color: var(--green); line-height: 1; margin-bottom: 4px; }
+.fw-bw { height: 3px; background: var(--surface3); border-radius: 2px; overflow: hidden; margin-bottom: 5px; }
+.fw-b { height: 100%; border-radius: 2px; background: var(--green); }
+.fw-st { font-size: 10px; color: var(--text3); }
+
+/* License savings */
+.sav-hero {
+  text-align: center; padding: 14px;
+  background: rgba(0,201,133,0.06); border: 1px solid rgba(0,201,133,0.15);
+  border-radius: var(--radius-md); margin-bottom: 10px;
+}
+.sav-amount { font-family: var(--font-display); font-size: 30px; font-weight: 800; color: var(--green); }
+.sav-label { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.lic-rows { display: flex; flex-direction: column; gap: 6px; }
+.lic-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 11px; background: var(--bg3);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px;
+}
+.lic-t { color: var(--text2); }
+.lic-s { color: var(--green); font-weight: 600; }
+.lic-a {
+  font-size: 10px; padding: 3px 7px;
+  border-radius: 4px;
+  background: rgba(245,166,35,0.1);
+  color: var(--amber);
+  border: 1px solid rgba(245,166,35,0.18);
+}
+
+/* ═══════════════════════════════════════════
+   AI SECTION
+═══════════════════════════════════════════ */
+.ai-section {
+  padding: 96px 0;
+  background: linear-gradient(180deg, transparent, rgba(27,111,255,0.03), transparent);
+}
+.ai-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+
+.ai-tools-grid {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 7px; margin-top: 24px;
+}
+.tool-chip {
+  padding: 8px 10px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  font-size: 11.5px; color: var(--text3);
+  text-align: center; transition: all var(--transition); cursor: default;
+}
+.tool-chip:hover {
+  border-color: rgba(27,111,255,0.3);
+  color: var(--blue-bright);
+  background: rgba(27,111,255,0.05);
+}
+
+/* AI Chat */
+.ai-chat {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--radius-xl); overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.ai-chat-head {
+  background: var(--bg3); padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.ai-av {
+  width: 28px; height: 28px; border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--blue), var(--cyan));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: white; font-weight: 700;
+}
+.ai-n { font-size: 13px; font-weight: 600; color: var(--text); }
+.ai-on { font-size: 11px; color: var(--green); }
+.ai-msgs { padding: 16px; display: flex; flex-direction: column; gap: 11px; min-height: 300px; }
+.msg { max-width: 88%; }
+.msg-u { align-self: flex-end; }
+.mb { padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.55; }
+.mb-u { background: var(--blue); color: #fff; border-bottom-right-radius: 4px; }
+.mb-a { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); border-bottom-left-radius: 4px; }
+.mb-a strong { color: var(--text); }
+.msg-tool {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 10px; margin-top: 5px;
+  background: rgba(27,111,255,0.06);
+  border: 1px solid rgba(27,111,255,0.14);
+  border-radius: var(--radius-sm); font-size: 11px; color: var(--blue-bright);
+}
+.t-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--blue-bright); animation: blink 1.2s ease-in-out infinite; }
+.msg-acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.act-btn {
+  padding: 5px 10px; border-radius: var(--radius-sm);
+  background: rgba(27,111,255,0.1); border: 1px solid rgba(27,111,255,0.2);
+  color: var(--blue-bright); font-size: 11px; cursor: pointer;
+  transition: all var(--transition); font-family: var(--font-body);
+}
+.act-btn:hover { background: rgba(27,111,255,0.2); }
+
+/* ═══════════════════════════════════════════
+   ARCHITECTURE
+═══════════════════════════════════════════ */
+.arch-section {
+  padding: 80px 0;
+  border-top: 1px solid var(--border);
+}
+.arch-grid {
+  display: grid; grid-template-columns: repeat(5,1fr);
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  overflow: hidden; margin-top: 48px;
+}
+.arch-card {
+  background: var(--bg2); padding: 22px 18px;
+  transition: background var(--transition);
+}
+.arch-card:hover { background: var(--surface); }
+.arch-icon { font-size: 22px; margin-bottom: 10px; }
+.arch-name { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.arch-detail { font-size: 11.5px; color: var(--text3); line-height: 1.55; }
+
+/* ═══════════════════════════════════════════
+   DIFFERENTIATORS
+═══════════════════════════════════════════ */
+.diff-section { padding: 88px 0; }
+.diff-grid {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 16px; margin-top: 52px;
+}
+.diff-card {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--radius-lg); padding: 28px 24px;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.diff-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card);
+  border-color: rgba(27,111,255,0.3);
+}
+.diff-num {
+  font-family: var(--font-display); font-size: 11px; font-weight: 700;
+  color: var(--blue-bright); letter-spacing: 0.1em; text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.diff-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.diff-body { font-size: 13px; color: var(--text3); line-height: 1.6; }
+
+/* ═══════════════════════════════════════════
+   PRICING
+═══════════════════════════════════════════ */
+.pricing-section { padding: 96px 0; }
+.pricing-grid {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 18px; margin-top: 56px;
+}
+.p-card {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--radius-xl); padding: 30px 26px;
+  position: relative;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.p-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-card); }
+.p-card.featured {
+  border-color: rgba(27,111,255,0.45);
+  background: linear-gradient(180deg, rgba(27,111,255,0.06) 0%, var(--surface) 50%);
+}
+[data-theme="light"] .p-card.featured {
+  background: linear-gradient(180deg, rgba(27,111,255,0.05) 0%, #fff 50%);
+}
+.feat-badge {
+  position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+  padding: 4px 14px; background: var(--blue); color: #fff;
+  font-size: 11px; font-weight: 600; border-radius: 100px; white-space: nowrap;
+}
+.p-plan {
+  font-family: var(--font-display); font-size: 12px; font-weight: 700;
+  color: var(--text3); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px;
+}
+.p-amount {
+  font-family: var(--font-display); font-size: 42px; font-weight: 800;
+  color: var(--text); letter-spacing: -.04em; line-height: 1; margin-bottom: 3px;
+}
+.p-period { font-size: 13px; color: var(--text3); font-family: var(--font-body); font-weight: 300; }
+.p-desc {
+  font-size: 13px; color: var(--text3); margin: 14px 0 16px;
+  padding-bottom: 18px; border-bottom: 1px solid var(--border); line-height: 1.55;
+}
+.p-feats { list-style: none; display: flex; flex-direction: column; gap: 9px; margin-bottom: 24px; }
+.p-feats li { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; color: var(--text2); }
+.chk {
+  width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; margin-top: 2px;
+  background: rgba(0,201,133,0.12); border: 1px solid rgba(0,201,133,0.28);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: var(--green);
+}
+
+/* ═══════════════════════════════════════════
+   FAQ
+═══════════════════════════════════════════ */
+.faq-section { padding: 88px 0; border-top: 1px solid var(--border); }
+.faq-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px; margin-top: 52px;
+}
+.faq-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 22px 24px;
+  transition: border-color var(--transition);
+}
+.faq-item:hover { border-color: var(--border2); }
+.faq-q { font-weight: 500; font-size: 14px; color: var(--text); margin-bottom: 8px; }
+.faq-a { font-size: 13px; color: var(--text3); line-height: 1.6; }
+
+/* ═══════════════════════════════════════════
+   CTA
+═══════════════════════════════════════════ */
+.cta-section { padding: 112px 0; }
+.cta-inner {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 24px; padding: 80px 60px;
+  text-align: center; position: relative; overflow: hidden;
+}
+.cta-inner::before {
+  content: '';
+  position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+  width: 500px; height: 300px;
+  background: radial-gradient(ellipse, var(--glow-hero) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cta-title {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 5vw, 50px);
+  font-weight: 800; letter-spacing: -0.04em;
+  margin-bottom: 14px; position: relative;
+}
+.cta-sub {
+  font-size: 18px; color: var(--text2);
+  margin-bottom: 32px; font-weight: 300; position: relative;
+}
+.cta-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; position: relative; }
+
+/* ═══════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════ */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 52px 0 32px;
+  background: var(--bg2);
+}
+.foot-inner {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 40px; margin-bottom: 40px;
+}
+.foot-brand p { font-size: 13px; color: var(--text3); margin-top: 12px; max-width: 220px; line-height: 1.65; }
+.foot-col h4 {
+  font-family: var(--font-display); font-size: 11px; font-weight: 700;
+  color: var(--text2); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 14px;
+}
+.foot-col a {
+  display: block; font-size: 13px; color: var(--text3);
+  text-decoration: none; margin-bottom: 8px; transition: color var(--transition);
+}
+.foot-col a:hover { color: var(--text2); }
+.foot-bottom {
+  padding-top: 24px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: var(--text3);
+}
+.foot-chips { display: flex; gap: 12px; }
+.foot-chip { font-size: 11px; color: var(--text4); }
+
+/* ═══════════════════════════════════════════
+   ANIMATIONS & REVEAL
+═══════════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.reveal {
+  opacity: 0; transform: translateY(22px);
+  transition: opacity .55s ease, transform .55s ease;
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* Stagger children */
+.stagger .reveal:nth-child(1) { transition-delay: 0ms; }
+.stagger .reveal:nth-child(2) { transition-delay: 80ms; }
+.stagger .reveal:nth-child(3) { transition-delay: 160ms; }
+.stagger .reveal:nth-child(4) { transition-delay: 240ms; }
+.stagger .reveal:nth-child(5) { transition-delay: 320ms; }
+.stagger .reveal:nth-child(6) { transition-delay: 400ms; }
+
+/* ═══════════════════════════════════════════
+   HAMBURGER MENU (mobile-only)
+═══════════════════════════════════════════ */
+.hamburger {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  background: none;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  margin-left: auto;
+}
+.hamburger .bar {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  transform-origin: center;
+}
+.hamburger.open .bar:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+.hamburger.open .bar:nth-child(2) { opacity: 0; }
+.hamburger.open .bar:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+/* Hide hamburger on desktop */
+@media (min-width: 801px) {
+  .hamburger { display: none; }
+}
+
+/* Mobile overlay + drawer */
+.mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 198;
+  backdrop-filter: blur(4px);
+}
+.mobile-overlay.show { display: block; }
+
+.mobile-menu {
+  display: none;
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(320px, 85vw);
+  height: 100dvh;
+  background: var(--surface);
+  border-left: 1px solid var(--border2);
+  z-index: 199;
+  padding: 5rem 1.5rem 2rem;
+  flex-direction: column;
+  gap: 0.25rem;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+}
+.mobile-menu.show {
+  display: flex;
+  transform: translateX(0);
+}
+.mobile-link {
+  display: block;
+  padding: 0.85rem 1rem;
+  color: var(--text2);
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 450;
+  border-radius: var(--radius-md);
+  transition: background 0.15s;
+}
+.mobile-link:hover { background: var(--surface2); color: var(--text); }
+.mobile-divider { height: 1px; background: var(--border); margin: 0.5rem 0; }
+.mobile-cta {
+  display: block;
+  margin-top: 0.75rem;
+  padding: 0.85rem;
+  text-align: center;
+  background: var(--blue);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  min-height: 48px;
+  line-height: 48px;
+  padding: 0;
+}
+
+/* ═══════════════════════════════════════════
+   MOBILE RESPONSIVE (max-width: 800px)
+═══════════════════════════════════════════ */
+@media (max-width: 800px) {
+  /* Nav */
+  .nav-links, .nav-right { display: none !important; }
+
+  /* Hero */
+  .hero { padding-top: 80px; }
+  .hero h1 { font-size: clamp(2rem, 8vw, 3rem); }
+  .hero-sub { font-size: 0.95rem; padding: 0 1rem; }
+  .hero-actions { flex-direction: column; gap: 12px; padding: 0 2rem; }
+  .hero-actions .btn { width: 100%; justify-content: center; }
+  .hero-trust { padding: 0 1rem; }
+
+  /* Stats */
+  .stats-inner { grid-template-columns: repeat(2,1fr); }
+  .stat-item { border-right: none; border-bottom: 1px solid var(--border); }
+  .stat-item:nth-child(odd) { border-right: 1px solid var(--border); }
+  .stat-item:nth-last-child(-n+2) { border-bottom: none; }
+
+  /* Dashboard preview */
+  .db-body { grid-template-columns: 1fr; }
+  .db-sidebar { display: none; }
+  .stat-grid { grid-template-columns: repeat(2,1fr); }
+  .th-row, .t-row { grid-template-columns: 1fr 44px; }
+  .t-row > *:nth-child(3), .t-row > *:nth-child(4) { display: none; }
+  .th-row > *:nth-child(3), .th-row > *:nth-child(4) { display: none; }
+
+  /* Pillars */
+  .p-content.active { grid-template-columns: 1fr; }
+  .p-visual { display: none; }
+  .pillar-tabs { flex-direction: column; }
+  .p-tab { border-right: none; border-bottom: 1px solid var(--border); }
+  .p-tab:last-child { border-bottom: none; }
+
+  /* AI section */
+  .ai-inner { grid-template-columns: 1fr; }
+  .ai-tools-grid { grid-template-columns: repeat(2,1fr); }
+
+  /* Grids */
+  .arch-grid { grid-template-columns: repeat(2,1fr); }
+  .diff-grid { grid-template-columns: 1fr; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .faq-grid { grid-template-columns: 1fr; }
+  .fw-grid { grid-template-columns: 1fr; }
+
+  /* CTA + Footer */
+  .cta-inner { padding: 48px 20px; }
+  .foot-inner { grid-template-columns: 1fr 1fr; }
+  .foot-bottom { flex-direction: column; gap: 10px; text-align: center; }
+
+  /* General spacing */
+  section { padding-left: 1rem !important; padding-right: 1rem !important; }
+}
+
+/* ═══════════════════════════════════════════
+   SMALL PHONE (max-width: 480px)
+═══════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .hero h1 { font-size: 1.75rem; letter-spacing: -0.035em; }
+  .hero-sub { font-size: 0.875rem; }
+  .hero-badge { font-size: 11px; padding: 6px 14px; }
+  .hero-actions { padding: 0 1rem; }
+  .hero-trust { gap: 6px; }
+  .hero-trust span { font-size: 11px; padding: 5px 10px; }
+
+  .stats-inner { grid-template-columns: 1fr; }
+  .stat-item { border-right: none !important; }
+
+  .arch-grid { grid-template-columns: 1fr; }
+  .ai-tools-grid { grid-template-columns: repeat(2,1fr); }
+  .foot-inner { grid-template-columns: 1fr; }
+
+  section { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+}
+
+/* ═══════════════════════════════════════════
+   TOUCH TARGETS (mobile)
+═══════════════════════════════════════════ */
+@media (pointer: coarse) {
+  .btn, a, button, select { min-height: 44px; }
+  .nav-link, .mobile-link { min-height: 48px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <a href="#" class="nav-logo" aria-label="TenantIQ home">
+    <!-- Inline SVG logo — theme-aware via CSS vars -->
+    <svg class="logo-svg" viewBox="0 0 440 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="height:34px;width:auto;">
+      <defs>
+        <linearGradient id="iqG" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#1B6FFF"/>
+          <stop offset="100%" stop-color="#4D94FF"/>
+        </linearGradient>
+      </defs>
+      <!-- Outer ring - opens at bottom-right for Q shape -->
+      <circle cx="50" cy="47" r="34" stroke-width="3" fill="none" stroke-dasharray="196 20" stroke-dashoffset="-8" stroke-linecap="round" class="logo-dark-stroke"/>
+      <!-- Inner ring -->
+      <circle cx="50" cy="47" r="24" stroke-width="2.2" fill="none" stroke-dasharray="138 16" stroke-dashoffset="-6" stroke-linecap="round" class="logo-dark-stroke"/>
+      <!-- Nodes -->
+      <circle cx="35" cy="52" r="4" class="logo-dark-parts"/>
+      <circle cx="54" cy="34" r="4" class="logo-dark-parts"/>
+      <circle cx="61" cy="52" r="4" class="logo-dark-parts"/>
+      <!-- Edges -->
+      <line x1="35" y1="52" x2="54" y2="34" stroke-width="2.2" stroke-linecap="round" class="logo-dark-stroke"/>
+      <line x1="54" y1="34" x2="61" y2="52" stroke-width="2.2" stroke-linecap="round" class="logo-dark-stroke"/>
+      <!-- Q tail -->
+      <line x1="67" y1="67" x2="80" y2="80" stroke-width="4.5" stroke-linecap="round" class="logo-dark-stroke"/>
+      <!-- Wordmark: Tenant -->
+      <text x="98" y="66" font-family="'Syne','Helvetica Neue',sans-serif" font-size="40" font-weight="800" letter-spacing="-2" class="logo-dark-parts" style="fill:var(--text)">Tenant</text>
+      <!-- Wordmark: IQ -->
+      <text x="305" y="66" font-family="'Syne','Helvetica Neue',sans-serif" font-size="40" font-weight="800" letter-spacing="-2" fill="url(#iqG)">IQ</text>
+    </svg>
+  </a>
+
+  <ul class="nav-links">
+    <li><a href="#secure">Security</a></li>
+    <li><a href="#comply">Compliance</a></li>
+    <li><a href="#optimize">Licensing</a></li>
+    <li><a href="#ai">AI Agent</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+  </ul>
+
+  <div class="nav-right">
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme" id="themeBtn">☀️</button>
+    <a href="https://api.tenantiq.app/api/auth/login" class="btn btn-ghost">Sign in</a>
+    <a href="https://api.tenantiq.app/api/auth/onboard-org" class="btn btn-primary">Start free trial</a>
+  </div>
+
+  <button class="hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Open menu">
+    <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+  </button>
+</nav>
+
+<!-- Mobile drawer menu -->
+<div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#secure" class="mobile-link" onclick="toggleMobileMenu()">Security</a>
+  <a href="#comply" class="mobile-link" onclick="toggleMobileMenu()">Compliance</a>
+  <a href="#optimize" class="mobile-link" onclick="toggleMobileMenu()">Licensing</a>
+  <a href="#ai" class="mobile-link" onclick="toggleMobileMenu()">AI Agent</a>
+  <a href="#pricing" class="mobile-link" onclick="toggleMobileMenu()">Pricing</a>
+  <div class="mobile-divider"></div>
+  <a href="https://api.tenantiq.app/api/auth/login" class="mobile-link" onclick="toggleMobileMenu()">Sign in</a>
+  <a href="https://api.tenantiq.app/api/auth/onboard-org" class="mobile-cta" onclick="toggleMobileMenu()">Start free trial</a>
+</div>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-glow2"></div>
+
+  <div class="hero-badge">
+    <span class="live-dot"></span>
+    AI-Powered M365 Operations Platform
+  </div>
+
+  <h1>Every tenant.<br><em>Fully in control.</em></h1>
+
+  <p class="hero-sub">
+    Secure, automate, and optimize every Microsoft 365 tenant from one AI-powered control plane — built for MSPs managing at scale.
+  </p>
+
+  <div class="hero-actions">
+    <a href="https://api.tenantiq.app/api/auth/login" class="btn btn-primary btn-lg">
+      Sign in with Microsoft
+    </a>
+    <a href="https://api.tenantiq.app/api/auth/login/linkedin" class="btn btn-linkedin btn-lg">
+      Sign in with LinkedIn
+    </a>
+  </div>
+
+  <div class="hero-actions hero-actions-secondary">
+    <a href="https://api.tenantiq.app/api/auth/login/personal" class="btn btn-ghost btn-lg">
+      Try with my M365 account only (no admin needed)
+    </a>
+    <a href="https://api.tenantiq.app/api/auth/onboard-org" class="btn btn-ghost btn-lg">
+      Onboard your organization (Global Admin) →
+    </a>
+  </div>
+
+  <div class="hero-trust">
+    <span class="trust-sep">Compliance ready</span>
+    <div class="trust-badges">
+      <span class="trust-badge">SOC 2</span>
+      <span class="trust-badge">HIPAA</span>
+      <span class="trust-badge">GDPR</span>
+      <span class="trust-badge">Zero Trust</span>
+      <span class="trust-badge">CIS Benchmark</span>
+      <span class="trust-badge">100+ Controls</span>
+    </div>
+  </div>
+
+  <!-- Dashboard preview -->
+  <div class="dashboard-preview">
+    <div class="db-frame">
+      <div class="db-topbar">
+        <div class="dots">
+          <div class="dot dot-r"></div>
+          <div class="dot dot-y"></div>
+          <div class="dot dot-g"></div>
+        </div>
+        <div class="url-bar">app.tenantiq.app/dashboard</div>
+      </div>
+      <div class="db-body">
+        <div class="db-sidebar">
+          <div class="db-org">
+            <div class="db-org-av"></div>
+            <div>
+              <div class="db-org-name">Acme MSP</div>
+              <div class="db-org-sub">14 tenants</div>
+            </div>
+          </div>
+          <div class="db-nav-item active"><div class="db-nav-ic"></div> Dashboard</div>
+          <div class="db-nav-item"><div class="db-nav-ic"></div> Security</div>
+          <div class="db-nav-item"><div class="db-nav-ic"></div> Compliance</div>
+          <div class="db-nav-item"><div class="db-nav-ic"></div> Licenses</div>
+          <div class="db-nav-item"><div class="db-nav-ic"></div> AI Agent</div>
+          <div class="db-nav-item"><div class="db-nav-ic"></div> Workflows</div>
+        </div>
+        <div class="db-main">
+          <div class="db-header">
+            <div>
+              <div class="db-title">Portfolio Overview</div>
+              <div class="db-sub">All tenants · Last 24h</div>
+            </div>
+            <span class="pill pill-ok">
+              <span class="pill-dot"></span> All systems operational
+            </span>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-c"><div class="stat-l">Avg Security Score</div><div class="stat-v">84<span style="font-size:11px;color:var(--text3)">/100</span></div><div class="stat-d d-up">↑ +3 this week</div></div>
+            <div class="stat-c"><div class="stat-l">Open Threats</div><div class="stat-v">2</div><div class="stat-d d-up">↓ from 7</div></div>
+            <div class="stat-c"><div class="stat-l">License Savings</div><div class="stat-v">$4.2k</div><div class="stat-d d-up">↑ this month</div></div>
+            <div class="stat-c"><div class="stat-l">Compliance Pass</div><div class="stat-v">91%</div><div class="stat-d d-up">↑ +6%</div></div>
+          </div>
+          <div class="tenant-list">
+            <div class="th-row"><span>Tenant</span><span>Score</span><span>Posture</span><span>Compliance</span></div>
+            <div class="t-row"><span class="t-name">Contoso Ltd</span><span class="t-score s-hi">94</span><div class="bar-w"><div class="bar b-hi" style="width:94%"></div></div><span class="t-comp" style="color:var(--green)">SOC2 ✓</span></div>
+            <div class="t-row"><span class="t-name">Fabrikam Inc</span><span class="t-score s-md">71</span><div class="bar-w"><div class="bar b-md" style="width:71%"></div></div><span class="t-comp" style="color:var(--amber)">HIPAA ⚠</span></div>
+            <div class="t-row"><span class="t-name">WoodGrove Bank</span><span class="t-score s-hi">88</span><div class="bar-w"><div class="bar b-hi" style="width:88%"></div></div><span class="t-comp" style="color:var(--green)">GDPR ✓</span></div>
+            <div class="t-row"><span class="t-name">Northwind Retail</span><span class="t-score s-lo">52</span><div class="bar-w"><div class="bar b-lo" style="width:52%"></div></div><span class="t-comp" style="color:var(--red)">CIS ✗</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame-glow"></div>
+  </div>
+</section>
+
+<!-- ═══ STATS ═══ -->
+<section class="stats-bar">
+  <div class="container">
+    <div class="stats-inner">
+      <div class="stat-item"><span class="stat-num" data-target="100" data-suffix="+">0</span><div class="stat-desc">CIS benchmark controls</div></div>
+      <div class="stat-item"><span class="stat-num" data-target="5">0</span><div class="stat-desc">Compliance frameworks</div></div>
+      <div class="stat-item"><span class="stat-num" data-target="13" data-suffix="+">0</span><div class="stat-desc">AI agent tools</div></div>
+      <div class="stat-item"><span class="stat-num" data-target="955">0</span><div class="stat-desc">Unit tests in production</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PILLARS ═══ -->
+<section class="pillars" id="secure">
+  <div class="container">
+    <div class="pillars-header reveal">
+      <div class="section-eyebrow">Platform</div>
+      <h2 class="section-title">Three pillars.<br><em>One control plane.</em></h2>
+      <p class="section-sub">Everything you need to protect, prove, and optimize every tenant — without switching tools.</p>
+    </div>
+
+    <div class="pillar-tabs">
+      <button class="p-tab t-sec active" onclick="switchTab('sec')"><span class="p-tab-ic">🛡</span> Secure Tenants</button>
+      <button class="p-tab t-com" onclick="switchTab('com')" id="comply"><span class="p-tab-ic">✓</span> Control Compliance</button>
+      <button class="p-tab t-opt" onclick="switchTab('opt')" id="optimize"><span class="p-tab-ic">⚡</span> Cut License Waste</button>
+    </div>
+
+    <!-- TAB: SECURE -->
+    <div class="p-content active" id="tab-sec">
+      <div class="feat-list">
+        <div class="feat-item"><div class="feat-ic ic-b">🎯</div><div><div class="feat-name">CIS Benchmark Scanning</div><div class="feat-desc">100+ controls evaluated against live tenant configuration with per-section scoring and hourly automated rescans.</div></div></div>
+        <div class="feat-item"><div class="feat-ic ic-c">📡</div><div><div class="feat-name">Threat Detection & Anomaly Analysis</div><div class="feat-desc">AI-powered detection of impossible travel, brute-force attempts, risky IPs, and behavioral deviations from user baseline.</div></div></div>
+        <div class="feat-item"><div class="feat-ic ic-b">🔒</div><div><div class="feat-name">Risky User Monitoring</div><div class="feat-desc">Deep integration with Microsoft Identity Protection for credential compromise detection and real-time suspicious activity alerts.</div></div></div>
+        <div class="feat-item"><div class="feat-ic ic-g">⚡</div><div><div class="feat-name">One-Click Remediation with Rollback</div><div class="feat-desc">Execute fixes with dry-run preview, approval gates, and full state capture — every action reversible in one click.</div></div></div>
+      </div>
+      <div class="p-visual">
+        <div class="vis-card">
+          <div class="vis-head"><div class="vis-title">CIS Security Score</div><span class="pill pill-ok">Scanning hourly</span></div>
+          <div class="vis-body">
+            <div class="cis-ring-wrap">
+              <svg width="110" height="110" viewBox="0 0 110 110">
+                <circle cx="55" cy="55" r="46" fill="none" stroke="var(--surface3)" stroke-width="8"/>
+                <circle cx="55" cy="55" r="46" fill="none" stroke="var(--green)" stroke-width="8" stroke-dasharray="289" stroke-dashoffset="43" stroke-linecap="round"/>
+              </svg>
+              <div class="ring-num"><span class="ring-big">85</span><span class="ring-sub">/ 100</span></div>
+            </div>
+            <div class="cis-rows">
+              <div class="cis-r"><span class="cis-n">Identity & Access</span><div class="cis-bw"><div class="cis-b" style="width:92%;background:var(--green)"></div></div><span class="cis-p">92%</span></div>
+              <div class="cis-r"><span class="cis-n">Data Protection</span><div class="cis-bw"><div class="cis-b" style="width:88%;background:var(--green)"></div></div><span class="cis-p">88%</span></div>
+              <div class="cis-r"><span class="cis-n">Device Management</span><div class="cis-bw"><div class="cis-b" style="width:76%;background:var(--amber)"></div></div><span class="cis-p" style="color:var(--amber)">76%</span></div>
+              <div class="cis-r"><span class="cis-n">Email & Collab</span><div class="cis-bw"><div class="cis-b" style="width:83%;background:var(--green)"></div></div><span class="cis-p">83%</span></div>
+              <div class="cis-r"><span class="cis-n">Cloud Applications</span><div class="cis-bw"><div class="cis-b" style="width:69%;background:var(--amber)"></div></div><span class="cis-p" style="color:var(--amber)">69%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: COMPLY -->
+    <div class="p-content" id="tab-com">
+      <div class="feat-list">
+        <div class="feat-item"><div class="feat-ic ic-g">📋</div><div><div class="feat-name">Multi-Framework Assessment</div><div class="feat-desc">SOC 2, HIPAA, GDPR, Zero Trust, and CIS — evaluated against live tenant configuration, not static checklists.</div></div></div>
+        <div class="feat-item"><div class="feat-ic ic-b">📸</div><div><div class="feat-name">Config Snapshots & Drift Detection</div><div class="feat-desc">Capture complete M365 configuration state. Get alerted immediately when conditional access policies or auth methods change unexpectedly.</div></div></div>
+        <div class="feat-item"><div class="feat-ic ic-c">📦</div><div><div class="feat-name">Audit-Ready Evidence Packages</div><div class="feat-desc">Generate compliance evidence mapped to specific framework controls — exportable PDFs ready for your auditors on demand.</div></div></div>
+        <div class="feat-item"><div class="feat-ic ic-g">🤖</div><div><div class="feat-name">Copilot Readiness Assessment</div><div class="feat-desc">Step-by-step readiness scoring with prerequisite checks before deploying Microsoft 365 Copilot across client tenants.</div></div></div>
+      </div>
+      <div class="p-visual">
+        <div class="vis-card">
+          <div class="vis-head"><div class="vis-title">Compliance Overview</div><span class="pill pill-ok">Daily scan</span></div>
+          <div class="vis-body">
+            <div class="fw-grid">
+              <div class="fw-card"><div class="fw-name">SOC 2</div><div class="fw-pct">89%</div><div class="fw-bw"><div class="fw-b" style="width:89%"></div></div><div class="fw-st">24/27 controls passing</div></div>
+              <div class="fw-card"><div class="fw-name">HIPAA</div><div class="fw-pct" style="color:var(--amber)">74%</div><div class="fw-bw"><div class="fw-b" style="width:74%;background:var(--amber)"></div></div><div class="fw-st">3 gaps detected</div></div>
+              <div class="fw-card"><div class="fw-name">GDPR</div><div class="fw-pct">92%</div><div class="fw-bw"><div class="fw-b" style="width:92%"></div></div><div class="fw-st">Evidence ready</div></div>
+              <div class="fw-card"><div class="fw-name">Zero Trust</div><div class="fw-pct">81%</div><div class="fw-bw"><div class="fw-b" style="width:81%"></div></div><div class="fw-st">5/6 pillars mature</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: OPTIMIZE -->
+    <div class="p-content" id="tab-opt">
+      <div class="feat-list">
+        <div class="feat-item"><div class="feat-ic ic-a">💡</div><div><div class="feat-name">AI Downgrade Recommendations</div><div class="feat-desc">AI-generated suggestions for license tier changes (E5→E3) with projected savings and per-user usage justification.</div></div></div>
+        <div class="feat-item"><div class="feat-ic ic-g">👻</div><div><div class="feat-name">Inactive User Detection</div><div class="feat-desc">Configurable 30/60/90-day inactivity thresholds with cost impact calculations across every managed tenant.</div></div></div>
+        <div class="feat-item"><div class="feat-ic ic-c">🤖</div><div><div class="feat-name">License Autopilot</div><div class="feat-desc">Automated optimization analysis with configurable approval gates — savings happen without surprises or unauthorized changes.</div></div></div>
+        <div class="feat-item"><div class="feat-ic ic-a">📈</div><div><div class="feat-name">ROI Dashboards & Savings Leaderboard</div><div class="feat-desc">Per-tenant and portfolio-wide cost savings visualization. Show clients exactly what you've saved them each month.</div></div></div>
+      </div>
+      <div class="p-visual">
+        <div class="vis-card">
+          <div class="vis-head"><div class="vis-title">License Optimization</div><span class="pill pill-warn">Autopilot active</span></div>
+          <div class="vis-body">
+            <div class="sav-hero"><div class="sav-amount">$4,210</div><div class="sav-label">saved this month across 14 tenants</div></div>
+            <div class="lic-rows">
+              <div class="lic-row"><span class="lic-t">Contoso Ltd</span><span class="lic-s">−$1,240/mo</span><span class="lic-a">E5→E3 · 8 users</span></div>
+              <div class="lic-row"><span class="lic-t">Fabrikam Inc</span><span class="lic-s">−$890/mo</span><span class="lic-a">12 inactive</span></div>
+              <div class="lic-row"><span class="lic-t">Northwind Retail</span><span class="lic-s">−$640/mo</span><span class="lic-a">Downgrade ready</span></div>
+              <div class="lic-row"><span class="lic-t">WoodGrove Bank</span><span class="lic-s">−$480/mo</span><span class="lic-a">Pending approval</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ AI AGENT ═══ -->
+<section class="ai-section" id="ai">
+  <div class="container">
+    <div class="ai-inner">
+      <div>
+        <div class="section-eyebrow reveal">AI Agent</div>
+        <h2 class="section-title reveal">Ask anything.<br><em>Act instantly.</em></h2>
+        <p class="section-sub reveal" style="margin-bottom:20px;">Powered by Anthropic Claude with 13+ tools that query live tenant data and execute real operations — not just chatbot answers.</p>
+        <ul class="p-feats reveal" style="margin-bottom:24px;">
+          <li><span class="chk">✓</span> Natural language queries across all tenants simultaneously</li>
+          <li><span class="chk">✓</span> Executes user management, license changes, security analysis</li>
+          <li><span class="chk">✓</span> Generates executive reports exportable to PDF or Markdown</li>
+          <li><span class="chk">✓</span> Streaming real-time responses with tool execution progress</li>
+          <li><span class="chk">✓</span> Conversation history with search, tagging, and shareable links</li>
+        </ul>
+        <div class="ai-tools-grid reveal">
+          <div class="tool-chip">Query users</div>
+          <div class="tool-chip">License analysis</div>
+          <div class="tool-chip">Security posture</div>
+          <div class="tool-chip">Compliance gaps</div>
+          <div class="tool-chip">Cost savings</div>
+          <div class="tool-chip">Compare tenants</div>
+          <div class="tool-chip">Usage heatmap</div>
+          <div class="tool-chip">Savings report</div>
+          <div class="tool-chip">Anomaly scan</div>
+        </div>
+      </div>
+      <div class="ai-chat reveal">
+        <div class="ai-chat-head">
+          <div class="ai-av">✦</div>
+          <div><div class="ai-n">TenantIQ AI</div><div class="ai-on">● Active · 13 tools available</div></div>
+        </div>
+        <div class="ai-msgs">
+          <div class="msg msg-u"><div class="mb mb-u">Which tenants have E5 users who aren't fully utilizing the license?</div></div>
+          <div class="msg">
+            <div class="msg-tool"><span class="t-dot"></span> Running license_utilization_analysis across 14 tenants...</div>
+            <div class="msg-tool" style="margin-top:4px"><span class="t-dot"></span> Fetching feature usage data via Microsoft Graph...</div>
+            <div class="mb mb-a" style="margin-top:8px">Found <strong>3 tenants</strong> with underutilized E5 licenses totaling <strong style="color:var(--green)">$2,130/mo</strong> in potential savings:<br><br>• <strong>Contoso Ltd</strong> — 8 users qualify for E3 downgrade ($1,240/mo)<br>• <strong>Fabrikam Inc</strong> — 6 users inactive 60+ days ($590/mo)<br>• <strong>Northwind</strong> — 4 users never activated Defender ($300/mo)</div>
+            <div class="msg-acts">
+              <button class="act-btn">Generate PDF report ↗</button>
+              <button class="act-btn">Run autopilot ↗</button>
+              <button class="act-btn">Export CSV ↗</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DIFFERENTIATORS ═══ -->
+<section class="diff-section">
+  <div class="container">
+    <div style="text-align:center;" class="reveal">
+      <div class="section-eyebrow" style="justify-content:center;">Why TenantIQ</div>
+      <h2 class="section-title">Built for MSPs.<br><em>Not adapted for them.</em></h2>
+    </div>
+    <div class="diff-grid stagger">
+      <div class="diff-card reveal"><div class="diff-num">01</div><div class="diff-title">Multi-tenant from day one</div><div class="diff-body">Every database query is scoped by organization and tenant ID at the API middleware layer. Data isolation is architectural, not bolted on.</div></div>
+      <div class="diff-card reveal"><div class="diff-num">02</div><div class="diff-title">AI that can analyze and act</div><div class="diff-body">Not just chat. The AI agent has 13+ tools that query live data and execute real operations — user management, license changes, executive reports.</div></div>
+      <div class="diff-card reveal"><div class="diff-num">03</div><div class="diff-title">Actionable security, not dashboards</div><div class="diff-body">Nine remediation actions execute directly against Microsoft Graph with dry-run preview, scheduling, approval gates, and complete rollback.</div></div>
+      <div class="diff-card reveal"><div class="diff-num">04</div><div class="diff-title">Compliance mapped to live config</div><div class="diff-body">SOC 2, HIPAA, GDPR, CIS, and Zero Trust engines evaluate real tenant settings. Evidence packages generated automatically for auditors.</div></div>
+      <div class="diff-card reveal"><div class="diff-num">05</div><div class="diff-title">Zero cold starts, ever</div><div class="diff-body">Built entirely on Cloudflare Workers, Pages, D1, KV, R2, and Queues. Every API request runs at the edge with 120+ endpoints.</div></div>
+      <div class="diff-card reveal"><div class="diff-num">06</div><div class="diff-title">955 tests. Production-grade.</div><div class="diff-body">955 unit tests and 127 end-to-end browser tests across 21 sections. Not a demo — a production platform built to enterprise standards.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<section class="arch-section">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-eyebrow">Infrastructure</div>
+      <h2 class="section-title">Built at the edge.<br><em>Zero cold starts.</em></h2>
+    </div>
+    <div class="arch-grid stagger">
+      <div class="arch-card reveal"><div class="arch-icon">⚡</div><div class="arch-name">Cloudflare Workers</div><div class="arch-detail">120+ API endpoints. Hono 4 + TypeScript strict. Every request runs at the nearest edge node.</div></div>
+      <div class="arch-card reveal"><div class="arch-icon">🗄</div><div class="arch-name">Cloudflare D1</div><div class="arch-detail">15-table SQLite with Drizzle ORM. Every query scoped by org and tenant ID at middleware.</div></div>
+      <div class="arch-card reveal"><div class="arch-icon">💾</div><div class="arch-name">R2 + KV Storage</div><div class="arch-detail">AES-256-GCM encrypted backups per tenant. Tokens, scores, rate limits in KV.</div></div>
+      <div class="arch-card reveal"><div class="arch-icon">🔄</div><div class="arch-name">Cloudflare Queues</div><div class="arch-detail">Async scan processing, remediation jobs, and webhook delivery with retry logic.</div></div>
+      <div class="arch-card reveal"><div class="arch-icon">🧪</div><div class="arch-name">955 Unit Tests</div><div class="arch-detail">955 unit + 127 E2E browser tests across 21 sections in production CI/CD.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PRICING ═══ -->
+<section class="pricing-section" id="pricing">
+  <div class="container">
+    <div style="text-align:center;" class="reveal">
+      <div class="section-eyebrow" style="justify-content:center;">Pricing</div>
+      <h2 class="section-title">Simple, per-tenant pricing.</h2>
+      <p class="section-sub" style="margin:0 auto;">Pay for what you manage. No seat fees, no platform costs, no surprises.</p>
+    </div>
+    <div class="pricing-grid stagger">
+      <div class="p-card reveal">
+        <div class="p-plan">Starter</div>
+        <div class="p-amount">$49<span class="p-period">/tenant/mo</span></div>
+        <p class="p-desc">For small MSPs and individual IT teams getting started with M365 management.</p>
+        <ul class="p-feats">
+          <li><span class="chk">✓</span> CIS benchmark scanning (100+ controls)</li>
+          <li><span class="chk">✓</span> Microsoft Secure Score tracking</li>
+          <li><span class="chk">✓</span> Basic threat detection</li>
+          <li><span class="chk">✓</span> License utilization reporting</li>
+          <li><span class="chk">✓</span> SOC 2 & GDPR assessments</li>
+          <li><span class="chk">✓</span> 90-day audit log retention</li>
+        </ul>
+        <a href="https://api.tenantiq.app/api/auth/onboard-org" class="btn btn-ghost" style="width:100%;justify-content:center;">Start free trial</a>
+      </div>
+      <div class="p-card featured reveal">
+        <div class="feat-badge">Most popular</div>
+        <div class="p-plan">Professional</div>
+        <div class="p-amount">$99<span class="p-period">/tenant/mo</span></div>
+        <p class="p-desc">For growing MSPs needing full security, compliance automation, and AI-powered optimization.</p>
+        <ul class="p-feats">
+          <li><span class="chk">✓</span> Everything in Starter</li>
+          <li><span class="chk">✓</span> AI agent with 13+ tools</li>
+          <li><span class="chk">✓</span> One-click remediation with rollback</li>
+          <li><span class="chk">✓</span> All 5 compliance frameworks</li>
+          <li><span class="chk">✓</span> License Autopilot with approval gates</li>
+          <li><span class="chk">✓</span> Workflow automation & offboarding</li>
+          <li><span class="chk">✓</span> Encrypted backup & drift detection</li>
+          <li><span class="chk">✓</span> Cross-tenant benchmarking</li>
+        </ul>
+        <a href="https://api.tenantiq.app/api/auth/onboard-org" class="btn btn-primary" style="width:100%;justify-content:center;">Start free trial</a>
+      </div>
+      <div class="p-card reveal">
+        <div class="p-plan">Enterprise</div>
+        <div class="p-amount" style="font-size:32px;line-height:1.2">Custom</div>
+        <p class="p-desc">For large MSPs requiring dedicated support, custom SLAs, white-labeling, and SAML SSO.</p>
+        <ul class="p-feats">
+          <li><span class="chk">✓</span> Everything in Professional</li>
+          <li><span class="chk">✓</span> SAML & OIDC SSO</li>
+          <li><span class="chk">✓</span> Dedicated support & SLA</li>
+          <li><span class="chk">✓</span> Custom integrations</li>
+          <li><span class="chk">✓</span> White-label option</li>
+          <li><span class="chk">✓</span> Data residency guarantees</li>
+        </ul>
+        <a href="mailto:sales@tenantiq.app" class="btn btn-ghost" style="width:100%;justify-content:center;">Contact sales</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FAQ ═══ -->
+<section class="faq-section">
+  <div class="container">
+    <div class="reveal" style="margin-bottom:52px;">
+      <div class="section-eyebrow">FAQ</div>
+      <h2 class="section-title">Common questions.</h2>
+    </div>
+    <div class="faq-grid stagger">
+      <div class="faq-item reveal"><div class="faq-q">What Microsoft permissions are required?</div><div class="faq-a">TenantIQ uses Microsoft Graph API with delegated and application-only access. Permissions include users, groups, licenses, security alerts, conditional access, audit logs, and SharePoint/OneDrive configuration. Remediation actions require additional write permissions granted per-tenant during onboarding.</div></div>
+      <div class="faq-item reveal"><div class="faq-q">How is tenant data isolated?</div><div class="faq-a">Every database query is scoped by organization ID and tenant ID at the API middleware layer. Data isolation is enforced architecturally — not by application convention. Each tenant's backup data is encrypted with a unique AES-256-GCM key.</div></div>
+      <div class="faq-item reveal"><div class="faq-q">Can remediation actions be rolled back?</div><div class="faq-a">Yes. Every remediation action captures full before-state and after-state. Rollback restores the previous configuration with a single click. Dry-run preview is available before execution, and scheduling allows timed execution with approval gates.</div></div>
+      <div class="faq-item reveal"><div class="faq-q">How does the AI agent work?</div><div class="faq-a">The AI agent is powered by Anthropic Claude with function calling. It has 13+ tools that query live tenant data — users, licenses, security posture, compliance status, and cost metrics. It streams responses in real time and generates suggested actions based on analysis results.</div></div>
+      <div class="faq-item reveal"><div class="faq-q">Where is data stored?</div><div class="faq-a">All data is stored on Cloudflare's global network. Structured data lives in Cloudflare D1. Cached tokens and scores use Cloudflare KV. Encrypted backups, PDF reports, and exports are stored in Cloudflare R2.</div></div>
+      <div class="faq-item reveal"><div class="faq-q">What compliance frameworks are covered?</div><div class="faq-a">TenantIQ evaluates against SOC 2 (Trust Service Criteria), HIPAA (Administrative, Physical, Technical safeguards), GDPR (Data Protection Principles), CIS Microsoft 365 Benchmark (100+ controls), Zero Trust maturity (6 pillars), and Copilot Readiness assessment.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="cta-section">
+  <div class="container">
+    <div class="cta-inner reveal">
+      <h2 class="cta-title">Stop managing tenants.<br><em>Start controlling them.</em></h2>
+      <p class="cta-sub">Full platform access. No credit card. Cancel anytime.</p>
+      <div class="cta-actions">
+        <a href="https://api.tenantiq.app/api/auth/onboard-org" class="btn btn-primary btn-xl">Start free trial</a>
+        <a href="https://app.tenantiq.app" class="btn btn-ghost btn-xl">View live demo →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="container">
+    <div class="foot-inner">
+      <div class="foot-brand">
+        <svg class="logo-svg" viewBox="0 0 440 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="height:28px;width:auto;">
+          <defs><linearGradient id="iqGF" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#1B6FFF"/><stop offset="100%" stop-color="#4D94FF"/></linearGradient></defs>
+          <circle cx="50" cy="47" r="34" stroke-width="3" fill="none" stroke-dasharray="196 20" stroke-dashoffset="-8" stroke-linecap="round" class="logo-dark-stroke"/>
+          <circle cx="50" cy="47" r="24" stroke-width="2.2" fill="none" stroke-dasharray="138 16" stroke-dashoffset="-6" stroke-linecap="round" class="logo-dark-stroke"/>
+          <circle cx="35" cy="52" r="4" class="logo-dark-parts"/>
+          <circle cx="54" cy="34" r="4" class="logo-dark-parts"/>
+          <circle cx="61" cy="52" r="4" class="logo-dark-parts"/>
+          <line x1="35" y1="52" x2="54" y2="34" stroke-width="2.2" stroke-linecap="round" class="logo-dark-stroke"/>
+          <line x1="54" y1="34" x2="61" y2="52" stroke-width="2.2" stroke-linecap="round" class="logo-dark-stroke"/>
+          <line x1="67" y1="67" x2="80" y2="80" stroke-width="4.5" stroke-linecap="round" class="logo-dark-stroke"/>
+          <text x="98" y="66" font-family="'Syne','Helvetica Neue',sans-serif" font-size="40" font-weight="800" letter-spacing="-2" style="fill:var(--text)">Tenant</text>
+          <text x="305" y="66" font-family="'Syne','Helvetica Neue',sans-serif" font-size="40" font-weight="800" letter-spacing="-2" fill="url(#iqGF)">IQ</text>
+        </svg>
+        <p>AI-powered Microsoft 365 control for MSPs managing at scale.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Product</h4>
+        <a href="#secure">Security</a>
+        <a href="#comply">Compliance</a>
+        <a href="#optimize">License Optimization</a>
+        <a href="#ai">AI Agent</a>
+        <a href="#pricing">Pricing</a>
+      </div>
+      <div class="foot-col">
+        <h4>Resources</h4>
+        <a href="https://app.tenantiq.app/support">Documentation</a>
+        <a href="https://app.tenantiq.app/support">API Reference</a>
+        <a href="https://app.tenantiq.app/changelog">Changelog</a>
+      </div>
+      <div class="foot-col">
+        <h4>Company</h4>
+        <a href="https://app.tenantiq.app/support">About</a>
+        <a href="mailto:sales@tenantiq.app">Contact Sales</a>
+        <a href="https://app.tenantiq.app/privacy">Privacy Policy</a>
+        <a href="https://app.tenantiq.app/terms">Terms of Service</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 TenantIQ. All rights reserved.</span>
+      <div class="foot-chips">
+        <span class="foot-chip">SOC 2 in progress</span>
+        <span class="foot-chip">·</span>
+        <span class="foot-chip">GDPR compliant</span>
+        <span class="foot-chip">·</span>
+        <span class="foot-chip">Built on Cloudflare</span>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ── THEME ── */
+const html = document.documentElement;
+const btn  = document.getElementById('themeBtn');
+
+function applyTheme(t) {
+  html.setAttribute('data-theme', t);
+  btn.textContent = t === 'dark' ? '☀️' : '🌙';
+  try { localStorage.setItem('tiq-theme', t); } catch(e){}
+}
+
+function toggleTheme() {
+  applyTheme(html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+
+// Restore saved preference (default: light)
+(function() {
+  try {
+    const saved = localStorage.getItem('tiq-theme');
+    if (saved) { applyTheme(saved); return; }
+  } catch(e){}
+  // Default to light unless OS prefers dark
+  if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    applyTheme('dark');
+  } else {
+    applyTheme('light');
+  }
+})();
+
+/* ── MOBILE MENU ── */
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const overlay = document.getElementById('mobileOverlay');
+  const hamburger = document.getElementById('hamburgerBtn');
+  const isOpen = menu.classList.contains('show');
+  menu.classList.toggle('show');
+  overlay.classList.toggle('show');
+  hamburger.classList.toggle('open');
+  document.body.style.overflow = isOpen ? '' : 'hidden';
+}
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    const menu = document.getElementById('mobileMenu');
+    if (menu && menu.classList.contains('show')) toggleMobileMenu();
+  }
+});
+
+/* ── PILLAR TABS ── */
+function switchTab(id) {
+  document.querySelectorAll('.p-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.p-content').forEach(c => c.classList.remove('active'));
+  document.querySelector('.t-' + id).classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+}
+
+/* ── SCROLL REVEAL ── */
+const revealObs = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      revealObs.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => revealObs.observe(el));
+
+/* ── STAT COUNTERS ── */
+function animCount(el) {
+  const target = parseInt(el.dataset.target, 10);
+  const suffix = el.dataset.suffix || '';
+  const dur = 1600;
+  const start = performance.now();
+  const tick = (now) => {
+    const p = Math.min((now - start) / dur, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(eased * target) + (p === 1 ? suffix : '');
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+const countObs = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) { animCount(e.target); countObs.unobserve(e.target); }
+  });
+}, { threshold: 0.5 });
+
+document.querySelectorAll('[data-target]').forEach(el => countObs.observe(el));
+
+/* ── DASHBOARD BARS ANIMATE ── */
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.querySelectorAll('.bar, .cis-b, .fw-b').forEach(b => {
+      const w = b.style.width;
+      b.style.width = '0';
+      requestAnimationFrame(() => {
+        b.style.transition = 'width 0.9s cubic-bezier(0.16,1,0.3,1)';
+        b.style.width = w;
+      });
+    });
+  }, 600);
+});
+
+/* ── LOGO: sync stroke color ── */
+// Handled entirely via CSS — .logo-dark-stroke and .logo-dark-parts
+// use fill/stroke: var(--text) which adapts automatically
+</script>
+</body>
+</html>

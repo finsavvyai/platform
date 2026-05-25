@@ -1,0 +1,430 @@
+/**
+ * Integration Example - Real-time Collaboration + Test Impact Analysis
+ * Demonstrates how to integrate both services in a real application
+ */
+
+import express, { Express, Request, Response } from 'express';
+import { WebSocketServer } from 'ws';
+import { http } from 'http';
+
+// Import services
+import { collaborationServer, collaborationRouter } from './collaboration/index.js';
+import { impactAnalyzer, coverageMapper, impactAnalysisRouter } from './impact-analysis/index.js';
+import type { CollaborationMessage, EditMessage, CursorMessage } from './collaboration/types.js';
+import type { CodeChange } from './impact-analysis/types.js';
+
+/**
+ * Setup Express app with both services
+ */
+export function setupServices(app: Express): void {
+  // Mount REST API routes
+  app.use('/api/collaboration', collaborationRouter);
+  app.use('/api/impact', impactAnalysisRouter);
+
+  // Health check endpoint
+  app.get('/api/services/health', (req: Request, res: Response) => {
+    const collabStats = collaborationServer.getStats();
+    res.json({
+      status: 'ok',
+      services: {
+        collaboration: collabStats,
+        timestamp: new Date(),
+      },
+    });
+  });
+}
+
+/**
+ * Setup WebSocket server for real-time collaboration
+ */
+export function setupWebSocket(server: http.Server): void {
+  const wss = new WebSocketServer({ server, path: '/ws/collaboration' });
+
+  const sessionConnections = new Map<string, Set<WebSocket>>();
+
+  wss.on('connection', (ws, req) => {
+    const url = new URL(req.url ?? '', `http://${req.headers.host}`);
+    const sessionId = url.searchParams.get('sessionId');
+    const userId = url.searchParams.get('userId');
+
+    if (!sessionId || !userId) {
+      ws.close(1008, 'Missing sessionId or userId');
+      return;
+    }
+
+    // Track connection
+    if (!sessionConnections.has(sessionId)) {
+      sessionConnections.set(sessionId, new Set());
+    }
+    sessionConnections.get(sessionId)!.add(ws);
+
+    console.log(`WebSocket connected: sessionId=${sessionId}, userId=${userId}`);
+
+    // Handle incoming messages
+    ws.on('message', async (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString()) as CollaborationMessage;
+
+        switch (message.type) {
+          case 'edit': {
+            const editMsg = message as EditMessage;
+            const ack = await collaborationServer.broadcastEdit(
+              sessionId,
+              editMsg.payload
+            );
+
+            // Broadcast to all clients
+            broadcastToSession(sessionId, {
+              ...ack,
+              sessionId,
+              timestamp: Date.now(),
+            });
+            break;
+          }
+
+          case 'cursor': {
+            const cursorMsg = message as CursorMessage;
+            await collaborationServer.broadcastCursor(sessionId, cursorMsg.payload);
+
+            // Broadcast to all clients
+            broadcastToSession(sessionId, {
+              ...cursorMsg,
+              timestamp: Date.now(),
+            });
+            break;
+          }
+
+          case 'presence': {
+            const status = (message.payload as { status: string }).status;
+            await collaborationServer.updatePresence(
+              sessionId,
+              userId,
+              status as 'editing' | 'viewing' | 'idle'
+            );
+            break;
+          }
+
+          case 'sync': {
+            const state = collaborationServer.getSessionState(sessionId);
+            if (state) {
+              ws.send(
+                JSON.stringify({
+                  type: 'sync',
+                  sessionId,
+                  payload: state,
+                  timestamp: Date.now(),
+                })
+              );
+            }
+            break;
+          }
+        }
+      } catch (error) {
+        console.error(`WebSocket message error: ${error}`);
+        ws.send(
+          JSON.stringify({
+            type: 'error',
+            payload: { message: 'Message processing failed' },
+          })
+        );
+      }
+    });
+
+    ws.on('close', () => {
+      const sessions = sessionConnections.get(sessionId);
+      if (sessions) {
+        sessions.delete(ws);
+        if (sessions.size === 0) {
+          sessionConnections.delete(sessionId);
+        }
+      }
+      console.log(`WebSocket disconnected: sessionId=${sessionId}, userId=${userId}`);
+    });
+
+    ws.on('error', (error) => {
+      console.error(`WebSocket error: ${error}`);
+    });
+  });
+
+  function broadcastToSession(sessionId: string, message: unknown): void {
+    const connections = sessionConnections.get(sessionId);
+    if (connections) {
+      const payload = JSON.stringify(message);
+      for (const client of connections) {
+        if (client.readyState === 1) {
+          client.send(payload);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Example: CI/CD Integration
+ * Analyze PR changes and determine which tests to run
+ */
+export async function analyzeAndScheduleTests(
+  projectId: string,
+  changes: CodeChange[]
+): Promise<string[]> {
+  // 1. Analyze impact
+  const impact = await impactAnalyzer.analyzeImpact(projectId, changes);
+
+  console.log(`\n=== Impact Analysis Results ===`);
+  console.log(`Total Changes: ${impact.stats.totalChanges}`);
+  console.log(`Affected Tests: ${impact.stats.totalAffectedTests}`);
+  console.log(`Risk Level: ${impact.risk.riskLevel}`);
+  console.log(`Estimated Run Time: ${impact.risk.estimatedRunTime}ms`);
+
+  if (impact.risk.criticalFiles.length > 0) {
+    console.log(`Critical Files: ${impact.risk.criticalFiles.join(', ')}`);
+  }
+
+  // 2. Generate test schedule
+  const testIds = impact.affectedTests
+    .sort((a, b) => b.failureProbability - a.failureProbability)
+    .slice(0, 50)
+    .map(t => t.testId);
+
+  // 3. Provide recommendations
+  console.log(`\nRecommendations:`);
+  impact.risk.recommendations.forEach(rec => console.log(`  - ${rec}`));
+
+  return testIds;
+}
+
+/**
+ * Example: Continuous Test Coverage Tracking
+ * Update coverage after test execution
+ */
+export async function updateTestCoverage(
+  projectId: string,
+  testExecutionResults: Array<{
+    testId: string;
+    passed: boolean;
+    coveredFiles: string[];
+  }>
+): Promise<void> {
+  console.log(`\n=== Updating Coverage for ${testExecutionResults.length} tests ===`);
+
+  for (const result of testExecutionResults) {
+    if (result.passed) {
+      await coverageMapper.updateCoverage(
+        result.testId,
+        result.coveredFiles,
+        projectId
+      );
+      console.log(`✓ ${result.testId}: ${result.coveredFiles.length} files`);
+    }
+  }
+
+  // Get coverage stats
+  const stats = await coverageMapper.getCoverageStats(projectId);
+  console.log(`\nCoverage Stats:`);
+  console.log(`  Total Files: ${stats.totalFiles}`);
+  console.log(`  Covered: ${stats.coveredFiles}`);
+  console.log(`  Coverage: ${stats.coverage.toFixed(2)}%`);
+
+  if (stats.gaps.length > 0) {
+    console.log(`  Gaps: ${stats.gaps.slice(0, 5).join(', ')}`);
+  }
+}
+
+/**
+ * Example: Collaborative Test Editing
+ * Multiple QA engineers editing a test together
+ */
+export async function collaborativeTestEditing(
+  testId: string,
+  projectId: string,
+  participants: Array<{ userId: string; userName: string; email: string }>
+): Promise<void> {
+  console.log(`\n=== Starting Collaborative Editing Session ===`);
+  console.log(`Test: ${testId}`);
+  console.log(`Participants: ${participants.length}`);
+
+  // Create session
+  const session = await collaborationServer.createSession(
+    testId,
+    projectId,
+    participants[0].userId,
+    participants[0].userName
+  );
+
+  console.log(`Session created: ${session.sessionId}`);
+
+  // Add remaining participants
+  for (const p of participants.slice(1)) {
+    const participant = await collaborationServer.joinSession(
+      session.sessionId,
+      p.userId,
+      p.userName,
+      p.email
+    );
+    console.log(`✓ ${participant.userName} joined`);
+  }
+
+  // Simulate collaborative editing
+  const operations = [
+    {
+      type: 'insert' as const,
+      position: 0,
+      content: 'test("Login flow", async ({ page }) => {\n',
+      userId: participants[0].userId,
+    },
+    {
+      type: 'insert' as const,
+      position: 45,
+      content: '  await page.goto("/login");\n',
+      userId: participants[1].userId,
+    },
+    {
+      type: 'insert' as const,
+      position: 75,
+      content: '  await page.fill("input[name=email]", "test@example.com");\n',
+      userId: participants[0].userId,
+    },
+  ];
+
+  for (const op of operations) {
+    const ack = await collaborationServer.broadcastEdit(session.sessionId, {
+      ...op,
+      timestamp: Date.now(),
+      version: 1,
+    });
+
+    if (ack.payload.success) {
+      console.log(`✓ Edit applied by ${op.userId}`);
+    }
+  }
+
+  const finalState = collaborationServer.getSessionState(session.sessionId);
+  console.log(`\nFinal document (${finalState?.document.length} chars):`);
+  console.log(finalState?.document);
+}
+
+/**
+ * Example: Risk-based Test Strategy
+ * Decide whether to run full suite or subset based on change risk
+ */
+export async function getRiskBasedTestStrategy(
+  projectId: string,
+  changes: CodeChange[]
+): Promise<{ strategy: string; testCount: number; estimatedTime: number }> {
+  const impact = await impactAnalyzer.analyzeImpact(projectId, changes);
+
+  switch (impact.risk.riskLevel) {
+    case 'critical':
+      return {
+        strategy: 'full-suite',
+        testCount: impact.affectedTests.length,
+        estimatedTime: impact.risk.estimatedRunTime,
+      };
+
+    case 'high':
+      return {
+        strategy: 'affected + critical',
+        testCount: impact.affectedTests.filter(t => t.impactLevel === 'direct').length + 10,
+        estimatedTime: impact.risk.estimatedRunTime + 30000,
+      };
+
+    case 'medium':
+      return {
+        strategy: 'affected-only',
+        testCount: impact.affectedTests.length,
+        estimatedTime: impact.risk.estimatedRunTime,
+      };
+
+    default:
+      return {
+        strategy: 'smoke-tests',
+        testCount: Math.max(5, Math.ceil(impact.affectedTests.length / 2)),
+        estimatedTime: 10000,
+      };
+  }
+}
+
+/**
+ * Example: Real-world workflow combining both services
+ */
+export async function completeTestingWorkflow(): Promise<void> {
+  const projectId = 'qestro-main';
+
+  console.log('🚀 Starting Complete Testing Workflow...\n');
+
+  // Step 1: Simulate a PR with code changes
+  const changes: CodeChange[] = [
+    {
+      filePath: 'src/auth.ts',
+      changeType: 'modified',
+      additions: 45,
+      deletions: 12,
+      linesChanged: Array(30).fill('modified'),
+      timestamp: new Date(),
+      commitHash: 'abc123def456',
+      author: 'developer@example.com',
+    },
+    {
+      filePath: 'src/middleware.ts',
+      changeType: 'modified',
+      additions: 20,
+      deletions: 5,
+      linesChanged: Array(15).fill('modified'),
+      timestamp: new Date(),
+      commitHash: 'abc123def456',
+      author: 'developer@example.com',
+    },
+  ];
+
+  // Register test metadata
+  impactAnalyzer.registerTest('test-auth', 'Authentication Tests', 'src/tests/auth.test.ts', 8000);
+  impactAnalyzer.registerTest('test-middleware', 'Middleware Tests', 'src/tests/middleware.test.ts', 5000);
+  impactAnalyzer.registerTest('test-integration', 'Integration Tests', 'src/tests/integration.test.ts', 15000);
+
+  // Setup coverage
+  await coverageMapper.updateCoverage('test-auth', ['src/auth.ts', 'src/middleware.ts'], projectId);
+  await coverageMapper.updateCoverage('test-middleware', ['src/middleware.ts'], projectId);
+  await coverageMapper.updateCoverage('test-integration', ['src/auth.ts'], projectId);
+
+  // Step 2: Analyze impact and get strategy
+  const strategy = await getRiskBasedTestStrategy(projectId, changes);
+
+  console.log(`Strategy: ${strategy.strategy}`);
+  console.log(`Tests to run: ${strategy.testCount}`);
+  console.log(`Estimated time: ${strategy.estimatedTime / 1000}s\n`);
+
+  // Step 3: Get detailed impact
+  const testsToRun = await analyzeAndScheduleTests(projectId, changes);
+
+  console.log(`\nTests to execute: ${testsToRun.length}`);
+  console.log(`Test IDs: ${testsToRun.join(', ')}\n`);
+
+  // Step 4: Simulate test execution with coverage
+  const executionResults = [
+    {
+      testId: 'test-auth',
+      passed: true,
+      coveredFiles: ['src/auth.ts', 'src/middleware.ts'],
+    },
+    {
+      testId: 'test-middleware',
+      passed: true,
+      coveredFiles: ['src/middleware.ts'],
+    },
+  ];
+
+  await updateTestCoverage(projectId, executionResults);
+
+  console.log('\n✅ Workflow Complete!');
+}
+
+// Export for use in other modules
+export default {
+  setupServices,
+  setupWebSocket,
+  analyzeAndScheduleTests,
+  updateTestCoverage,
+  collaborativeTestEditing,
+  getRiskBasedTestStrategy,
+  completeTestingWorkflow,
+};

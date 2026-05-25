@@ -1,0 +1,173 @@
+---
+// Fixed-bottom global pipe prompt. Press the keyboard shortcut, type a pipe expression,
+// see a simulated trace. The cursor IS the prompt, the page becomes a terminal.
+---
+
+<aside class="pp" id="pp" aria-label="Pipe prompt" hidden>
+  <form class="pp-form" id="pp-form" autocomplete="off">
+    <label for="pp-input" class="pp-prompt" aria-hidden="true">&gt;&gt;</label>
+    <input
+      id="pp-input"
+      name="pipe"
+      type="text"
+      spellcheck="false"
+      autocorrect="off"
+      placeholder="persona generate >> ghost &quot;launch post&quot; >> publish notion"
+      aria-label="Type a Luna Pipes expression"
+    />
+    <button type="submit" class="pp-go" aria-label="Run">run</button>
+    <button type="button" class="pp-close" id="pp-close" aria-label="Close prompt">esc</button>
+  </form>
+  <output class="pp-trace" id="pp-trace" role="log" aria-live="polite" hidden></output>
+</aside>
+<button class="pp-toggle" id="pp-toggle" aria-controls="pp" aria-expanded="false">
+  <span aria-hidden="true">&gt;&gt;</span>
+  <span class="pp-toggle-label">prompt</span>
+  <kbd class="pp-toggle-kbd">/</kbd>
+</button>
+
+<style>
+  .pp-toggle {
+    position: fixed;
+    right: clamp(1rem, 3vw, 2rem);
+    bottom: clamp(1rem, 3vw, 2rem);
+    z-index: 50;
+    background: var(--ink);
+    color: var(--paper);
+    border: 0;
+    padding: 0.6rem 0.9rem;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5ch;
+    cursor: pointer;
+    box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.3);
+    transition: transform 240ms var(--ease), background-color 240ms var(--ease);
+  }
+  .pp-toggle:hover { transform: translateY(-2px); background: var(--saffron-deep); }
+  .pp-toggle-kbd {
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    padding: 0 0.4em;
+    font-size: 0.85em;
+    opacity: 0.7;
+    margin-left: 0.25ch;
+  }
+  .pp {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 60;
+    background: var(--saffron);
+    color: var(--saffron-on);
+    border-top: 1px solid var(--saffron-deep);
+    padding: var(--t-2) clamp(1rem, 4vw, 3rem);
+  }
+  .pp[hidden] { display: none; }
+  .pp-form {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: baseline;
+    gap: 0.75ch;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .pp-prompt {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: var(--step-1);
+    color: var(--saffron-on);
+    letter-spacing: -0.05em;
+  }
+  #pp-input {
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--saffron-deep);
+    padding: 0.25rem 0;
+    font-family: var(--font-mono);
+    font-size: var(--step-0);
+    color: var(--saffron-on);
+    caret-color: var(--saffron-on);
+    width: 100%;
+  }
+  #pp-input:focus { outline: 0; border-bottom-color: var(--saffron-on); }
+  #pp-input::placeholder { color: var(--saffron-on); opacity: 0.55; }
+  .pp-go, .pp-close {
+    background: var(--saffron-on);
+    color: var(--saffron);
+    border: 0;
+    padding: 0.35rem 0.7rem;
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    cursor: pointer;
+  }
+  .pp-close { background: transparent; color: var(--saffron-on); border: 1px solid var(--saffron-on); }
+  .pp-trace {
+    display: block;
+    margin: var(--t-2) auto 0;
+    max-width: 1200px;
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    color: var(--saffron-on);
+    white-space: pre-wrap;
+    background: rgba(0,0,0,0.06);
+    padding: var(--t-2);
+    border-radius: 2px;
+  }
+  .pp-trace[hidden] { display: none; }
+</style>
+
+<script>
+  import { simulate } from "../lib/pipe-sim";
+
+  const toggle = document.getElementById("pp-toggle") as HTMLButtonElement;
+  const pp = document.getElementById("pp") as HTMLElement;
+  const close = document.getElementById("pp-close") as HTMLButtonElement;
+  const form = document.getElementById("pp-form") as HTMLFormElement;
+  const input = document.getElementById("pp-input") as HTMLInputElement;
+  const trace = document.getElementById("pp-trace") as HTMLElement;
+
+  const open = () => { pp.hidden = false; toggle.setAttribute("aria-expanded", "true"); input.focus(); };
+  const shut = () => { pp.hidden = true; toggle.setAttribute("aria-expanded", "false"); toggle.focus(); };
+
+  toggle.addEventListener("click", open);
+  close.addEventListener("click", shut);
+  window.addEventListener("keydown", (e) => {
+    const target = e.target as HTMLElement | null;
+    const isField = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA");
+    if (e.key === "/" && !pp.hidden === false && !isField) { e.preventDefault(); open(); }
+    if (e.key === "Escape" && !pp.hidden) { e.preventDefault(); shut(); }
+  });
+
+  const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  async function append(line: string) {
+    trace.textContent = (trace.textContent ?? "") + line + "\n";
+    if (!reduced()) await sleep(40);
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const expr = input.value.trim();
+    if (!expr) return;
+    trace.hidden = false;
+    trace.textContent = "";
+    for (const ev of simulate(expr)) {
+      if (ev.kind === "parsed") {
+        await append(`parsed: ${ev.stageCount} stage${ev.stageCount === 1 ? "" : "s"}`);
+      } else if (ev.kind === "stage-start") {
+        const tag = `[${String(ev.index + 1).padStart(2, "0")}]`;
+        await append(`${tag} ${ev.stage.verb}${ev.stage.args.length ? " " + ev.stage.args.map((a) => `"${a}"`).join(" ") : ""}`);
+      } else if (ev.kind === "stage-line") {
+        await append(`     ${ev.text}`);
+      } else if (ev.kind === "stage-end") {
+        await append(`     ok (${ev.ms}ms)`);
+      } else if (ev.kind === "done") {
+        await append(`done in ${ev.totalMs}ms. simulated; install luna-agents to run for real.`);
+      }
+    }
+  });
+</script>

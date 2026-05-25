@@ -1,0 +1,90 @@
+{
+  "name": "cepien-insight",
+  "version": "0.1.0",
+  "description": "Fetch Cepien AI product insights and route top-impact recommendations into LunaOS workflows — downstream execution for Cepien's agentic product discovery.",
+  "author": "LunaOS",
+  "license": "MIT",
+  "runtime": "openhands",
+  "homepage": "https://agents.lunaos.ai/skills/cepien-insight",
+  "partner": {
+    "name": "Cepien AI",
+    "url": "https://cepien.ai",
+    "integration": "complementary"
+  },
+  "tools": [
+    {
+      "name": "cepien-client",
+      "description": "Call Cepien REST API — list insights, fetch recommendation detail, trigger discovery run"
+    },
+    {
+      "name": "impact-filter",
+      "description": "Filter Cepien recommendations by impact score thresholds (business, product, usability)"
+    },
+    {
+      "name": "workflow-dispatcher",
+      "description": "Route approved recommendations into LunaOS workflows for execution"
+    }
+  ],
+  "environment": {
+    "CEPIEN_API_URL": "https://platform.cepien.ai/api/v1",
+    "CEPIEN_API_KEY": "${CEPIEN_API_KEY}",
+    "LUNAOS_API_KEY": "${LUNAOS_API_KEY}"
+  },
+  "config": {
+    "project_id": {
+      "type": "string",
+      "default": "",
+      "description": "Cepien project ID to pull insights from"
+    },
+    "min_impact_score": {
+      "type": "number",
+      "default": 70,
+      "description": "Minimum combined impact score (0-100) to include a recommendation"
+    },
+    "impact_dimension": {
+      "type": "enum",
+      "values": ["business", "product", "usability", "combined"],
+      "default": "combined",
+      "description": "Which impact axis to filter on"
+    },
+    "limit": {
+      "type": "number",
+      "default": 5,
+      "description": "Max recommendations to return per run"
+    },
+    "destination": {
+      "type": "enum",
+      "values": ["workflow", "webhook", "jira", "notion", "slack"],
+      "default": "workflow",
+      "description": "Where to send filtered recommendations"
+    },
+    "target_workflow_id": {
+      "type": "string",
+      "default": "",
+      "description": "LunaOS workflow ID to trigger per recommendation (when destination=workflow)"
+    },
+    "auto_trigger": {
+      "type": "boolean",
+      "default": false,
+      "description": "Auto-trigger workflow per recommendation (else return list for manual approval)"
+    }
+  },
+  "outputs": {
+    "recommendations": {
+      "type": "array",
+      "description": "Filtered recommendations with impact scores, source data, and proposed actions"
+    },
+    "dispatched_runs": {
+      "type": "array",
+      "description": "LunaOS workflow run IDs triggered per recommendation (when auto_trigger=true)"
+    },
+    "summary": {
+      "type": "object",
+      "description": "Totals: fetched, filtered, dispatched, skipped with reasons"
+    }
+  },
+  "permissions": {
+    "cepien": ["read:insights", "read:recommendations", "read:projects"],
+    "lunaos": ["write:runs", "read:workflows"]
+  }
+}

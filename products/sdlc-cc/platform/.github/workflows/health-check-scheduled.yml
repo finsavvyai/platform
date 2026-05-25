@@ -1,0 +1,35 @@
+# Scheduled health check of production/staging endpoints. See docs/DEPLOYMENT_PIPELINES_AND_HEALTH_CHECKS.md
+name: Health Check (Scheduled)
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+    inputs:
+      gateway_url:
+        description: 'Gateway URL'
+        required: false
+        default: 'https://api.sdlc.cc'
+      landing_url:
+        description: 'Landing URL'
+        required: false
+        default: 'https://sdlc.cc'
+
+jobs:
+  health-check:
+    name: Health check endpoints
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GATEWAY_URL: ${{ github.event.inputs.gateway_url || 'https://api.sdlc.cc' }}
+      LANDING_URL: ${{ github.event.inputs.landing_url || 'https://sdlc.cc' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run health checks
+        run: |
+          cd deployments/production && node run-health-checks.js
+        env:
+          GATEWAY_URL: ${{ env.GATEWAY_URL }}
+          LANDING_URL: ${{ env.LANDING_URL }}
+          GATEWAY_REQUIRED: 'false'

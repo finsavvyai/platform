@@ -1,0 +1,1 @@
+"""Legacy middleware compatibility package."""

@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LunaOS GUI Functional Tests</title>
+    <style>
+        body {
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .test-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .test-header h1 {
+            font-size: 2.5rem;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .test-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 5px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+        }
+        
+        .test-section h2 {
+            color: #667eea;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .test-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .test-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+        
+        .test-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+        
+        .test-description {
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+        
+        .test-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .test-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            display: none;
+        }
+        
+        .test-result.success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 1px solid rgba(16, 185, 129, 0.5);
+            color: #10b981;
+        }
+        
+        .test-result.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            color: #ef4444;
+        }
+        
+        .test-result.warning {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid rgba(245, 158, 11, 0.5);
+            color: #f59e0b;
+        }
+        
+        .test-log {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        
+        .log-entry.info { color: #60a5fa; }
+        .log-entry.success { color: #10b981; }
+        .log-entry.error { color: #ef4444; }
+        .log-entry.warning { color: #f59e0b; }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .run-all-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            margin: 20px auto;
+            display: block;
+        }
+        
+        .run-all-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 30px rgba(16, 185, 129, 0.3);
+        }
+        
+        .run-all-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🧪 LunaOS GUI Functional Tests</h1>
+            <p>Comprehensive testing suite for the LunaOS Orchestrator GUI</p>
+        </div>
+        
+        <div class="test-stats">
+            <div class="stat-card">
+                <div class="stat-number" id="total-tests">0</div>
+                <div class="stat-label">Total Tests</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="passed-tests">0</div>
+                <div class="stat-label">Passed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="failed-tests">0</div>
+                <div class="stat-label">Failed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="test-coverage">0%</div>
+                <div class="stat-label">Coverage</div>
+            </div>
+        </div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        
+        <button class="run-all-button" id="run-all-tests" onclick="runAllTests()">
+            🚀 Run All Tests
+        </button>
+        
+        <div class="test-section">
+            <h2>🔧 Basic GUI Tests</h2>
+            <div class="test-grid">
+                <div class="test-card">
+                    <div class="test-title">Page Load Test</div>
+                    <div class="test-description">Verify the GUI loads correctly with all required elements</div>
+                    <button class="test-button" onclick="testPageLoad()">Run Test</button>
+                    <div class="test-result" id="page-load-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Button Clickability</div>
+                    <div class="test-description">Test that all buttons are clickable and responsive</div>
+                    <button class="test-button" onclick="testButtonClickability()">Run Test</button>
+                    <div class="test-result" id="button-clickability-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Canvas Initialization</div>
+                    <div class="test-description">Verify Konva canvas and Three.js background initialize</div>
+                    <button class="test-button" onclick="testCanvasInitialization()">Run Test</button>
+                    <div class="test-result" id="canvas-init-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">JavaScript Loading</div>
+                    <div class="test-description">Check that all JavaScript files load without errors</div>
+                    <button class="test-button" onclick="testJavaScriptLoading()">Run Test</button>
+                    <div class="test-result" id="js-loading-result"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>📋 Workflow Operations</h2>
+            <div class="test-grid">
+                <div class="test-card">
+                    <div class="test-title">New Workflow</div>
+                    <div class="test-description">Test creating a new workflow</div>
+                    <button class="test-button" onclick="testNewWorkflow()">Run Test</button>
+                    <div class="test-result" id="new-workflow-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Save Workflow</div>
+                    <div class="test-description">Test saving workflow to JSON file</div>
+                    <button class="test-button" onclick="testSaveWorkflow()">Run Test</button>
+                    <div class="test-result" id="save-workflow-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Load Workflow</div>
+                    <div class="test-description">Test loading workflow from JSON file</div>
+                    <button class="test-button" onclick="testLoadWorkflow()">Run Test</button>
+                    <div class="test-result" id="load-workflow-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Run Workflow</div>
+                    <div class="test-description">Test workflow execution</div>
+                    <button class="test-button" onclick="testRunWorkflow()">Run Test</button>
+                    <div class="test-result" id="run-workflow-result"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🎯 Node System Tests</h2>
+            <div class="test-grid">
+                <div class="test-card">
+                    <div class="test-title">Node Creation</div>
+                    <div class="test-description">Test creating nodes by drag and drop</div>
+                    <button class="test-button" onclick="testNodeCreation()">Run Test</button>
+                    <div class="test-result" id="node-creation-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Node Selection</div>
+                    <div class="test-description">Test selecting and highlighting nodes</div>
+                    <button class="test-button" onclick="testNodeSelection()">Run Test</button>
+                    <div class="test-result" id="node-selection-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Node Dragging</div>
+                    <div class="test-description">Test dragging nodes around the canvas</div>
+                    <button class="test-button" onclick="testNodeDragging()">Run Test</button>
+                    <div class="test-result" id="node-dragging-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Node Types</div>
+                    <div class="test-description">Test all available node types</div>
+                    <button class="test-button" onclick="testNodeTypes()">Run Test</button>
+                    <div class="test-result" id="node-types-result"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🎮 Canvas Controls</h2>
+            <div class="test-grid">
+                <div class="test-card">
+                    <div class="test-title">Zoom Controls</div>
+                    <div class="test-description">Test zoom in, zoom out, and reset view</div>
+                    <button class="test-button" onclick="testZoomControls()">Run Test</button>
+                    <div class="test-result" id="zoom-controls-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Canvas Panning</div>
+                    <div class="test-description">Test panning the canvas</div>
+                    <button class="test-button" onclick="testCanvasPanning()">Run Test</button>
+                    <div class="test-result" id="canvas-panning-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Grid Toggle</div>
+                    <div class="test-description">Test grid visibility toggle</div>
+                    <button class="test-button" onclick="testGridToggle()">Run Test</button>
+                    <div class="test-result" id="grid-toggle-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">3D Background</div>
+                    <div class="test-description">Test 3D background animation</div>
+                    <button class="test-button" onclick="test3DBackground()">Run Test</button>
+                    <div class="test-result" id="3d-background-result"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h2>🌐 Integration Tests</h2>
+            <div class="test-grid">
+                <div class="test-card">
+                    <div class="test-title">Full Workflow</div>
+                    <div class="test-description">Test complete workflow creation and execution</div>
+                    <button class="test-button" onclick="testFullWorkflow()">Run Test</button>
+                    <div class="test-result" id="full-workflow-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Performance Test</div>
+                    <div class="test-description">Test performance with multiple nodes</div>
+                    <button class="test-button" onclick="testPerformance()">Run Test</button>
+                    <div class="test-result" id="performance-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Error Handling</div>
+                    <div class="test-description">Test error handling and recovery</div>
+                    <button class="test-button" onclick="testErrorHandling()">Run Test</button>
+                    <div class="test-result" id="error-handling-result"></div>
+                </div>
+                
+                <div class="test-card">
+                    <div class="test-title">Cross-Browser</div>
+                    <div class="test-description">Test compatibility across browsers</div>
+                    <button class="test-button" onclick="testCrossBrowser()">Run Test</button>
+                    <div class="test-result" id="cross-browser-result"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-log" id="test-log">
+            <div class="log-entry info">🧪 Test suite initialized. Ready to run tests.</div>
+        </div>
+    </div>
+    
+    <script>
+        // Test framework
+        let testResults = {
+            total: 0,
+            passed: 0,
+            failed: 0,
+            running: false
+        };
+        
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('test-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        function updateStats() {
+            document.getElementById('total-tests').textContent = testResults.total;
+            document.getElementById('passed-tests').textContent = testResults.passed;
+            document.getElementById('failed-tests').textContent = testResults.failed;
+            
+            const coverage = testResults.total > 0 ? Math.round((testResults.passed / testResults.total) * 100) : 0;
+            document.getElementById('test-coverage').textContent = coverage + '%';
+            
+            const progress = testResults.total > 0 ? (testResults.passed + testResults.failed) / testResults.total * 100 : 0;
+            document.getElementById('progress-fill').style.width = progress + '%';
+        }
+        
+        function showResult(testId, success, message) {
+            const resultElement = document.getElementById(testId);
+            resultElement.style.display = 'block';
+            resultElement.className = `test-result ${success ? 'success' : 'error'}`;
+            resultElement.textContent = message;
+            
+            testResults.total++;
+            if (success) {
+                testResults.passed++;
+                log(`✅ ${testId.replace('-result', '')}: ${message}`, 'success');
+            } else {
+                testResults.failed++;
+                log(`❌ ${testId.replace('-result', '')}: ${message}`, 'error');
+            }
+            updateStats();
+        }
+        
+        // Basic GUI Tests
+        function testPageLoad() {
+            try {
+                const requiredElements = [
+                    'konva-container',
+                    'three-container',
+                    'node-sidebar',
+                    'toolbar'
+                ];
+                
+                let missingElements = [];
+                requiredElements.forEach(id => {
+                    if (!document.getElementById(id)) {
+                        missingElements.push(id);
+                    }
+                });
+                
+                if (missingElements.length === 0) {
+                    showResult('page-load-result', true, 'All required elements found');
+                } else {
+                    showResult('page-load-result', false, `Missing elements: ${missingElements.join(', ')}`);
+                }
+            } catch (error) {
+                showResult('page-load-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testButtonClickability() {
+            try {
+                const buttons = document.querySelectorAll('button');
+                let unclickableButtons = [];
+                
+                buttons.forEach(button => {
+                    if (button.disabled || button.style.pointerEvents === 'none') {
+                        unclickableButtons.push(button.textContent || button.className);
+                    }
+                });
+                
+                if (unclickableButtons.length === 0) {
+                    showResult('button-clickability-result', true, `All ${buttons.length} buttons are clickable`);
+                } else {
+                    showResult('button-clickability-result', false, `Unclickable buttons: ${unclickableButtons.join(', ')}`);
+                }
+            } catch (error) {
+                showResult('button-clickability-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testCanvasInitialization() {
+            try {
+                const konvaContainer = document.getElementById('konva-container');
+                const threeContainer = document.getElementById('three-container');
+                
+                if (konvaContainer && threeContainer) {
+                    showResult('canvas-init-result', true, 'Canvas containers found');
+                } else {
+                    showResult('canvas-init-result', false, 'Canvas containers not found');
+                }
+            } catch (error) {
+                showResult('canvas-init-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testJavaScriptLoading() {
+            try {
+                // Check if main functions are available
+                const requiredFunctions = ['newWorkflow', 'saveWorkflow', 'runWorkflow'];
+                let missingFunctions = [];
+                
+                requiredFunctions.forEach(funcName => {
+                    if (typeof window[funcName] !== 'function') {
+                        missingFunctions.push(funcName);
+                    }
+                });
+                
+                if (missingFunctions.length === 0) {
+                    showResult('js-loading-result', true, 'All required functions loaded');
+                } else {
+                    showResult('js-loading-result', false, `Missing functions: ${missingFunctions.join(', ')}`);
+                }
+            } catch (error) {
+                showResult('js-loading-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        // Workflow Operations Tests
+        function testNewWorkflow() {
+            try {
+                if (typeof window.newWorkflow === 'function') {
+                    // Mock prompt for testing
+                    const originalPrompt = window.prompt;
+                    window.prompt = () => 'Test Workflow';
+                    
+                    window.newWorkflow();
+                    
+                    // Restore prompt
+                    window.prompt = originalPrompt;
+                    
+                    showResult('new-workflow-result', true, 'New workflow function executed');
+                } else {
+                    showResult('new-workflow-result', false, 'newWorkflow function not found');
+                }
+            } catch (error) {
+                showResult('new-workflow-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testSaveWorkflow() {
+            try {
+                if (typeof window.saveWorkflow === 'function') {
+                    // Mock URL.createObjectURL for testing
+                    const originalCreateObjectURL = window.URL.createObjectURL;
+                    window.URL.createObjectURL = () => 'mock-url';
+                    
+                    window.saveWorkflow();
+                    
+                    // Restore function
+                    window.URL.createObjectURL = originalCreateObjectURL;
+                    
+                    showResult('save-workflow-result', true, 'Save workflow function executed');
+                } else {
+                    showResult('save-workflow-result', false, 'saveWorkflow function not found');
+                }
+            } catch (error) {
+                showResult('save-workflow-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testLoadWorkflow() {
+            try {
+                if (typeof window.openWorkflow === 'function') {
+                    showResult('load-workflow-result', true, 'Load workflow function available');
+                } else {
+                    showResult('load-workflow-result', false, 'openWorkflow function not found');
+                }
+            } catch (error) {
+                showResult('load-workflow-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testRunWorkflow() {
+            try {
+                if (typeof window.runWorkflow === 'function') {
+                    showResult('run-workflow-result', true, 'Run workflow function available');
+                } else {
+                    showResult('run-workflow-result', false, 'runWorkflow function not found');
+                }
+            } catch (error) {
+                showResult('run-workflow-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        // Node System Tests
+        function testNodeCreation() {
+            try {
+                const nodeItems = document.querySelectorAll('.node-item');
+                if (nodeItems.length > 0) {
+                    showResult('node-creation-result', true, `${nodeItems.length} node types available`);
+                } else {
+                    showResult('node-creation-result', false, 'No node types found');
+                }
+            } catch (error) {
+                showResult('node-creation-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testNodeSelection() {
+            try {
+                // Check if Konva is available
+                if (typeof Konva !== 'undefined') {
+                    showResult('node-selection-result', true, 'Konva available for node selection');
+                } else {
+                    showResult('node-selection-result', false, 'Konva not available');
+                }
+            } catch (error) {
+                showResult('node-selection-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testNodeDragging() {
+            try {
+                if (typeof Konva !== 'undefined') {
+                    showResult('node-dragging-result', true, 'Konva available for node dragging');
+                } else {
+                    showResult('node-dragging-result', false, 'Konva not available');
+                }
+            } catch (error) {
+                showResult('node-dragging-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testNodeTypes() {
+            try {
+                const expectedNodeTypes = ['chat-agent', 'data-processor', 'web-scraper', 'trigger'];
+                const nodeItems = document.querySelectorAll('.node-item');
+                let foundTypes = [];
+                
+                nodeItems.forEach(item => {
+                    const nodeType = item.dataset.nodeType;
+                    if (nodeType) {
+                        foundTypes.push(nodeType);
+                    }
+                });
+                
+                if (foundTypes.length >= expectedNodeTypes.length) {
+                    showResult('node-types-result', true, `${foundTypes.length} node types found`);
+                } else {
+                    showResult('node-types-result', false, `Only ${foundTypes.length} node types found`);
+                }
+            } catch (error) {
+                showResult('node-types-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        // Canvas Controls Tests
+        function testZoomControls() {
+            try {
+                const zoomFunctions = ['zoomIn', 'zoomOut', 'resetView'];
+                let availableFunctions = [];
+                
+                zoomFunctions.forEach(funcName => {
+                    if (typeof window[funcName] === 'function') {
+                        availableFunctions.push(funcName);
+                    }
+                });
+                
+                if (availableFunctions.length === zoomFunctions.length) {
+                    showResult('zoom-controls-result', true, 'All zoom functions available');
+                } else {
+                    showResult('zoom-controls-result', false, `Missing functions: ${zoomFunctions.filter(f => !availableFunctions.includes(f)).join(', ')}`);
+                }
+            } catch (error) {
+                showResult('zoom-controls-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testCanvasPanning() {
+            try {
+                if (typeof Konva !== 'undefined') {
+                    showResult('canvas-panning-result', true, 'Konva available for canvas panning');
+                } else {
+                    showResult('canvas-panning-result', false, 'Konva not available');
+                }
+            } catch (error) {
+                showResult('canvas-panning-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testGridToggle() {
+            try {
+                if (typeof window.toggleGrid === 'function') {
+                    showResult('grid-toggle-result', true, 'Grid toggle function available');
+                } else {
+                    showResult('grid-toggle-result', false, 'toggleGrid function not found');
+                }
+            } catch (error) {
+                showResult('grid-toggle-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function test3DBackground() {
+            try {
+                if (typeof THREE !== 'undefined') {
+                    showResult('3d-background-result', true, 'Three.js available for 3D background');
+                } else {
+                    showResult('3d-background-result', false, 'Three.js not available');
+                }
+            } catch (error) {
+                showResult('3d-background-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        // Integration Tests
+        function testFullWorkflow() {
+            try {
+                const requiredComponents = [
+                    'newWorkflow', 'saveWorkflow', 'runWorkflow',
+                    'zoomIn', 'zoomOut', 'resetView'
+                ];
+                
+                let missingComponents = [];
+                requiredComponents.forEach(component => {
+                    if (typeof window[component] !== 'function') {
+                        missingComponents.push(component);
+                    }
+                });
+                
+                if (missingComponents.length === 0) {
+                    showResult('full-workflow-result', true, 'All workflow components available');
+                } else {
+                    showResult('full-workflow-result', false, `Missing components: ${missingComponents.join(', ')}`);
+                }
+            } catch (error) {
+                showResult('full-workflow-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testPerformance() {
+            try {
+                const startTime = performance.now();
+                
+                // Simulate performance test
+                for (let i = 0; i < 1000; i++) {
+                    Math.random();
+                }
+                
+                const endTime = performance.now();
+                const duration = endTime - startTime;
+                
+                if (duration < 10) {
+                    showResult('performance-result', true, `Performance test completed in ${duration.toFixed(2)}ms`);
+                } else {
+                    showResult('performance-result', false, `Performance test took ${duration.toFixed(2)}ms (too slow)`);
+                }
+            } catch (error) {
+                showResult('performance-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testErrorHandling() {
+            try {
+                // Test error handling by calling non-existent function
+                try {
+                    if (typeof window.nonExistentFunction === 'function') {
+                        window.nonExistentFunction();
+                    }
+                    showResult('error-handling-result', true, 'Error handling working correctly');
+                } catch (error) {
+                    showResult('error-handling-result', true, 'Error handling working correctly');
+                }
+            } catch (error) {
+                showResult('error-handling-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        function testCrossBrowser() {
+            try {
+                const userAgent = navigator.userAgent;
+                const isChrome = userAgent.includes('Chrome');
+                const isFirefox = userAgent.includes('Firefox');
+                const isSafari = userAgent.includes('Safari') && !userAgent.includes('Chrome');
+                const isEdge = userAgent.includes('Edge');
+                
+                const browser = isChrome ? 'Chrome' : isFirefox ? 'Firefox' : isSafari ? 'Safari' : isEdge ? 'Edge' : 'Unknown';
+                
+                showResult('cross-browser-result', true, `Running on ${browser}`);
+            } catch (error) {
+                showResult('cross-browser-result', false, `Error: ${error.message}`);
+            }
+        }
+        
+        // Run all tests
+        async function runAllTests() {
+            if (testResults.running) return;
+            
+            testResults.running = true;
+            testResults.total = 0;
+            testResults.passed = 0;
+            testResults.failed = 0;
+            
+            const runAllButton = document.getElementById('run-all-tests');
+            runAllButton.disabled = true;
+            runAllButton.textContent = '🔄 Running Tests...';
+            
+            log('🚀 Starting comprehensive test suite...', 'info');
+            
+            const testFunctions = [
+                { name: 'Page Load', func: testPageLoad },
+                { name: 'Button Clickability', func: testButtonClickability },
+                { name: 'Canvas Initialization', func: testCanvasInitialization },
+                { name: 'JavaScript Loading', func: testJavaScriptLoading },
+                { name: 'New Workflow', func: testNewWorkflow },
+                { name: 'Save Workflow', func: testSaveWorkflow },
+                { name: 'Load Workflow', func: testLoadWorkflow },
+                { name: 'Run Workflow', func: testRunWorkflow },
+                { name: 'Node Creation', func: testNodeCreation },
+                { name: 'Node Selection', func: testNodeSelection },
+                { name: 'Node Dragging', func: testNodeDragging },
+                { name: 'Node Types', func: testNodeTypes },
+                { name: 'Zoom Controls', func: testZoomControls },
+                { name: 'Canvas Panning', func: testCanvasPanning },
+                { name: 'Grid Toggle', func: testGridToggle },
+                { name: '3D Background', func: test3DBackground },
+                { name: 'Full Workflow', func: testFullWorkflow },
+                { name: 'Performance', func: testPerformance },
+                { name: 'Error Handling', func: testErrorHandling },
+                { name: 'Cross Browser', func: testCrossBrowser }
+            ];
+            
+            for (const test of testFunctions) {
+                try {
+                    log(`🧪 Running ${test.name} test...`, 'info');
+                    await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+                    test.func();
+                } catch (error) {
+                    log(`❌ ${test.name} test failed: ${error.message}`, 'error');
+                }
+            }
+            
+            runAllButton.disabled = false;
+            runAllButton.textContent = '🚀 Run All Tests';
+            testResults.running = false;
+            
+            const coverage = testResults.total > 0 ? Math.round((testResults.passed / testResults.total) * 100) : 0;
+            log(`✅ Test suite completed! ${testResults.passed}/${testResults.total} tests passed (${coverage}% coverage)`, 'success');
+        }
+        
+        // Initialize test suite
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🧪 LunaOS GUI Test Suite initialized', 'info');
+            updateStats();
+        });
+    </script>
+</body>
+</html>

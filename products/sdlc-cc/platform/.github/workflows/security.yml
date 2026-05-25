@@ -1,0 +1,135 @@
+name: Security baseline
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Daily 06:00 UTC sweep so a newly-disclosed CVE in a pinned dep
+    # surfaces even on a quiet branch.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  allowlist:
+    name: Allowlist sanity (no expired entries)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install pyyaml
+      - run: bash security/check-allowlist.sh
+
+  gosec:
+    name: gosec (Go) — fail on HIGH
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.24", cache: true }
+      - name: Install gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Run gosec
+        working-directory: services/gateway
+        run: |
+          gosec -severity high -confidence high -fmt sarif -out gosec.sarif ./cmd/... ./internal/... ./tests/... || \
+            (echo "::error::gosec found HIGH-severity findings" && exit 1)
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: services/gateway/gosec.sarif
+
+  npm-audit:
+    name: npm audit — fail on Critical/High
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        service: [admin-ui, document-processor]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+      - name: Install
+        working-directory: services/${{ matrix.service }}
+        run: npm ci --ignore-scripts
+      - name: Audit
+        working-directory: services/${{ matrix.service }}
+        run: npm audit --audit-level=high --omit=dev
+
+  pip-audit:
+    name: pip-audit (RAG) — fail on any vuln
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit
+        working-directory: services/rag
+        run: pip-audit -r requirements.txt --strict --ignore-vuln-file ../../security/allowlist.yml || pip-audit -r requirements.txt --strict
+
+  cargo-audit:
+    name: cargo audit (vector-core) — fail on Critical/High
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/vector-core
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Audit
+        working-directory: services/vector-core
+        run: cargo audit --deny warnings
+
+  trivy:
+    name: Trivy — container + filesystem scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy filesystem scan (deps + config)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-fs.sarif
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs.sarif
+
+  secret-scan:
+    name: gitleaks — secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

@@ -1,0 +1,82 @@
+# amliq.finance — Render deployment
+# One-click deploy: https://render.com/deploy
+#
+# SCALE UP: change plan values below, push to main.
+#   starter  →  $7/month  (512MB, 0.5 CPU)
+#   standard →  $25/month (2GB, 1 CPU)      ← first paying customer
+#   pro      →  $80/month (4GB, 2 CPU)      ← growth stage
+#
+# Zero downtime on plan change — Render handles it live.
+
+services:
+
+  # ── Watchman (sanctions matching engine) ──────────────────────────────────
+  # Private service — not exposed to the internet, only reachable internally
+  - type: pserv
+    name: amliq-watchman
+    image:
+      url: docker.io/moov/watchman:latest
+    plan: starter                # bump to standard when volume grows
+    envVars:
+      - key: LOG_FORMAT
+        value: json
+      - key: DATA_REFRESH_INTERVAL
+        value: 12h
+      - key: EXACT_MATCH_FAVORITISM
+        value: "0.25"
+
+  # ── Go screening service ───────────────────────────────────────────────────
+  - type: web
+    name: amliq-screening
+    runtime: go
+    buildCommand: go build -o bin/server ./cmd/server
+    startCommand: ./bin/server
+    plan: starter                # bump to standard at first paying customer
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: WATCHMAN_ENDPOINT
+        value: http://amliq-watchman:8084
+      - key: DATABASE_URL
+        fromDatabase:
+          name: amliq-db
+          property: connectionString
+      - key: INTERNAL_SECRET
+        generateValue: true
+      - key: ENV
+        value: production
+      - key: CF_ACCOUNT_ID
+        sync: false              # set in Render dashboard
+      - key: CF_KV_NAMESPACE_ID
+        sync: false
+      - key: CF_API_TOKEN
+        sync: false
+
+  # ── Ingest worker (nightly list refresh + KV population) ──────────────────
+  - type: cron
+    name: amliq-ingest
+    runtime: go
+    buildCommand: go build -o bin/ingest ./cmd/ingest
+    startCommand: ./bin/ingest
+    schedule: "0 2 * * *"       # 2am UTC daily
+    plan: starter
+    envVars:
+      - key: WATCHMAN_ENDPOINT
+        value: http://amliq-watchman:8084
+      - key: DATABASE_URL
+        fromDatabase:
+          name: amliq-db
+          property: connectionString
+      - key: CF_ACCOUNT_ID
+        sync: false
+      - key: CF_KV_NAMESPACE_ID
+        sync: false
+      - key: CF_API_TOKEN
+        sync: false
+
+databases:
+  - name: amliq-db
+    databaseName: amliq
+    plan: starter                # bump to standard ($20) at growth stage

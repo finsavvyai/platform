@@ -1,0 +1,501 @@
+name: Questro Unified Deployment Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - development
+        - staging
+        - production
+      components:
+        description: 'Components to deploy (comma-separated)'
+        required: false
+        default: 'frontend,backend,agent'
+        type: string
+      skip_tests:
+        description: 'Skip running tests'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Dry run (no actual deployment)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Test Components
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [frontend, backend, agent, vscode-extension, browser-extension]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: ${{ matrix.component }}/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd ${{ matrix.component }}
+        npm ci
+
+    - name: Run tests
+      run: |
+        cd ${{ matrix.component }}
+        npm test
+
+    - name: Run linting
+      run: |
+        cd ${{ matrix.component }}
+        npm run lint
+
+    - name: Upload coverage reports
+      if: matrix.component == 'frontend' || matrix.component == 'backend'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ${{ matrix.component }}/coverage/lcov.info
+        flags: ${{ matrix.component }}
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run security audit
+      run: |
+        npm audit --audit-level=moderate
+        cd frontend && npm audit --audit-level=moderate
+        cd ../backend && npm audit --audit-level=moderate
+        cd ../agent && npm audit --audit-level=moderate
+        cd ../vscode-extension && npm audit --audit-level=moderate
+        cd ../browser-extension && npm audit --audit-level=moderate
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        languages: javascript, typescript
+
+  build:
+    name: Build Components
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    strategy:
+      matrix:
+        component: [frontend, backend, agent, vscode-extension, browser-extension]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: ${{ matrix.component }}/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd ${{ matrix.component }}
+        npm ci
+
+    - name: Build component
+      run: |
+        cd ${{ matrix.component }}
+        npm run build
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.component }}-build
+        path: |
+          ${{ matrix.component }}/dist
+          ${{ matrix.component }}/out
+        retention-days: 7
+
+  deploy-development:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/develop' || github.event_name == 'workflow_dispatch'
+    environment: development
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: ./artifacts
+
+    - name: Extract artifacts
+      run: |
+        mkdir -p frontend/dist backend/dist agent/dist vscode-extension/out browser-extension/dist
+        if [ -d "artifacts/frontend-build" ]; then cp -r artifacts/frontend-build/* frontend/dist/; fi
+        if [ -d "artifacts/backend-build" ]; then cp -r artifacts/backend-build/* backend/dist/; fi
+        if [ -d "artifacts/agent-build" ]; then cp -r artifacts/agent-build/* agent/dist/; fi
+        if [ -d "artifacts/vscode-extension-build" ]; then cp -r artifacts/vscode-extension-build/* vscode-extension/out/; fi
+        if [ -d "artifacts/browser-extension-build" ]; then cp -r artifacts/browser-extension-build/* browser-extension/dist/; fi
+
+    - name: Deploy to development
+      run: |
+        chmod +x scripts/deploy/unified-deploy.sh
+        ./scripts/deploy/unified-deploy.sh \
+          --environment development \
+          --components frontend,backend,agent \
+          --skip-tests \
+          --verbose
+      env:
+        NODE_ENV: development
+        DATABASE_URL: ${{ secrets.DEV_DATABASE_URL }}
+        REDIS_URL: ${{ secrets.DEV_REDIS_URL }}
+        JWT_SECRET: ${{ secrets.DEV_JWT_SECRET }}
+        JWT_REFRESH_SECRET: ${{ secrets.DEV_JWT_REFRESH_SECRET }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        FRONTEND_URL: http://localhost:3000
+        CORS_ORIGIN: http://localhost:3000
+
+    - name: Health check
+      run: |
+        sleep 30
+        curl -f http://localhost:8000/api/health || exit 1
+        curl -f http://localhost:3000 || exit 1
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    environment: staging
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: ./artifacts
+
+    - name: Extract artifacts
+      run: |
+        mkdir -p frontend/dist backend/dist agent/dist vscode-extension/out browser-extension/dist
+        if [ -d "artifacts/frontend-build" ]; then cp -r artifacts/frontend-build/* frontend/dist/; fi
+        if [ -d "artifacts/backend-build" ]; then cp -r artifacts/backend-build/* backend/dist/; fi
+        if [ -d "artifacts/agent-build" ]; then cp -r artifacts/agent-build/* agent/dist/; fi
+        if [ -d "artifacts/vscode-extension-build" ]; then cp -r artifacts/vscode-extension-build/* vscode-extension/out/; fi
+        if [ -d "artifacts/browser-extension-build" ]; then cp -r artifacts/browser-extension-build/* browser-extension/dist/; fi
+
+    - name: Deploy to staging
+      run: |
+        chmod +x scripts/deploy/unified-deploy.sh
+        ./scripts/deploy/unified-deploy.sh \
+          --environment staging \
+          --components frontend,backend,agent,vscode-extension,browser-extension \
+          --verbose
+      env:
+        NODE_ENV: staging
+        DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        REDIS_URL: ${{ secrets.STAGING_REDIS_URL }}
+        JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+        JWT_REFRESH_SECRET: ${{ secrets.STAGING_JWT_REFRESH_SECRET }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+        FRONTEND_URL: https://staging.questro.io
+        CORS_ORIGIN: https://staging.questro.io
+        SENTRY_DSN: ${{ secrets.STAGING_SENTRY_DSN }}
+
+    - name: Run smoke tests
+      run: |
+        chmod +x scripts/testing/smoke-tests.sh
+        ./scripts/testing/smoke-tests.sh staging
+
+    - name: Run E2E tests
+      run: |
+        chmod +x scripts/testing/e2e-tests.sh
+        ./scripts/testing/e2e-tests.sh staging
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    environment: production
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: ./artifacts
+
+    - name: Extract artifacts
+      run: |
+        mkdir -p frontend/dist backend/dist agent/dist vscode-extension/out browser-extension/dist
+        if [ -d "artifacts/frontend-build" ]; then cp -r artifacts/frontend-build/* frontend/dist/; fi
+        if [ -d "artifacts/backend-build" ]; then cp -r artifacts/backend-build/* backend/dist/; fi
+        if [ -d "artifacts/agent-build" ]; then cp -r artifacts/agent-build/* agent/dist/; fi
+        if [ -d "artifacts/vscode-extension-build" ]; then cp -r artifacts/vscode-extension-build/* vscode-extension/out/; fi
+        if [ -d "artifacts/browser-extension-build" ]; then cp -r artifacts/browser-extension-build/* browser-extension/dist/; fi
+
+    - name: Run final tests
+      run: |
+        npm test
+        npm run test:e2e
+        npm run test:performance
+
+    - name: Deploy to production
+      run: |
+        chmod +x scripts/deploy/unified-deploy.sh
+        ./scripts/deploy/unified-deploy.sh \
+          --environment production \
+          --components frontend,backend,agent,vscode-extension,browser-extension \
+          --verbose
+      env:
+        NODE_ENV: production
+        DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        REDIS_URL: ${{ secrets.PRODUCTION_REDIS_URL }}
+        JWT_SECRET: ${{ secrets.PRODUCTION_JWT_SECRET }}
+        JWT_REFRESH_SECRET: ${{ secrets.PRODUCTION_JWT_REFRESH_SECRET }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+        STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
+        LEMONSQUEEZY_API_KEY: ${{ secrets.LEMONSQUEEZY_API_KEY }}
+        FRONTEND_URL: https://questro.io
+        CORS_ORIGIN: https://questro.io
+        SENTRY_DSN: ${{ secrets.PRODUCTION_SENTRY_DSN }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    - name: Production health checks
+      run: |
+        sleep 60
+        chmod +x scripts/testing/production-health-checks.sh
+        ./scripts/testing/production-health-checks.sh
+
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow
+
+  publish-extensions:
+    name: Publish Extensions
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        extension: [vscode-extension, browser-extension]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: ${{ matrix.extension }}/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd ${{ matrix.extension }}
+        npm ci
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: ${{ matrix.extension }}-build
+        path: ${{ matrix.extension }}/
+
+    - name: Publish extension
+      if: matrix.extension == 'vscode-extension'
+      run: |
+        cd vscode-extension
+        npm run publish
+      env:
+        VSCE_TOKEN: ${{ secrets.VSCE_TOKEN }}
+
+    - name: Prepare browser extension for store
+      if: matrix.extension == 'browser-extension'
+      run: |
+        cd browser-extension
+        npm run build:production
+        zip -r questro-browser-extension.zip dist/ manifest.json icons/
+
+    - name: Upload browser extension artifact
+      if: matrix.extension == 'browser-extension'
+      uses: actions/upload-artifact@v3
+      with:
+        name: questro-browser-extension
+        path: browser-extension/questro-browser-extension.zip
+
+  docker:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        service: [backend, agent]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./${{ matrix.service }}
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+
+    - name: Run performance tests
+      run: |
+        chmod +x scripts/testing/performance-tests.sh
+        ./scripts/testing/performance-tests.sh staging
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: performance-results/
+
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy-production, deploy-staging, deploy-development]
+    if: always()
+    steps:
+    - name: Cleanup old artifacts
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            run_id: context.runId,
+          });
+
+          const oldArtifacts = artifacts.data.artifacts.filter(artifact => {
+            const createdAt = new Date(artifact.created_at);
+            const daysOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+            return daysOld > 7;
+          });
+
+          for (const artifact of oldArtifacts) {
+            await github.rest.actions.deleteArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: artifact.id,
+            });
+          }

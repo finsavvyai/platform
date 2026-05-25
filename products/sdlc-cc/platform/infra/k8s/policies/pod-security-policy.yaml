@@ -1,0 +1,375 @@
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: sdlc-platform-psp
+  labels:
+    app: sdlc-platform
+    component: security-policy
+  annotations:
+    description: "Pod Security Policy for SDLC Platform"
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default,docker/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 2000
+    seccompProfile:
+      type: RuntimeDefault
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sdlc-platform-psp-user
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: psp-role
+rules:
+  - apiGroups: ['policy']
+    resources: ['podsecuritypolicies']
+    verbs: ['use']
+    resourceNames:
+      - sdlc-platform-psp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sdlc-platform-psp-binding
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: psp-binding
+roleRef:
+  kind: Role
+  name: sdlc-platform-psp-user
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: sdlc-platform
+    namespace: sdlc-platform
+  - kind: ServiceAccount
+    name: default
+    namespace: sdlc-platform
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: sdlc-platform-limits
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: limits
+spec:
+  limits:
+    - default:
+        cpu: "1000m"
+        memory: "1Gi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      type: Container
+      max:
+        cpu: "4000m"
+        memory: "4Gi"
+      min:
+        cpu: "50m"
+        memory: "64Mi"
+    - default:
+        ephemeral-storage: "1Gi"
+      defaultRequest:
+        ephemeral-storage: "100Mi"
+      max:
+        ephemeral-storage: "10Gi"
+      min:
+        ephemeral-storage: "10Mi"
+      type: Container
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: sdlc-platform-quota
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: quota
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.cpu: "40"
+    limits.memory: 80Gi
+    persistentvolumeclaims: "20"
+    requests.storage: 10Ti
+    pods: "50"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"
+    count/deployments.apps: "20"
+    count/replicasets.apps: "50"
+    count/statefulsets.apps: "10"
+    count/jobs.batch: "20"
+    count/cronjobs.batch: "20"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sdlc-platform
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+  annotations:
+    iam.amazonaws.com/role: "arn:aws:iam::ACCOUNT_ID:role/sdlc-platform-service-role"
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/sdlc-platform-service-role"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sdlc-platform-cluster-role
+  labels:
+    app: sdlc-platform
+    component: cluster-role
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    verbs: ["use"]
+  - apiGroups: ["extensions"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
+  - apiGroups: ["custom.metrics.k8s.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  - apiGroups: ["events.k8s.io"]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create", "get", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sdlc-platform-cluster-binding
+  labels:
+    app: sdlc-platform
+    component: cluster-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sdlc-platform-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: sdlc-platform
+    namespace: sdlc-platform
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: sdlc-monitoring
+  - kind: ServiceAccount
+    name: grafana
+    namespace: sdlc-monitoring
+  - kind: ServiceAccount
+    name: filebeat
+    namespace: sdlc-logging
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: sdlc-platform-validator
+  labels:
+    app: sdlc-platform
+    component: validator
+webhooks:
+  - name: validator.sdlc-platform.io
+    clientConfig:
+      service:
+        name: sdlc-platform-validator
+        namespace: sdlc-platform
+        path: "/validate"
+      caBundle: ""
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        resources: ["deployments"]
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None
+    failurePolicy: Fail
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: sdlc-platform-mutator
+  labels:
+    app: sdlc-platform
+    component: mutator
+webhooks:
+  - name: mutator.sdlc-platform.io
+    clientConfig:
+      service:
+        name: sdlc-platform-mutator
+        namespace: sdlc-platform
+        path: "/mutate"
+      caBundle: ""
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        resources: ["deployments"]
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None
+    failurePolicy: Fail
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: sdlc-platform-restricted
+  labels:
+    app: sdlc-platform
+    component: restricted-psp
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: true
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 2000
+    seccompProfile:
+      type: RuntimeDefault
+---
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+  labels:
+    app: sdlc-platform
+    component: runtime-class
+handler: gvisor
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-policies-config
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: security-config
+data:
+  policies.yaml: |
+    apiVersion: v1
+    kind: List
+    items:
+      - apiVersion: policy/v1beta1
+        kind: PodSecurityPolicy
+        metadata:
+          name: restricted
+        spec:
+          privileged: false
+          allowPrivilegeEscalation: false
+          requiredDropCapabilities:
+            - ALL
+          volumes:
+            - 'configMap'
+            - 'emptyDir'
+            - 'projected'
+            - 'secret'
+            - 'downwardAPI'
+            - 'persistentVolumeClaim'
+          runAsUser:
+            rule: 'MustRunAsNonRoot'
+          seLinux:
+            rule: 'RunAsAny'
+          fsGroup:
+            rule: 'RunAsAny'
+          readOnlyRootFilesystem: true
+      - apiVersion: policy/v1beta1
+        kind: PodSecurityPolicy
+        metadata:
+          name: baseline
+        spec:
+          privileged: false
+          allowPrivilegeEscalation: false
+          requiredDropCapabilities:
+            - NET_RAW
+            - SYS_ADMIN
+          volumes:
+            - 'configMap'
+            - 'emptyDir'
+            - 'projected'
+            - 'secret'
+            - 'downwardAPI'
+            - 'persistentVolumeClaim'
+          runAsUser:
+            rule: 'RunAsAny'
+          seLinux:
+            rule: 'RunAsAny'
+          fsGroup:
+            rule: 'RunAsAny'

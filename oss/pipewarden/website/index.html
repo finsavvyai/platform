@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="dark light" />
+<title>PipeWarden — AI-powered CI/CD for modern engineering teams</title>
+<meta name="description" content="PipeWarden is the AI CI/CD platform that automates pipelines, predicts release failures, and cuts deployment risk. Built for DevOps, platform teams, and CTOs." />
+<meta property="og:title" content="PipeWarden — AI CI/CD Platform" />
+<meta property="og:description" content="Automate pipelines. Predict failures. Ship with confidence." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://pipewarden.io/" />
+<meta property="og:image" content="https://pipewarden.io/favicon.svg" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="PipeWarden — AI CI/CD Platform" />
+<meta name="twitter:description" content="Automate pipelines. Predict failures. Ship with confidence." />
+<link rel="canonical" href="https://pipewarden.io/" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/design-system/tokens.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.iife.min.js" defer></script>
+
+<style>
+  :root {
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --bg: #000000;
+    --bg-soft: #0a0a0a;
+    --surface: #14141a;
+    --surface-2: rgba(255,255,255,0.04);
+    --text-1: rgba(255,255,255,0.96);
+    --text-2: rgba(235,235,245,0.60);
+    --text-3: rgba(235,235,245,0.30);
+    --separator: rgba(84,84,88,0.40);
+    --accent: #8b5cf6;
+    --accent-hover: #9b6cff;
+    --accent-soft: rgba(139,92,246,0.12);
+
+    --text: var(--text-1);
+    --text-secondary: var(--text-2);
+    --text-tertiary: var(--text-3);
+    --text-muted: var(--text-2);
+    --text-dim: var(--text-3);
+    --bg-elev-1: var(--surface);
+    --bg-elev-2: #1c1c24;
+    --bg-card: var(--surface-2);
+    --bg-card-hover: rgba(255,255,255,0.06);
+    --hairline: var(--separator);
+    --hairline-strong: rgba(255,255,255,0.14);
+    --border: var(--separator);
+    --border-strong: rgba(255,255,255,0.14);
+    --brand-green: #30D158;
+    --accent-2: #a78bfa;
+    --blue: #0A84FF;
+    --sys-teal: #a78bfa;
+    --sys-blue: #8b5cf6;
+    --sys-green: #30D158;
+    --sys-indigo: #5E5CE6;
+    --warn: #FF9F0A;
+    --danger: #FF453A;
+
+    --r-xs: 6px;
+    --r-sm: 10px;
+    --r-md: 14px;
+    --r-lg: 22px;
+    --r-xl: 28px;
+    --r-full: 9999px;
+    --radius-sm: var(--r-sm);
+    --radius: var(--r-md);
+    --radius-lg: var(--r-lg);
+
+    --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px;
+    --s-6: 24px; --s-8: 32px; --s-10: 40px; --s-12: 48px; --s-16: 64px; --s-20: 80px;
+
+    --fs-11: 11px; --fs-13: 13px; --fs-15: 15px; --fs-17: 17px; --fs-20: 20px;
+    --fs-24: 24px; --fs-28: 28px; --fs-34: 34px; --fs-48: 48px; --fs-60: 60px;
+    --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600; --fw-bold: 700;
+
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-emph: cubic-bezier(0.2, 0, 0, 1);
+    --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    --dur-micro: 150ms;
+    --dur-short: 220ms;
+    --dur-med: 320ms;
+    --dur-long: 480ms;
+
+    --shadow-xs: 0 1px 2px rgba(0,0,0,0.32);
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.36), 0 1px 2px rgba(0,0,0,0.24);
+    --shadow-md: 0 8px 24px rgba(0,0,0,0.42), 0 2px 6px rgba(0,0,0,0.22);
+    --shadow-lg: 0 24px 60px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.28);
+    --shadow-focus: 0 0 0 4px rgba(139,92,246,0.40);
+
+    --glass-bg: rgba(10,10,12,0.62);
+    --glass-bg-strong: rgba(10,10,12,0.82);
+    --glass-border: rgba(255,255,255,0.10);
+    --glass-blur: saturate(180%) blur(20px);
+
+    --max: 1180px;
+    --content-max: 1180px;
+    --section-pad: clamp(80px, 12vw, 160px);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #ffffff;
+      --bg-soft: #f5f5f7;
+      --surface: #ffffff;
+      --surface-2: rgba(0,0,0,0.04);
+      --text-1: #1d1d1f;
+      --text-2: rgba(60,60,67,0.65);
+      --text-3: rgba(60,60,67,0.30);
+      --separator: rgba(0,0,0,0.08);
+      --accent: #7c3aed;
+      --accent-hover: #6d28d9;
+      --accent-soft: rgba(124,58,237,0.10);
+
+      --text: var(--text-1);
+      --text-secondary: var(--text-2);
+      --text-tertiary: var(--text-3);
+      --text-muted: var(--text-2);
+      --text-dim: var(--text-3);
+      --bg-elev-1: var(--surface);
+      --bg-elev-2: #f0f0f3;
+      --bg-card: var(--surface-2);
+      --bg-card-hover: rgba(0,0,0,0.06);
+      --hairline: var(--separator);
+      --hairline-strong: rgba(0,0,0,0.14);
+      --border: var(--separator);
+      --border-strong: rgba(0,0,0,0.14);
+      --sys-blue: #7c3aed;
+      --sys-teal: #8b5cf6;
+
+      --shadow-xs: 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+      --shadow-lg: 0 24px 60px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.06);
+      --shadow-focus: 0 0 0 4px rgba(124,58,237,0.30);
+
+      --glass-bg: rgba(255,255,255,0.72);
+      --glass-bg-strong: rgba(255,255,255,0.88);
+      --glass-border: rgba(0,0,0,0.06);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    font-size: var(--fs-17);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  img { max-width: 100%; display: block; }
+  button { font-family: inherit; cursor: pointer; border: none; }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  h1, h2, h3, h4 { font-weight: 600; letter-spacing: -0.02em; line-height: 1.08; margin: 0; color: var(--text-1); }
+  h1 { font-size: clamp(40px, 7vw, 80px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; }
+  h2 { font-size: clamp(28px, 4vw, 48px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.08; }
+  h3 { font-size: var(--fs-20); font-weight: 600; letter-spacing: -0.01em; }
+  h4 { font-size: var(--fs-17); font-weight: 600; }
+  p { margin: 0; color: var(--text-2); }
+
+  .container { max-width: var(--max); margin: 0 auto; padding: 0 clamp(24px, 4vw, 48px); }
+  .mono { font-family: var(--font-mono); }
+
+  .skip-link {
+    position: absolute; top: -48px; left: 12px;
+    padding: 10px 16px;
+    background: var(--accent); color: #fff;
+    font-weight: 600; font-size: 15px;
+    border-radius: 8px;
+    z-index: 100;
+    transition: top var(--dur-short) var(--ease-standard);
+  }
+  .skip-link:focus { top: 12px; }
+
+  /* ---------- NAV ---------- */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    background: var(--glass-bg);
+    border-bottom: 1px solid var(--separator);
+  }
+  .nav-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text-1); font-size: 17px; letter-spacing: -0.01em; }
+  .logo-mark {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--accent), #6d28d9);
+    display: grid; place-items: center;
+    box-shadow: 0 0 0 1px rgba(139,92,246,0.30), 0 6px 18px -8px rgba(139,92,246,0.55);
+  }
+  .logo-mark::after {
+    content: ''; width: 9px; height: 9px; border-radius: 2px;
+    background: var(--bg);
+  }
+  .nav-links { display: flex; gap: 28px; align-items: center; }
+  .nav-links a { color: var(--text-2); font-size: 14px; font-weight: 500; transition: color var(--dur-short) var(--ease-standard); }
+  .nav-links a:hover { color: var(--text-1); }
+  .nav-cta { display: flex; gap: 10px; align-items: center; }
+  .nav-burger { display: none; background: transparent; color: var(--text-1); width: 44px; height: 44px; border-radius: 10px; }
+  .nav-burger:hover { background: var(--bg-card); }
+  .nav-burger svg { width: 20px; height: 20px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+    min-height: 44px;
+    padding: 0 var(--s-6);
+    border-radius: var(--r-full);
+    font-weight: 600; font-size: 15px;
+    letter-spacing: -0.01em;
+    transition: transform var(--dur-micro) var(--ease-standard),
+                background var(--dur-short) var(--ease-standard),
+                border-color var(--dur-short) var(--ease-standard),
+                box-shadow var(--dur-short) var(--ease-standard),
+                filter var(--dur-short) var(--ease-standard);
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 12px -2px rgba(139,92,246,0.45); }
+  .btn-primary:hover { background: var(--accent-hover); filter: brightness(1.08); box-shadow: 0 4px 18px -4px rgba(139,92,246,0.55); }
+  .btn-ghost {
+    background: transparent; color: var(--text-1); border: 1px solid var(--hairline-strong);
+  }
+  .btn-ghost:hover { background: var(--bg-card); border-color: var(--accent); }
+  .btn-lg { min-height: 52px; padding: 0 28px; font-size: 17px; }
+  .btn-plain {
+    background: transparent; color: var(--accent); padding: 0 var(--s-4);
+    min-height: 44px; font-weight: 600; font-size: 17px;
+  }
+  .btn-plain:hover { text-decoration: underline; }
+
+  /* ---------- HERO ---------- */
+  .hero { position: relative; padding: clamp(96px, 14vw, 160px) 0 clamp(72px, 10vw, 120px); overflow: hidden; }
+  .hero::before {
+    content: ''; position: absolute; inset: -30% -10% auto -10%; height: 900px;
+    background:
+      radial-gradient(ellipse 55% 45% at 50% 5%, rgba(139,92,246,0.22), transparent 65%),
+      radial-gradient(ellipse 42% 36% at 78% 18%, rgba(167,139,250,0.14), transparent 65%),
+      radial-gradient(ellipse 38% 32% at 22% 24%, rgba(124,58,237,0.10), transparent 65%);
+    pointer-events: none; z-index: 0;
+  }
+  .hero::after {
+    content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 20%, #000 30%, transparent 80%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 20%, #000 30%, transparent 80%);
+  }
+  @media (prefers-color-scheme: light) {
+    .hero::after { background-image:
+      linear-gradient(rgba(0,0,0,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.035) 1px, transparent 1px); }
+  }
+  .hero-inner {
+    position: relative; z-index: 1; text-align: center;
+    animation: heroFadeIn 480ms var(--ease-emph) both;
+  }
+  @keyframes heroFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 8px 16px 8px 14px; border-radius: 999px;
+    background: var(--accent-soft);
+    border: 1px solid var(--separator);
+    color: var(--accent); font-size: 13px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+  .eyebrow .dot {
+    width: 7px; height: 7px; border-radius: 999px;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft), 0 0 14px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  .eyebrow .pip { color: var(--accent); font-weight: 700; letter-spacing: 0.02em; }
+
+  .hero h1 { max-width: 980px; margin: 0 auto 24px; font-weight: 700; color: var(--text-1); }
+  .hero h1 .grad { color: var(--text-1); }
+  .hero h1 .accent {
+    background: linear-gradient(135deg, var(--accent) 0%, #c4a4ff 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero-sub {
+    max-width: 640px; margin: 0 auto;
+    font-size: clamp(18px, 1.6vw, 22px);
+    color: var(--text-2); line-height: 1.45;
+    font-weight: 400;
+  }
+  .hero-ctas { display: flex; gap: 16px; justify-content: center; margin-top: 44px; flex-wrap: wrap; align-items: center; }
+  .hero-meta { display: flex; gap: 32px; justify-content: center; margin-top: 32px; flex-wrap: wrap; color: var(--text-3); font-size: 14px; }
+  .hero-meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .check { width: 14px; height: 14px; color: var(--accent); }
+
+  /* Product preview */
+  .hero-preview {
+    position: relative; z-index: 1;
+    margin: 80px auto 0; max-width: 1180px;
+    border-radius: var(--r-xl);
+    background: var(--surface);
+    border: 1px solid var(--separator);
+    box-shadow:
+      0 60px 160px -40px rgba(139,92,246,0.25),
+      0 30px 80px -20px rgba(0,0,0,0.5),
+      inset 0 1px 0 rgba(255,255,255,0.04);
+    overflow: hidden;
+  }
+  .preview-chrome {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 18px;
+    background: var(--bg-soft);
+    border-bottom: 1px solid var(--separator);
+  }
+  .chrome-dots { display: flex; gap: 6px; }
+  .chrome-dots span { width: 11px; height: 11px; border-radius: 999px; background: var(--text-3); opacity: 0.5; }
+  .chrome-url {
+    flex: 1; margin: 0 auto; max-width: 360px;
+    padding: 6px 12px; border-radius: 8px;
+    background: var(--surface-2); color: var(--text-3); font-size: 12px; text-align: center;
+    font-family: var(--font-mono);
+  }
+  .preview-body { display: grid; grid-template-columns: 220px 1fr; min-height: 420px; }
+  .preview-side {
+    background: var(--bg-soft); border-right: 1px solid var(--separator);
+    padding: 20px 14px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .side-group { color: var(--text-3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; padding: 14px 8px 6px; }
+  .side-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 8px;
+    color: var(--text-2); font-size: 14px;
+  }
+  .side-item.active { background: var(--accent-soft); color: var(--accent); }
+  .side-item .ico { width: 14px; height: 14px; border-radius: 3px; background: currentColor; opacity: 0.6; }
+  .preview-main { padding: 28px; display: flex; flex-direction: column; gap: 22px; }
+  .preview-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+  .preview-header h4 { color: var(--text-1); font-size: 16px; font-weight: 600; margin: 0; }
+  .preview-header .status { font-size: 13px; color: var(--accent); display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
+  .preview-header .status::before { content:''; width: 6px; height: 6px; border-radius: 999px; background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity: 0.5; } }
+
+  .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .stat {
+    padding: 16px; border-radius: 12px;
+    background: var(--surface-2); border: 1px solid var(--separator);
+  }
+  .stat-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+  .stat-value { font-size: 22px; font-weight: 700; color: var(--text-1); margin-top: 4px; font-family: var(--font-mono); letter-spacing: -0.02em; }
+  .stat-delta { font-size: 12px; color: var(--accent); margin-top: 2px; font-weight: 500; }
+  .stat-delta.neg { color: var(--danger); }
+
+  .pipeline {
+    padding: 18px; border-radius: 12px;
+    background: var(--surface-2); border: 1px solid var(--separator);
+  }
+  .pipe-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--separator); font-size: 14px; }
+  .pipe-row:last-child { border-bottom: none; }
+  .pipe-name { flex: 1; color: var(--text-1); font-weight: 500; }
+  .pipe-branch { color: var(--text-3); font-family: var(--font-mono); font-size: 12px; }
+  .badge {
+    font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px; letter-spacing: 0.02em;
+  }
+  .badge.ok { background: rgba(48,209,88,0.14); color: var(--sys-green); }
+  .badge.warn { background: rgba(255,159,10,0.16); color: var(--warn); }
+  .badge.run { background: var(--accent-soft); color: var(--accent); }
+  .bar { height: 4px; background: var(--separator); border-radius: 99px; overflow: hidden; width: 80px; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+
+  /* ---------- SECTIONS ---------- */
+  section { padding: var(--section-pad) 0; position: relative; }
+  .section-head { text-align: center; max-width: 720px; margin: 0 auto clamp(56px, 8vw, 88px); }
+  .section-tag {
+    display: inline-block;
+    color: var(--accent);
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .section-head p { margin-top: 20px; font-size: 20px; color: var(--text-2); line-height: 1.45; font-weight: 400; }
+
+  /* ---------- SCROLL REVEAL ---------- */
+  .reveal {
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 520ms var(--ease-emph), transform 520ms var(--ease-emph);
+    will-change: opacity, transform;
+  }
+  .reveal.in {
+    opacity: 1; transform: none;
+  }
+
+  /* Trust */
+  .trust { padding: clamp(56px, 8vw, 96px) 0 clamp(24px, 4vw, 48px); }
+  .trust-strip {
+    display: flex; justify-content: center; align-items: center;
+    flex-wrap: wrap; gap: 0;
+    max-width: 980px; margin: 0 auto 28px;
+    padding: 24px 20px;
+    background: var(--surface-2);
+    border: 1px solid var(--separator);
+    border-radius: var(--r-lg);
+  }
+  .trust-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 6px 28px; min-width: 140px;
+  }
+  .trust-num {
+    color: var(--text-1); font-weight: 600; font-size: 17px;
+    letter-spacing: -0.01em;
+  }
+  .trust-label {
+    color: var(--text-2); font-size: 13px;
+  }
+  .trust-divider {
+    width: 1px; height: 32px; background: var(--separator);
+  }
+  @media (max-width: 760px) {
+    .trust-strip { gap: 4px; padding: 16px; }
+    .trust-chip { padding: 6px 12px; min-width: 120px; flex: 1 1 calc(50% - 1px); }
+    .trust-divider { display: none; }
+  }
+  .trust-copy { text-align: center; color: var(--text-2); font-size: 14px; margin-bottom: 0; }
+  .trust-copy a { color: var(--accent); }
+  .trust-copy a:hover { text-decoration: underline; }
+  .logos {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 28px;
+    align-items: center; justify-items: center;
+    opacity: 0.75;
+  }
+  .logo-pill {
+    color: var(--text-2); font-weight: 600; font-size: 16px; letter-spacing: -0.01em;
+    filter: grayscale(1); opacity: 0.6; transition: opacity var(--dur-short) var(--ease-standard);
+  }
+  .logo-pill:hover { opacity: 1; }
+  .metrics {
+    margin-top: 48px; display: grid; grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--separator); border-bottom: 1px solid var(--separator);
+  }
+  .metric { padding: 32px 16px; text-align: center; border-right: 1px solid var(--separator); }
+  .metric:last-child { border-right: none; }
+  .metric .v { font-size: 28px; font-weight: 700; color: var(--text-1); letter-spacing: -0.02em; }
+  .metric .l { font-size: 13px; color: var(--text-2); margin-top: 6px; }
+
+  /* Features */
+  .features-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, 3vw, 40px) clamp(24px, 3vw, 40px);
+  }
+  .feat {
+    padding: 8px 8px 8px 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    transition: transform var(--dur-short) var(--ease-standard);
+    position: relative;
+  }
+  .feat:hover { transform: translateY(-2px); }
+  .feat-ico {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--accent-soft);
+    display: grid; place-items: center; color: var(--accent);
+    margin-bottom: 20px;
+  }
+  .feat-ico svg { width: 24px; height: 24px; }
+  .feat h3 { color: var(--text-1); margin-bottom: 10px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+  .feat p { font-size: 15px; line-height: 1.55; color: var(--text-2); }
+  .feat.wide { grid-column: span 2; }
+  .features-grid .feat.reveal:nth-child(2) { transition-delay: 80ms; }
+  .features-grid .feat.reveal:nth-child(3) { transition-delay: 160ms; }
+  .features-grid .feat.reveal:nth-child(4) { transition-delay: 240ms; }
+  .features-grid .feat.reveal:nth-child(5) { transition-delay: 320ms; }
+  .features-grid .feat.reveal:nth-child(6) { transition-delay: 400ms; }
+
+  /* How it works */
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; position: relative; }
+  .step {
+    padding: 32px 28px;
+    background: var(--surface);
+    border: 1px solid var(--separator);
+    border-radius: var(--r-lg);
+    position: relative;
+    transition: transform var(--dur-short) var(--ease-standard), border-color var(--dur-short) var(--ease-standard);
+  }
+  .step:hover { transform: translateY(-2px); border-color: var(--hairline-strong); }
+  .step-num {
+    font-family: var(--font-mono);
+    font-size: 12px; color: var(--accent);
+    background: var(--accent-soft);
+    padding: 4px 10px; border-radius: 999px;
+    display: inline-block; margin-bottom: 18px;
+    font-weight: 600; letter-spacing: 0.04em;
+  }
+  .step h3 { margin-bottom: 8px; font-size: 17px; font-weight: 600; color: var(--text-1); }
+  .step p { font-size: 15px; line-height: 1.55; color: var(--text-2); }
+
+  /* Dashboard deeper preview */
+  .dash {
+    background: var(--surface);
+    border: 1px solid var(--separator);
+    border-radius: var(--r-lg);
+    padding: 28px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    box-shadow: var(--shadow-lg);
+  }
+  .dash-card {
+    background: var(--surface-2); border: 1px solid var(--separator); border-radius: 14px;
+    padding: 22px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .dash-card h4 { color: var(--text-1); font-size: 15px; font-weight: 600; margin: 0; display: flex; justify-content: space-between; align-items: center; }
+  .dash-card h4 small { font-weight: 500; color: var(--text-3); font-size: 12px; font-family: var(--font-mono); }
+  .sparkline { height: 90px; position: relative; }
+  .sparkline svg { width: 100%; height: 100%; }
+
+  .logstream { font-family: var(--font-mono); font-size: 12px; display: flex; flex-direction: column; gap: 6px; color: var(--text-2); }
+  .logstream .t { color: var(--text-3); margin-right: 8px; }
+  .logstream .ok { color: var(--sys-green); }
+  .logstream .warn { color: var(--warn); }
+  .logstream .err { color: var(--danger); }
+  .logstream .info { color: var(--accent); }
+
+  .deploy-list { display: flex; flex-direction: column; gap: 10px; }
+  .deploy-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 12px; align-items: center; padding: 10px 12px; background: var(--bg-soft); border-radius: 8px; border: 1px solid var(--separator); font-size: 13px; color: var(--text-1); }
+  .env-chip { font-family: var(--font-mono); font-size: 11px; padding: 3px 8px; border-radius: 5px; background: var(--surface-2); color: var(--text-2); }
+
+  /* Personas */
+  .persona-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .persona {
+    padding: 28px; border-radius: var(--r-lg);
+    border: 1px solid var(--separator); background: var(--surface);
+    transition: transform var(--dur-short) var(--ease-standard), border-color var(--dur-short) var(--ease-standard);
+  }
+  .persona:hover { transform: translateY(-2px); border-color: var(--hairline-strong); }
+  .persona h4 { font-size: 15px; font-weight: 600; color: var(--text-1); margin-bottom: 14px; letter-spacing: -0.01em; }
+  .persona ul { padding: 0; margin: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .persona li { font-size: 14px; color: var(--text-2); padding-left: 20px; position: relative; line-height: 1.45; }
+  .persona li::before { content: ''; position: absolute; left: 0; top: 9px; width: 10px; height: 2px; background: var(--accent); border-radius: 1px; }
+
+  /* Integrations */
+  .integrations {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px;
+  }
+  .integ {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px;
+    background: var(--surface);
+    border: 1px solid var(--separator); border-radius: 12px;
+    font-size: 14px; font-weight: 500; color: var(--text-1);
+    transition: border-color var(--dur-short) var(--ease-standard),
+                transform var(--dur-short) var(--ease-standard),
+                background var(--dur-short) var(--ease-standard);
+  }
+  .integ:hover { border-color: var(--hairline-strong); transform: translateY(-2px); background: var(--bg-card-hover); }
+  .integ-ico {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--surface-2); display: grid; place-items: center; color: var(--text-1);
+    font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* Security */
+  .security { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 64px; align-items: start; }
+  .security > div:first-child > p { font-size: 17px; color: var(--text-2); line-height: 1.55; }
+  .security a { color: var(--accent); }
+  .security a:hover { text-decoration: underline; }
+  .sec-list { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 32px; }
+  .sec-item { display: flex; gap: 12px; align-items: flex-start; }
+  .sec-item .ico { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+  .sec-item strong { color: var(--text-1); font-size: 14px; display: block; margin-bottom: 2px; font-weight: 600; }
+  .sec-item span { font-size: 13px; color: var(--text-2); }
+  .compliance-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+    padding: 28px; background: var(--surface); border: 1px solid var(--separator); border-radius: var(--r-lg);
+  }
+  .comp-badge {
+    padding: 20px; background: var(--surface-2); border: 1px solid var(--separator);
+    border-radius: 12px; text-align: center;
+  }
+  .comp-badge .t { color: var(--text-1); font-weight: 700; font-size: 15px; letter-spacing: 0.05em; }
+  .comp-badge .s { color: var(--text-2); font-size: 12px; margin-top: 4px; }
+  .compliance-line {
+    font-size: 14px; color: var(--text-2); line-height: 1.55;
+    padding: 24px; background: var(--surface-2); border: 1px solid var(--separator);
+    border-radius: var(--r-md); margin-top: 0;
+  }
+
+  /* Pricing */
+  .pricing { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  @media (max-width: 1024px) { .pricing { grid-template-columns: repeat(2, 1fr); } }
+  .plan {
+    padding: 36px 32px;
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    border: 1px solid var(--separator);
+    display: flex; flex-direction: column; gap: 20px;
+    position: relative;
+    transition: transform var(--dur-short) var(--ease-standard),
+                box-shadow var(--dur-short) var(--ease-standard),
+                border-color var(--dur-short) var(--ease-standard);
+  }
+  .plan:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: var(--hairline-strong); }
+  .plan.featured {
+    border-color: var(--accent);
+    background: linear-gradient(180deg, var(--accent-soft), var(--surface) 60%);
+    box-shadow: 0 20px 48px -20px rgba(139,92,246,0.38);
+  }
+  .plan-ribbon {
+    position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: #fff;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 999px;
+    box-shadow: 0 4px 12px -2px rgba(139,92,246,0.45);
+  }
+  .plan-name { font-size: 13px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+  .plan-price { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+  .plan-price .amt { font-size: clamp(40px, 4vw, 56px); font-weight: 700; color: var(--text-1); letter-spacing: -0.025em; line-height: 1; }
+  .plan-price .per { font-size: 13px; color: var(--text-3); }
+  .plan-desc { font-size: 15px; color: var(--text-2); line-height: 1.45; }
+  .plan ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  .plan li { font-size: 15px; color: var(--text-1); padding-left: 26px; position: relative; line-height: 1.45; }
+  .plan li::before {
+    content: ''; position: absolute; left: 0; top: 6px;
+    width: 12px; height: 6px;
+    border-left: 2px solid var(--accent);
+    border-bottom: 2px solid var(--accent);
+    transform: rotate(-45deg);
+  }
+
+  /* FAQ */
+  .faq { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .faq details {
+    border: 1px solid var(--separator); border-radius: 14px;
+    background: var(--surface); padding: 22px 26px;
+    transition: border-color var(--dur-short) var(--ease-standard);
+  }
+  .faq details[open] { border-color: var(--hairline-strong); }
+  .faq summary {
+    cursor: pointer; list-style: none;
+    font-weight: 600; color: var(--text-1); font-size: 17px;
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    letter-spacing: -0.01em;
+  }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after {
+    content: '+'; font-size: 24px; color: var(--text-2); line-height: 1; font-weight: 300;
+    transition: transform var(--dur-short) var(--ease-standard);
+  }
+  .faq details[open] summary::after { content: '−'; color: var(--accent); }
+  .faq p { margin-top: 14px; font-size: 15px; line-height: 1.55; }
+  .faq a { color: var(--accent); }
+  .faq a:hover { text-decoration: underline; }
+
+  /* Final CTA */
+  .final-cta {
+    text-align: center;
+    padding: clamp(64px, 10vw, 112px) clamp(24px, 4vw, 48px);
+    border-radius: var(--r-xl);
+    background: var(--bg-soft);
+    border: 1px solid var(--separator);
+    position: relative; overflow: hidden;
+  }
+  .final-cta::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 70% at 50% 0%, var(--accent-soft), transparent 70%);
+    pointer-events: none;
+  }
+  .final-cta > * { position: relative; z-index: 1; }
+  .final-cta .section-tag { color: var(--accent); }
+  .final-cta h2 { max-width: 720px; margin: 0 auto 18px; }
+  .final-cta p { max-width: 560px; margin: 0 auto 36px; font-size: 19px; color: var(--text-2); line-height: 1.45; }
+
+  /* Footer */
+  footer { border-top: 1px solid var(--separator); padding: 72px 0 36px; margin-top: 48px; }
+  .foot-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 48px; }
+  .foot-col h5 { color: var(--text-1); font-size: 13px; font-weight: 600; margin: 0 0 16px; letter-spacing: 0.02em; text-transform: uppercase; }
+  .foot-col a { display: block; color: var(--text-2); font-size: 14px; padding: 6px 0; transition: color var(--dur-short) var(--ease-standard); }
+  .foot-col a:hover { color: var(--accent); }
+  .foot-brand p { margin: 16px 0 20px; font-size: 14px; max-width: 300px; color: var(--text-2); line-height: 1.55; }
+  .foot-social { display: flex; gap: 10px; }
+  .foot-social a { width: 36px; height: 36px; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--separator); border-radius: 10px; transition: border-color var(--dur-short) var(--ease-standard), background var(--dur-short) var(--ease-standard); }
+  .foot-social a:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .foot-social svg { width: 15px; height: 15px; color: var(--text-2); }
+  .foot-social a:hover svg { color: var(--accent); }
+  .foot-bottom {
+    margin-top: 56px; padding-top: 28px;
+    border-top: 1px solid var(--separator);
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+    color: var(--text-3); font-size: 13px;
+  }
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width: 1024px) {
+    .features-grid { grid-template-columns: repeat(2, 1fr); }
+    .feat.wide { grid-column: span 2; }
+    .steps { grid-template-columns: repeat(2, 1fr); }
+    .persona-grid { grid-template-columns: repeat(2, 1fr); }
+    .integrations { grid-template-columns: repeat(3, 1fr); }
+    .security { grid-template-columns: 1fr; gap: 40px; }
+    .pricing { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .plan.featured { order: 0; }
+    .foot-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+    .foot-brand { grid-column: span 2; }
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .metric:nth-child(2) { border-right: none; }
+    .metric:nth-child(1), .metric:nth-child(2) { border-bottom: 1px solid var(--separator); }
+    .logos { grid-template-columns: repeat(3, 1fr); row-gap: 24px; }
+    .dash { grid-template-columns: 1fr; }
+    .preview-body { grid-template-columns: 1fr; }
+    .preview-side { display: none; }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 768px) {
+    .nav-links, .nav-cta .btn-ghost { display: none; }
+    .nav-burger { display: grid; place-items: center; }
+    .features-grid { grid-template-columns: 1fr; gap: 32px; }
+    .feat.wide { grid-column: auto; }
+    .steps { grid-template-columns: 1fr; }
+    .persona-grid { grid-template-columns: 1fr; }
+    .integrations { grid-template-columns: repeat(2, 1fr); }
+    .pricing { grid-template-columns: 1fr; max-width: 480px; margin: 0 auto; }
+    .compliance-grid { grid-template-columns: 1fr 1fr; }
+    .sec-list { grid-template-columns: 1fr; }
+    .hero-meta { gap: 16px; font-size: 13px; }
+    .foot-grid { grid-template-columns: 1fr; }
+    .foot-brand { grid-column: auto; }
+    .hero-ctas .btn { width: 100%; }
+    .hero-ctas { flex-direction: column; align-items: stretch; padding: 0 12px; }
+    .metric .v { font-size: 22px; }
+    .stat-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .preview-main { padding: 18px; gap: 16px; }
+  }
+
+  .mobile-menu {
+    display: none;
+    position: fixed; inset: 60px 0 0 0;
+    background: var(--glass-bg-strong); backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    padding: 24px; z-index: 49;
+    flex-direction: column; gap: 4px;
+  }
+  .mobile-menu.open { display: flex; }
+  .mobile-menu a { padding: 16px 12px; color: var(--text-1); font-weight: 500; font-size: 17px; border-bottom: 1px solid var(--separator); }
+  .mobile-menu .btn { margin-top: 16px; }
+</style>
+    <!-- SoftwareApplication JSON-LD (no fabricated aggregateRating) -->
+    <script type="application/ld+json">
+    {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "PipeWarden",
+  "url": "https://pipewarden.io/",
+  "description": "Multi-platform CI/CD security scanning across GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins, Azure DevOps, and CircleCI. Claude AI analyzer + 13-pattern DLP + 8 OPA policies + SARIF export.",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Web, macOS, Linux, Windows",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "Free",
+      "price": "0",
+      "priceCurrency": "USD",
+      "category": "subscription",
+      "description": "1 CI connection, 50 scans/day, heuristic + DLP"
+    },
+    {
+      "@type": "Offer",
+      "name": "Pro",
+      "price": "19",
+      "priceCurrency": "USD",
+      "category": "subscription",
+      "description": "Unlimited connections, 5k scans/day, Claude AI analyzer, SARIF export"
+    },
+    {
+      "@type": "Offer",
+      "name": "Team",
+      "price": "49",
+      "priceCurrency": "USD",
+      "category": "subscription",
+      "description": "SSO/SAML, immutable audit log, compliance evidence packs"
+    }
+  ],
+  "publisher": {
+    "@type": "Organization",
+    "name": "FinSavvyAI",
+    "url": "https://shacharsolomon.dev"
+  },
+  "creator": {
+    "@type": "Person",
+    "name": "Shachar Solomon",
+    "url": "https://shacharsolomon.dev",
+    "jobTitle": "Founder"
+  },
+  "dateModified": "2026-05-19"
+}
+    </script>
+    <!-- FAQPage JSON-LD -->
+    <script type="application/ld+json">
+    {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is PipeWarden SOC 2 certified?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Not today. SOC 2 Type I is in progress with target attestation Q3 2026 via Vanta/Drata. We will not claim certification we do not have."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Where does my source code go?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On Free and Pro tiers your source never leaves your machine. The CLI runs locally and only finding metadata is uploaded. Team / Enterprise can self-host on-prem."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which CI providers are supported?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "GitHub Actions, GitLab CI/CD, Bitbucket Pipelines, Jenkins, Azure DevOps, and CircleCI \u2014 multi-platform from day one."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is there a free tier?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Free tier: 1 connection, 50 scans/day, heuristic + DLP scanners. No credit card required."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can PipeWarden run air-gapped or on-prem?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Single Go binary, self-hostable, with offline LLM support via Ollama / LLamaFile / LM Studio for the AI analyzer."
+      }
+    }
+  ]
+}
+    </script>
+    <!-- Organization + Person JSON-LD -->
+    <script type="application/ld+json">
+    {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://pipewarden.io/#org",
+      "name": "PipeWarden",
+      "url": "https://pipewarden.io/",
+      "logo": "https://pipewarden.io/logo.png",
+      "sameAs": [
+        "https://shacharsolomon.dev",
+        "https://github.com/finsavvyai"
+      ],
+      "founder": {
+        "@id": "https://shacharsolomon.dev/#person"
+      }
+    },
+    {
+      "@type": "Person",
+      "@id": "https://shacharsolomon.dev/#person",
+      "name": "Shachar Solomon",
+      "url": "https://shacharsolomon.dev",
+      "jobTitle": "Founder & Engineer",
+      "sameAs": [
+        "https://github.com/finsavvyai"
+      ]
+    }
+  ]
+}
+    </script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<!-- NAV -->
+<header class="nav">
+  <div class="container nav-inner">
+    <a href="/" class="logo" aria-label="PipeWarden home">
+      <span class="logo-mark"></span>
+      <span>PipeWarden</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#features">Platform</a>
+      <a href="#how">How it works</a>
+      <a href="#integrations">Integrations</a>
+      <a href="#security">Security</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">Docs</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="/login/">Sign in</a>
+      <button class="btn btn-primary" type="button" data-signup="starter">Start free</button>
+      <button class="nav-burger" id="burger" aria-label="Menu" aria-expanded="false" aria-controls="mobileMenu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#features">Platform</a>
+    <a href="#how">How it works</a>
+    <a href="#integrations">Integrations</a>
+    <a href="#security">Security</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+    <button class="btn btn-primary btn-lg" type="button" data-signup="starter">Start free</button>
+  </div>
+</header>
+
+<!-- HERO -->
+<main id="main">
+<section class="hero" aria-labelledby="hero-title">
+  <div class="container hero-inner">
+    <span class="eyebrow"><span class="dot" aria-hidden="true"></span><span class="pip">v1.0</span> · AI release risk scoring · now live</span>
+    <h1 id="hero-title"><span class="grad">Ship faster.</span> <span class="accent">Break less.</span></h1>
+    <p class="hero-sub">AI-aware CI/CD that scores release risk before merge, catches secrets before they ship, and tells you which deploy will fail — before it does.</p>
+    <div class="hero-ctas">
+      <button class="btn btn-primary btn-lg" type="button" data-signup="starter">Start free — no credit card</button>
+      <button class="btn btn-ghost btn-lg" type="button" data-signup="demo">Book a demo →</button>
+    </div>
+    <div class="hero-meta">
+      <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg> 14-day Pro trial</span>
+      <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg> Source never leaves your machine on Free + Pro</span>
+      <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg> Self-hosted option</span>
+    </div>
+
+    <!-- Product preview -->
+    <div class="hero-preview" role="img" aria-label="PipeWarden dashboard preview">
+      <div class="preview-chrome">
+        <div class="chrome-dots"><span></span><span></span><span></span></div>
+        <div class="chrome-url">app.pipewarden.dev / overview</div>
+        <div style="width:54px"></div>
+      </div>
+      <div class="preview-body">
+        <aside class="preview-side">
+          <div class="side-group">Workspace</div>
+          <div class="side-item active"><span class="ico"></span> Overview</div>
+          <div class="side-item"><span class="ico"></span> Pipelines</div>
+          <div class="side-item"><span class="ico"></span> Deployments</div>
+          <div class="side-item"><span class="ico"></span> Environments</div>
+          <div class="side-item"><span class="ico"></span> Insights</div>
+          <div class="side-group">AI</div>
+          <div class="side-item"><span class="ico"></span> Risk Scoring</div>
+          <div class="side-item"><span class="ico"></span> Rollback Advisor</div>
+          <div class="side-item"><span class="ico"></span> Incidents</div>
+        </aside>
+        <div class="preview-main">
+          <div class="preview-header">
+            <div>
+              <h4>Release health — last 24h</h4>
+              <p style="font-size:0.8rem;margin-top:2px">42 pipelines · 6 environments · 2 anomalies</p>
+            </div>
+            <span class="status">Systems healthy</span>
+          </div>
+          <div class="stat-row">
+            <div class="stat"><div class="stat-label">Deploy success</div><div class="stat-value">99.4%</div><div class="stat-delta">+1.2%</div></div>
+            <div class="stat"><div class="stat-label">Lead time</div><div class="stat-value">11m</div><div class="stat-delta">−34%</div></div>
+            <div class="stat"><div class="stat-label">Failed releases</div><div class="stat-value">0.6%</div><div class="stat-delta">−58%</div></div>
+            <div class="stat"><div class="stat-label">MTTR</div><div class="stat-value">7m</div><div class="stat-delta">−41%</div></div>
+          </div>
+          <div class="pipeline">
+            <div class="pipe-row">
+              <span class="badge ok">Passed</span>
+              <span class="pipe-name">web-frontend · build + deploy</span>
+              <span class="pipe-branch">main@a3f1c2</span>
+              <div class="bar"><span style="width:100%"></span></div>
+            </div>
+            <div class="pipe-row">
+              <span class="badge run">Running</span>
+              <span class="pipe-name">payments-api · canary</span>
+              <span class="pipe-branch">release/v4.2</span>
+              <div class="bar"><span style="width:62%"></span></div>
+            </div>
+            <div class="pipe-row">
+              <span class="badge warn">AI Risk: high</span>
+              <span class="pipe-name">checkout-service · prod deploy</span>
+              <span class="pipe-branch">main@d8c74e</span>
+              <div class="bar"><span style="width:84%;background:var(--warn)"></span></div>
+            </div>
+            <div class="pipe-row">
+              <span class="badge ok">Passed</span>
+              <span class="pipe-name">ml-inference · nightly</span>
+              <span class="pipe-branch">main@002bf3</span>
+              <div class="bar"><span style="width:100%"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EARLY ACCESS · honest metrics only (anti-bluff) -->
+<section class="trust" aria-label="Early access stats">
+  <div class="container">
+    <div class="trust-strip reveal">
+      <div class="trust-chip">
+        <span class="trust-num">Design-partner</span>
+        <span class="trust-label">phase · onboarding now</span>
+      </div>
+      <div class="trust-divider" aria-hidden="true"></div>
+      <div class="trust-chip">
+        <span class="trust-num">6</span>
+        <span class="trust-label">CI/CD providers covered</span>
+      </div>
+      <div class="trust-divider" aria-hidden="true"></div>
+      <div class="trust-chip">
+        <span class="trust-num">13</span>
+        <span class="trust-label">DLP secret patterns</span>
+      </div>
+      <div class="trust-divider" aria-hidden="true"></div>
+      <div class="trust-chip">
+        <span class="trust-num">8</span>
+        <span class="trust-label">OPA policies shipped</span>
+      </div>
+      <div class="trust-divider" aria-hidden="true"></div>
+      <div class="trust-chip">
+        <span class="trust-num">MIT</span>
+        <span class="trust-label">open-core licence</span>
+      </div>
+    </div>
+    <p class="trust-copy">Built by <a href="https://shacharsolomon.dev">Shachar Solomon</a> · early-access partners get hands-on onboarding and lifetime Pro.</p>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" aria-labelledby="features-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">Platform</div>
+      <h2 id="features-title">Everything your delivery pipeline was missing.</h2>
+      <p>From commit to production — PipeWarden observes, predicts, and optimizes every step so your team ships faster with fewer surprises.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feat reveal">
+        <div class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/></svg></div>
+        <h3>AI pipeline optimization</h3>
+        <p>Detect slow stages, cache misses, and dependency bottlenecks. PipeWarden rewrites pipeline configs to cut build time without breaking anything.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+        <h3>Release risk scoring</h3>
+        <p>Each deploy gets a real-time risk score based on code change, test coverage, deploy history, and downstream dependencies.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <h3>Failure prediction</h3>
+        <p>Surface flaky tests, unstable infra, and regression patterns before they become outages. Stop debugging production.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9"/><path d="M3 4v5h5"/></svg></div>
+        <h3>Rollback intelligence</h3>
+        <p>When things go wrong, PipeWarden recommends the exact commit to roll back to — with blast radius and recovery ETA.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 4v16"/></svg></div>
+        <h3>Multi-environment visibility</h3>
+        <p>One pane of glass across dev, staging, canary, and prod. See drift, divergence, and mismatched configs in real time.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l4 4-4 4-4-4 4-4zM12 14l4 4-4 4-4-4 4-4z"/></svg></div>
+        <h3>Incident insights</h3>
+        <p>Auto-generate incident timelines with the deploys, configs, and services involved. Blameless post-mortems in minutes.</p>
+      </div>
+      <div class="feat wide reveal">
+        <div class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 17l6-6 4 4 6-6"/><path d="M14 5h6v6"/></svg></div>
+        <h3>Deployment analytics that actually mean something</h3>
+        <p>DORA metrics out of the box, plus PipeWarden's own AI benchmarks comparing your team's velocity, stability, and risk posture to peers of similar scale — updated continuously, not quarterly.</p>
+      </div>
+      <div class="feat reveal">
+        <div class="feat-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 12l9-5M12 12v10M12 12L3 7"/></svg></div>
+        <h3>Compliance & audit</h3>
+        <p>Immutable audit trails and policy gates you can version like code. Compliance evidence packs (SOC 2 / HIPAA / PCI) ship on the Team tier.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" aria-labelledby="how-title" style="background: var(--bg-soft);">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">How it works</div>
+      <h2 id="how-title">From connect to confident deploy in under 10 minutes.</h2>
+      <p>No agent sprawl. No invasive refactors. Plug in, and PipeWarden starts learning the shape of your delivery.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="step-num">01 / connect</span>
+        <h3>Connect repos & runners</h3>
+        <p>One-click OAuth with GitHub, GitLab, Bitbucket, Jenkins, or self-hosted runners. Read-only by default.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">02 / analyze</span>
+        <h3>Analyze pipelines</h3>
+        <p>PipeWarden ingests build history, tests, and deploy signals. A baseline is ready in minutes — no config required.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">03 / detect</span>
+        <h3>Detect risk</h3>
+        <p>AI flags regressions, flaky tests, slow stages, and high-risk releases — with clear root-cause context.</p>
+      </div>
+      <div class="step">
+        <span class="step-num">04 / automate</span>
+        <h3>Automate decisions</h3>
+        <p>Promote, pause, or roll back via policy gates. Ship with approvals wired into Slack, PagerDuty, or GitHub.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DASHBOARD PREVIEW -->
+<section aria-labelledby="dash-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">Product</div>
+      <h2 id="dash-title">The observability layer your pipelines deserve.</h2>
+      <p>Built for teams running hundreds of pipelines across dozens of environments — without drowning in dashboards.</p>
+    </div>
+    <div class="dash">
+      <div class="dash-card">
+        <h4>Deploy frequency <small>last 14 days</small></h4>
+        <div class="sparkline" id="pw-spark" style="height:90px" role="img" aria-label="Deploy frequency trend, last 14 days, 6.2 per day, up 41 percent"></div>
+        <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--text-dim)">
+          <span>6.2 / day</span><span style="color:var(--sys-green, #30D158)">▲ 41%</span>
+        </div>
+      </div>
+      <div class="dash-card">
+        <h4>Live deployments <small>3 active</small></h4>
+        <div class="deploy-list">
+          <div class="deploy-row">
+            <span class="badge run">Canary</span>
+            <span>payments-api · v4.2.1</span>
+            <span class="env-chip">prod-eu</span>
+            <span style="color:var(--text-dim);font-size:0.75rem">12%</span>
+          </div>
+          <div class="deploy-row">
+            <span class="badge ok">Live</span>
+            <span>web-frontend · v2.18.0</span>
+            <span class="env-chip">prod-us</span>
+            <span style="color:var(--text-dim);font-size:0.75rem">100%</span>
+          </div>
+          <div class="deploy-row">
+            <span class="badge warn">Watch</span>
+            <span>auth-service · v1.9.4</span>
+            <span class="env-chip">staging</span>
+            <span style="color:var(--text-dim);font-size:0.75rem">AI risk</span>
+          </div>
+          <div class="deploy-row">
+            <span class="badge ok">Live</span>
+            <span>search-index · v3.0.2</span>
+            <span class="env-chip">prod-ap</span>
+            <span style="color:var(--text-dim);font-size:0.75rem">100%</span>
+          </div>
+        </div>
+      </div>
+      <div class="dash-card">
+        <h4>Pipeline activity <small>streaming</small></h4>
+        <div class="logstream">
+          <div><span class="t">14:02:11</span><span class="ok">[pass]</span> web-frontend build (82s)</div>
+          <div><span class="t">14:02:03</span><span class="info">[info]</span> AI — risk score 12/100 for main@a3f1c2</div>
+          <div><span class="t">14:01:44</span><span class="ok">[pass]</span> payments-api tests (346 / 346)</div>
+          <div><span class="t">14:01:10</span><span class="warn">[warn]</span> flaky: checkout.e2e.spec (3/10 runs)</div>
+          <div><span class="t">14:00:59</span><span class="info">[info]</span> deploy gate — approvals 2/2</div>
+          <div><span class="t">14:00:12</span><span class="err">[stop]</span> auth-service — risk 78/100, paused</div>
+          <div><span class="t">13:59:48</span><span class="ok">[pass]</span> ml-inference nightly</div>
+        </div>
+      </div>
+      <div class="dash-card">
+        <h4>Environments <small>6 tracked</small></h4>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="deploy-row"><span class="badge ok">Healthy</span><span>prod-us</span><span class="env-chip">v2.18.0</span><span style="color:var(--text-dim);font-size:0.75rem">42s lag</span></div>
+          <div class="deploy-row"><span class="badge ok">Healthy</span><span>prod-eu</span><span class="env-chip">v2.18.0</span><span style="color:var(--text-dim);font-size:0.75rem">48s lag</span></div>
+          <div class="deploy-row"><span class="badge warn">Drift</span><span>prod-ap</span><span class="env-chip">v2.17.4</span><span style="color:var(--text-dim);font-size:0.75rem">+1 behind</span></div>
+          <div class="deploy-row"><span class="badge ok">Healthy</span><span>staging</span><span class="env-chip">v2.19-rc1</span><span style="color:var(--text-dim);font-size:0.75rem">on track</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PERSONAS -->
+<section aria-labelledby="personas-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">Built for modern eng orgs</div>
+      <h2 id="personas-title">One platform. Every role on the team.</h2>
+    </div>
+    <div class="persona-grid">
+      <div class="persona">
+        <h4>For CTOs</h4>
+        <ul>
+          <li>Reduce incident risk at org scale</li>
+          <li>DORA + delivery benchmarks</li>
+          <li>Compliance-ready audit posture</li>
+          <li>Consolidate point tools</li>
+        </ul>
+      </div>
+      <div class="persona">
+        <h4>For Platform / DevOps</h4>
+        <ul>
+          <li>Unified pipeline observability</li>
+          <li>Self-service policy gates</li>
+          <li>Cut build time with AI tuning</li>
+          <li>Fewer on-call incidents</li>
+        </ul>
+      </div>
+      <div class="persona">
+        <h4>For Eng Managers</h4>
+        <ul>
+          <li>Spot delivery bottlenecks early</li>
+          <li>Track velocity without spreadsheets</li>
+          <li>Clear release health across teams</li>
+          <li>Shared source of truth</li>
+        </ul>
+      </div>
+      <div class="persona">
+        <h4>For Developers</h4>
+        <ul>
+          <li>Faster feedback on every PR</li>
+          <li>AI-suggested fixes in context</li>
+          <li>Confident one-click rollbacks</li>
+          <li>Zero config to get started</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INTEGRATIONS -->
+<section id="integrations" aria-labelledby="integrations-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">Integrations</div>
+      <h2 id="integrations-title">Plugs into your stack. Doesn't rebuild it.</h2>
+      <p>PipeWarden connects to the tools your team already trusts — no migration required.</p>
+    </div>
+    <div class="integrations">
+      <div class="integ"><div class="integ-ico">GH</div>GitHub</div>
+      <div class="integ"><div class="integ-ico">GL</div>GitLab</div>
+      <div class="integ"><div class="integ-ico">BB</div>Bitbucket</div>
+      <div class="integ"><div class="integ-ico">JK</div>Jenkins</div>
+      <div class="integ"><div class="integ-ico">AC</div>ArgoCD</div>
+      <div class="integ"><div class="integ-ico">K8</div>Kubernetes</div>
+      <div class="integ"><div class="integ-ico">AW</div>AWS</div>
+      <div class="integ"><div class="integ-ico">AZ</div>Azure</div>
+      <div class="integ"><div class="integ-ico">GC</div>GCP</div>
+      <div class="integ"><div class="integ-ico">SL</div>Slack</div>
+      <div class="integ"><div class="integ-ico">PD</div>PagerDuty</div>
+      <div class="integ"><div class="integ-ico">+</div>50+ more</div>
+    </div>
+  </div>
+</section>
+
+<!-- SECURITY -->
+<section id="security" aria-labelledby="security-title">
+  <div class="container">
+    <div class="security">
+      <div>
+        <div class="section-tag">Security & posture</div>
+        <h2 id="security-title">Honest by default. Auditable by design.</h2>
+        <p style="margin-top:16px">Your source never leaves your machine on Free + Pro. On Team you get SSO, RBAC, immutable audit log export, and the compliance-evidence packs (SOC 2 / HIPAA / PCI / GDPR) — generated from real scan history, not marketing. SOC 2 Type I audit kicks off when MRR ≥ $10k; see our <a href="/security">security posture page</a>.</p>
+        <div class="sec-list">
+          <div class="sec-item">
+            <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+            <div><strong>SSO / SAML</strong><span>Okta, Azure AD, Google, custom IdPs</span></div>
+          </div>
+          <div class="sec-item">
+            <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+            <div><strong>Granular RBAC</strong><span>Scoped roles per repo, env, or team</span></div>
+          </div>
+          <div class="sec-item">
+            <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+            <div><strong>Immutable audit logs</strong><span>Every action, signed and exportable</span></div>
+          </div>
+          <div class="sec-item">
+            <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+            <div><strong>AES-256 encryption</strong><span>In transit and at rest, customer-managed keys</span></div>
+          </div>
+          <div class="sec-item">
+            <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+            <div><strong>Self-hosted option</strong><span>Air-gapped deploy for regulated orgs</span></div>
+          </div>
+          <div class="sec-item">
+            <svg class="ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
+            <div><strong>Data residency</strong><span>US, EU, and APAC regions supported</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="compliance-line">Compliance: SOC 2 Type I in progress, target Q3 2026. We are not certified today — see the <a href="/security">security posture page</a> for the full status of each framework.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" aria-labelledby="pricing-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">Pricing</div>
+      <h2 id="pricing-title">Start free. Scale when you need to.</h2>
+      <p>Transparent pricing. No seat-based surprises. Swap tiers anytime.</p>
+    </div>
+    <div class="pricing">
+      <div class="plan">
+        <div>
+          <div class="plan-name">Community</div>
+          <div class="plan-price"><span class="amt">$0</span><span class="per">/ forever</span></div>
+          <p class="plan-desc" style="margin-top:10px">Self-host, MIT license. For solo devs and evaluation.</p>
+        </div>
+        <ul>
+          <li>1 CI/CD connection</li>
+          <li>Heuristic + DLP scanning</li>
+          <li>SARIF export to GitHub Security</li>
+          <li>7-day finding retention</li>
+          <li>Community support</li>
+        </ul>
+        <button class="btn btn-ghost btn-lg" type="button" data-signup="starter">Get started free</button>
+      </div>
+      <div class="plan">
+        <div>
+          <div class="plan-name">Starter</div>
+          <div class="plan-price"><span class="amt">$19</span><span class="per">/ month · flat</span></div>
+          <p class="plan-desc" style="margin-top:10px">For small teams shipping weekly.</p>
+        </div>
+        <ul>
+          <li>5 CI/CD connections</li>
+          <li>Claude AI analysis</li>
+          <li>REST API + SARIF export</li>
+          <li>30-day retention · 3 seats</li>
+          <li>Email support</li>
+        </ul>
+        <button class="btn btn-ghost btn-lg" type="button" data-signup="starter">Start 14-day trial</button>
+      </div>
+      <div class="plan featured">
+        <div class="plan-ribbon">Most popular</div>
+        <div>
+          <div class="plan-name">Team</div>
+          <div class="plan-price"><span class="amt">$99</span><span class="per">/ month · flat</span></div>
+          <p class="plan-desc" style="margin-top:10px">For scaling engineering orgs. 10 seats, no per-user surprise.</p>
+        </div>
+        <ul>
+          <li>10 CI/CD connections · 10 seats</li>
+          <li>Custom OPA policies</li>
+          <li>Audit log (180-day retention)</li>
+          <li>Slack, PagerDuty, Jira integrations</li>
+          <li>Priority email support</li>
+        </ul>
+        <button class="btn btn-primary btn-lg" type="button" data-signup="team">Start 14-day trial</button>
+      </div>
+      <div class="plan">
+        <div>
+          <div class="plan-name">Enterprise</div>
+          <div class="plan-price"><span class="amt">$199</span><span class="per">+ / month</span></div>
+          <p class="plan-desc" style="margin-top:10px">Regulated orgs, air-gapped deploys, SSO.</p>
+        </div>
+        <ul>
+          <li>Unlimited connections + seats</li>
+          <li>SSO / SAML / SCIM</li>
+          <li>Self-hosted &amp; air-gap deploy</li>
+          <li>Customer-managed encryption keys</li>
+          <li>Dedicated CSM &amp; 24/7 support</li>
+        </ul>
+        <button class="btn btn-ghost btn-lg" type="button" data-signup="enterprise">Contact sales</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" aria-labelledby="faq-title">
+  <div class="container">
+    <div class="section-head reveal">
+      <div class="section-tag">FAQ</div>
+      <h2 id="faq-title">Questions, answered.</h2>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary>How long does setup take?</summary>
+        <p>Most teams are running under 10 minutes. Connect your repo provider via OAuth, optionally install the GitHub App or GitLab token, and PipeWarden starts ingesting your pipeline history automatically.</p>
+      </details>
+      <details>
+        <summary>Which CI/CD platforms do you support?</summary>
+        <p>GitHub Actions, GitLab CI/CD, Bitbucket Pipelines, Jenkins, Azure DevOps, and CircleCI. We also integrate with ArgoCD, Kubernetes, AWS, Azure, and GCP for runtime visibility.</p>
+      </details>
+      <details>
+        <summary>How is my data secured?</summary>
+        <p>On Free + Pro your source code never leaves your machine — the CLI runs locally and only finding metadata is uploaded. AES-256-GCM credential vault. SOC 2 Type I audit is on the roadmap (Q3 2026); we are not certified today. See the full posture on the <a href="/security">security page</a>. Customer-managed keys + self-host are available on Team / Enterprise.</p>
+      </details>
+      <details>
+        <summary>Will this change my existing pipelines?</summary>
+        <p>No. PipeWarden is read-only by default. Automation and policy gates are opt-in, per-repo, and fully reversible — you stay in control.</p>
+      </details>
+      <details>
+        <summary>Do you offer a free trial?</summary>
+        <p>Yes. Starter is free forever. Growth includes a 14-day trial with no credit card required. Enterprise teams can request a full POC with a dedicated engineer.</p>
+      </details>
+      <details>
+        <summary>What team sizes is PipeWarden built for?</summary>
+        <p>Indie developers and teams of 5–50, today. We're in active build mode with an early-access cohort — <a href="#cta">join the design-partner program</a> for Pro free for life in exchange for product feedback. Larger orgs are welcome on the self-hosted track.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section id="cta" aria-labelledby="cta-title">
+  <div class="container">
+    <div class="final-cta">
+      <div class="section-tag">Ready when you are</div>
+      <h2 id="cta-title">Ship with confidence. Starting today.</h2>
+      <p>Join the engineering teams using PipeWarden to deploy faster, detect failures earlier, and sleep better at night.</p>
+      <div class="hero-ctas" style="margin-top:8px">
+        <button class="btn btn-primary btn-lg" type="button" data-signup="starter">Start free — no credit card</button>
+        <button class="btn btn-ghost btn-lg" type="button" data-signup="demo">Book a demo</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="foot-grid">
+      <div class="foot-col foot-brand">
+        <a href="/" class="logo" aria-label="PipeWarden home"><span class="logo-mark"></span><span>PipeWarden</span></a>
+        <p>AI-powered CI/CD for teams that ship. Automate pipelines, predict failures, and deploy with confidence.</p>
+        <div class="foot-social">
+          <a href="https://github.com/finsavvyai/pipewarden" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.3 1.9 1.3 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.3-3.2-.1-.3-.6-1.6.1-3.3 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.7 1.7.2 3 .1 3.3.8.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg></a>
+          <a href="https://www.linkedin.com/company/pipewarden" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4.98 3.5C4.98 4.9 3.87 6 2.5 6S0 4.9 0 3.5 1.12 1 2.5 1s2.48 1.1 2.48 2.5zM0 8h5v16H0V8zm7.5 0H12v2.2h.1a4.9 4.9 0 0 1 4.4-2.4c4.7 0 5.5 3 5.5 7V24h-5v-7.2c0-1.7 0-4-2.4-4s-2.8 2-2.8 3.9V24h-5V8z"/></svg></a>
+          <a href="https://x.com/pipewarden" target="_blank" rel="noopener" aria-label="X (formerly Twitter)"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.9 2h3.3l-7.2 8.2L23.5 22h-6.6l-5.2-6.8L5.7 22H2.4l7.7-8.8L1.7 2h6.8l4.7 6.2L18.9 2zm-1.2 18h1.8L7.4 4h-2l12.3 16z"/></svg></a>
+        </div>
+      </div>
+      <div class="foot-col">
+        <h5>Product</h5>
+        <a href="#features">Platform</a>
+        <a href="#integrations">Integrations</a>
+        <a href="#pricing">Pricing</a>
+        <a href="https://github.com/finsavvyai/pipewarden/releases" target="_blank" rel="noopener">Changelog</a>
+        <a href="/health" target="_blank" rel="noopener">Status</a>
+      </div>
+      <div class="foot-col">
+        <h5>Account</h5>
+        <a href="/signup/">Create account</a>
+        <a href="/login/">Sign in</a>
+        <a href="/onboarding/">Onboarding</a>
+        <a href="/?signup=enterprise">Contact sales</a>
+      </div>
+      <div class="foot-col">
+        <h5>Resources</h5>
+        <a href="/quick-start/">Docs</a>
+        <a href="/quick-start/#api">API reference</a>
+        <a href="https://github.com/finsavvyai/pipewarden">GitHub</a>
+        <a href="/quick-start/">Guides</a>
+        <a href="https://github.com/finsavvyai/pipewarden/discussions">Community</a>
+      </div>
+      <div class="foot-col">
+        <h5>Legal</h5>
+        <a href="/privacy/">Privacy</a>
+        <a href="/terms/">Terms</a>
+        <a href="/.well-known/security.txt">Security</a>
+        <a href="/privacy/#dpa">DPA</a>
+        <a href="/quick-start/">Trust</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>&copy; 2026 PipeWarden Labs, Inc. All rights reserved.</span>
+      <span>Made for teams that ship.</span>
+    </div>
+  </div>
+</footer>
+
+<!-- SIGNUP MODAL -->
+<div class="pw-modal" id="signupModal" role="dialog" aria-modal="true" aria-labelledby="signupTitle" aria-hidden="true">
+  <div class="pw-modal-backdrop" data-close></div>
+  <div class="pw-modal-card" role="document">
+    <button class="pw-modal-close" type="button" aria-label="Close dialog" data-close>&times;</button>
+    <div class="pw-modal-badge" id="signupBadge">Starter</div>
+    <h2 id="signupTitle">Start your free trial</h2>
+    <p id="signupDesc" class="pw-modal-desc">14 days free, no credit card. We'll set up your workspace within 1 business day.</p>
+    <form id="signupForm" novalidate>
+      <label class="pw-field">
+        <span>Work email</span>
+        <input type="email" name="email" id="signupEmail" required autocomplete="email" placeholder="you@company.com" />
+      </label>
+      <label class="pw-field">
+        <span>Company (optional)</span>
+        <input type="text" name="company" autocomplete="organization" placeholder="Acme Inc." />
+      </label>
+      <input type="hidden" name="tier" id="signupTier" value="starter" />
+      <button type="submit" class="btn btn-primary btn-lg" id="signupSubmit">Start free trial</button>
+      <p class="pw-modal-note">By submitting you agree to our <a href="/terms/">Terms</a> and <a href="/privacy/">Privacy Policy</a>.</p>
+    </form>
+    <div id="signupSuccess" class="pw-modal-success" hidden>
+      <h3>You're in.</h3>
+      <p>Check <span id="signupSuccessEmail"></span> — we'll email setup instructions within 1 business day.</p>
+      <button class="btn btn-ghost btn-lg" type="button" data-close>Close</button>
+    </div>
+  </div>
+</div>
+<style>
+  .pw-modal { position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .pw-modal[aria-hidden="false"] { display: flex; }
+  .pw-modal-backdrop { position: absolute; inset: 0; background: rgba(4,6,10,0.72); backdrop-filter: blur(6px); }
+  .pw-modal-card {
+    position: relative;
+    background: var(--glass-bg-strong, rgba(13, 17, 23, 0.88));
+    backdrop-filter: var(--glass-blur, saturate(180%) blur(20px));
+    -webkit-backdrop-filter: var(--glass-blur, saturate(180%) blur(20px));
+    border: 1px solid var(--glass-border, rgba(255,255,255,0.12));
+    border-radius: var(--r-lg, 20px);
+    padding: var(--s-8, 32px);
+    max-width: 440px; width: 100%;
+    color: var(--text, #f5f7fa);
+    box-shadow: var(--shadow-lg, 0 30px 80px rgba(0,0,0,0.5));
+    animation: pw-modal-in var(--dur-med, 320ms) var(--ease-emph, cubic-bezier(0.2, 0, 0, 1));
+  }
+  @keyframes pw-modal-in { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+  .pw-modal-close { position: absolute; top: 12px; right: 12px; background: transparent; border: 0; color: var(--text-muted, #8b97a5); font-size: 28px; line-height: 1; cursor: pointer; padding: 6px 10px; border-radius: 8px; }
+  .pw-modal-close:hover, .pw-modal-close:focus-visible { color: var(--text, #fff); background: rgba(255,255,255,0.06); outline: none; }
+  .pw-modal-badge {
+    display: inline-block;
+    background: var(--accent-soft, rgba(10, 132, 255, 0.12));
+    color: var(--accent, #0A84FF);
+    padding: var(--s-1, 4px) var(--s-3, 12px);
+    border-radius: var(--r-full, 999px);
+    font-size: var(--fs-11, 11px); font-weight: var(--fw-semibold, 600);
+    letter-spacing: 0.04em; text-transform: uppercase;
+    margin-bottom: var(--s-3, 12px);
+  }
+  .pw-modal-card h2 { font-size: 22px; margin: 0 0 8px; }
+  .pw-modal-desc { color: var(--text-muted, #8b97a5); margin: 0 0 20px; font-size: 14px; }
+  .pw-field { display: block; margin-bottom: 14px; }
+  .pw-field span { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; }
+  .pw-field input {
+    width: 100%; min-height: 44px; padding: 0 var(--s-4, 16px);
+    border-radius: var(--r-sm, 10px);
+    border: 1px solid var(--hairline-strong, rgba(255,255,255,0.14));
+    background: rgba(255,255,255,0.04);
+    color: var(--text, #fff); font-family: inherit; font-size: var(--fs-15, 15px);
+    transition: border-color var(--dur-short, 220ms) var(--ease-standard, cubic-bezier(0.4, 0, 0.2, 1)),
+                box-shadow var(--dur-short, 220ms) var(--ease-standard, cubic-bezier(0.4, 0, 0.2, 1));
+  }
+  .pw-field input:focus-visible { outline: none; border-color: var(--accent, #0A84FF); box-shadow: var(--shadow-focus, 0 0 0 4px rgba(10,132,255,0.35)); }
+  #signupSubmit { width: 100%; margin-top: 6px; }
+  #signupSubmit[disabled] { opacity: 0.6; cursor: not-allowed; }
+  .pw-modal-note { margin: 14px 0 0; font-size: 12px; color: var(--text-dim, #5c6773); text-align: center; }
+  .pw-modal-note a { color: var(--text-muted); text-decoration: underline; }
+  .pw-modal-success h3 { margin: 0 0 var(--s-2, 8px); color: var(--sys-green, #30D158); font-size: var(--fs-20, 20px); font-weight: var(--fw-semibold, 600); }
+  .pw-modal-success p { color: var(--text-muted); margin: 0 0 20px; }
+  .pw-modal-success .btn { width: 100%; }
+  body.pw-modal-open { overflow: hidden; }
+</style>
+<script>
+  // Scroll-reveal — fades sections in as they enter viewport.
+  // Respects prefers-reduced-motion (CSS already kills the transform).
+  (function(){
+    if (!('IntersectionObserver' in window)) {
+      document.querySelectorAll('.reveal').forEach(el => el.classList.add('in'));
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add('in');
+          io.unobserve(e.target);
+        }
+      }
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+  })();
+
+  window.addEventListener('load', () => {
+    const el = document.getElementById('pw-spark');
+    if (!el || typeof uPlot === 'undefined') return;
+    const days = Array.from({length: 14}, (_, i) => i + 1);
+    const freq = [2, 3, 3, 4, 4, 5, 4, 6, 5, 7, 6, 7, 6, 8];
+    const w = el.clientWidth || 420;
+    new uPlot({
+      width: w, height: 90,
+      padding: [4, 6, 4, 6],
+      axes: [{ show: false }, { show: false }],
+      scales: { x: { time: false } },
+      legend: { show: false },
+      cursor: { show: false },
+      series: [
+        {},
+        {
+          stroke: 'rgba(48, 209, 88, 1)', width: 2,
+          fill: 'rgba(48, 209, 88, 0.18)',
+          points: { show: false },
+        },
+      ],
+    }, [days, freq], el);
+  });
+  (function(){
+    const burger = document.getElementById('burger');
+    const menu = document.getElementById('mobileMenu');
+    if (burger && menu) {
+      burger.addEventListener('click', () => {
+        const open = menu.classList.toggle('open');
+        burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      menu.querySelectorAll('a, button').forEach(el => el.addEventListener('click', () => {
+        menu.classList.remove('open');
+        burger.setAttribute('aria-expanded', 'false');
+      }));
+    }
+
+    const modal = document.getElementById('signupModal');
+    const form = document.getElementById('signupForm');
+    const success = document.getElementById('signupSuccess');
+    const submit = document.getElementById('signupSubmit');
+    const badge = document.getElementById('signupBadge');
+    const title = document.getElementById('signupTitle');
+    const desc = document.getElementById('signupDesc');
+    const tierInput = document.getElementById('signupTier');
+    const emailInput = document.getElementById('signupEmail');
+    let lastFocus = null;
+
+    const TIERS = {
+      free:         { badge: 'Free — $0',              title: 'Install the CLI',         desc: 'Unlimited public repos · 1 private repo · CLI + GitHub Action · cheap-mode AI. Forever free.',                                btn: 'Install pipewarden', checkout: '/api/v1/billing/checkout', plan: 'free' },
+      starter:      { badge: 'Pro — $19/dev/mo',       title: 'Start your 14-day trial', desc: 'Unlimited private repos · Sonnet-tier AI · Claude Code skill + hook · Cursor MCP · 14 days free, no credit card.',           btn: 'Start free trial',   checkout: '/api/v1/billing/checkout', plan: 'pro' },
+      pro:          { badge: 'Pro — $19/dev/mo',       title: 'Start your 14-day trial', desc: 'Unlimited private repos · Sonnet-tier AI · Claude Code skill + hook · Cursor MCP · 14 days free, no credit card.',           btn: 'Start free trial',   checkout: '/api/v1/billing/checkout', plan: 'pro' },
+      team:         { badge: 'Team — $49/dev/mo',      title: 'Start your 14-day trial', desc: 'Everything in Pro · Opus-tier AI · compliance packs · SSO · custom OPA · audit log export. 14 days free.',                  btn: 'Start free trial',   checkout: '/api/v1/billing/checkout', plan: 'team' },
+      growth:       { badge: 'Team — $49/dev/mo',      title: 'Start your 14-day trial', desc: 'Everything in Pro · Opus-tier AI · compliance packs · SSO · custom OPA · audit log export. 14 days free.',                  btn: 'Start free trial',   checkout: '/api/v1/billing/checkout', plan: 'team' },
+      professional: { badge: 'Team — $49/dev/mo',      title: 'Start your 14-day trial', desc: 'Everything in Pro · Opus-tier AI · compliance packs · SSO · custom OPA · audit log export. 14 days free.',                  btn: 'Start free trial',   checkout: '/api/v1/billing/checkout', plan: 'team' },
+      enterprise:   { badge: 'Enterprise — contact',   title: 'Talk to sales',           desc: 'Self-host · SSO/SAML/SCIM · dedicated support + SLA · custom contract terms. We reach out within 1 business day.',          btn: 'Contact sales',                                         plan: 'enterprise' },
+      demo:         { badge: 'Live demo',              title: 'Book a demo',             desc: 'Walk through PipeWarden with an engineer. 20 minutes, tailored to your stack.',                                              btn: 'Request demo',                                          plan: 'demo' }
+    };
+
+    function openModal(tier) {
+      const t = TIERS[tier] || TIERS.starter;
+      badge.textContent = t.badge;
+      title.textContent = t.title;
+      desc.textContent = t.desc;
+      submit.textContent = t.btn;
+      tierInput.value = tier;
+      form.hidden = false;
+      success.hidden = true;
+      submit.disabled = false;
+      lastFocus = document.activeElement;
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('pw-modal-open');
+      setTimeout(() => emailInput.focus(), 50);
+    }
+    function closeModal() {
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('pw-modal-open');
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const preselect = params.get('signup');
+    if (preselect && TIERS[preselect]) {
+      setTimeout(() => openModal(preselect), 100);
+    }
+
+    document.querySelectorAll('[data-signup]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.preventDefault();
+        const tier = btn.getAttribute('data-signup');
+        // Free + paid self-serve tiers go straight to real signup. The
+        // legacy modal only handles 'demo' (sales contact) and 'enterprise'
+        // (also sales contact) — all other tiers create a real account.
+        if (tier === 'demo' || tier === 'enterprise') {
+          openModal(tier);
+          return;
+        }
+        const url = '/signup/' + (tier && tier !== 'starter' ? '?tier=' + encodeURIComponent(tier) : '');
+        window.location.href = url;
+      });
+    });
+    modal.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', closeModal));
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') closeModal();
+    });
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!form.reportValidity()) return;
+      submit.disabled = true;
+      submit.textContent = 'Submitting…';
+      const data = Object.fromEntries(new FormData(form).entries());
+      const tierCfg = TIERS[data.tier] || TIERS.starter;
+
+      if (tierCfg.checkout && tierCfg.plan) {
+        try {
+          const res = await fetch(tierCfg.checkout, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: tierCfg.plan, email: data.email, tenant_id: data.company || 'self-serve' })
+          });
+          if (res.ok) {
+            const body = await res.json();
+            if (body && body.checkout_url) {
+              window.location.href = body.checkout_url;
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('checkout failed, falling back to waitlist', err);
+        }
+      }
+
+      try {
+        const res = await fetch('/api/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (!res.ok && res.status !== 202) throw new Error('HTTP ' + res.status);
+      } catch (err) {
+        console.error('waitlist submit failed', err);
+      }
+      document.getElementById('signupSuccessEmail').textContent = data.email;
+      form.hidden = true;
+      success.hidden = false;
+    });
+  })();
+</script>
+</body>
+</html>

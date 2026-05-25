@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawPipe vs Portkey — Which LLM Gateway Should You Use?</title>
+  <meta name="description" content="Detailed comparison of ClawPipe and Portkey. SDK-local optimization vs AI gateway platform. Feature-by-feature breakdown with honest analysis.">
+  <meta property="og:title" content="ClawPipe vs Portkey — Feature Comparison">
+  <meta property="og:description" content="SDK-local optimization pipeline vs managed AI gateway. See which approach fits your architecture.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://clawpipe.ai/vs/portkey">
+  <link rel="canonical" href="https://clawpipe.ai/vs/portkey">
+  <meta name="color-scheme" content="dark light">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-primary: #000000; --bg-secondary: #1c1c1e; --bg-tertiary: #2c2c2e;
+      --separator: rgba(84, 84, 88, 0.65); --separator-opaque: #38383a;
+      --label-primary: #ffffff; --label-secondary: rgba(235, 235, 245, 0.6);
+      --label-tertiary: rgba(235, 235, 245, 0.3);
+      --accent: #8b5cf6; --accent-hover: #7c3aed; --green: #30d158; --red: #ff453a;
+      --tint: rgba(139, 92, 246, 0.15);
+      --fill-tertiary: rgba(120, 120, 128, 0.24);
+      --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px;
+      --space-xl: 32px; --space-2xl: 48px; --space-3xl: 64px; --space-4xl: 80px;
+      --font-caption1: 12px; --font-footnote: 13px; --font-subhead: 15px;
+      --font-body: 17px; --font-title3: 20px; --font-title2: 22px;
+      --font-title1: 28px; --font-large-title: 34px;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-primary: #f2f2f7; --bg-secondary: #ffffff; --bg-tertiary: #f2f2f7;
+        --separator: rgba(60, 60, 67, 0.29); --separator-opaque: #c6c6c8;
+        --label-primary: #000000; --label-secondary: rgba(60, 60, 67, 0.6);
+        --label-tertiary: rgba(60, 60, 67, 0.3);
+        --accent: #7c3aed; --accent-hover: #6d28d9; --green: #34c759; --red: #ff3b30;
+        --tint: rgba(124, 58, 237, 0.1);
+        --fill-tertiary: rgba(120, 120, 128, 0.12);
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+      background: var(--bg-primary); color: var(--label-primary);
+      line-height: 1.47; -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 900px; margin: 0 auto; padding: 0 var(--space-lg); }
+    header {
+      padding: var(--space-md) 0; border-bottom: 0.5px solid var(--separator);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { font-size: var(--font-title3); font-weight: 700; color: var(--accent); }
+    nav a { margin-left: var(--space-xl); color: var(--label-secondary); font-size: var(--font-subhead); font-weight: 500; }
+    nav a:hover { color: var(--label-primary); text-decoration: none; }
+    .hero { text-align: center; padding: var(--space-4xl) 0 var(--space-2xl); }
+    .hero h1 { font-size: clamp(var(--font-title1), 4vw, 44px); font-weight: 700; letter-spacing: -0.5px; line-height: 1.15; margin-bottom: var(--space-md); }
+    .hero h1 span { background: linear-gradient(135deg, var(--accent), #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: var(--font-body); color: var(--label-secondary); max-width: 600px; margin: 0 auto; }
+    .section { padding: var(--space-2xl) 0; }
+    .section h2 { font-size: var(--font-title2); font-weight: 700; letter-spacing: -0.3px; margin-bottom: var(--space-lg); }
+    .section p, .section li { font-size: var(--font-subhead); color: var(--label-secondary); line-height: 1.6; }
+    .section p { margin-bottom: var(--space-md); }
+    .section ul { padding-left: var(--space-lg); margin-bottom: var(--space-md); }
+    .section li { margin-bottom: var(--space-sm); }
+    .table-wrap {
+      background: var(--bg-secondary); border-radius: var(--radius-lg);
+      border: 0.5px solid var(--separator); overflow-x: auto; margin: var(--space-lg) 0;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: var(--font-footnote); }
+    th, td { padding: var(--space-md); text-align: left; border-bottom: 0.5px solid var(--separator); }
+    th { color: var(--label-secondary); font-weight: 600; font-size: var(--font-caption1); text-transform: uppercase; letter-spacing: 0.04em; }
+    td:first-child { font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
+    .yes { color: var(--green); font-weight: 600; }
+    .no { color: var(--red); opacity: 0.7; }
+    .partial { color: #ff9f0a; font-weight: 500; }
+    .verdict {
+      background: var(--tint); border: 0.5px solid var(--accent);
+      border-radius: var(--radius-lg); padding: var(--space-xl);
+      margin: var(--space-xl) 0; text-align: center;
+    }
+    .verdict h3 { font-size: var(--font-title3); margin-bottom: var(--space-sm); color: var(--accent); }
+    .verdict p { font-size: var(--font-subhead); color: var(--label-secondary); max-width: 600px; margin: 0 auto; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: var(--space-md) var(--space-lg); min-height: 44px;
+      border-radius: var(--radius-md); font-weight: 600;
+      font-size: var(--font-subhead); cursor: pointer; border: none;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); text-decoration: none; }
+    .cta { text-align: center; padding: var(--space-3xl) 0; }
+    footer { padding: var(--space-xl) 0; text-align: center; color: var(--label-tertiary); font-size: var(--font-caption1); border-top: 0.5px solid var(--separator); }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
+    @media (max-width: 768px) { .hero h1 { font-size: var(--font-title1); } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="https://clawpipe.ai" class="logo">ClawPipe</a>
+    <nav>
+      <a href="https://clawpipe.ai/#features">Features</a>
+      <a href="https://clawpipe.ai/#pricing">Pricing</a>
+      <a href="https://docs.clawpipe.ai">Docs</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>ClawPipe vs <span>Portkey</span></h1>
+      <p>Two platforms for managing LLM calls at scale. One is a managed gateway, the other is an SDK-local pipeline. Here is how they compare.</p>
+    </section>
+
+    <section class="section">
+      <h2>Architecture: SDK-Local vs Managed Gateway</h2>
+      <p><strong>ClawPipe</strong> is an SDK that runs inside your application process. Optimization happens locally before requests leave your machine. No proxy servers, no extra infrastructure.</p>
+      <p><strong>Portkey</strong> is a managed AI gateway platform. Requests route through Portkey's infrastructure, which provides observability, caching, guardrails, and routing. It is a hosted service with a polished dashboard and enterprise features.</p>
+    </section>
+
+    <section class="section">
+      <h2>Feature Comparison</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Feature</th><th>ClawPipe</th><th>Portkey</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Multi-provider routing</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>OpenAI-compatible API</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Observability / logging</td><td class="yes">Dashboard + traces</td><td class="yes">Excellent dashboard</td></tr>
+            <tr><td>Agent Booster (skip LLM)</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Context Packing</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Semantic Caching</td><td class="yes">Hash + embedding</td><td class="yes">Semantic + simple</td></tr>
+            <tr><td>Self-learning routing</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Guardrails</td><td class="partial">Input validation</td><td class="yes">Advanced guardrails</td></tr>
+            <tr><td>Swarm orchestration</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>RAG pipeline</td><td class="yes">Built-in</td><td class="no">No</td></tr>
+            <tr><td>Offline / local LLMs</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Voice I/O</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Pipeline tracing</td><td class="yes">Perfetto format</td><td class="yes">Built-in traces</td></tr>
+            <tr><td>Deployment model</td><td>SDK (no infra)</td><td>Managed gateway</td></tr>
+            <tr><td>Added latency</td><td class="yes">Near zero</td><td class="partial">Gateway hop</td></tr>
+            <tr><td>Prompt management</td><td class="no">No</td><td class="yes">Yes</td></tr>
+            <tr><td>A/B testing</td><td class="partial">Via router weights</td><td class="yes">Built-in</td></tr>
+            <tr><td>Virtual keys</td><td class="no">No</td><td class="yes">Yes</td></tr>
+            <tr><td>Fallback / retry</td><td class="yes">Circuit breaker</td><td class="yes">Advanced fallbacks</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Where Portkey Shines</h2>
+      <ul>
+        <li><strong>Enterprise observability.</strong> Portkey's logging, analytics, and trace dashboard is best-in-class. If observability is your primary concern, Portkey delivers a polished experience.</li>
+        <li><strong>Guardrails.</strong> Content filtering, PII detection, and output validation are deeply integrated. ClawPipe focuses on cost optimization, not content moderation.</li>
+        <li><strong>Prompt management.</strong> Version-controlled prompt templates with A/B testing and rollback. This is a genuine feature gap in ClawPipe.</li>
+        <li><strong>Virtual keys.</strong> Manage provider API keys centrally without exposing them to individual services or team members.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Where ClawPipe Shines</h2>
+      <ul>
+        <li><strong>Active cost reduction.</strong> ClawPipe does not just route requests -- it actively reduces costs by boosting, packing, caching, and smart-routing. Portkey caches but does not compress or skip calls.</li>
+        <li><strong>No infrastructure dependency.</strong> ClawPipe is an SDK. There is no gateway to depend on, no single point of failure, and no vendor infrastructure in your critical path.</li>
+        <li><strong>Lower latency.</strong> No network hop to a gateway means faster responses, especially for cache hits and boosted results that never leave your process.</li>
+        <li><strong>Built-in RAG and swarm.</strong> ClawPipe includes retrieval-augmented generation and multi-model orchestration. With Portkey, you build these yourself.</li>
+        <li><strong>Offline support.</strong> Route to local models via Ollama, llamafile, or LM Studio when you want zero-cost, fully private processing.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>When to Use Which</h2>
+      <p><strong>Choose Portkey if:</strong> You need enterprise-grade observability and guardrails. Your team wants centralized prompt management and A/B testing. You prefer a managed service with a polished admin dashboard. Compliance and content moderation are top priorities.</p>
+      <p><strong>Choose ClawPipe if:</strong> Reducing LLM costs is your primary goal. You want an SDK with no infrastructure dependency. You need built-in RAG, swarm orchestration, or local model support. You prefer optimization that runs in your process with near-zero latency.</p>
+    </section>
+
+    <div class="verdict">
+      <h3>Observability vs Optimization</h3>
+      <p>Portkey excels at monitoring and managing LLM usage. ClawPipe excels at reducing it. If you want to see what you are spending, Portkey is excellent. If you want to spend less, ClawPipe's multi-stage pipeline delivers savings that gateway routing alone cannot match.</p>
+    </div>
+
+    <div class="cta">
+      <p style="color: var(--label-secondary); margin-bottom: var(--space-md);">Try ClawPipe free. 1,000 calls/day, all pipeline stages.</p>
+      <a href="https://app.clawpipe.ai/signup" class="btn btn-primary">Start Free</a>
+    </div>
+  </main>
+
+  <footer><p>ClawPipe &copy; 2026. Built on Cloudflare.</p></footer>
+</div>
+</body>
+</html>

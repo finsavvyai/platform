@@ -1,0 +1,32 @@
+name: Publish LunaForge Extension
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm install
+
+      - name: Build extension
+        run: npm run build:extension
+
+      - name: Package extension
+        run: npm run package:extension
+
+      - name: Publish
+        run: npm run publish:extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}

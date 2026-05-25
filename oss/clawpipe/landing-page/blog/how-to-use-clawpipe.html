@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How to use ClawPipe — cut LLM cost in 60 seconds</title>
+  <meta name="description" content="One npm install, three lines of code. Booster + semantic cache + smart routing before the network hop. A 60-second guide to using ClawPipe in your app.">
+  <link rel="canonical" href="https://clawpipe.ai/blog/how-to-use-clawpipe">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/legal.css">
+  <style>
+    pre{background:#0a0a0a;color:#e5e5e5;padding:16px;border-radius:8px;overflow-x:auto;font-family:ui-monospace,monospace;font-size:13px;line-height:1.5}
+    code{background:rgba(0,0,0,.06);padding:2px 6px;border-radius:4px;font-family:ui-monospace,monospace;font-size:.92em}
+    .step{display:flex;gap:14px;align-items:flex-start;margin:18px 0}
+    .step-n{flex:0 0 32px;height:32px;border-radius:50%;background:var(--accent,#7c3aed);color:#fff;display:grid;place-items:center;font-weight:700}
+    .pill{display:inline-block;padding:2px 10px;border-radius:999px;background:#eef;font-size:12px;margin-right:6px}
+  </style>
+</head>
+<body>
+<div class="container">
+  <header class="legal-header">
+    <a href="/" class="logo" style="text-decoration:none">ClawPipe</a>
+    <nav><a href="/#pricing">Pricing</a><a href="/benchmarks">Benchmarks</a><a href="https://docs.clawpipe.ai">Docs</a><a href="https://app.clawpipe.ai/signup">Sign in</a></nav>
+  </header>
+  <main class="content">
+    <p style="color:#888;font-size:13px">2026-04-19 · 4 min read</p>
+    <h1>How to use ClawPipe — cut your LLM bill in 60 seconds</h1>
+    <p class="lead">One install. Three lines of code. Every prompt now flows through 246 deterministic rules, a self-learning router, a semantic cache, and a budget guard — before it ever hits OpenAI, Anthropic, or anyone else. No code rewrite. No lock-in.</p>
+
+    <h2>The problem in one sentence</h2>
+    <p>Most apps send <em>every</em> prompt to the most capable model at full price — even when the answer is "convert 17% to a decimal" or the same question someone else asked yesterday.</p>
+
+    <h2>The fix in four steps</h2>
+
+    <div class="step"><div class="step-n">1</div><div>
+      <h3 style="margin:0 0 6px">Install</h3>
+      <pre>npm install clawpipe-ai</pre>
+    </div></div>
+
+    <div class="step"><div class="step-n">2</div><div>
+      <h3 style="margin:0 0 6px">Sign up (free, no card)</h3>
+      <p>Grab an API key at <a href="https://app.clawpipe.ai/signup">app.clawpipe.ai/signup</a>. The free tier is 1,000 calls/day — that's 30K/month, 3× larger than Portkey's free tier.</p>
+    </div></div>
+
+    <div class="step"><div class="step-n">3</div><div>
+      <h3 style="margin:0 0 6px">Replace your provider call</h3>
+      <pre>import { ClawPipe } from 'clawpipe-ai';
+
+const pipe = new ClawPipe({
+  apiKey: process.env.CLAWPIPE_API_KEY,
+  projectId: 'my-app',
+});
+
+const { text, meta } = await pipe.prompt('Explain this code', {
+  system: 'You are a code reviewer',
+  maxTokens: 500,
+});
+
+console.log(text);
+console.log(meta.estimatedCostUsd);  // 0 if Booster or Cache resolved it</pre>
+      <p>That's it. Same input. Same output. Lower bill.</p>
+    </div></div>
+
+    <div class="step"><div class="step-n">4</div><div>
+      <h3 style="margin:0 0 6px">Watch the savings tick up</h3>
+      <p><a href="https://app.clawpipe.ai">app.clawpipe.ai</a> shows boost rate, cache hit rate, and a cost-trend chart. Send 100 prompts and the green "saved" bars start showing within minutes.</p>
+    </div></div>
+
+    <h2>What's actually happening</h2>
+    <p>Every call flows through six pipeline stages, in order. Any stage can short-circuit the rest:</p>
+    <ol>
+      <li><strong>Booster</strong> — 246 deterministic rules. "What is 17% of 240?" → <code>40.8</code> in 0.0125 ms at $0. 30% of typical agent traffic resolves here.</li>
+      <li><strong>Packer</strong> — strips redundancy from your prompt + system. ~4% fewer tokens, free.</li>
+      <li><strong>Semantic Cache</strong> — "explain recursion" and "what is recursion?" hit the same cached answer. Hash caches miss both.</li>
+      <li><strong>Router</strong> — picks the cheapest model that meets the quality bar for the task. Learns from outcomes.</li>
+      <li><strong>Gateway</strong> — 21 providers behind one interface (OpenAI, Anthropic, Gemini, Groq, DeepSeek, Mistral, Together, Fireworks, Perplexity, xAI, Cohere, AI21, Cerebras, Replicate, Hugging Face, Writer, Databricks, Azure OpenAI, Bedrock, Vertex, OpenRouter) plus any OpenAI-compatible endpoint (Ollama, LM Studio, llamafile, vLLM, TGI).</li>
+      <li><strong>Learner</strong> — every response updates the router. The longer it runs, the smarter it gets.</li>
+    </ol>
+
+    <h2>Common patterns</h2>
+
+    <h3>Hard budget cap</h3>
+    <pre>new ClawPipe({
+  apiKey, projectId,
+  budgetCapUsd: 50,            // hard ceiling per day
+  budgetWarnUsd: 40,           // soft warning at 80%
+});</pre>
+
+    <h3>Quality mode (swarm vote)</h3>
+    <pre>import { ClawPipe, withPreset, QualityMode } from 'clawpipe-ai';
+const pipe = new ClawPipe(withPreset({ apiKey, projectId }, QualityMode));</pre>
+
+    <h3>Cheap mode (cache + cheap-model allowlist)</h3>
+    <pre>import { CheapMode, withPreset } from 'clawpipe-ai';
+const pipe = new ClawPipe(withPreset({ apiKey, projectId }, CheapMode));</pre>
+
+    <h3>Guard rails (15 plugins out of the box)</h3>
+    <pre>new ClawPipe({
+  apiKey, projectId,
+  guardRules: [
+    { guard: 'pii_redact' },
+    { guard: 'contains', config: { words: ['ssn', 'credit card'] }, blockOnFail: true },
+    { guard: 'model_whitelist', config: { models: ['claude-haiku-4-5'] } },
+  ],
+});</pre>
+
+    <h3>Cross-provider tool calling</h3>
+    <pre>import { toolsForProvider, parseToolCalls } from 'clawpipe-ai';
+
+const tools = [{
+  name: 'get_weather',
+  description: 'Get current weather for a city',
+  parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
+}];
+
+// works on OpenAI, Anthropic, Gemini, Groq, DeepSeek, Mistral
+const wireTools = toolsForProvider(tools, 'anthropic');</pre>
+
+    <h2>What you save (real numbers)</h2>
+    <table class="compare-table">
+      <thead><tr><th>Stage</th><th>Mechanism</th></tr></thead>
+      <tbody>
+        <tr><td>Booster (skip LLM entirely)</td><td>Deterministic resolution at <strong>−100% cost</strong> for matching prompts</td></tr>
+        <tr><td>Semantic cache</td><td>Embedding-based dedup on top of exact-match hash</td></tr>
+        <tr><td>Router (cheaper model that still works)</td><td>Cost-quality model selection on eligible calls</td></tr>
+        <tr><td>Packer (token compression)</td><td>Compression on every non-boosted call</td></tr>
+        <tr><td><strong>Combined per-bucket numbers</strong></td><td><strong>Pending public measured benchmark (in progress)</strong></td></tr>
+      </tbody>
+    </table>
+    <p>Methodology + comment window: <a href="https://github.com/finsavvyai/clawpipe-booster-benchmark">github.com/finsavvyai/clawpipe-booster-benchmark</a></p>
+
+    <h2>Where it runs</h2>
+    <ul>
+      <li><strong>SDK</strong> in your process (Node, Bun, Deno, edge runtimes). Adds ~0.02 ms per call.</li>
+      <li><strong>Gateway</strong> on Cloudflare Workers — same runtime as Cloudflare AI Gateway, but with the full pipeline above.</li>
+      <li><strong>OpenAI-compatible</strong> endpoint. Drop-in replacement for <code>baseURL</code> if you don't want the SDK.</li>
+    </ul>
+
+    <h2>Try it now</h2>
+    <p><a class="cta" href="https://app.clawpipe.ai/signup">Start free →</a> &nbsp; <a href="https://github.com/finsavvyai/clawpipe-sdk">Open source on GitHub →</a></p>
+    <p style="color:#888;font-size:13px;margin-top:48px">If you're already on Portkey, LiteLLM, or going direct to OpenAI, see the side-by-side at <a href="/vs/portkey">/vs/portkey</a>, <a href="/vs/litellm">/vs/litellm</a>, or <a href="/vs/direct-api">/vs/direct-api</a>.</p>
+  </main>
+  <footer class="legal-footer">
+    <div><a href="/">Home</a> · <a href="/benchmarks">Benchmarks</a> · <a href="/vs/cloudflare">vs Cloudflare AI</a> · <a href="https://github.com/finsavvyai/clawpipe-sdk">GitHub</a></div>
+    <div>&copy; 2026 ClawPipe</div>
+  </footer>
+</div>
+</body>
+</html>

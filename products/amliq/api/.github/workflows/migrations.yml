@@ -1,0 +1,45 @@
+name: migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "migrations/**"
+  pull_request:
+    paths:
+      - "migrations/**"
+
+jobs:
+  apply-all:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: aegis_mig
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: apply every migration in order
+        env:
+          PGPASSWORD: test
+        run: |
+          set -e
+          cd migrations
+          for f in $(ls *.up.sql | sort); do
+            echo "Applying $f"
+            psql -h localhost -U postgres -d aegis_mig -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+      - name: assert tenant_saml_config exists
+        env:
+          PGPASSWORD: test
+        run: |
+          psql -h localhost -U postgres -d aegis_mig -c '\d tenant_saml_config'

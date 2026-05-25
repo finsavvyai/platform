@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sdlc.cc — the privacy layer for AI workflows</title>
+<meta name="description" content="DLP scrub for PII, credentials, and IDs before they reach Claude, ChatGPT, Copilot, or Cowork. One gateway, six surfaces — web, browser extension, Outlook, Excel, Word, Teams." />
+<meta property="og:title" content="sdlc.cc — privacy layer for AI" />
+<meta property="og:description" content="Scrub PII before it reaches Claude, ChatGPT, or Cowork. Ships as a web app, browser extension, and Office add-ins." />
+<meta property="og:url" content="https://sdlc.cc" />
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --panel: #14141a;
+    --panel-2: #1c1c24;
+    --line: #2a2a35;
+    --text: #ececef;
+    --muted: #9a9aa6;
+    --accent: #6ea8ff;
+    --accent-2: #b58fff;
+    --ok: #4ade80;
+    --grad: linear-gradient(135deg, #6ea8ff 0%, #b58fff 100%);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 15px/1.55 -apple-system, ui-sans-serif, system-ui, "Inter", "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  header { padding: 20px 0; border-bottom: 1px solid var(--line); }
+  .nav { display: flex; align-items: center; justify-content: space-between; }
+  .brand { font-weight: 700; font-size: 16px; letter-spacing: -0.02em; }
+  .brand .dot { color: var(--accent); }
+  .nav-links { display: flex; gap: 18px; font-size: 14px; color: var(--muted); }
+  .nav-links a { color: var(--muted); }
+  .nav-links a:hover { color: var(--text); text-decoration: none; }
+
+  .hero { padding: 80px 0 60px; text-align: center; }
+  .hero h1 { font-size: 56px; line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 18px; font-weight: 700; max-width: 880px; margin-left: auto; margin-right: auto; }
+  .hero h1 .grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero .lead { font-size: 19px; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
+  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; transition: transform 0.1s, opacity 0.1s; }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); }
+  .btn.primary { background: var(--grad); color: #000; }
+  .btn.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+  @media (max-width: 720px) { .hero h1 { font-size: 38px; } .hero .lead { font-size: 16px; } }
+
+  section { padding: 60px 0; }
+  section h2 { font-size: 28px; letter-spacing: -0.02em; margin: 0 0 8px; }
+  section .sect-lead { color: var(--muted); font-size: 16px; max-width: 720px; margin-bottom: 32px; }
+
+  .surfaces { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .surface { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: flex; flex-direction: column; gap: 10px; transition: border-color 0.15s, transform 0.15s; }
+  .surface:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .surface .badge { display: inline-block; font-size: 11px; color: var(--muted); border: 1px solid var(--line); padding: 2px 7px; border-radius: 999px; font-family: var(--mono); align-self: flex-start; }
+  .surface h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .surface p { margin: 0; color: var(--muted); font-size: 13px; }
+  .surface a.try { color: var(--accent); font-size: 13px; font-weight: 600; margin-top: auto; }
+
+  .pipeline { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px; font-family: var(--mono); font-size: 13px; color: var(--muted); white-space: pre; overflow-x: auto; }
+  .pipeline .h { color: var(--text); font-weight: 600; }
+  .pipeline .y { color: var(--accent); }
+
+  .detectors { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+  .det { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .det .name { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text); }
+  .det .desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .compare { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .compare th, .compare td { border-bottom: 1px solid var(--line); padding: 12px 10px; text-align: left; }
+  .compare th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .compare .yes { color: var(--ok); }
+  .compare .no { color: #6c6c75; }
+
+  footer { padding: 40px 0 60px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  footer .row { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container nav">
+    <div class="brand">sdlc<span class="dot">.</span>cc</div>
+    <nav class="nav-links">
+      <a href="#surfaces">Surfaces</a>
+      <a href="#how">How it works</a>
+      <a href="#detectors">Detectors</a>
+      <a href="https://github.com/finsavvyai/sdlc-cc">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero container">
+  <h1>The <span class="grad">privacy layer</span> for every AI workflow.</h1>
+  <p class="lead">Scrub PII, credentials, IDs, and secrets out of every prompt before they reach Claude, ChatGPT, Copilot, or Cowork. One gateway. Six surfaces. Audit-ready by default.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://sdlc-cc-scrub.pages.dev">Try scrub.sdlc.cc →</a>
+    <a class="btn secondary" href="#surfaces">See all 6 surfaces</a>
+  </div>
+</section>
+
+<section id="surfaces" class="container">
+  <h2>Six front doors. One backend.</h2>
+  <p class="sect-lead">Same DLP engine, same audit trail, same `sk_sdlc_*` key. Install the surfaces your team actually uses.</p>
+  <div class="surfaces">
+    <div class="surface">
+      <span class="badge">web</span>
+      <h3>scrub.sdlc.cc</h3>
+      <p>Drop-in paste-and-redact. No install. Cmd-Enter to scrub. Shows per-category redaction counts.</p>
+      <a class="try" href="https://sdlc-cc-scrub.pages.dev">Open the app →</a>
+    </div>
+    <div class="surface">
+      <span class="badge">browser</span>
+      <h3>Chrome / Edge extension</h3>
+      <p>Intercepts prompts on claude.ai and chatgpt.com. Two-step send — review redactions before submit. Firefox port included.</p>
+      <a class="try" href="https://github.com/finsavvyai/sdlc-cc/tree/main/extension">Sideload guide →</a>
+    </div>
+    <div class="surface">
+      <span class="badge">m365</span>
+      <h3>Outlook add-in</h3>
+      <p>"Sanitize for AI" ribbon button. Compose mode: rewrite the draft. Read mode: preview + clipboard copy.</p>
+      <a class="try" href="https://sdlc-cc-outlook.pages.dev/taskpane.html">Taskpane preview →</a>
+    </div>
+    <div class="surface">
+      <span class="badge">m365</span>
+      <h3>Excel add-in</h3>
+      <p>Selection-based scrubbing. Replace cells in place, or write a sanitized copy to a new sheet. Compliance-friendly default.</p>
+      <a class="try" href="https://sdlc-cc-excel.pages.dev/taskpane.html">Taskpane preview →</a>
+    </div>
+    <div class="surface">
+      <span class="badge">m365</span>
+      <h3>Word add-in</h3>
+      <p>Scope: selection or whole document. Replace text, or append a sanitized copy — your call per workflow.</p>
+      <a class="try" href="https://sdlc-cc-word.pages.dev/taskpane.html">Taskpane preview →</a>
+    </div>
+    <div class="surface">
+      <span class="badge">m365</span>
+      <h3>Teams app</h3>
+      <p>Personal tab — paste any chat message or thread, get the redacted copy back. Use before forwarding to Copilot.</p>
+      <a class="try" href="https://sdlc-cc-teams.pages.dev/tab.html">Tab preview →</a>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="container">
+  <h2>How it works</h2>
+  <p class="sect-lead">Every surface POSTs to one endpoint with one bearer key. Counts and tenant_id land in the audit log; raw text never persists.</p>
+  <div class="pipeline"><span class="h">Any client (browser ext / Outlook / Excel / Word / Teams / web)</span>
+        │
+        │  POST <span class="y">https://api.sdlc.cc/v1/dlp/scrub</span>
+        │  Authorization: Bearer <span class="y">sk_sdlc_*</span>
+        │  body: { text: "Customer SSN 123-45-6789, card 4111-1111-1111-1111" }
+        ▼
+<span class="h">sdlc.cc gateway</span>
+        │
+        ├─ MaskAML chain (Luhn / mod-97 / mod-10 validated)
+        ├─ audit row: { tenant_id, counts, latency_ms, status }
+        └─ metrics: requests_ok, dlp_redactions_total, latency p50/p99
+        ▼
+        clean_text: "Customer SSN ***-**-6789, card ************1111"
+        redactions: { ssn: 1, pan: 1, ... }</div>
+</section>
+
+<section id="detectors" class="container">
+  <h2>What it catches</h2>
+  <p class="sect-lead">11 detector categories. Validator-aware — every match is check-digit verified before it counts as a redaction.</p>
+  <div class="detectors">
+    <div class="det"><div class="name">PAN</div><div class="desc">Credit cards — Luhn validated</div></div>
+    <div class="det"><div class="name">IBAN</div><div class="desc">Bank accounts — mod-97</div></div>
+    <div class="det"><div class="name">BIC</div><div class="desc">SWIFT codes — shape + length</div></div>
+    <div class="det"><div class="name">US SSN</div><div class="desc">SSA structural rules</div></div>
+    <div class="det"><div class="name">UK NI</div><div class="desc">HMRC blacklist-checked</div></div>
+    <div class="det"><div class="name">IL ID</div><div class="desc">Israeli ID — mod-10</div></div>
+    <div class="det"><div class="name">Email</div><div class="desc">Universal RFC-shaped</div></div>
+    <div class="det"><div class="name">Phone</div><div class="desc">Multi-format digit runs</div></div>
+    <div class="det"><div class="name">IPv4 / IPv6</div><div class="desc">GDPR — full IPs are PII</div></div>
+    <div class="det"><div class="name">Credentials</div><div class="desc">Anthropic / OpenAI / GitHub / AWS / Slack / Stripe / Google / JWT / PEM</div></div>
+  </div>
+</section>
+
+<section class="container">
+  <h2>How we compare</h2>
+  <p class="sect-lead">Strac and Skyflow ship the closest patterns. Microsoft Purview covers M365 Copilot natively. We focus on what they don't.</p>
+  <table class="compare">
+    <thead>
+      <tr>
+        <th></th>
+        <th>sdlc.cc</th>
+        <th>Strac (M365 DLP)</th>
+        <th>Skyflow MCP</th>
+        <th>Purview (Copilot)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>MSP / multi-tenant channel</td>
+        <td class="yes">✓ TenantIQ-channeled</td>
+        <td class="no">direct-enterprise</td>
+        <td class="no">direct-enterprise</td>
+        <td class="no">Microsoft channel only</td>
+      </tr>
+      <tr>
+        <td>Validator-aware DLP (Luhn / mod-97 / mod-10)</td>
+        <td class="yes">✓ forensic-grade counts</td>
+        <td class="no">regex-only by default</td>
+        <td class="no">tokenization-based</td>
+        <td class="no">SIT-based</td>
+      </tr>
+      <tr>
+        <td>Browser extension for Cowork pre-transmission</td>
+        <td class="yes">✓ Chrome + Edge + Firefox</td>
+        <td class="no">—</td>
+        <td class="no">—</td>
+        <td class="no">Claude Cowork has no Purview hook</td>
+      </tr>
+      <tr>
+        <td>Office add-ins (Outlook / Excel / Word) + Teams + web</td>
+        <td class="yes">✓ all six surfaces</td>
+        <td class="no">SharePoint + OneDrive only</td>
+        <td class="no">SDK / proxy</td>
+        <td class="yes">native in Copilot</td>
+      </tr>
+      <tr>
+        <td>One key, every surface</td>
+        <td class="yes">✓ sk_sdlc_*</td>
+        <td class="no">per-app config</td>
+        <td class="no">per-vault</td>
+        <td class="no">per-policy</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  <div class="container row">
+    <div>
+      sdlc.cc — privacy for the AI surface area.
+      Built on <a href="https://github.com/finsavvyai/sdlc-core">sdlc-core</a>.
+    </div>
+    <div>
+      <a href="https://github.com/finsavvyai/sdlc-cc">GitHub</a> ·
+      <a href="https://api.sdlc.cc/health">/health</a> ·
+      <a href="mailto:support@sdlc.cc">support</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

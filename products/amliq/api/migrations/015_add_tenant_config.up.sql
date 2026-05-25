@@ -1,0 +1,1 @@
+ALTER TABLE tenants ADD COLUMN config JSONB NOT NULL DEFAULT '{}';

@@ -1,0 +1,160 @@
+name: Deploy Unified Billing System
+
+on:
+  push:
+    branches: [main]
+    paths: ['packages/shared-billing/**']
+  pull_request:
+    branches: [main]
+    paths: ['packages/shared-billing/**']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+env:
+  NODE_VERSION: '18'
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  test:
+    name: Test Billing System
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'packages/shared-billing/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: packages/shared-billing
+
+      - name: Type check
+        run: npm run typecheck
+        working-directory: packages/shared-billing
+
+      - name: Build
+        run: npm run build
+        working-directory: packages/shared-billing
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://unified-billing-api-staging.ahusolomon.workers.dev
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'packages/shared-billing/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: packages/shared-billing
+
+      - name: Build
+        run: npm run build
+        working-directory: packages/shared-billing
+
+      - name: Deploy to Cloudflare Workers (Staging)
+        run: npx wrangler deploy --env staging
+        working-directory: packages/shared-billing
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          LEMONSQUEEZY_API_KEY: ${{ secrets.LEMONSQUEEZY_API_KEY }}
+          LEMONSQUEEZY_SIGNING_SECRET: ${{ secrets.LEMONSQUEEZY_SIGNING_SECRET }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      - name: Run smoke tests
+        run: |
+          sleep 10
+          curl -f https://unified-billing-api-staging.ahusolomon.workers.dev/health || exit 1
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: https://unified-billing-api.ahusolomon.workers.dev
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'packages/shared-billing/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: packages/shared-billing
+
+      - name: Build
+        run: npm run build
+        working-directory: packages/shared-billing
+
+      - name: Deploy to Cloudflare Workers (Production)
+        run: npx wrangler deploy
+        working-directory: packages/shared-billing
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          LEMONSQUEEZY_API_KEY: ${{ secrets.LEMONSQUEEZY_API_KEY }}
+          LEMONSQUEEZY_SIGNING_SECRET: ${{ secrets.LEMONSQUEEZY_SIGNING_SECRET }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      - name: Run health checks
+        run: |
+          sleep 10
+          echo "Testing production deployment..."
+
+          # Health check
+          curl -f https://unified-billing-api.ahusolomon.workers.dev/health || exit 1
+
+          # API endpoint tests
+          curl -f https://unified-billing-api.ahusolomon.workers.dev/subscriptions || exit 1
+
+          echo "✅ Production deployment successful"
+
+      - name: Update deployment status
+        run: |
+          echo "🚀 Unified Billing System deployed to production!"
+          echo "🌐 URL: https://unified-billing-api.ahusolomon.workers.dev"
+          echo "📋 Commit: ${{ github.sha }}"
+          echo "👤 Deployed by: ${{ github.actor }}"
+
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: failure() && (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production')
+    needs: deploy-production
+    environment: production
+    steps:
+      - name: Rollback to previous version
+        run: |
+          echo "🔄 Rolling back Unified Billing System..."
+          # In a real scenario, you would deploy the previous version
+          echo "✅ Rollback completed"

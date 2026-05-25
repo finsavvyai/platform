@@ -1,0 +1,35 @@
+services:
+  # Backend API
+  - type: web
+    name: questro-backend-api
+    env: node
+    plan: starter
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        value: https://questro.app
+      - key: API_VERSION
+        value: v1
+    healthCheckPath: /health
+    autoDeploy: true
+
+  # Redis for caching
+  - type: redis
+    name: questro-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+
+databases:
+  - name: questro-database
+    databaseName: questro_production
+    user: questro_user
+    plan: starter

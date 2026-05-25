@@ -1,0 +1,96 @@
+name = "luna-rag-backend"
+main = "src/index.js"
+compatibility_date = "2024-05-12"
+compatibility_flags = ["nodejs_compat"]
+
+# Environment variables
+[vars]
+ENVIRONMENT = "development"
+LEMONSQUEEZY_STORE_ID = "214097"
+JWT_EXPIRES_IN = "7d"
+API_VERSION = "v1"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "luna-rag-db"
+database_id = "b3b1420b-4db9-4598-b9a5-f6f1ca17d41e"
+
+# KV Storage for caching
+[[kv_namespaces]]
+binding = "CACHE"
+id = "3ba6e6f7397049aa8bc56565c214526e"
+preview_id = "c818e8631af64633b322a2cca6b03fb1"
+
+# KV Storage for cache metadata
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "73b427dc72c34f5c8809061bb90cfaaa"
+preview_id = "fc8929c4f5b4410eaa4a8cc559872154"
+
+# Queue for email processing
+[[queues.producers]]
+binding = "EMAIL_QUEUE"
+queue = "luna-rag-email-queue"
+
+# Scheduled tasks for cache management
+[triggers]
+crons = ["0 */15 * * *", "0 0 * * *", "0 2 * * SUN"]
+
+# Environment-specific configurations
+[env.staging]
+name = "luna-rag-backend-staging"
+vars = { ENVIRONMENT = "staging" }
+
+[env.production]
+name = "luna-rag-backend"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+LEMONSQUEEZY_STORE_ID = "214097"
+JWT_EXPIRES_IN = "7d"
+API_VERSION = "v1"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "luna-rag-db"
+database_id = "b3b1420b-4db9-4598-b9a5-f6f1ca17d41e"
+
+[[env.production.kv_namespaces]]
+binding = "CACHE"
+id = "3ba6e6f7397049aa8bc56565c214526e"
+
+[[env.production.kv_namespaces]]
+binding = "CACHE_KV"
+id = "73b427dc72c34f5c8809061bb90cfaaa"
+
+[[env.production.queues.producers]]
+binding = "EMAIL_QUEUE"
+queue = "luna-rag-email-queue"
+
+# Route configuration (for custom domain)
+# [[routes]]
+# pattern = "api.lunaos.ai/*"
+# zone_name = "lunaos.ai"
+
+# Limits and quotas
+[limits]
+cpu_ms = 50000
+
+# Build configuration
+[build]
+command = ""
+
+
+# Analytics Engine (optional - for detailed metrics)
+# [[analytics_engine_datasets]]
+# binding = "ANALYTICS"
+
+# Secrets (set via: wrangler secret put <SECRET_NAME>)
+# Required secrets:
+# - LEMONSQUEEZY_API_KEY
+# - LEMONSQUEEZY_WEBHOOK_SECRET
+# - JWT_SECRET
+# - SENDGRID_API_KEY
+# - EMAIL_FROM
+# - EMAIL_SUPPORT

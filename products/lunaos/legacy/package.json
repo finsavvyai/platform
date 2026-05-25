@@ -1,0 +1,50 @@
+{
+  "name": "lunaforge-monorepo",
+  "private": true,
+
+  "workspaces": [
+    "packages/*",
+    "workers/*"
+  ],
+  "devDependencies": {
+  "commitizen": "^4",
+  "@commitlint/cli": "^19",
+  "@commitlint/config-conventional": "^19",
+  "cz-conventional-changelog": "^3",
+   "vitest": "^2.0.0",
+    "jsdom": "^24.0.0",
+    "@testing-library/dom": "^9.0.0",
+    "miniflare": "^3.20241018.0"
+},
+"config": {
+  "commitizen": {
+    "path": "cz-conventional-changelog"
+  }
+},
+  "scripts": {
+    "build": "node scripts/_build-all.js",
+    "watch": "node scripts/_watch-all.js",
+    "typecheck": "node scripts/_typecheck-all.js",
+    "validate:modes": "node scripts/validate-modes.js",
+    "release": "node scripts/release.js",
+    "fix-mode-ids": "node scripts/validate-mode-ids.js",
+
+    "deploy:worker": "npm run build --workspace lunaforge-worker && wrangler deploy --config workers/lunaforge-worker/wrangler.toml",
+    "deploy:worker:preview": "npm run build --workspace lunaforge-worker && wrangler dev --config workers/lunaforge-worker/wrangler.toml",
+
+    "build:extension": "npm run build --workspace lunaforge-extension",
+    "package:extension": "cd packages/lunaforge-extension && vsce package",
+    "publish:extension": "cd packages/lunaforge-extension && vsce publish",
+
+    "deploy:all": "npm run deploy:worker && npm run publish:extension",
+     
+    "test": "npm run test:unit && npm run test:integration && npm run test:ui",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:ui": "vitest run --config vitest.ui.config.ts",
+
+    
+    "test:extension": "cd packages/lunaforge-extension && npm test"
+  }
+}

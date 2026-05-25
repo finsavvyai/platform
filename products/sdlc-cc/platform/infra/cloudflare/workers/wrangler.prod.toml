@@ -1,0 +1,100 @@
+# Cloudflare Workers Production Configuration
+name = "sdlc-platform"
+main = "src/index.ts"
+compatibility_date = "2024-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Production configuration
+[env.production]
+name = "sdlc-platform-prod"
+route = { pattern = "api.sdlc.cc/*", zone_name = "sdlc.cc" }
+
+# Environment variables
+[vars]
+ENVIRONMENT = "production"
+LOG_LEVEL = "info"
+RATE_LIMIT_REQUESTS = "10000"
+RATE_LIMIT_WINDOW = "60"
+CACHE_TTL = "300"
+MAX_REQUEST_SIZE = "10485760"
+CORS_ORIGINS = "https://sdlc.cc,https://app.sdlc.cc,https://admin.sdlc.cc"
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "CACHE"
+id = "b2c5e1d1b6e84c1c8a7e2f6c3d9b5a0e"
+preview_id = "d3f6e2e2c7f9d2d9b8f3e7d4e0c6b1f"
+
+[[kv_namespaces]]
+binding = "CONFIG"
+id = "e4d7f3f3d8g0e3e0c9g4f8e5f1d7c2g"
+preview_id = "f5g8g4g4e9h1f4f1d0h5g9f2e8d3h3"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "sdlc-platform-prod"
+database_id = "a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6"
+
+# R2 Storage
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "sdlc-platform-prod"
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "WEBSOCKET"
+class_name = "WebSocketHandler"
+script_name = "sdlc-platform-prod"
+
+# Queues
+[[queues.producers]]
+binding = "JOB_QUEUE"
+queue = "sdlc-platform-jobs"
+
+[[queues.consumers]]
+queue = "sdlc-platform-jobs"
+max_batch_size = 100
+max_batch_timeout = 5
+
+# Vectorize Index
+[[vectorize]]
+binding = "VECTOR_INDEX"
+index_name = "sdlc-embeddings"
+
+# Triggers
+[[triggers]]
+crons = ["0 */6 * * *"]  # Every 6 hours
+
+# Limits
+[limits]
+cpu_ms = 50000
+
+# Build configuration
+[build]
+command = "npm run build"
+watch_dir = "src"
+
+# Deployment configuration
+[deploy]
+compatibility_date = "2024-01-15"
+
+# Analytics Engine
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+
+# Services
+[[services]]
+binding = "AUTH_SERVICE"
+service = "sdlc-auth-service"
+environment = "production"
+
+[[services]]
+binding = "DOCUMENT_SERVICE"
+service = "sdlc-document-service"
+environment = "production"
+
+[[services]]
+binding = "RAG_SERVICE"
+service = "sdlc-rag-service"
+environment = "production"

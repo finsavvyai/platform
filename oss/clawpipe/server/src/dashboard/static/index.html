@@ -1,0 +1,3411 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>FinSavvyAI Dashboard</title>
+        <style>
+            /* ── Apple HIG Design System ─────────────────────────────────── */
+            :root {
+                --blue: #007aff;
+                --green: #34c759;
+                --red: #ff3b30;
+                --orange: #ff9500;
+                --yellow: #ffcc00;
+                --purple: #af52de;
+                --teal: #30b0c7;
+                --indigo: #5856d6;
+                --pink: #ff2d55;
+                --bg-primary: #f2f2f7;
+                --bg-secondary: #ffffff;
+                --bg-tertiary: #f9f9fb;
+                --bg-grouped: #f2f2f7;
+                --text-primary: #000000;
+                --text-secondary: #3c3c43;
+                --text-tertiary: #8e8e93;
+                --text-quaternary: #c7c7cc;
+                --separator: #c6c6c8;
+                --opaque-separator: #d1d1d6;
+                --fill: rgba(120, 120, 128, 0.2);
+                --fill-secondary: rgba(120, 120, 128, 0.16);
+                --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+                --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+                --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.12);
+                --radius-sm: 8px;
+                --radius-md: 12px;
+                --radius-lg: 16px;
+                --radius-xl: 20px;
+                --sidebar-width: 260px;
+                --header-height: 52px;
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --bg-primary: #000000;
+                    --bg-secondary: #1c1c1e;
+                    --bg-tertiary: #2c2c2e;
+                    --bg-grouped: #000000;
+                    --text-primary: #ffffff;
+                    --text-secondary: #ebebf5;
+                    --text-tertiary: #8e8e93;
+                    --separator: #38383a;
+                    --opaque-separator: #48484a;
+                    --fill: rgba(120, 120, 128, 0.36);
+                    --fill-secondary: rgba(120, 120, 128, 0.32);
+                    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+                    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.4);
+                }
+            }
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "SF Pro Display",
+                    "SF Pro Text", "Helvetica Neue", Helvetica, Arial,
+                    sans-serif;
+                background: var(--bg-primary);
+                color: var(--text-primary);
+                line-height: 1.47;
+                font-size: 15px;
+                -webkit-font-smoothing: antialiased;
+                overflow: hidden;
+                height: 100vh;
+            }
+            /* ── Layout ───────────────────────────────────────────────────── */
+            .app {
+                display: flex;
+                height: 100vh;
+            }
+            .sidebar {
+                width: var(--sidebar-width);
+                background: var(--bg-secondary);
+                border-right: 0.5px solid var(--separator);
+                display: flex;
+                flex-direction: column;
+                flex-shrink: 0;
+                z-index: 100;
+            }
+            .sidebar-header {
+                padding: 16px 20px;
+                border-bottom: 0.5px solid var(--separator);
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                height: var(--header-height);
+            }
+            .sidebar-header .logo {
+                width: 32px;
+                height: 32px;
+                background: linear-gradient(135deg, var(--blue), var(--indigo));
+                border-radius: var(--radius-sm);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: 700;
+                font-size: 16px;
+                flex-shrink: 0;
+            }
+            .sidebar-header h1 {
+                font-size: 17px;
+                font-weight: 600;
+                letter-spacing: -0.4px;
+            }
+            .sidebar-nav {
+                flex: 1;
+                padding: 8px 12px;
+                overflow-y: auto;
+            }
+            .nav-section {
+                margin-bottom: 24px;
+            }
+            .nav-section-title {
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--text-tertiary);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                padding: 0 8px;
+                margin-bottom: 4px;
+            }
+            .nav-item {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 8px 10px;
+                border-radius: var(--radius-sm);
+                cursor: pointer;
+                font-size: 14px;
+                color: var(--text-secondary);
+                transition: all 0.15s ease;
+                user-select: none;
+            }
+            .nav-item:focus-visible {
+                outline: 2px solid var(--blue);
+                outline-offset: -2px;
+            }
+            .nav-item:hover {
+                background: var(--fill);
+            }
+            .nav-item:active {
+                transform: scale(0.98);
+            }
+            .nav-item.active {
+                background: var(--blue);
+                color: white;
+            }
+            .nav-item .icon {
+                width: 20px;
+                text-align: center;
+                font-size: 16px;
+                flex-shrink: 0;
+            }
+            .nav-item .badge {
+                margin-left: auto;
+                background: var(--red);
+                color: white;
+                font-size: 11px;
+                font-weight: 600;
+                padding: 1px 6px;
+                border-radius: 10px;
+                min-width: 20px;
+                text-align: center;
+            }
+            .sidebar-footer {
+                padding: 12px 20px;
+                border-top: 0.5px solid var(--separator);
+                font-size: 11px;
+                color: var(--text-tertiary);
+            }
+            .main-content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            .main-header {
+                height: var(--header-height);
+                background: var(--bg-secondary);
+                border-bottom: 0.5px solid var(--separator);
+                display: flex;
+                align-items: center;
+                padding: 0 24px;
+                gap: 16px;
+                flex-shrink: 0;
+            }
+            .main-header h2 {
+                font-size: 17px;
+                font-weight: 600;
+                letter-spacing: -0.4px;
+            }
+            .main-header .status-pill {
+                font-size: 12px;
+                font-weight: 500;
+                padding: 3px 10px;
+                border-radius: 12px;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+            .status-pill.healthy {
+                background: rgba(52, 199, 89, 0.12);
+                color: var(--green);
+            }
+            .status-pill.unhealthy {
+                background: rgba(255, 59, 48, 0.12);
+                color: var(--red);
+            }
+            .status-pill.unknown {
+                background: var(--fill);
+                color: var(--text-tertiary);
+            }
+            .main-header .spacer {
+                flex: 1;
+            }
+            .main-header .header-actions {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            .main-body {
+                flex: 1;
+                overflow-y: auto;
+                padding: 24px;
+            }
+            /* ── Cards ────────────────────────────────────────────────────── */
+            .card {
+                background: var(--bg-secondary);
+                border-radius: var(--radius-lg);
+                box-shadow: var(--shadow-sm);
+                overflow: hidden;
+            }
+            .card-header {
+                padding: 16px 20px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .card-header h3 {
+                font-size: 15px;
+                font-weight: 600;
+            }
+            .card-header .spacer {
+                flex: 1;
+            }
+            .card-body {
+                padding: 0 20px 16px;
+            }
+            .card-footer {
+                padding: 12px 20px;
+                border-top: 0.5px solid var(--separator);
+                font-size: 12px;
+                color: var(--text-tertiary);
+            }
+            .grid {
+                display: grid;
+                gap: 16px;
+            }
+            .grid-2 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .grid-3 {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .grid-4 {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            @media (max-width: 1200px) {
+                .grid-4 {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+            }
+            @media (max-width: 900px) {
+                .grid-3,
+                .grid-2 {
+                    grid-template-columns: 1fr;
+                }
+                .sidebar {
+                    display: none;
+                }
+                .mobile-header {
+                    display: flex !important;
+                }
+            }
+            /* ── Stat Cards ───────────────────────────────────────────────── */
+            .stat-card {
+                background: var(--bg-secondary);
+                border-radius: var(--radius-md);
+                padding: 16px 20px;
+                box-shadow: var(--shadow-sm);
+            }
+            .stat-card .stat-label {
+                font-size: 12px;
+                color: var(--text-tertiary);
+                font-weight: 500;
+                margin-bottom: 4px;
+            }
+            .stat-card .stat-value {
+                font-size: 28px;
+                font-weight: 700;
+                letter-spacing: -0.5px;
+                line-height: 1.1;
+            }
+            .stat-card .stat-change {
+                font-size: 12px;
+                margin-top: 4px;
+                font-weight: 500;
+            }
+            .stat-card .stat-change.positive {
+                color: var(--green);
+            }
+            .stat-card .stat-change.negative {
+                color: var(--red);
+            }
+            /* ── Buttons ──────────────────────────────────────────────────── */
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 8px 16px;
+                border-radius: var(--radius-sm);
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                border: none;
+                transition: all 0.15s ease;
+                user-select: none;
+            }
+            .btn:focus-visible {
+                outline: 2px solid var(--blue);
+                outline-offset: 2px;
+            }
+            .btn-primary {
+                background: var(--blue);
+                color: white;
+            }
+            .btn-primary:hover {
+                background: #0066d6;
+            }
+            .btn-secondary {
+                background: var(--fill);
+                color: var(--text-primary);
+            }
+            .btn-secondary:hover {
+                background: var(--fill-secondary);
+            }
+            .btn:active {
+                transform: scale(0.97);
+            }
+            .btn:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                pointer-events: none;
+            }
+            .btn-danger {
+                background: var(--red);
+                color: white;
+            }
+            .btn-sm {
+                padding: 4px 10px;
+                font-size: 13px;
+            }
+            .btn-icon {
+                padding: 6px;
+                width: 32px;
+                height: 32px;
+                justify-content: center;
+            }
+            /* ── Tables ───────────────────────────────────────────────────── */
+            .table-wrap {
+                overflow-x: auto;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 14px;
+            }
+            th {
+                text-align: left;
+                font-size: 11px;
+                font-weight: 600;
+                color: var(--text-tertiary);
+                text-transform: uppercase;
+                letter-spacing: 0.4px;
+                padding: 8px 12px;
+                border-bottom: 0.5px solid var(--separator);
+            }
+            td {
+                padding: 10px 12px;
+                border-bottom: 0.5px solid var(--separator);
+            }
+            tr:last-child td {
+                border-bottom: none;
+            }
+            tr {
+                cursor: default;
+            }
+            tbody tr {
+                cursor: pointer;
+            }
+            tr:hover td {
+                background: var(--fill);
+            }
+            /* ── Status Dots ──────────────────────────────────────────────── */
+            .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                display: inline-block;
+            }
+            .dot-green {
+                background: var(--green);
+                box-shadow: 0 0 6px rgba(52, 199, 89, 0.4);
+            }
+            .dot-red {
+                background: var(--red);
+                box-shadow: 0 0 6px rgba(255, 59, 48, 0.4);
+            }
+            .dot-yellow {
+                background: var(--orange);
+                box-shadow: 0 0 6px rgba(255, 149, 0, 0.4);
+            }
+            .dot-gray {
+                background: var(--text-tertiary);
+            }
+            /* ── Chat ─────────────────────────────────────────────────────── */
+            .chat-container {
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+            }
+            .chat-messages {
+                flex: 1;
+                overflow-y: auto;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+            .chat-msg {
+                max-width: 75%;
+                padding: 10px 14px;
+                border-radius: var(--radius-md);
+                font-size: 14px;
+                line-height: 1.5;
+                word-wrap: break-word;
+            }
+            .chat-msg.user {
+                align-self: flex-end;
+                background: var(--blue);
+                color: white;
+                border-bottom-right-radius: 4px;
+            }
+            .chat-msg.assistant {
+                align-self: flex-start;
+                background: var(--bg-tertiary);
+                border-bottom-left-radius: 4px;
+            }
+            .chat-msg.system {
+                align-self: center;
+                background: var(--fill);
+                color: var(--text-tertiary);
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+            .chat-msg pre {
+                background: rgba(0, 0, 0, 0.06);
+                padding: 8px 10px;
+                border-radius: 6px;
+                overflow-x: auto;
+                font-size: 13px;
+                margin: 6px 0;
+                font-family: "SF Mono", Menlo, monospace;
+            }
+            .chat-input-area {
+                padding: 12px 20px;
+                border-top: 0.5px solid var(--separator);
+                display: flex;
+                gap: 8px;
+                align-items: flex-end;
+                background: var(--bg-secondary);
+            }
+            .chat-input-area textarea {
+                flex: 1;
+                border: 1px solid var(--separator);
+                border-radius: var(--radius-md);
+                padding: 10px 14px;
+                font-size: 14px;
+                font-family: inherit;
+                resize: none;
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                outline: none;
+                min-height: 42px;
+                max-height: 120px;
+                line-height: 1.4;
+            }
+            .chat-input-area textarea:focus {
+                border-color: var(--blue);
+            }
+            .chat-model-select {
+                border: 1px solid var(--separator);
+                border-radius: var(--radius-sm);
+                padding: 8px 10px;
+                font-size: 13px;
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                outline: none;
+                min-width: 140px;
+            }
+            /* ── Pages ────────────────────────────────────────────────────── */
+            .page {
+                display: none;
+                height: 100%;
+            }
+            .page.active {
+                display: flex;
+                flex-direction: column;
+            }
+            /* ── Progress Bar ─────────────────────────────────────────────── */
+            .progress-bar {
+                height: 6px;
+                background: var(--fill);
+                border-radius: 3px;
+                overflow: hidden;
+            }
+            .progress-bar .fill {
+                height: 100%;
+                border-radius: 3px;
+                transition: width 0.5s ease;
+            }
+            /* ── Tags ─────────────────────────────────────────────────────── */
+            .tag {
+                display: inline-flex;
+                align-items: center;
+                padding: 2px 8px;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+            .tag-blue {
+                background: rgba(0, 122, 255, 0.12);
+                color: var(--blue);
+            }
+            .tag-green {
+                background: rgba(52, 199, 89, 0.12);
+                color: var(--green);
+            }
+            .tag-red {
+                background: rgba(255, 59, 48, 0.12);
+                color: var(--red);
+            }
+            .tag-orange {
+                background: rgba(255, 149, 0, 0.12);
+                color: var(--orange);
+            }
+            .tag-purple {
+                background: rgba(175, 82, 222, 0.12);
+                color: var(--purple);
+            }
+            .wa-template-wrap {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            .wa-event-list {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                max-height: 280px;
+                overflow-y: auto;
+            }
+            .wa-event {
+                border: 0.5px solid var(--separator);
+                border-radius: var(--radius-sm);
+                padding: 8px 10px;
+                background: var(--bg-tertiary);
+            }
+            .wa-event-meta {
+                font-size: 12px;
+                color: var(--text-tertiary);
+                margin-bottom: 4px;
+            }
+            .wa-event-title {
+                font-size: 13px;
+                color: var(--text-secondary);
+                line-height: 1.4;
+                word-break: break-word;
+            }
+            .wa-ops-row {
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+            /* ── Log Viewer ───────────────────────────────────────────────── */
+            .log-viewer {
+                background: #1e1e1e;
+                color: #d4d4d4;
+                font-family: "SF Mono", Menlo, monospace;
+                font-size: 12px;
+                padding: 16px;
+                border-radius: var(--radius-md);
+                max-height: 400px;
+                overflow-y: auto;
+                line-height: 1.6;
+            }
+            .log-viewer .log-info {
+                color: #4fc1ff;
+            }
+            .log-viewer .log-warn {
+                color: #cca700;
+            }
+            .log-viewer .log-error {
+                color: #f44747;
+            }
+            .log-viewer .log-time {
+                color: #6a9955;
+            }
+            /* ── Settings Form ────────────────────────────────────────────── */
+            .form-group {
+                margin-bottom: 16px;
+            }
+            .form-group label {
+                display: block;
+                font-size: 13px;
+                font-weight: 500;
+                margin-bottom: 4px;
+                color: var(--text-secondary);
+            }
+            .form-group input,
+            .form-group select,
+            .form-group textarea {
+                width: 100%;
+                border: 1px solid var(--separator);
+                border-radius: var(--radius-sm);
+                padding: 8px 12px;
+                font-size: 14px;
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+                outline: none;
+            }
+            .form-group input:focus,
+            .form-group select:focus,
+            .form-group textarea:focus {
+                border-color: var(--blue);
+            }
+            input:hover:not(:focus),
+            select:hover:not(:focus),
+            textarea:hover:not(:focus) {
+                border-color: var(--text-quaternary);
+            }
+            /* ── Empty State ──────────────────────────────────────────────── */
+            .empty-state {
+                text-align: center;
+                padding: 48px 24px;
+                color: var(--text-tertiary);
+            }
+            .empty-state .icon {
+                font-size: 48px;
+                margin-bottom: 12px;
+            }
+            .empty-state h3 {
+                font-size: 17px;
+                font-weight: 600;
+                color: var(--text-secondary);
+                margin-bottom: 4px;
+            }
+            .empty-state p {
+                font-size: 14px;
+            }
+            /* ── Animations ───────────────────────────────────────────────── */
+            @keyframes pulse {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.5;
+                }
+            }
+            .loading {
+                animation: pulse 1.5s ease-in-out infinite;
+            }
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(8px);
+                }
+                to {
+                    opacity: 1;
+                    transform: none;
+                }
+            }
+            .fade-in {
+                animation: fadeIn 0.3s ease-out;
+            }
+            /* ── Mobile Header ────────────────────────────────────────────── */
+            .mobile-header {
+                display: none;
+                height: 48px;
+                background: var(--bg-secondary);
+                border-bottom: 0.5px solid var(--separator);
+                align-items: center;
+                padding: 0 16px;
+                gap: 12px;
+            }
+            .mobile-header .hamburger {
+                font-size: 20px;
+                cursor: pointer;
+                background: none;
+                border: none;
+                color: var(--text-primary);
+            }
+            @media (prefers-reduced-motion: reduce) {
+                *, *::before, *::after {
+                    animation-duration: 0.01ms !important;
+                    animation-iteration-count: 1 !important;
+                    transition-duration: 0.01ms !important;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app" id="app">
+            <!-- Mobile Header -->
+            <div class="mobile-header">
+                <button class="hamburger" onclick="toggleSidebar()">
+                    &#9776;
+                </button>
+                <span style="font-weight: 600">FinSavvyAI</span>
+            </div>
+
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <div class="logo">F</div>
+                    <h1>FinSavvyAI</h1>
+                </div>
+                <nav class="sidebar-nav" role="navigation" aria-label="Main navigation">
+                    <div class="nav-section">
+                        <div class="nav-section-title">Main</div>
+                        <div
+                            class="nav-item active"
+                            data-page="dashboard"
+                            onclick="navigateTo('dashboard')"
+                        >
+                            <span class="icon">&#9679;</span> Dashboard
+                        </div>
+                        <div
+                            class="nav-item"
+                            data-page="chat"
+                            onclick="navigateTo('chat')"
+                        >
+                            <span class="icon">&#9993;</span> Chat
+                        </div>
+                        <div
+                            class="nav-item"
+                            data-page="whatsapp"
+                            onclick="navigateTo('whatsapp')"
+                        >
+                            <span class="icon">&#9742;</span> WhatsApp Test
+                        </div>
+                        <div
+                            class="nav-item"
+                            data-page="control"
+                            onclick="navigateTo('control')"
+                        >
+                            <span class="icon">&#9874;</span> Control Hub
+                        </div>
+                    </div>
+                    <div class="nav-section">
+                        <div class="nav-section-title">Cluster</div>
+                        <div
+                            class="nav-item"
+                            data-page="nodes"
+                            onclick="navigateTo('nodes')"
+                        >
+                            <span class="icon">&#9645;</span> Nodes
+                            <span
+                                class="badge"
+                                id="node-count-badge"
+                                style="display: none"
+                                >0</span
+                            >
+                        </div>
+                        <div
+                            class="nav-item"
+                            data-page="models"
+                            onclick="navigateTo('models')"
+                        >
+                            <span class="icon">&#9881;</span> Models
+                        </div>
+                        <div
+                            class="nav-item"
+                            data-page="routing"
+                            onclick="navigateTo('routing')"
+                        >
+                            <span class="icon">&#8644;</span> Routing
+                        </div>
+                    </div>
+                    <div class="nav-section">
+                        <div class="nav-section-title">Operations</div>
+                        <div
+                            class="nav-item"
+                            data-page="monitoring"
+                            onclick="navigateTo('monitoring')"
+                        >
+                            <span class="icon">&#9636;</span> Monitoring
+                        </div>
+                        <div
+                            class="nav-item"
+                            data-page="logs"
+                            onclick="navigateTo('logs')"
+                        >
+                            <span class="icon">&#9776;</span> Logs
+                        </div>
+                        <div
+                            class="nav-item"
+                            data-page="settings"
+                            onclick="navigateTo('settings')"
+                        >
+                            <span class="icon">&#9881;</span> Settings
+                        </div>
+                    </div>
+                </nav>
+                <div class="sidebar-footer">
+                    FinSavvyAI v1.0.0 &middot;
+                    <span id="connection-status">Connecting...</span>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content" role="main">
+                <!-- ── Dashboard Page ───────────────────────────── -->
+                <div class="page active" id="page-dashboard">
+                    <div class="main-header">
+                        <h2>Dashboard</h2>
+                        <div class="status-pill unknown" id="cluster-pill">
+                            <span class="dot dot-gray"></span> Checking...
+                        </div>
+                        <div class="spacer"></div>
+                        <div class="header-actions">
+                            <button
+                                class="btn btn-secondary btn-sm"
+                                onclick="refreshAll()"
+                            >
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="main-body">
+                        <div class="grid grid-4" id="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">Nodes Online</div>
+                                <div class="stat-value" id="stat-nodes">--</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Models Loaded</div>
+                                <div class="stat-value" id="stat-models">
+                                    --
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Requests / min</div>
+                                <div class="stat-value" id="stat-rpm">--</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Avg Latency</div>
+                                <div class="stat-value" id="stat-latency">
+                                    --
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px" class="grid grid-2">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Cluster Nodes</h3>
+                                    <div class="spacer"></div>
+                                    <span class="tag tag-blue" id="nodes-tag"
+                                        >0 nodes</span
+                                    >
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-wrap">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Status</th>
+                                                    <th>Node</th>
+                                                    <th>Host</th>
+                                                    <th>Models</th>
+                                                    <th>Last Seen</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="nodes-table">
+                                                <tr>
+                                                    <td
+                                                        colspan="5"
+                                                        class="loading"
+                                                        style="
+                                                            text-align: center;
+                                                            color: var(
+                                                                --text-tertiary
+                                                            );
+                                                        "
+                                                    >
+                                                        Loading...
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Recent Activity</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div
+                                        id="activity-feed"
+                                        style="
+                                            font-size: 13px;
+                                            color: var(--text-secondary);
+                                        "
+                                    >
+                                        <div
+                                            class="empty-state"
+                                            style="padding: 24px"
+                                        >
+                                            <div class="icon">&#128196;</div>
+                                            <p>Activity will appear here</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px" class="card">
+                            <div class="card-header">
+                                <h3>System Health</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="grid grid-3" id="health-grid">
+                                    <div>
+                                        <div
+                                            style="
+                                                font-size: 13px;
+                                                color: var(--text-tertiary);
+                                                margin-bottom: 4px;
+                                            "
+                                        >
+                                            Gateway
+                                        </div>
+                                        <div
+                                            style="
+                                                display: flex;
+                                                align-items: center;
+                                                gap: 8px;
+                                            "
+                                        >
+                                            <span
+                                                class="dot dot-gray"
+                                                id="health-gateway-dot"
+                                            ></span
+                                            ><span id="health-gateway-text"
+                                                >Checking...</span
+                                            >
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div
+                                            style="
+                                                font-size: 13px;
+                                                color: var(--text-tertiary);
+                                                margin-bottom: 4px;
+                                            "
+                                        >
+                                            Master
+                                        </div>
+                                        <div
+                                            style="
+                                                display: flex;
+                                                align-items: center;
+                                                gap: 8px;
+                                            "
+                                        >
+                                            <span
+                                                class="dot dot-gray"
+                                                id="health-master-dot"
+                                            ></span
+                                            ><span id="health-master-text"
+                                                >Checking...</span
+                                            >
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div
+                                            style="
+                                                font-size: 13px;
+                                                color: var(--text-tertiary);
+                                                margin-bottom: 4px;
+                                            "
+                                        >
+                                            OpenCLaw
+                                        </div>
+                                        <div
+                                            style="
+                                                display: flex;
+                                                align-items: center;
+                                                gap: 8px;
+                                            "
+                                        >
+                                            <span
+                                                class="dot dot-gray"
+                                                id="health-openclaw-dot"
+                                            ></span
+                                            ><span id="health-openclaw-text"
+                                                >Checking...</span
+                                            >
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Chat Page ────────────────────────────────── -->
+                <div class="page" id="page-chat">
+                    <div class="main-header">
+                        <h2>Chat</h2>
+                        <div class="spacer"></div>
+                        <select
+                            class="chat-model-select"
+                            id="chat-model-select"
+                        >
+                            <option value="default">default</option>
+                        </select>
+                        <button
+                            class="btn btn-secondary btn-sm"
+                            onclick="clearChat()"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                    <div
+                        class="chat-container"
+                        style="flex: 1; overflow: hidden"
+                    >
+                        <div class="chat-messages" id="chat-messages">
+                            <div class="chat-msg system">
+                                Welcome to FinSavvyAI. Ask me anything about
+                                finance, AI, or your cluster.
+                            </div>
+                        </div>
+                        <div class="chat-input-area">
+                            <textarea
+                                id="chat-input"
+                                rows="1"
+                                placeholder="Type a message..."
+                                onkeydown="handleChatKey(event)"
+                            ></textarea>
+                            <button
+                                class="btn btn-primary"
+                                id="chat-send-btn"
+                                onclick="sendChat()"
+                            >
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── WhatsApp Test Page ───────────────────────── -->
+                <div class="page" id="page-whatsapp">
+                    <div class="main-header">
+                        <h2>WhatsApp Test</h2>
+                        <div class="spacer"></div>
+                        <select
+                            class="chat-model-select"
+                            id="wa-auto-interval"
+                            style="min-width: 110px"
+                        >
+                            <option value="5">Auto 5s</option>
+                            <option value="10">Auto 10s</option>
+                            <option value="20">Auto 20s</option>
+                            <option value="30">Auto 30s</option>
+                        </select>
+                        <button
+                            class="btn btn-secondary btn-sm"
+                            id="wa-auto-btn"
+                            onclick="toggleWhatsAppAutoRefresh()"
+                        >
+                            Auto: Off
+                        </button>
+                        <button
+                            class="btn btn-secondary btn-sm"
+                            onclick="refreshWhatsAppPanel()"
+                        >
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="main-body">
+                        <div class="grid grid-4" id="wa-kpi-grid">
+                            <div class="stat-card">
+                                <div class="stat-label">Tests Sent</div>
+                                <div class="stat-value" id="wa-stat-total">0</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Success Rate</div>
+                                <div class="stat-value" id="wa-stat-success">
+                                    --
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Last Latency</div>
+                                <div class="stat-value" id="wa-stat-latency">
+                                    --
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Active Sessions</div>
+                                <div class="stat-value" id="wa-stat-sessions">
+                                    --
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-2">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Webhook Simulator</h3>
+                                    <div class="spacer"></div>
+                                    <span class="tag tag-blue" id="wa-worker-health"
+                                        >Checking worker...</span
+                                    >
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-group">
+                                        <label>Worker URL</label>
+                                        <input
+                                            type="text"
+                                            id="wa-worker-url"
+                                            placeholder="http://localhost:8001"
+                                        />
+                                    </div>
+                                    <div class="grid grid-2">
+                                        <div class="form-group">
+                                            <label>Channel</label>
+                                            <select id="wa-channel">
+                                                <option value="whatsapp">
+                                                    whatsapp
+                                                </option>
+                                                <option value="telegram">
+                                                    telegram
+                                                </option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Model</label>
+                                            <input
+                                                type="text"
+                                                id="wa-model"
+                                                value="default"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-2">
+                                        <div class="form-group">
+                                            <label>Sender</label>
+                                            <input
+                                                type="text"
+                                                id="wa-sender"
+                                                value="user-a"
+                                            />
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Session ID</label>
+                                            <input
+                                                type="text"
+                                                id="wa-session-id"
+                                                value="wa-test-1"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Webhook Secret (optional)</label>
+                                        <input
+                                            type="password"
+                                            id="wa-secret"
+                                            placeholder="Only needed if CHANNELS_WEBHOOK_SECRET is set"
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Message</label>
+                                        <textarea
+                                            id="wa-text"
+                                            rows="4"
+                                            placeholder="Try: @finsavvy analyze this invoice..."
+                                        ></textarea>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Quick Templates</label>
+                                        <div class="wa-template-wrap">
+                                            <button
+                                                class="btn btn-secondary btn-sm"
+                                                onclick="setWhatsAppTemplate('What is the cluster status right now?')"
+                                            >
+                                                Status
+                                            </button>
+                                            <button
+                                                class="btn btn-secondary btn-sm"
+                                                onclick="setWhatsAppTemplate('Summarize the last response in 3 bullets.')"
+                                            >
+                                                Summarize
+                                            </button>
+                                            <button
+                                                class="btn btn-secondary btn-sm"
+                                                onclick="setWhatsAppTemplate('@finsavvy analyze this transaction list for anomalies')"
+                                            >
+                                                Analyze
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-2">
+                                        <div class="form-group">
+                                            <label>Image URL (optional)</label>
+                                            <input
+                                                type="text"
+                                                id="wa-media-url"
+                                                placeholder="https://example.com/image.jpg"
+                                            />
+                                        </div>
+                                        <div class="form-group">
+                                            <label style="display: flex; gap: 8px; align-items: center">
+                                                <input
+                                                    type="checkbox"
+                                                    id="wa-group-toggle"
+                                                />
+                                                Group Mention Mode
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-2">
+                                        <div class="form-group">
+                                            <label>Group ID (optional)</label>
+                                            <input
+                                                type="text"
+                                                id="wa-group-id"
+                                                placeholder="wa-group-1"
+                                            />
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Mention Trigger</label>
+                                            <input
+                                                type="text"
+                                                id="wa-group-mention"
+                                                value="@finsavvy"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                                        <button
+                                            class="btn btn-primary"
+                                            id="wa-send-btn"
+                                            onclick="sendWhatsAppTest()"
+                                        >
+                                            Send Test
+                                        </button>
+                                        <button
+                                            class="btn btn-secondary"
+                                            onclick="sendWhatsAppCommand('/reset')"
+                                        >
+                                            Send /reset
+                                        </button>
+                                        <button
+                                            class="btn btn-secondary"
+                                            onclick="sendWhatsAppCommand('/new')"
+                                        >
+                                            Send /new
+                                        </button>
+                                        <button
+                                            class="btn btn-secondary"
+                                            onclick="copyWhatsAppCurl()"
+                                        >
+                                            Copy cURL
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    This sends directly to the worker
+                                    <code>/hooks/agent</code> endpoint.
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Response</h3>
+                                    <div class="spacer"></div>
+                                    <span class="tag tag-purple" id="wa-last-status"
+                                        >No requests yet</span
+                                    >
+                                </div>
+                                <div class="card-body">
+                                    <pre
+                                        id="wa-response"
+                                        class="log-viewer"
+                                        style="max-height: 280px"
+                                    >
+Ready.</pre
+                                    >
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px" class="grid grid-2">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Live WhatsApp URLs</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-group">
+                                        <label>OpenClaw Base URL</label>
+                                        <input
+                                            type="text"
+                                            id="wa-openclaw-url"
+                                            placeholder="https://your-openclaw-service.workers.dev"
+                                            oninput="syncWhatsAppUrls()"
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Meta Callback URL (Bridge)</label>
+                                        <input
+                                            type="text"
+                                            id="wa-url-bridge"
+                                            readonly
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Meta Callback URL (Channels)</label>
+                                        <input
+                                            type="text"
+                                            id="wa-url-channels"
+                                            readonly
+                                        />
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    Use one callback URL in Meta WhatsApp Cloud
+                                    API setup.
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Active Sessions</h3>
+                                    <div class="spacer"></div>
+                                    <button
+                                        class="btn btn-secondary btn-sm"
+                                        onclick="refreshWhatsAppSessions()"
+                                    >
+                                        Reload
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <pre
+                                        id="wa-sessions"
+                                        class="log-viewer"
+                                        style="max-height: 280px"
+                                    >
+No sessions loaded.</pre
+                                    >
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px" class="card">
+                            <div class="card-header">
+                                <h3>Recent Activity</h3>
+                                <div class="spacer"></div>
+                                <button
+                                    class="btn btn-secondary btn-sm"
+                                    onclick="clearWhatsAppEvents()"
+                                >
+                                    Clear
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="wa-events" class="wa-event-list">
+                                    <div class="empty-state" style="padding: 24px">
+                                        <p>No test activity yet</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Control Hub Page ─────────────────────────── -->
+                <div class="page" id="page-control">
+                    <div class="main-header">
+                        <h2>Control Hub</h2>
+                        <div class="spacer"></div>
+                        <button
+                            class="btn btn-secondary btn-sm"
+                            onclick="refreshControlHub()"
+                        >
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="main-body">
+                        <div class="grid grid-2">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>OpenClaw Connection</h3>
+                                    <div class="spacer"></div>
+                                    <span class="tag tag-blue" id="control-oc-status"
+                                        >Not checked</span
+                                    >
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-group">
+                                        <label>OpenClaw Base URL</label>
+                                        <input
+                                            type="text"
+                                            id="control-openclaw-url"
+                                            placeholder="https://your-openclaw-service.workers.dev"
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Auth Mode</label>
+                                        <select id="control-auth-mode">
+                                            <option value="none">None (public only)</option>
+                                            <option value="bearer">Bearer Token</option>
+                                            <option value="apikey">X-API-Key</option>
+                                            <option value="service">X-Service-Key</option>
+                                        </select>
+                                    </div>
+                                    <div class="grid grid-2">
+                                        <div class="form-group">
+                                            <label>Auth Secret</label>
+                                            <input
+                                                type="password"
+                                                id="control-auth-secret"
+                                                placeholder="Token / API key / Service key"
+                                            />
+                                        </div>
+                                        <div class="form-group">
+                                            <label>User ID (service mode)</label>
+                                            <input
+                                                type="text"
+                                                id="control-user-id"
+                                                placeholder="optional-user-id"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div class="wa-ops-row">
+                                        <button
+                                            class="btn btn-primary"
+                                            onclick="saveControlHubConfig()"
+                                        >
+                                            Save Config
+                                        </button>
+                                        <button
+                                            class="btn btn-secondary"
+                                            onclick="testOpenClawConnection()"
+                                        >
+                                            Test Connection
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Quick Snapshot</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="grid grid-4">
+                                        <div class="stat-card">
+                                            <div class="stat-label">Nodes</div>
+                                            <div class="stat-value" id="control-stat-nodes">
+                                                --
+                                            </div>
+                                        </div>
+                                        <div class="stat-card">
+                                            <div class="stat-label">Models</div>
+                                            <div class="stat-value" id="control-stat-models">
+                                                --
+                                            </div>
+                                        </div>
+                                        <div class="stat-card">
+                                            <div class="stat-label">Channels</div>
+                                            <div class="stat-value" id="control-stat-channels">
+                                                --
+                                            </div>
+                                        </div>
+                                        <div class="stat-card">
+                                            <div class="stat-label">Services</div>
+                                            <div class="stat-value" id="control-stat-services">
+                                                --
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="margin-top: 12px; font-size: 13px; color: var(--text-tertiary)" id="control-summary">
+                                        Load the hub to see channels, skills/services, and model capabilities.
+                                    </div>
+                                    <div class="wa-ops-row" style="margin-top: 10px">
+                                        <button class="btn btn-secondary btn-sm" onclick="navigateTo('nodes')">
+                                            Manage Nodes
+                                        </button>
+                                        <button class="btn btn-secondary btn-sm" onclick="navigateTo('models')">
+                                            View Models
+                                        </button>
+                                        <button class="btn btn-secondary btn-sm" onclick="navigateTo('routing')">
+                                            Routing
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px" class="grid grid-2">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Connect Channel</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="grid grid-2">
+                                        <div class="form-group">
+                                            <label>Channel Type</label>
+                                            <select id="control-channel-type" onchange="renderControlChannelFields()">
+                                                <option value="whatsapp">whatsapp</option>
+                                                <option value="telegram">telegram</option>
+                                                <option value="slack">slack</option>
+                                                <option value="discord">discord</option>
+                                                <option value="webhook">webhook</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Label</label>
+                                            <input type="text" id="control-channel-label" placeholder="My Channel" />
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-2">
+                                        <div class="form-group">
+                                            <label>Default Agent</label>
+                                            <input type="text" id="control-default-agent" value="run" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Verify Token (optional)</label>
+                                            <input type="text" id="control-verify-token" placeholder="for WhatsApp" />
+                                        </div>
+                                    </div>
+                                    <div id="control-channel-fields"></div>
+                                    <div class="wa-ops-row">
+                                        <button class="btn btn-primary" onclick="connectControlChannel()">
+                                            Connect Channel
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="refreshControlConnections()">
+                                            Reload Connections
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Connect Result</h3>
+                                </div>
+                                <div class="card-body">
+                                    <pre class="log-viewer" id="control-connect-result" style="max-height: 280px">No connection attempts yet.</pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px" class="grid grid-2">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Available Channels</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="control-channel-catalog" class="wa-event-list">
+                                        <div class="empty-state" style="padding: 24px">
+                                            <p>Loading channel catalog...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Connected Channels</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-wrap">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Type</th>
+                                                    <th>Label</th>
+                                                    <th>Status</th>
+                                                    <th>Messages</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="control-connections-table">
+                                                <tr>
+                                                    <td colspan="4" style="text-align: center; color: var(--text-tertiary)">
+                                                        No data yet
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px" class="grid grid-2">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Skills / Services</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="control-services-list" class="wa-event-list">
+                                        <div class="empty-state" style="padding: 24px">
+                                            <p>Load services...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>LLM Offerings</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-group">
+                                        <label>Provider Status</label>
+                                        <pre class="log-viewer" id="control-provider-status" style="max-height: 120px">No data yet.</pre>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Models</label>
+                                        <pre class="log-viewer" id="control-models" style="max-height: 140px">No data yet.</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Nodes Page ───────────────────────────────── -->
+                <div class="page" id="page-nodes">
+                    <div class="main-header">
+                        <h2>Cluster Nodes</h2>
+                        <div class="spacer"></div>
+                        <button
+                            class="btn btn-secondary btn-sm"
+                            onclick="refreshNodes()"
+                        >
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="main-body">
+                        <div id="nodes-detail-grid" class="grid grid-2"></div>
+                        <div class="empty-state" id="nodes-empty">
+                            <div class="icon">&#9645;</div>
+                            <h3>No Nodes</h3>
+                            <p>No worker nodes connected to the cluster</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Models Page ──────────────────────────────── -->
+                <div class="page" id="page-models">
+                    <div class="main-header">
+                        <h2>Models</h2>
+                        <div class="spacer"></div>
+                        <button
+                            class="btn btn-secondary btn-sm"
+                            onclick="refreshModels()"
+                        >
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="main-body">
+                        <div id="models-grid" class="grid grid-3"></div>
+                        <div class="empty-state" id="models-empty">
+                            <div class="icon">&#9881;</div>
+                            <h3>No Models</h3>
+                            <p>No models are currently loaded</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Routing Page ─────────────────────────────── -->
+                <div class="page" id="page-routing">
+                    <div class="main-header"><h2>Routing</h2></div>
+                    <div class="main-body">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Routing Configuration</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-wrap">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>Task Type</th>
+                                                <th>Primary Backend</th>
+                                                <th>Fallback</th>
+                                                <th>Strategy</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Text Completion</td>
+                                                <td>
+                                                    <span class="tag tag-blue"
+                                                        >OpenCLaw</span
+                                                    >
+                                                </td>
+                                                <td>
+                                                    <span class="tag tag-purple"
+                                                        >Local</span
+                                                    >
+                                                </td>
+                                                <td>Cost-Aware</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Vision / Image</td>
+                                                <td>
+                                                    <span class="tag tag-blue"
+                                                        >OpenCLaw</span
+                                                    >
+                                                </td>
+                                                <td>
+                                                    <span class="tag tag-orange"
+                                                        >None</span
+                                                    >
+                                                </td>
+                                                <td>Capability</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Document OCR</td>
+                                                <td>
+                                                    <span class="tag tag-purple"
+                                                        >Local Pipeline</span
+                                                    >
+                                                </td>
+                                                <td>
+                                                    <span class="tag tag-blue"
+                                                        >OpenCLaw</span
+                                                    >
+                                                </td>
+                                                <td>Latency</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Code Generation</td>
+                                                <td>
+                                                    <span class="tag tag-blue"
+                                                        >OpenCLaw</span
+                                                    >
+                                                </td>
+                                                <td>
+                                                    <span class="tag tag-purple"
+                                                        >Local</span
+                                                    >
+                                                </td>
+                                                <td>Quality</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Financial Analysis</td>
+                                                <td>
+                                                    <span class="tag tag-blue"
+                                                        >OpenCLaw</span
+                                                    >
+                                                </td>
+                                                <td>
+                                                    <span class="tag tag-purple"
+                                                        >Local</span
+                                                    >
+                                                </td>
+                                                <td>Quality</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Monitoring Page ──────────────────────────── -->
+                <div class="page" id="page-monitoring">
+                    <div class="main-header">
+                        <h2>Monitoring</h2>
+                        <div class="spacer"></div>
+                        <button
+                            class="btn btn-secondary btn-sm"
+                            onclick="refreshMetrics()"
+                        >
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="main-body">
+                        <div class="grid grid-4" id="metrics-stats">
+                            <div class="stat-card">
+                                <div class="stat-label">Total Requests</div>
+                                <div class="stat-value" id="metric-total-req">
+                                    --
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Success Rate</div>
+                                <div class="stat-value" id="metric-success">
+                                    --
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Uptime</div>
+                                <div class="stat-value" id="metric-uptime">
+                                    --
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Errors (24h)</div>
+                                <div class="stat-value" id="metric-errors">
+                                    --
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 20px" class="card">
+                            <div class="card-header">
+                                <h3>Metrics Endpoint</h3>
+                            </div>
+                            <div class="card-body">
+                                <pre
+                                    id="metrics-raw"
+                                    class="log-viewer"
+                                    style="max-height: 500px"
+                                >
+Loading metrics...</pre
+                                >
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Logs Page ────────────────────────────────── -->
+                <div class="page" id="page-logs">
+                    <div class="main-header">
+                        <h2>Logs</h2>
+                        <div class="spacer"></div>
+                        <select
+                            class="chat-model-select"
+                            id="log-level-filter"
+                            onchange="filterLogs()"
+                        >
+                            <option value="all">All Levels</option>
+                            <option value="info">Info</option>
+                            <option value="warn">Warning</option>
+                            <option value="error">Error</option>
+                        </select>
+                        <button
+                            class="btn btn-secondary btn-sm"
+                            onclick="clearLogs()"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                    <div class="main-body">
+                        <div
+                            class="log-viewer"
+                            id="log-viewer"
+                            style="
+                                height: calc(100vh - 150px);
+                                max-height: none;
+                            "
+                        >
+                            <div>
+                                <span class="log-time">[startup]</span>
+                                <span class="log-info"
+                                    >Dashboard initialized</span
+                                >
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Settings Page ────────────────────────────── -->
+                <div class="page" id="page-settings">
+                    <div class="main-header"><h2>Settings</h2></div>
+                    <div class="main-body">
+                        <div class="grid grid-2">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Connection</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-group">
+                                        <label>Gateway URL</label
+                                        ><input
+                                            type="text"
+                                            id="setting-gateway"
+                                            value=""
+                                            placeholder="Leave empty for same-origin"
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Master URL</label
+                                        ><input
+                                            type="text"
+                                            id="setting-master"
+                                            value=""
+                                            placeholder="Leave empty for same-origin"
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Worker URL</label
+                                        ><input
+                                            type="text"
+                                            id="setting-worker"
+                                            value=""
+                                            placeholder="http://localhost:8001"
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>API Key</label
+                                        ><input
+                                            type="password"
+                                            id="setting-apikey"
+                                            placeholder="Enter API key"
+                                        />
+                                    </div>
+                                    <button
+                                        class="btn btn-primary"
+                                        onclick="saveSettings()"
+                                    >
+                                        Save & Reconnect
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>Preferences</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-group">
+                                        <label>Refresh Interval (seconds)</label
+                                        ><input
+                                            type="number"
+                                            id="setting-refresh"
+                                            value="5"
+                                            min="1"
+                                            max="60"
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Default Model</label
+                                        ><input
+                                            type="text"
+                                            id="setting-model"
+                                            value="default"
+                                        />
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Max Chat History</label
+                                        ><input
+                                            type="number"
+                                            id="setting-maxhistory"
+                                            value="50"
+                                            min="5"
+                                            max="200"
+                                        />
+                                    </div>
+                                    <button
+                                        class="btn btn-primary"
+                                        onclick="savePreferences()"
+                                    >
+                                        Save Preferences
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <script>
+            /* ── State ────────────────────────────────────────────────── */
+            const state = {
+                gatewayUrl: localStorage.getItem("gateway_url") || "",
+                masterUrl: localStorage.getItem("master_url") || "",
+                workerUrl:
+                    localStorage.getItem("worker_url") ||
+                    "http://localhost:8001",
+                openclawBaseUrl: localStorage.getItem("openclaw_base_url") || "",
+                openclawAuthMode:
+                    localStorage.getItem("openclaw_auth_mode") || "none",
+                openclawAuthSecret:
+                    localStorage.getItem("openclaw_auth_secret") || "",
+                openclawUserId:
+                    localStorage.getItem("openclaw_user_id") || "",
+                apiKey: localStorage.getItem("api_key") || "",
+                refreshInterval: parseInt(
+                    localStorage.getItem("refresh_interval") || "5",
+                ),
+                waAutoRefresh:
+                    localStorage.getItem("wa_auto_refresh") === "true",
+                waAutoInterval: parseInt(
+                    localStorage.getItem("wa_auto_interval") || "10",
+                ),
+                currentPage: "dashboard",
+                chatMessages: [],
+                chatModel: "default",
+                nodes: [],
+                models: [],
+                logs: [],
+                healthy: false,
+                waStats: {
+                    total: 0,
+                    success: 0,
+                    failed: 0,
+                    lastLatencyMs: null,
+                    activeSessions: 0,
+                },
+                waEvents: [],
+                control: {
+                    channelTypes: [],
+                    connections: [],
+                    services: [],
+                    providerStatus: null,
+                    models: [],
+                },
+            };
+
+            let refreshTimer = null;
+            let waRefreshTimer = null;
+
+            /* ── Navigation ───────────────────────────────────────────── */
+            function navigateTo(page) {
+                state.currentPage = page;
+                document
+                    .querySelectorAll(".page")
+                    .forEach((p) => p.classList.remove("active"));
+                document
+                    .querySelectorAll(".nav-item")
+                    .forEach((n) => n.classList.remove("active"));
+                const pageEl = document.getElementById("page-" + page);
+                const navEl = document.querySelector(
+                    `.nav-item[data-page="${page}"]`,
+                );
+                if (pageEl) {
+                    pageEl.classList.add("active");
+                    pageEl.classList.add("fade-in");
+                }
+                if (navEl) navEl.classList.add("active");
+                // Trigger page-specific refresh
+                if (page === "monitoring") refreshMetrics();
+                if (page === "nodes") refreshNodes();
+                if (page === "models") refreshModels();
+                if (page === "whatsapp") refreshWhatsAppPanel();
+                if (page === "control") refreshControlHub();
+            }
+
+            function toggleSidebar() {
+                const sb = document.getElementById("sidebar");
+                sb.style.display =
+                    sb.style.display === "flex" ? "none" : "flex";
+            }
+
+            /* ── API Helpers ──────────────────────────────────────────── */
+            async function apiFetch(url, opts = {}) {
+                const headers = {
+                    "Content-Type": "application/json",
+                    ...(opts.headers || {}),
+                };
+                if (state.apiKey)
+                    headers["Authorization"] = `Bearer ${state.apiKey}`;
+                try {
+                    const resp = await fetch(url, {
+                        ...opts,
+                        headers,
+                        signal: AbortSignal.timeout(8000),
+                    });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const ct = resp.headers.get("content-type") || "";
+                    return ct.includes("json")
+                        ? await resp.json()
+                        : await resp.text();
+                } catch (e) {
+                    addLog("error", `API fetch failed: ${url} — ${e.message}`);
+                    throw e;
+                }
+            }
+
+            /* ── Dashboard Refresh ────────────────────────────────────── */
+            async function refreshAll() {
+                await Promise.allSettled([
+                    refreshHealth(),
+                    refreshCluster(),
+                    refreshModelsList(),
+                ]);
+            }
+
+            async function refreshHealth() {
+                const pill = document.getElementById("cluster-pill");
+                const gwDot = document.getElementById("health-gateway-dot");
+                const gwText = document.getElementById("health-gateway-text");
+                const maDot = document.getElementById("health-master-dot");
+                const maText = document.getElementById("health-master-text");
+                const ocDot = document.getElementById("health-openclaw-dot");
+                const ocText = document.getElementById("health-openclaw-text");
+                const connStatus = document.getElementById("connection-status");
+                let gatewayHealth = null;
+
+                // Gateway health
+                try {
+                    gatewayHealth = await apiFetch(state.gatewayUrl + "/health");
+                    gwDot.className = "dot dot-green";
+                    gwText.textContent = gatewayHealth.status || "Healthy";
+                    state.healthy = true;
+                    pill.className = "status-pill healthy";
+                    pill.innerHTML =
+                        '<span class="dot dot-green"></span> Online';
+                    connStatus.textContent = "Connected";
+                    connStatus.style.color = "var(--green)";
+                } catch {
+                    gwDot.className = "dot dot-red";
+                    gwText.textContent = "Unreachable";
+                    state.healthy = false;
+                    pill.className = "status-pill unhealthy";
+                    pill.innerHTML =
+                        '<span class="dot dot-red"></span> Offline';
+                    connStatus.textContent = "Disconnected";
+                    connStatus.style.color = "var(--red)";
+                }
+
+                // Master health
+                try {
+                    const ma = await apiFetch(state.masterUrl + "/health");
+                    maDot.className = "dot dot-green";
+                    maText.textContent = ma.status || "Healthy";
+                } catch {
+                    maDot.className = "dot dot-red";
+                    maText.textContent = "Unreachable";
+                }
+
+                // Ollama/OpenCLaw health (from gateway health response)
+                try {
+                    if (
+                        gatewayHealth &&
+                        gatewayHealth.cloud_providers &&
+                        gatewayHealth.cloud_providers.ollama
+                    ) {
+                        ocDot.className = "dot dot-green";
+                        ocText.textContent = "Healthy";
+                    } else {
+                        ocDot.className = "dot dot-yellow";
+                        ocText.textContent = "Not running";
+                    }
+                } catch {
+                    ocDot.className = "dot dot-yellow";
+                    ocText.textContent = "Unknown";
+                }
+            }
+
+            async function refreshCluster() {
+                try {
+                    const data = await apiFetch(
+                        state.masterUrl + "/cluster/status",
+                    );
+                    document.getElementById("stat-nodes").textContent =
+                        data.online_nodes ?? data.total_nodes ?? "0";
+                    document.getElementById("stat-models").textContent =
+                        data.total_models ?? "0";
+                    document.getElementById("stat-rpm").textContent =
+                        data.requests_per_minute ?? "--";
+                    document.getElementById("stat-latency").textContent =
+                        data.avg_latency_ms ? data.avg_latency_ms + "ms" : "--";
+
+                    // Nodes table
+                    const nodes = data.nodes || [];
+                    state.nodes = nodes;
+                    const badge = document.getElementById("node-count-badge");
+                    const tag = document.getElementById("nodes-tag");
+                    if (nodes.length > 0) {
+                        badge.style.display = "inline";
+                        badge.textContent = nodes.length;
+                        tag.textContent =
+                            nodes.length +
+                            " node" +
+                            (nodes.length !== 1 ? "s" : "");
+                    }
+                    const tbody = document.getElementById("nodes-table");
+                    if (nodes.length === 0) {
+                        tbody.innerHTML =
+                            '<tr><td colspan="5" style="text-align:center;color:var(--text-tertiary)">No nodes connected</td></tr>';
+                    } else {
+                        tbody.innerHTML = nodes
+                            .map((n) => {
+                                const online =
+                                    n.status === "online" || n.healthy;
+                                const dotCls = online ? "dot-green" : "dot-red";
+                                const models = Array.isArray(n.models)
+                                    ? n.models.join(", ")
+                                    : n.models || "--";
+                                const lastSeen = n.last_heartbeat
+                                    ? new Date(
+                                          n.last_heartbeat * 1000,
+                                      ).toLocaleTimeString()
+                                    : "--";
+                                return `<tr><td><span class="dot ${dotCls}"></span></td><td>${n.node_id || n.name || "worker"}</td><td>${n.host || "--"}:${n.port || "--"}</td><td>${models}</td><td>${lastSeen}</td></tr>`;
+                            })
+                            .join("");
+                    }
+                } catch {
+                    document.getElementById("stat-nodes").textContent = "--";
+                    document.getElementById("nodes-table").innerHTML =
+                        '<tr><td colspan="5" style="text-align:center;color:var(--text-tertiary)">Unable to connect to master</td></tr>';
+                }
+            }
+
+            async function refreshNodes() {
+                try {
+                    const data = await apiFetch(
+                        state.masterUrl + "/cluster/nodes",
+                    );
+                    const nodes = data.nodes || data || [];
+                    const grid = document.getElementById("nodes-detail-grid");
+                    const empty = document.getElementById("nodes-empty");
+                    if (nodes.length === 0) {
+                        grid.innerHTML = "";
+                        empty.style.display = "";
+                        return;
+                    }
+                    empty.style.display = "none";
+                    grid.innerHTML = nodes
+                        .map((n) => {
+                            const online = n.status === "online" || n.healthy;
+                            const models = Array.isArray(n.models)
+                                ? n.models
+                                : [];
+                            return `<div class="card fade-in">
+        <div class="card-header"><span class="dot ${online ? "dot-green" : "dot-red"}"></span><h3>${n.node_id || n.name || "Worker"}</h3><div class="spacer"></div><span class="tag ${online ? "tag-green" : "tag-red"}">${online ? "Online" : "Offline"}</span></div>
+        <div class="card-body">
+          <div style="font-size:13px;color:var(--text-secondary)">
+            <div style="margin-bottom:6px"><strong>Host:</strong> ${n.host || "--"}:${n.port || "--"}</div>
+            <div style="margin-bottom:6px"><strong>Models:</strong> ${models.length > 0 ? models.map((m) => `<span class="tag tag-blue" style="margin:2px">${m}</span>`).join(" ") : "None"}</div>
+            <div><strong>Last Heartbeat:</strong> ${n.last_heartbeat ? new Date(n.last_heartbeat * 1000).toLocaleString() : "--"}</div>
+          </div>
+        </div>
+      </div>`;
+                        })
+                        .join("");
+                } catch {
+                    document.getElementById("nodes-detail-grid").innerHTML = "";
+                    document.getElementById("nodes-empty").style.display = "";
+                }
+            }
+
+            async function refreshModels() {
+                await refreshModelsList();
+            }
+            async function refreshModelsList() {
+                try {
+                    const data = await apiFetch(
+                        state.gatewayUrl + "/v1/models",
+                    );
+                    const models = data.data || data.models || [];
+                    state.models = models;
+                    document.getElementById("stat-models").textContent =
+                        models.length;
+
+                    // Update chat model select
+                    const sel = document.getElementById("chat-model-select");
+                    const cur = sel.value;
+                    sel.innerHTML =
+                        '<option value="default">default</option>' +
+                        models
+                            .map(
+                                (m) =>
+                                    `<option value="${m.id}">${m.id}</option>`,
+                            )
+                            .join("");
+                    sel.value = cur || "default";
+
+                    // Models page grid
+                    const grid = document.getElementById("models-grid");
+                    const empty = document.getElementById("models-empty");
+                    if (models.length === 0) {
+                        grid.innerHTML = "";
+                        empty.style.display = "";
+                        return;
+                    }
+                    empty.style.display = "none";
+                    grid.innerHTML = models
+                        .map((m) => {
+                            return `<div class="card fade-in">
+        <div class="card-header"><h3>${m.id}</h3></div>
+        <div class="card-body" style="font-size:13px;color:var(--text-secondary)">
+          <div style="margin-bottom:4px">${m.description || "AI Model"}</div>
+          <div><span class="tag tag-purple">${m.owned_by || "local"}</span></div>
+        </div>
+      </div>`;
+                        })
+                        .join("");
+                } catch {
+                    document.getElementById("stat-models").textContent = "--";
+                }
+            }
+
+            /* ── Chat ─────────────────────────────────────────────────── */
+            function handleChatKey(e) {
+                if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChat();
+                }
+            }
+
+            async function sendChat() {
+                const input = document.getElementById("chat-input");
+                const text = input.value.trim();
+                if (!text) return;
+                input.value = "";
+
+                const model =
+                    document.getElementById("chat-model-select").value;
+                state.chatMessages.push({ role: "user", content: text });
+                renderChat();
+
+                const sendBtn = document.getElementById("chat-send-btn");
+                sendBtn.disabled = true;
+                sendBtn.textContent = "...";
+
+                try {
+                    const resp = await apiFetch(
+                        state.gatewayUrl + "/v1/chat/completions",
+                        {
+                            method: "POST",
+                            body: JSON.stringify({
+                                model: model,
+                                messages: state.chatMessages.slice(-20),
+                                max_tokens: 1024,
+                            }),
+                        },
+                    );
+                    const content =
+                        resp.choices?.[0]?.message?.content ||
+                        resp.response ||
+                        "No response";
+                    state.chatMessages.push({ role: "assistant", content });
+                    addLog(
+                        "info",
+                        `Chat response received (${content.length} chars)`,
+                    );
+                } catch (e) {
+                    state.chatMessages.push({
+                        role: "system",
+                        content: "Error: " + e.message,
+                    });
+                }
+                sendBtn.disabled = false;
+                sendBtn.textContent = "Send";
+                renderChat();
+            }
+
+            function renderChat() {
+                const container = document.getElementById("chat-messages");
+                const msgs = state.chatMessages
+                    .map((m) => {
+                        let content = m.content
+                            .replace(/</g, "&lt;")
+                            .replace(/>/g, "&gt;");
+                        // Simple code block rendering
+                        content = content.replace(
+                            /```(\w*)\n([\s\S]*?)```/g,
+                            "<pre>$2</pre>",
+                        );
+                        content = content.replace(
+                            /`([^`]+)`/g,
+                            '<code style="background:rgba(0,0,0,0.06);padding:1px 4px;border-radius:3px;font-size:13px">$1</code>',
+                        );
+                        content = content.replace(/\n/g, "<br>");
+                        return `<div class="chat-msg ${m.role} fade-in">${content}</div>`;
+                    })
+                    .join("");
+                container.innerHTML =
+                    `<div class="chat-msg system">Welcome to FinSavvyAI. Ask me anything about finance, AI, or your cluster.</div>` +
+                    msgs;
+                container.scrollTop = container.scrollHeight;
+            }
+
+            function clearChat() {
+                state.chatMessages = [];
+                renderChat();
+            }
+
+            /* ── Metrics ──────────────────────────────────────────────── */
+            async function refreshMetrics() {
+                try {
+                    const data = await apiFetch(state.gatewayUrl + "/metrics");
+                    const raw =
+                        typeof data === "string"
+                            ? data
+                            : JSON.stringify(data, null, 2);
+                    document.getElementById("metrics-raw").textContent = raw;
+
+                    if (typeof data === "object") {
+                        document.getElementById(
+                            "metric-total-req",
+                        ).textContent = data.total_requests ?? "--";
+                        document.getElementById("metric-success").textContent =
+                            data.success_rate ? data.success_rate + "%" : "--";
+                        document.getElementById("metric-uptime").textContent =
+                            data.uptime ?? "--";
+                        document.getElementById("metric-errors").textContent =
+                            data.errors_24h ?? "--";
+                    }
+                } catch {
+                    document.getElementById("metrics-raw").textContent =
+                        "Unable to fetch metrics";
+                }
+            }
+
+            /* ── Logs ─────────────────────────────────────────────────── */
+            function addLog(level, message) {
+                const now = new Date().toLocaleTimeString();
+                state.logs.push({ time: now, level, message });
+                if (state.logs.length > 500)
+                    state.logs = state.logs.slice(-500);
+                const viewer = document.getElementById("log-viewer");
+                const cls =
+                    level === "error"
+                        ? "log-error"
+                        : level === "warn"
+                          ? "log-warn"
+                          : "log-info";
+                viewer.innerHTML += `<div><span class="log-time">[${now}]</span> <span class="${cls}">[${level.toUpperCase()}]</span> ${message}</div>`;
+                viewer.scrollTop = viewer.scrollHeight;
+            }
+
+            function clearLogs() {
+                state.logs = [];
+                document.getElementById("log-viewer").innerHTML =
+                    '<div><span class="log-time">[cleared]</span> <span class="log-info">Logs cleared</span></div>';
+            }
+
+            function filterLogs() {
+                const level = document.getElementById("log-level-filter").value;
+                const viewer = document.getElementById("log-viewer");
+                const filtered =
+                    level === "all"
+                        ? state.logs
+                        : state.logs.filter((l) => l.level === level);
+                viewer.innerHTML =
+                    filtered
+                        .map((l) => {
+                            const cls =
+                                l.level === "error"
+                                    ? "log-error"
+                                    : l.level === "warn"
+                                      ? "log-warn"
+                                      : "log-info";
+                            return `<div><span class="log-time">[${l.time}]</span> <span class="${cls}">[${l.level.toUpperCase()}]</span> ${l.message}</div>`;
+                        })
+                        .join("") ||
+                    '<div style="color:var(--text-tertiary)">No matching logs</div>';
+            }
+
+            /* ── WhatsApp UI Test ─────────────────────────────────────── */
+            function normalizeBaseUrl(url) {
+                return (url || "").trim().replace(/\/+$/, "");
+            }
+
+            function escapeHtml(text) {
+                return String(text || "")
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;");
+            }
+
+            function getWorkerUrl() {
+                const input = document.getElementById("wa-worker-url");
+                const url = normalizeBaseUrl(
+                    input ? input.value : state.workerUrl,
+                );
+                state.workerUrl = url || "http://localhost:8001";
+                if (input) input.value = state.workerUrl;
+                localStorage.setItem("worker_url", state.workerUrl);
+                return state.workerUrl;
+            }
+
+            function updateWhatsAppStatsUI() {
+                const total = state.waStats.total;
+                const ok = state.waStats.success;
+                const successRate =
+                    total > 0 ? Math.round((ok / total) * 100) + "%" : "--";
+                const latency =
+                    state.waStats.lastLatencyMs === null
+                        ? "--"
+                        : `${state.waStats.lastLatencyMs}ms`;
+
+                const totalEl = document.getElementById("wa-stat-total");
+                const successEl = document.getElementById("wa-stat-success");
+                const latencyEl = document.getElementById("wa-stat-latency");
+                const sessionsEl = document.getElementById("wa-stat-sessions");
+
+                if (totalEl) totalEl.textContent = String(total);
+                if (successEl) successEl.textContent = successRate;
+                if (latencyEl) latencyEl.textContent = latency;
+                if (sessionsEl)
+                    sessionsEl.textContent = String(
+                        state.waStats.activeSessions ?? 0,
+                    );
+            }
+
+            function renderWhatsAppEvents() {
+                const container = document.getElementById("wa-events");
+                if (!container) return;
+
+                if (state.waEvents.length === 0) {
+                    container.innerHTML =
+                        '<div class="empty-state" style="padding:24px"><p>No test activity yet</p></div>';
+                    return;
+                }
+
+                container.innerHTML = state.waEvents
+                    .map((e) => {
+                        const tone =
+                            e.level === "error"
+                                ? "tag-red"
+                                : e.level === "warn"
+                                  ? "tag-orange"
+                                  : "tag-green";
+                        return `<div class="wa-event fade-in"><div class="wa-event-meta">${escapeHtml(e.time)} · <span class="tag ${tone}">${escapeHtml(e.label)}</span></div><div class="wa-event-title">${escapeHtml(e.message)}</div></div>`;
+                    })
+                    .join("");
+            }
+
+            function addWhatsAppEvent(level, label, message) {
+                state.waEvents.unshift({
+                    time: new Date().toLocaleTimeString(),
+                    level,
+                    label,
+                    message,
+                });
+                if (state.waEvents.length > 60) {
+                    state.waEvents = state.waEvents.slice(0, 60);
+                }
+                renderWhatsAppEvents();
+            }
+
+            function clearWhatsAppEvents() {
+                state.waEvents = [];
+                renderWhatsAppEvents();
+            }
+
+            function setWhatsAppLastStatus(label, tone = "tag-purple") {
+                const el = document.getElementById("wa-last-status");
+                if (!el) return;
+                el.className = `tag ${tone}`;
+                el.textContent = label;
+            }
+
+            function getWhatsAppAutoInterval() {
+                const select = document.getElementById("wa-auto-interval");
+                if (!select) return state.waAutoInterval || 10;
+                const val = parseInt(select.value || "10");
+                return Number.isFinite(val) && val > 0 ? val : 10;
+            }
+
+            function applyWhatsAppAutoRefreshUi() {
+                const btn = document.getElementById("wa-auto-btn");
+                const select = document.getElementById("wa-auto-interval");
+                if (select) {
+                    select.value = String(state.waAutoInterval || 10);
+                }
+                if (!btn) return;
+                btn.textContent = state.waAutoRefresh
+                    ? `Auto: On (${state.waAutoInterval}s)`
+                    : "Auto: Off";
+                btn.className = state.waAutoRefresh
+                    ? "btn btn-primary btn-sm"
+                    : "btn btn-secondary btn-sm";
+            }
+
+            function startWhatsAppAutoRefresh() {
+                if (waRefreshTimer) clearInterval(waRefreshTimer);
+                waRefreshTimer = setInterval(() => {
+                    if (state.currentPage === "whatsapp") {
+                        refreshWhatsAppPanel();
+                    }
+                }, state.waAutoInterval * 1000);
+            }
+
+            function stopWhatsAppAutoRefresh() {
+                if (waRefreshTimer) clearInterval(waRefreshTimer);
+                waRefreshTimer = null;
+            }
+
+            function toggleWhatsAppAutoRefresh() {
+                state.waAutoInterval = getWhatsAppAutoInterval();
+                state.waAutoRefresh = !state.waAutoRefresh;
+                localStorage.setItem(
+                    "wa_auto_refresh",
+                    state.waAutoRefresh ? "true" : "false",
+                );
+                localStorage.setItem(
+                    "wa_auto_interval",
+                    String(state.waAutoInterval),
+                );
+                applyWhatsAppAutoRefreshUi();
+                if (state.waAutoRefresh) {
+                    startWhatsAppAutoRefresh();
+                } else {
+                    stopWhatsAppAutoRefresh();
+                }
+            }
+
+            function updateWhatsAppFormFromState() {
+                const workerInput = document.getElementById("wa-worker-url");
+                if (workerInput) workerInput.value = state.workerUrl;
+                const openclawInput = document.getElementById("wa-openclaw-url");
+                if (openclawInput) openclawInput.value = state.openclawBaseUrl;
+                const autoInterval = document.getElementById("wa-auto-interval");
+                if (autoInterval) autoInterval.value = String(state.waAutoInterval);
+                applyWhatsAppAutoRefreshUi();
+                updateWhatsAppStatsUI();
+                renderWhatsAppEvents();
+            }
+
+            function syncWhatsAppUrls() {
+                const baseInput = document.getElementById("wa-openclaw-url");
+                const base = normalizeBaseUrl(baseInput ? baseInput.value : "");
+                state.openclawBaseUrl = base;
+                localStorage.setItem("openclaw_base_url", base);
+
+                const bridge = document.getElementById("wa-url-bridge");
+                const channels = document.getElementById("wa-url-channels");
+                if (bridge) {
+                    bridge.value = base ? `${base}/bridge/whatsapp` : "";
+                }
+                if (channels) {
+                    channels.value = base ? `${base}/channels/incoming/whatsapp` : "";
+                }
+            }
+
+            function formatPretty(value) {
+                if (typeof value === "string") return value;
+                try {
+                    return JSON.stringify(value, null, 2);
+                } catch {
+                    return String(value);
+                }
+            }
+
+            async function computeWebhookSignature(secret, bodyText) {
+                if (!secret) return "";
+                const enc = new TextEncoder();
+                const key = await crypto.subtle.importKey(
+                    "raw",
+                    enc.encode(secret),
+                    { name: "HMAC", hash: "SHA-256" },
+                    false,
+                    ["sign"],
+                );
+                const sig = await crypto.subtle.sign(
+                    "HMAC",
+                    key,
+                    enc.encode(bodyText),
+                );
+                const bytes = new Uint8Array(sig);
+                return Array.from(bytes)
+                    .map((b) => b.toString(16).padStart(2, "0"))
+                    .join("");
+            }
+
+            function buildWhatsAppPayload(messageText = null) {
+                const sender =
+                    document.getElementById("wa-sender").value.trim() || "user-a";
+                const sessionId =
+                    document.getElementById("wa-session-id").value.trim() ||
+                    sender ||
+                    "wa-test-1";
+                const model =
+                    document.getElementById("wa-model").value.trim() || "default";
+                const channel =
+                    document.getElementById("wa-channel").value || "whatsapp";
+                const message =
+                    messageText !== null
+                        ? messageText
+                        : document.getElementById("wa-text").value.trim();
+                const mediaUrl = (
+                    document.getElementById("wa-media-url").value || ""
+                ).trim();
+                const groupMode =
+                    document.getElementById("wa-group-toggle").checked;
+
+                const payload = {
+                    sender,
+                    channel,
+                    session_id: sessionId,
+                    model,
+                    text: message,
+                };
+
+                if (mediaUrl) {
+                    payload.media = [{ type: "image", url: mediaUrl }];
+                }
+
+                if (groupMode) {
+                    payload.group = {
+                        id:
+                            document
+                                .getElementById("wa-group-id")
+                                .value.trim() || "wa-group-1",
+                        mention:
+                            document
+                                .getElementById("wa-group-mention")
+                                .value.trim() || "@finsavvy",
+                    };
+                }
+
+                return payload;
+            }
+
+            async function refreshWhatsAppWorkerHealth() {
+                const tag = document.getElementById("wa-worker-health");
+                if (!tag) return;
+
+                const workerUrl = getWorkerUrl();
+                tag.className = "tag tag-blue loading";
+                tag.textContent = "Checking worker...";
+                try {
+                    const health = await apiFetch(workerUrl + "/health");
+                    tag.className = "tag tag-green";
+                    tag.textContent = health.status || "Worker online";
+                } catch {
+                    tag.className = "tag tag-red";
+                    tag.textContent = "Worker offline";
+                }
+            }
+
+            async function refreshWhatsAppSessions() {
+                const out = document.getElementById("wa-sessions");
+                if (!out) return;
+                const workerUrl = getWorkerUrl();
+                out.textContent = "Loading sessions...";
+                try {
+                    const sessions = await apiFetch(workerUrl + "/hooks/sessions");
+                    const list = Array.isArray(sessions.sessions)
+                        ? sessions.sessions
+                        : [];
+                    state.waStats.activeSessions = list.length;
+                    updateWhatsAppStatsUI();
+                    out.textContent = formatPretty(sessions);
+                } catch (e) {
+                    out.textContent = `Unable to load sessions: ${e.message}`;
+                }
+            }
+
+            async function refreshWhatsAppPanel() {
+                state.waAutoInterval = getWhatsAppAutoInterval();
+                localStorage.setItem("wa_auto_interval", String(state.waAutoInterval));
+                updateWhatsAppFormFromState();
+                syncWhatsAppUrls();
+                await Promise.allSettled([
+                    refreshWhatsAppWorkerHealth(),
+                    refreshWhatsAppSessions(),
+                ]);
+            }
+
+            async function sendWhatsAppTest() {
+                const output = document.getElementById("wa-response");
+                const sendBtn = document.getElementById("wa-send-btn");
+                const workerUrl = getWorkerUrl();
+                const payload = buildWhatsAppPayload();
+                if (!payload.text) {
+                    output.textContent = "Enter a message first.";
+                    return;
+                }
+
+                const bodyText = JSON.stringify(payload);
+                const headers = { "Content-Type": "application/json" };
+
+                const secret = document.getElementById("wa-secret").value.trim();
+                if (secret) {
+                    try {
+                        headers["X-Webhook-Signature"] =
+                            await computeWebhookSignature(secret, bodyText);
+                    } catch (e) {
+                        output.textContent =
+                            "Failed to compute webhook signature: " + e.message;
+                        return;
+                    }
+                }
+
+                const started = Date.now();
+                if (sendBtn) {
+                    sendBtn.disabled = true;
+                    sendBtn.textContent = "Sending...";
+                }
+                setWhatsAppLastStatus("Sending...", "tag-orange");
+                output.textContent = "Sending...";
+                try {
+                    const resp = await fetch(workerUrl + "/hooks/agent", {
+                        method: "POST",
+                        headers,
+                        body: bodyText,
+                        signal: AbortSignal.timeout(12000),
+                    });
+
+                    const raw = await resp.text();
+                    let parsed = raw;
+                    try {
+                        parsed = JSON.parse(raw);
+                    } catch {
+                        // keep raw text
+                    }
+
+                    const latency = Date.now() - started;
+                    state.waStats.total += 1;
+                    state.waStats.lastLatencyMs = latency;
+                    if (resp.ok) state.waStats.success += 1;
+                    else state.waStats.failed += 1;
+                    updateWhatsAppStatsUI();
+
+                    output.textContent = formatPretty({
+                        status: resp.status,
+                        ok: resp.ok,
+                        latency_ms: latency,
+                        request: payload,
+                        response: parsed,
+                    });
+                    setWhatsAppLastStatus(
+                        `${resp.status} · ${latency}ms`,
+                        resp.ok ? "tag-green" : "tag-red",
+                    );
+                    addWhatsAppEvent(
+                        resp.ok ? "info" : "warn",
+                        `HTTP ${resp.status}`,
+                        `${payload.channel} · ${payload.session_id} · ${payload.text.slice(0, 90)}`,
+                    );
+                    addLog(
+                        resp.ok ? "info" : "warn",
+                        `WhatsApp test completed with HTTP ${resp.status}`,
+                    );
+                    await Promise.allSettled([
+                        refreshWhatsAppSessions(),
+                        refreshWhatsAppWorkerHealth(),
+                    ]);
+                } catch (e) {
+                    const latency = Date.now() - started;
+                    state.waStats.total += 1;
+                    state.waStats.failed += 1;
+                    state.waStats.lastLatencyMs = latency;
+                    updateWhatsAppStatsUI();
+                    output.textContent = formatPretty({
+                        error: e.message,
+                        latency_ms: latency,
+                        request: payload,
+                    });
+                    setWhatsAppLastStatus(`Error · ${latency}ms`, "tag-red");
+                    addWhatsAppEvent(
+                        "error",
+                        "Network error",
+                        `${payload.channel} · ${payload.session_id} · ${e.message}`,
+                    );
+                    addLog("error", `WhatsApp test failed: ${e.message}`);
+                } finally {
+                    if (sendBtn) {
+                        sendBtn.disabled = false;
+                        sendBtn.textContent = "Send Test";
+                    }
+                }
+            }
+
+            async function sendWhatsAppCommand(command) {
+                document.getElementById("wa-text").value = command;
+                await sendWhatsAppTest();
+            }
+
+            function setWhatsAppTemplate(text) {
+                const input = document.getElementById("wa-text");
+                input.value = text;
+                input.focus();
+                input.dispatchEvent(new Event("input"));
+            }
+
+            async function copyWhatsAppCurl() {
+                const workerUrl = getWorkerUrl();
+                const payload = buildWhatsAppPayload();
+                const bodyText = JSON.stringify(payload);
+                const secret = document.getElementById("wa-secret").value.trim();
+
+                let sigLine = "";
+                if (secret) {
+                    try {
+                        const sig = await computeWebhookSignature(secret, bodyText);
+                        sigLine = ` -H 'X-Webhook-Signature: ${sig}'`;
+                    } catch {
+                        sigLine = "";
+                    }
+                }
+
+                const cmd = `curl -X POST '${workerUrl}/hooks/agent' -H 'Content-Type: application/json'${sigLine} -d '${bodyText.replace(/'/g, "'\\''")}'`;
+
+                try {
+                    await navigator.clipboard.writeText(cmd);
+                    addLog("info", "WhatsApp test cURL copied");
+                    addWhatsAppEvent("info", "Copied", "Request cURL copied");
+                } catch {
+                    const output = document.getElementById("wa-response");
+                    output.textContent = cmd;
+                    addLog(
+                        "warn",
+                        "Clipboard unavailable, cURL printed in response panel",
+                    );
+                }
+            }
+
+            /* ── Control Hub ─────────────────────────────────────────── */
+            function getOpenClawBaseUrl() {
+                const input = document.getElementById("control-openclaw-url");
+                const value = normalizeBaseUrl(
+                    input ? input.value : state.openclawBaseUrl,
+                );
+                state.openclawBaseUrl = value;
+                if (input) input.value = value;
+                return value;
+            }
+
+            function getOpenClawAuthConfig() {
+                const modeEl = document.getElementById("control-auth-mode");
+                const secretEl = document.getElementById("control-auth-secret");
+                const userEl = document.getElementById("control-user-id");
+                state.openclawAuthMode = modeEl
+                    ? modeEl.value
+                    : state.openclawAuthMode || "none";
+                state.openclawAuthSecret = secretEl
+                    ? secretEl.value
+                    : state.openclawAuthSecret || "";
+                state.openclawUserId = userEl
+                    ? userEl.value
+                    : state.openclawUserId || "";
+                return {
+                    mode: state.openclawAuthMode,
+                    secret: state.openclawAuthSecret,
+                    userId: state.openclawUserId,
+                };
+            }
+
+            function buildOpenClawHeaders(extra = {}) {
+                const { mode, secret, userId } = getOpenClawAuthConfig();
+                const headers = { ...extra };
+                if (mode === "bearer" && secret) {
+                    headers.Authorization = `Bearer ${secret}`;
+                } else if (mode === "apikey" && secret) {
+                    headers["X-API-Key"] = secret;
+                } else if (mode === "service" && secret) {
+                    headers["X-Service-Key"] = secret;
+                    if (userId) headers["X-User-Id"] = userId;
+                }
+                return headers;
+            }
+
+            async function openClawFetch(path, opts = {}) {
+                const base = getOpenClawBaseUrl();
+                if (!base) throw new Error("Set OpenClaw Base URL first");
+                const url = `${base}${path}`;
+                const headers = buildOpenClawHeaders({
+                    "Content-Type": "application/json",
+                    ...(opts.headers || {}),
+                });
+                const response = await fetch(url, {
+                    ...opts,
+                    headers,
+                    signal: AbortSignal.timeout(12000),
+                });
+                const contentType = response.headers.get("content-type") || "";
+                const body = contentType.includes("json")
+                    ? await response.json()
+                    : await response.text();
+                if (!response.ok) {
+                    const msg =
+                        typeof body === "string"
+                            ? body
+                            : body?.error || body?.message || `HTTP ${response.status}`;
+                    throw new Error(msg);
+                }
+                return body;
+            }
+
+            function renderControlChannelFields() {
+                const type = document.getElementById("control-channel-type").value;
+                const container = document.getElementById("control-channel-fields");
+                if (!container) return;
+
+                if (type === "whatsapp") {
+                    container.innerHTML = `
+                        <div class="grid grid-2">
+                            <div class="form-group">
+                                <label>WhatsApp Access Token</label>
+                                <input type="password" id="control-cred-access-token" placeholder="Meta API token" />
+                            </div>
+                            <div class="form-group">
+                                <label>Phone Number ID</label>
+                                <input type="text" id="control-cred-phone-id" placeholder="1234567890" />
+                            </div>
+                        </div>
+                    `;
+                } else if (type === "telegram") {
+                    container.innerHTML = `
+                        <div class="form-group">
+                            <label>Telegram Bot Token</label>
+                            <input type="password" id="control-cred-bot-token" placeholder="bot token from @BotFather" />
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <div style="font-size:13px;color:var(--text-tertiary)">
+                                ${type} uses OAuth/webhook flow. Connect call will return setup details (for oauthUrl/webhookUrl).
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            function renderControlChannelCatalog() {
+                const container = document.getElementById("control-channel-catalog");
+                if (!container) return;
+                const items = state.control.channelTypes || [];
+                if (items.length === 0) {
+                    container.innerHTML =
+                        '<div class="empty-state" style="padding:24px"><p>No channel catalog loaded</p></div>';
+                    return;
+                }
+                container.innerHTML = items
+                    .map((ch) => {
+                        const features = Array.isArray(ch.features)
+                            ? ch.features.slice(0, 4).join(", ")
+                            : "";
+                        return `<div class="wa-event"><div class="wa-event-meta">${escapeHtml(ch.type)} · ${escapeHtml(ch.authMethod || "n/a")}</div><div class="wa-event-title"><strong>${escapeHtml(ch.name || ch.type)}</strong><br>${escapeHtml(ch.description || "")}<br><span style="color:var(--text-tertiary)">${escapeHtml(features)}</span></div></div>`;
+                    })
+                    .join("");
+            }
+
+            function renderControlConnections() {
+                const tbody = document.getElementById("control-connections-table");
+                if (!tbody) return;
+                const rows = state.control.connections || [];
+                if (rows.length === 0) {
+                    tbody.innerHTML =
+                        '<tr><td colspan="4" style="text-align:center;color:var(--text-tertiary)">No connected channels</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = rows
+                    .map((c) => {
+                        const status = c.status || "unknown";
+                        const tone =
+                            status === "active"
+                                ? "tag-green"
+                                : status === "pending"
+                                  ? "tag-orange"
+                                  : "tag-red";
+                        return `<tr><td>${escapeHtml(c.channelType || "-")}</td><td>${escapeHtml(c.label || "-")}</td><td><span class="tag ${tone}">${escapeHtml(status)}</span></td><td>${escapeHtml(String(c.messageCount ?? 0))}</td></tr>`;
+                    })
+                    .join("");
+            }
+
+            function renderControlServices() {
+                const container = document.getElementById("control-services-list");
+                if (!container) return;
+                const services = state.control.services || [];
+                if (services.length === 0) {
+                    container.innerHTML =
+                        '<div class="empty-state" style="padding:24px"><p>No services loaded (auth may be required).</p></div>';
+                    return;
+                }
+                container.innerHTML = services
+                    .map((svc) => {
+                        const tone =
+                            svc.status === "active"
+                                ? "tag-green"
+                                : svc.status === "partial"
+                                  ? "tag-orange"
+                                  : svc.status === "error"
+                                    ? "tag-red"
+                                    : "tag-blue";
+                        return `<div class="wa-event"><div class="wa-event-meta">${escapeHtml(svc.tier || "core")} · <span class="tag ${tone}">${escapeHtml(svc.status || "unknown")}</span></div><div class="wa-event-title"><strong>${escapeHtml(svc.name || svc.id)}</strong><br>${escapeHtml(svc.quickInfo || svc.description || "")}</div></div>`;
+                    })
+                    .join("");
+            }
+
+            function renderControlProviderStatus() {
+                const pre = document.getElementById("control-provider-status");
+                if (!pre) return;
+                pre.textContent = formatPretty(
+                    state.control.providerStatus || { status: "not_loaded" },
+                );
+            }
+
+            function renderControlModels() {
+                const pre = document.getElementById("control-models");
+                if (!pre) return;
+                const models = state.control.models || [];
+                pre.textContent = models.map((m) => m.id || m).join("\n") || "No models loaded";
+            }
+
+            async function loadControlNodesAndModels() {
+                try {
+                    const cluster = await apiFetch(state.masterUrl + "/cluster/status");
+                    const nodes = cluster.online_nodes ?? cluster.total_nodes ?? 0;
+                    document.getElementById("control-stat-nodes").textContent =
+                        String(nodes);
+                } catch {
+                    document.getElementById("control-stat-nodes").textContent = "--";
+                }
+
+                try {
+                    const modelsResp = await apiFetch(state.gatewayUrl + "/v1/models");
+                    const models = modelsResp.data || modelsResp.models || [];
+                    state.control.models = models;
+                    document.getElementById("control-stat-models").textContent =
+                        String(models.length);
+                    renderControlModels();
+                } catch {
+                    document.getElementById("control-stat-models").textContent = "--";
+                }
+            }
+
+            async function loadControlChannelCatalog() {
+                try {
+                    const catalog = await openClawFetch("/channels");
+                    state.control.channelTypes = catalog.channelTypes || [];
+                    renderControlChannelCatalog();
+                } catch (e) {
+                    state.control.channelTypes = [];
+                    renderControlChannelCatalog();
+                    addLog("warn", `Channel catalog unavailable: ${e.message}`);
+                }
+            }
+
+            async function refreshControlConnections() {
+                try {
+                    const data = await openClawFetch("/channels/connections");
+                    state.control.connections = data.connections || [];
+                    document.getElementById("control-stat-channels").textContent =
+                        String(state.control.connections.length);
+                    renderControlConnections();
+                } catch (e) {
+                    state.control.connections = [];
+                    document.getElementById("control-stat-channels").textContent = "--";
+                    renderControlConnections();
+                    addLog("warn", `Connections unavailable: ${e.message}`);
+                }
+            }
+
+            async function loadControlServices() {
+                try {
+                    const data = await openClawFetch("/services");
+                    state.control.services = data.services || [];
+                    document.getElementById("control-stat-services").textContent =
+                        String(state.control.services.length);
+                    renderControlServices();
+                } catch (e) {
+                    state.control.services = [];
+                    document.getElementById("control-stat-services").textContent = "--";
+                    renderControlServices();
+                    addLog("warn", `Services unavailable: ${e.message}`);
+                }
+            }
+
+            async function loadControlProviderStatus() {
+                try {
+                    state.control.providerStatus = await openClawFetch(
+                        "/services/providers/status",
+                    );
+                    renderControlProviderStatus();
+                } catch (e) {
+                    state.control.providerStatus = { error: e.message };
+                    renderControlProviderStatus();
+                }
+            }
+
+            function updateControlSummary() {
+                const text =
+                    `Nodes: ${document.getElementById("control-stat-nodes").textContent}, ` +
+                    `Models: ${document.getElementById("control-stat-models").textContent}, ` +
+                    `Channels: ${document.getElementById("control-stat-channels").textContent}, ` +
+                    `Services: ${document.getElementById("control-stat-services").textContent}`;
+                const summary = document.getElementById("control-summary");
+                if (summary) summary.textContent = text;
+            }
+
+            function saveControlHubConfig() {
+                state.openclawBaseUrl = getOpenClawBaseUrl();
+                getOpenClawAuthConfig();
+                localStorage.setItem("openclaw_base_url", state.openclawBaseUrl || "");
+                localStorage.setItem("openclaw_auth_mode", state.openclawAuthMode || "none");
+                localStorage.setItem("openclaw_auth_secret", state.openclawAuthSecret || "");
+                localStorage.setItem("openclaw_user_id", state.openclawUserId || "");
+                addLog("info", "Control Hub config saved");
+            }
+
+            async function testOpenClawConnection() {
+                const statusTag = document.getElementById("control-oc-status");
+                statusTag.className = "tag tag-blue";
+                statusTag.textContent = "Checking...";
+                try {
+                    await openClawFetch("/health");
+                    statusTag.className = "tag tag-green";
+                    statusTag.textContent = "OpenClaw reachable";
+                } catch (e) {
+                    statusTag.className = "tag tag-red";
+                    statusTag.textContent = "Connection failed";
+                    addLog("warn", `OpenClaw health check failed: ${e.message}`);
+                }
+            }
+
+            async function connectControlChannel() {
+                const type = document.getElementById("control-channel-type").value;
+                const label = document.getElementById("control-channel-label").value.trim();
+                const defaultAgent =
+                    document.getElementById("control-default-agent").value.trim() || "run";
+                const verifyToken = document
+                    .getElementById("control-verify-token")
+                    .value.trim();
+
+                const payload = {
+                    channelType: type,
+                    label: label || `My ${type}`,
+                    config: { defaultAgent },
+                };
+
+                if (type === "whatsapp") {
+                    payload.credentials = {
+                        accessToken: (
+                            document.getElementById("control-cred-access-token")
+                                ?.value || ""
+                        ).trim(),
+                        phoneNumberId: (
+                            document.getElementById("control-cred-phone-id")?.value || ""
+                        ).trim(),
+                    };
+                    if (verifyToken) payload.credentials.verifyToken = verifyToken;
+                } else if (type === "telegram") {
+                    payload.credentials = {
+                        botToken: (
+                            document.getElementById("control-cred-bot-token")?.value || ""
+                        ).trim(),
+                    };
+                }
+
+                const out = document.getElementById("control-connect-result");
+                out.textContent = "Connecting...";
+                try {
+                    const result = await openClawFetch("/channels/connect", {
+                        method: "POST",
+                        body: JSON.stringify(payload),
+                    });
+                    out.textContent = formatPretty(result);
+                    addLog("info", `Connected channel ${type}`);
+                    await refreshControlConnections();
+                } catch (e) {
+                    out.textContent = formatPretty({ error: e.message, payload });
+                    addLog("error", `Channel connect failed: ${e.message}`);
+                }
+            }
+
+            async function refreshControlHub() {
+                saveControlHubConfig();
+                renderControlChannelFields();
+                await Promise.allSettled([
+                    testOpenClawConnection(),
+                    loadControlNodesAndModels(),
+                    loadControlChannelCatalog(),
+                    refreshControlConnections(),
+                    loadControlServices(),
+                    loadControlProviderStatus(),
+                ]);
+                updateControlSummary();
+            }
+
+            /* ── Settings ─────────────────────────────────────────────── */
+            function loadSettings() {
+                document.getElementById("setting-gateway").value =
+                    state.gatewayUrl;
+                document.getElementById("setting-master").value =
+                    state.masterUrl;
+                document.getElementById("setting-worker").value = state.workerUrl;
+                document.getElementById("setting-apikey").value = state.apiKey;
+                document.getElementById("setting-refresh").value =
+                    state.refreshInterval;
+                updateWhatsAppFormFromState();
+                syncWhatsAppUrls();
+                const ocUrl = document.getElementById("control-openclaw-url");
+                const ocMode = document.getElementById("control-auth-mode");
+                const ocSecret = document.getElementById("control-auth-secret");
+                const ocUser = document.getElementById("control-user-id");
+                if (ocUrl) ocUrl.value = state.openclawBaseUrl || "";
+                if (ocMode) ocMode.value = state.openclawAuthMode || "none";
+                if (ocSecret) ocSecret.value = state.openclawAuthSecret || "";
+                if (ocUser) ocUser.value = state.openclawUserId || "";
+                renderControlChannelFields();
+            }
+
+            function saveSettings() {
+                state.gatewayUrl = document
+                    .getElementById("setting-gateway")
+                    .value.replace(/\/+$/, "");
+                state.masterUrl = document
+                    .getElementById("setting-master")
+                    .value.replace(/\/+$/, "");
+                state.workerUrl = document
+                    .getElementById("setting-worker")
+                    .value.replace(/\/+$/, "");
+                state.apiKey = document.getElementById("setting-apikey").value;
+                localStorage.setItem("gateway_url", state.gatewayUrl);
+                localStorage.setItem("master_url", state.masterUrl);
+                localStorage.setItem("worker_url", state.workerUrl);
+                localStorage.setItem("api_key", state.apiKey);
+                updateWhatsAppFormFromState();
+                addLog("info", "Settings saved — reconnecting...");
+                refreshAll();
+            }
+
+            function savePreferences() {
+                state.refreshInterval =
+                    parseInt(
+                        document.getElementById("setting-refresh").value,
+                    ) || 5;
+                localStorage.setItem("refresh_interval", state.refreshInterval);
+                startRefreshTimer();
+                addLog("info", "Preferences saved");
+            }
+
+            /* ── Auto-Refresh Timer ───────────────────────────────────── */
+            function startRefreshTimer() {
+                if (refreshTimer) clearInterval(refreshTimer);
+                refreshTimer = setInterval(() => {
+                    if (state.currentPage === "dashboard") refreshAll();
+                }, state.refreshInterval * 1000);
+            }
+
+            /* ── Init ─────────────────────────────────────────────────── */
+            function init() {
+                loadSettings();
+                refreshAll();
+                refreshWhatsAppPanel();
+                refreshControlHub();
+                startRefreshTimer();
+                if (state.waAutoRefresh) {
+                    startWhatsAppAutoRefresh();
+                }
+                addLog(
+                    "info",
+                    "Dashboard initialized — gateway: " + state.gatewayUrl,
+                );
+
+                // Auto-resize chat textarea
+                const ta = document.getElementById("chat-input");
+                ta.addEventListener("input", () => {
+                    ta.style.height = "auto";
+                    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+                });
+
+                const waTa = document.getElementById("wa-text");
+                waTa.addEventListener("input", () => {
+                    waTa.style.height = "auto";
+                    waTa.style.height = Math.min(waTa.scrollHeight, 180) + "px";
+                });
+
+                const waInterval = document.getElementById("wa-auto-interval");
+                waInterval.addEventListener("change", () => {
+                    state.waAutoInterval = getWhatsAppAutoInterval();
+                    localStorage.setItem(
+                        "wa_auto_interval",
+                        String(state.waAutoInterval),
+                    );
+                    applyWhatsAppAutoRefreshUi();
+                    if (state.waAutoRefresh) {
+                        startWhatsAppAutoRefresh();
+                    }
+                });
+            }
+
+            document.addEventListener("DOMContentLoaded", init);
+        </script>
+    </body>
+</html>

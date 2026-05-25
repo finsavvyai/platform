@@ -1,0 +1,38 @@
+model
+  schema 1.1
+
+# SDLC Platform OpenFGA authorization model.
+#
+# This model encodes *relationships* between principals and resources.
+# OPA (services/opa/) still owns policy rules (rate limits, data class
+# gates, multitenancy invariants). OpenFGA answers relationship
+# questions such as "is alice the owner of doc1?" and
+# "which docs can alice read through folder inheritance?".
+
+type user
+
+type tenant
+  relations
+    define admin: [user]
+    define member: [user]
+
+type folder
+  relations
+    define tenant: [tenant]
+    define owner: [user]
+    define editor: [user] or owner
+    define viewer: [user] or editor
+    define can_read: viewer or member from tenant
+    define can_write: editor or admin from tenant
+
+type document
+  relations
+    define folder: [folder]
+    define owner: [user]
+    define can_read: owner or can_read from folder
+    define can_write: owner or can_write from folder
+
+type policy
+  relations
+    define tenant: [tenant]
+    define admin: [user] or admin from tenant

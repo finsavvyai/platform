@@ -1,0 +1,242 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for testing
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: claude-agent-postgres-test
+    environment:
+      POSTGRES_DB: claude_agent_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./database/init/test.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d claude_agent_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - test-network
+
+  # Redis for testing
+  redis-test:
+    image: redis:7-alpine
+    container_name: claude-agent-redis-test
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_test_data:/data
+    command: redis-server --appendonly yes --requirepass testpassword
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - test-network
+
+  # Elasticsearch for testing
+  elasticsearch-test:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    container_name: claude-agent-elasticsearch-test
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9201:9200"
+    volumes:
+      - elasticsearch_test_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - test-network
+
+  # Qdrant Vector Database for testing
+  qdrant-test:
+    image: qdrant/qdrant:v1.6.0
+    container_name: claude-agent-qdrant-test
+    ports:
+      - "6334:6333"
+    volumes:
+      - qdrant_test_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - test-network
+
+  # MinIO S3-compatible storage for testing
+  minio-test:
+    image: minio/minio:RELEASE.2023-10-07T15-23-28Z
+    container_name: claude-agent-minio-test
+    ports:
+      - "9001:9000"
+      - "9002:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - minio_test_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - test-network
+
+  # RabbitMQ Message Queue for testing
+  rabbitmq-test:
+    image: rabbitmq:3.12-management-alpine
+    container_name: claude-agent-rabbitmq-test
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+      RABBITMQ_DEFAULT_VHOST: claude-agent-test
+    volumes:
+      - rabbitmq_test_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    networks:
+      - test-network
+
+  # Jaeger for distributed tracing in tests
+  jaeger-test:
+    image: jaegertracing/all-in-one:1.49
+    container_name: claude-agent-jaeger-test
+    ports:
+      - "16687:16686"
+      - "14269:14268"
+      - "14251:14250"
+      - "6833:6831"
+      - "6834:6832"
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+    networks:
+      - test-network
+
+  # Prometheus for metrics collection in tests
+  prometheus-test:
+    image: prom/prometheus:v2.45.0
+    container_name: claude-agent-prometheus-test
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.test.yml:/etc/prometheus/prometheus.yml
+      - prometheus_test_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - test-network
+
+  # Test services for API mocking
+  mockoon-test:
+    image: mockoon/cli:latest
+    container_name: claude-agent-mockoon-test
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./tests/mock/mock-api.json:/data/mock-api.json
+    command: start --data /data/mock-api.json --port 3000
+    networks:
+      - test-network
+
+  # Web application for E2E tests
+  web-test:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.test
+    container_name: claude-agent-web-test
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@postgres-test:5432/claude_agent_test
+      REDIS_URL: redis://:testpassword@redis-test:6379
+      ELASTICSEARCH_URL: http://elasticsearch-test:9200
+      QDRANT_URL: http://qdrant-test:6333
+      MINIO_ENDPOINT: minio-test:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      RABBITMQ_URL: amqp://admin:admin123@rabbitmq-test:5672/claude-agent-test
+      JAEGER_ENDPOINT: http://jaeger-test:14268/api/traces
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+      elasticsearch-test:
+        condition: service_healthy
+      qdrant-test:
+        condition: service_healthy
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    networks:
+      - test-network
+
+  # API Gateway for E2E tests
+  gateway-test:
+    build:
+      context: .
+      dockerfile: packages/gateway/Dockerfile.test
+    container_name: claude-agent-gateway-test
+    ports:
+      - "8001:8000"
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@postgres-test:5432/claude_agent_test
+      REDIS_URL: redis://:testpassword@redis-test:6379
+      JWT_SECRET: test-jwt-secret-key
+      CORS_ORIGIN: http://localhost:3001
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    volumes:
+      - ./packages/gateway:/app
+      - /app/node_modules
+    networks:
+      - test-network
+
+volumes:
+  postgres_test_data:
+  redis_test_data:
+  elasticsearch_test_data:
+  qdrant_test_data:
+  minio_test_data:
+  rabbitmq_test_data:
+  prometheus_test_data:
+
+networks:
+  test-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

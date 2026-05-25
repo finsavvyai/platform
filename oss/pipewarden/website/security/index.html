@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PipeWarden — Security posture (honest version)</title>
+<meta name="description" content="What PipeWarden actually does with your code, credentials, and findings. Honest about what we are and are not certified for." />
+<style>
+:root{
+  --bg:#0b0f17; --panel:#121826; --panel-2:#182033; --line:#22304a;
+  --text:#e6ecf5; --muted:#9aa9c2; --accent:#7cc4ff;
+  --good:#1f9d6b; --good-bg:#0f2a21; --good-line:#1f6b50;
+  --warn:#d49a26; --warn-bg:#2a2110; --warn-line:#6b551f;
+  --bad:#e0524d; --bad-bg:#2a1212; --bad-line:#6b1f1f;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+code{background:#0d1320;padding:2px 7px;border-radius:4px;font-size:13px;color:#bcd0ee}
+pre{background:#0d1320;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;font-size:13px}
+.wrap{max-width:880px;margin:0 auto;padding:32px 24px 96px}
+header{padding:28px 0 16px;border-bottom:1px solid var(--line);margin-bottom:28px}
+h1{margin:0 0 6px;font-size:32px;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:16px}
+h2{font-size:22px;margin:36px 0 10px;letter-spacing:-.005em}
+h3{font-size:16px;margin:18px 0 6px;color:#cfe0fa}
+.block{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-top:10px}
+.block.good{background:var(--good-bg);border-color:var(--good-line)}
+.block.warn{background:var(--warn-bg);border-color:var(--warn-line)}
+.block.bad{background:var(--bad-bg);border-color:var(--bad-line)}
+table{width:100%;border-collapse:separate;border-spacing:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:10px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);background:#0f1626}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid;white-space:nowrap}
+.b-good{color:#7be0b1;background:var(--good-bg);border-color:var(--good-line)}
+.b-warn{color:#f3c777;background:var(--warn-bg);border-color:var(--warn-line)}
+.b-bad{color:#ff8b87;background:var(--bad-bg);border-color:var(--bad-line)}
+ul{margin:6px 0;padding-left:22px}
+li{margin:4px 0}
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+footer{margin-top:48px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Security posture</h1>
+  <p class="sub">What PipeWarden actually does with your code, credentials, and findings — and what it doesn't. Updated May 2026.</p>
+</header>
+
+<section>
+  <h2>TL;DR</h2>
+  <div class="block good">
+    <ul>
+      <li><b>Free + Pro:</b> your source code <b>never leaves your machine</b>. The CLI runs locally; only finding metadata (severity, category, file/line) is uploaded if you opt in.</li>
+      <li><b>Team:</b> same default, plus optional compliance-evidence packs and SSO. Customer-managed keys + self-host on request.</li>
+      <li><b>Credentials</b> stored by the binary are encrypted with AES-256-GCM using a per-installation master key. We never see your secrets.</li>
+      <li>SBOM is published with every release; binaries are cosign-signed. See the <a href="https://github.com/finsavvyai/pipewarden/releases">releases page</a>.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>What we are <em>not</em> (yet)</h2>
+  <div class="block warn">
+    <p>We are honest about certifications to avoid the dead-deal-after-procurement-googled-us moment.</p>
+    <table>
+      <thead><tr><th>Standard</th><th>Status</th><th>Plan</th></tr></thead>
+      <tbody>
+        <tr><td>SOC 2 Type I</td><td><span class="badge b-warn">In progress</span></td><td>Audit kicks off when MRR ≥ $10k (target Q3 2026, via Vanta/Drata)</td></tr>
+        <tr><td>SOC 2 Type II</td><td><span class="badge b-bad">Not yet</span></td><td>Year-2 target after Type I clears</td></tr>
+        <tr><td>ISO 27001</td><td><span class="badge b-bad">Not yet</span></td><td>Roadmap; revisit at Series A</td></tr>
+        <tr><td>HIPAA BAA</td><td><span class="badge b-warn">Self-host only</span></td><td>Self-hosted deploy supports HIPAA workflows; we do not sign BAAs for our hosted SaaS today</td></tr>
+        <tr><td>GDPR</td><td><span class="badge b-good">DPA available</span></td><td>Self-hosted = your DPA boundary. Hosted = standard DPA on request</td></tr>
+        <tr><td>FedRAMP</td><td><span class="badge b-bad">Not in plan</span></td><td>Out of scope until clear customer demand</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>What we collect</h2>
+  <div class="block">
+    <table>
+      <thead><tr><th>Tier</th><th>Source code</th><th>Findings</th><th>Telemetry</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Free</td>
+          <td>Never uploaded</td>
+          <td>Local SQLite only unless you opt in</td>
+          <td>Off by default. Set <code>PIPEWARDEN_TELEMETRY=on</code> to send anonymous install + scan-count events</td>
+        </tr>
+        <tr>
+          <td>Pro</td>
+          <td>Never uploaded</td>
+          <td>Synced to your account for trend charts; metadata only (severity, category, file path, line)</td>
+          <td>Same opt-in as Free</td>
+        </tr>
+        <tr>
+          <td>Team</td>
+          <td>Never uploaded by default; opt-in remote analyzer for Claude-AI tier on critical findings, with per-repo allowlist</td>
+          <td>Synced to your team account; per-user RBAC</td>
+          <td>Opt-out; audit log captures all access</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Credential vault</h2>
+  <div class="block">
+    <p>PipeWarden stores third-party tokens (GitHub PATs, GitLab tokens, Bitbucket app passwords, etc.) so it can poll your CI/CD systems on your behalf.</p>
+    <ul>
+      <li><b>Cipher:</b> AES-256-GCM, per-row nonce, per-installation master key derived from <code>PIPEWARDEN_VAULT_KEY</code>.</li>
+      <li><b>Storage:</b> SQLite (or Postgres on hosted Team) — never plaintext.</li>
+      <li><b>Key rotation:</b> documented in <code>docs/vault-rotation.md</code>. The CLI ships a <code>pipewarden vault rotate</code> command.</li>
+      <li><b>No phone home:</b> on Free + Pro the vault decryption happens entirely on your machine.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Supply chain</h2>
+  <div class="block">
+    <ul>
+      <li><b>SBOM:</b> SPDX SBOM published per release via GoReleaser + Syft.</li>
+      <li><b>Signing:</b> binaries cosign-signed (keyless / OIDC) — see <code>cosign verify-blob</code> instructions in the release notes.</li>
+      <li><b>Provenance:</b> SLSA L3 attestations on the GitHub Actions release workflow.</li>
+      <li><b>Dependencies:</b> govulncheck runs on every PR (see <code>.github/workflows/ci.yml</code>); a release is blocked on any unresolved Critical or High in the build chain.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Reporting a vulnerability</h2>
+  <div class="block">
+    <ul>
+      <li>Email: <a href="mailto:security@pipewarden.io">security@pipewarden.io</a></li>
+      <li>GitHub Security Advisories: <a href="https://github.com/finsavvyai/pipewarden/security/advisories/new">new advisory</a></li>
+      <li>PGP key: <a href="/.well-known/pgp-key.txt">/.well-known/pgp-key.txt</a></li>
+      <li>Machine-readable: <a href="/.well-known/security.txt">/.well-known/security.txt</a></li>
+    </ul>
+    <p>We aim to acknowledge reports within 48 hours and ship a fix within 14 days for High/Critical issues. A bug-bounty program will launch after the first public release.</p>
+  </div>
+</section>
+
+<footer>
+  Last updated: May 2026 · <a href="/">pipewarden.io</a> · <a href="https://github.com/finsavvyai/pipewarden">github.com/finsavvyai/pipewarden</a>
+</footer>
+
+</div>
+</body>
+</html>

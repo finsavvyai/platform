@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LunaOS — AI Code Review, Testing &amp; Security — 28 SDLC Agents</title>
+    <link rel="icon" type="image/png" href="assets/luna-logo.png">
+    <link rel="apple-touch-icon" href="assets/luna-logo.png">
+    <meta name="description" content="28 specialized AI agents for code review, testing, security audits, and deployment. RAG-powered to understand your codebase. Open source CLI on Cloudflare edge.">
+    <meta property="og:title" content="LunaOS — 28 AI Agents for the Entire SDLC">
+    <meta property="og:description" content="28 AI agents for code review, testing, security, and deployment. RAG-powered. Cloudflare edge. Open source CLI.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://lunaos.ai">
+    <meta property="og:image" content="https://lunaos.ai/assets/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://lunaos.ai/assets/og-image.png">
+    <meta name="theme-color" content="#6366f1">
+    <link rel="canonical" href="https://lunaos.ai/">
+    <script defer data-domain="lunaos.ai" src="https://plausible.io/js/script.js"></script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {"@type":"Question","name":"Does my code leave my machine?","acceptedAnswer":{"@type":"Answer","text":"The CLI runs locally. RAG indexing sends embeddings (not raw source) to Cloudflare Vectorize. BYOK mode keeps inference direct to OpenAI/Anthropic."}},
+        {"@type":"Question","name":"Which LLM providers are supported?","acceptedAnswer":{"@type":"Answer","text":"OpenAI, Anthropic Claude, Workers AI, and local llamafile. BYOK on Free, managed on Pro/Team."}},
+        {"@type":"Question","name":"How is this different from Copilot or CodeRabbit?","acceptedAnswer":{"@type":"Answer","text":"LunaOS runs 28 specialised agents from one CLI with RAG over your full repo — review, test-gen, security, deploy checks, docs."}},
+        {"@type":"Question","name":"Can I self-host?","acceptedAnswer":{"@type":"Answer","text":"The CLI is open source. Hosted Studio + Dashboard self-host is on the roadmap for Q3 2026."}},
+        {"@type":"Question","name":"Refund policy?","acceptedAnswer":{"@type":"Answer","text":"30-day money-back on Pro and Team. Cancel anytime."}}
+      ]
+    }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/mobile-responsive.css">
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :focus-visible { outline: 2px solid #8b5cf6; outline-offset: 2px; }
+
+        :root {
+            --violet-500: #8b5cf6;
+            --violet-600: #7c3aed;
+            --indigo-500: #6366f1;
+            --indigo-600: #4f46e5;
+            --emerald-400: #34d399;
+            --emerald-500: #10b981;
+            --amber-400: #fbbf24;
+            --rose-400: #fb7185;
+            --neutral-900: #0a0a0f;
+            --neutral-800: #141420;
+            --neutral-700: #1e1e2e;
+            --neutral-600: #4a4a5e;
+            --neutral-500: #6b7280;
+            --neutral-400: #9ca3af;
+            --neutral-300: #d1d5db;
+            --border: rgba(139, 92, 246, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--neutral-900);
+            color: #fff;
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .bg-grid {
+            position: fixed; inset: 0; z-index: -3;
+            background-image:
+                linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
+            background-size: 64px 64px;
+        }
+
+        .bg-glow {
+            position: fixed; inset: 0; z-index: -2;
+            background:
+                radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,102,241,0.12) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 80% 50%, rgba(139,92,246,0.08) 0%, transparent 50%);
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+
+        /* ── Nav ─────────────────────────────────────────── */
+        nav {
+            position: fixed; top: 0; width: 100%; z-index: 100;
+            background: rgba(10,10,15,0.85); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+        }
+        .nav-inner {
+            display: flex; align-items: center; justify-content: space-between;
+            max-width: 1200px; margin: 0 auto; padding: 0.75rem 2rem;
+        }
+        .nav-logo { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 1.1rem; color: #fff; text-decoration: none; }
+        .nav-logo img { width: 28px; height: 28px; border-radius: 6px; }
+        .nav-links { display: flex; gap: 2rem; align-items: center; }
+        .nav-links a { color: var(--neutral-400); text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+        .nav-links a:hover { color: #fff; }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 0.6rem 1.4rem; border-radius: 8px; font-weight: 600;
+            font-size: 0.9rem; text-decoration: none; transition: all 0.2s;
+            border: none; cursor: pointer;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--violet-600), var(--indigo-600));
+            color: #fff;
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(99,102,241,0.4); }
+        .btn-ghost { background: rgba(255,255,255,0.06); color: #fff; border: 1px solid var(--border); }
+        .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+        .btn-lg { padding: 0.85rem 2rem; font-size: 1rem; border-radius: 10px; }
+        .btn-full { width: 100%; justify-content: center; }
+
+        /* ── Hero ────────────────────────────────────────── */
+        .hero {
+            padding: 10rem 0 5rem; text-align: center;
+        }
+        .hero h1 {
+            font-size: 3.5rem; font-weight: 800; line-height: 1.1;
+            letter-spacing: -0.03em; margin-bottom: 1.5rem;
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, var(--violet-500), var(--indigo-500), var(--emerald-400));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-sub {
+            font-size: 1.25rem; color: var(--neutral-400); max-width: 600px;
+            margin: 0 auto 2.5rem; line-height: 1.7;
+        }
+        .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        .cli-bar {
+            display: inline-flex; align-items: center; gap: 0.75rem;
+            background: var(--neutral-800); border: 1px solid var(--border);
+            border-radius: 10px; padding: 0.75rem 1.25rem; margin-top: 2rem;
+            font-family: 'JetBrains Mono', monospace; font-size: 0.9rem;
+        }
+        .cli-bar .dollar { color: var(--emerald-400); }
+        .cli-copy-btn {
+            background: rgba(255,255,255,0.08); border: 1px solid var(--border);
+            color: var(--neutral-400); padding: 0.25rem 0.75rem; border-radius: 6px;
+            cursor: pointer; font-size: 0.8rem; transition: all 0.2s;
+        }
+        .cli-copy-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+        /* ── Hero badge ──────────────────────────────────── */
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.4rem 0.9rem; border-radius: 999px;
+            background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.25);
+            color: var(--violet-500); font-size: 0.8rem; font-weight: 500;
+            margin-bottom: 1.5rem;
+        }
+
+        /* ── Social proof ────────────────────────────────── */
+        .proof { padding: 3rem 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        .proof-row {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem;
+            color: var(--neutral-400); font-size: 0.85rem; text-align: center;
+        }
+        .proof-row .stat { display: flex; flex-direction: column; gap: 0.25rem; }
+        .proof-row .stat-num { font-size: 1.5rem; font-weight: 700; color: #fff; font-family: 'JetBrains Mono', monospace; }
+        .proof-row .stat-label { color: var(--neutral-500); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
+
+        /* ── Comparison strip ────────────────────────────── */
+        .replaces { padding: 4rem 0 2rem; text-align: center; }
+        .replaces-label { color: var(--neutral-500); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem; }
+        .replaces-chips { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; }
+        .replaces-chips .chip {
+            padding: 0.5rem 1rem; border: 1px solid var(--border);
+            border-radius: 999px; color: var(--neutral-400); font-size: 0.85rem;
+            background: var(--neutral-800);
+        }
+        .replaces-chips .chip.strike { text-decoration: line-through; opacity: 0.7; }
+
+        /* ── FAQ ─────────────────────────────────────────── */
+        .faq { padding: 5rem 0; }
+        .faq-grid { display: grid; gap: 0.75rem; max-width: 800px; margin: 0 auto; }
+        .faq-item {
+            background: var(--neutral-800); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1.25rem 1.5rem;
+        }
+        .faq-item summary {
+            cursor: pointer; font-weight: 600; font-size: 1rem;
+            list-style: none; display: flex; justify-content: space-between; align-items: center;
+        }
+        .faq-item summary::-webkit-details-marker { display: none; }
+        .faq-item summary::after { content: '+'; color: var(--violet-500); font-size: 1.5rem; font-weight: 400; }
+        .faq-item[open] summary::after { content: '−'; }
+        .faq-item p { color: var(--neutral-400); font-size: 0.9rem; margin-top: 0.75rem; line-height: 1.7; }
+
+        /* ── What you can build ──────────────────────────── */
+        .use-cases { padding: 5rem 0; }
+        .section-label {
+            display: inline-block; font-size: 0.8rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            color: var(--violet-500); margin-bottom: 0.75rem;
+        }
+        .section-header { text-align: center; margin-bottom: 3.5rem; }
+        .section-header h2 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1rem; }
+        .section-header p { color: var(--neutral-400); font-size: 1.1rem; max-width: 600px; margin: 0 auto; }
+
+        .use-case-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+        }
+        .use-case-card {
+            background: var(--neutral-800); border: 1px solid var(--border);
+            border-radius: 16px; padding: 2rem; transition: all 0.3s;
+        }
+        .use-case-card:hover { border-color: rgba(139,92,246,0.3); transform: translateY(-2px); }
+        .use-case-icon { font-size: 2rem; margin-bottom: 1rem; }
+        .use-case-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .use-case-card p { color: var(--neutral-400); font-size: 0.9rem; line-height: 1.6; }
+
+        /* ── Platform features ───────────────────────────── */
+        .platform { padding: 5rem 0; }
+        .platform-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+        .platform-card {
+            background: var(--neutral-800); border: 1px solid var(--border);
+            border-radius: 16px; padding: 2.5rem; transition: all 0.3s;
+        }
+        .platform-card:hover { border-color: rgba(139,92,246,0.3); }
+        .platform-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; margin-bottom: 1.25rem;
+            background: rgba(139,92,246,0.1);
+        }
+        .platform-card h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .platform-card p { color: var(--neutral-400); font-size: 0.9rem; line-height: 1.7; }
+        .platform-card .tag {
+            display: inline-block; font-size: 0.75rem; padding: 0.2rem 0.6rem;
+            border-radius: 6px; background: rgba(139,92,246,0.1);
+            color: var(--violet-500); margin-top: 1rem; font-weight: 500;
+        }
+
+        /* ── How it works ────────────────────────────────── */
+        .how-it-works { padding: 5rem 0; }
+        .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; }
+        .step { text-align: center; }
+        .step-num {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--violet-600), var(--indigo-600));
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 1.1rem; margin: 0 auto 1rem;
+        }
+        .step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .step p { color: var(--neutral-400); font-size: 0.85rem; }
+
+        /* ── Demo ────────────────────────────────────────── */
+        .demo { padding: 5rem 0; }
+        .demo-terminal {
+            background: var(--neutral-800); border: 1px solid var(--border);
+            border-radius: 16px; padding: 2rem; max-width: 720px; margin: 2rem auto 0;
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85rem;
+            line-height: 2;
+        }
+        .demo-terminal .comment { color: var(--neutral-500); }
+        .demo-terminal .cmd { color: var(--emerald-400); }
+        .demo-terminal .output { color: var(--neutral-300); }
+        .demo-terminal .highlight { color: var(--violet-500); }
+        .demo-terminal .sev-critical { color: #fb7185; }
+        .demo-terminal .sev-high { color: #fbbf24; }
+        .demo-terminal .sev-pass { color: #34d399; }
+
+        /* ── Architecture ────────────────────────────────── */
+        .architecture { padding: 5rem 0; }
+        .arch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; }
+        .arch-item {
+            background: var(--neutral-800); border: 1px solid var(--border);
+            border-radius: 12px; padding: 1.5rem; text-align: center;
+        }
+        .arch-item .arch-label { font-size: 0.75rem; color: var(--neutral-500); text-transform: uppercase; letter-spacing: 0.05em; }
+        .arch-item .arch-tech { font-weight: 700; font-size: 0.95rem; margin: 0.5rem 0; }
+        .arch-item .arch-desc { font-size: 0.8rem; color: var(--neutral-400); }
+
+        /* ── Pricing ─────────────────────────────────────── */
+        .pricing { padding: 5rem 0; }
+        .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; max-width: 900px; margin: 0 auto; }
+        .price-card {
+            background: var(--neutral-800); border: 1px solid var(--border);
+            border-radius: 16px; padding: 2.5rem 2rem; position: relative;
+        }
+        .price-card.featured { border-color: var(--violet-500); }
+        .price-card.featured::before {
+            content: 'Most Popular'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+            background: linear-gradient(135deg, var(--violet-600), var(--indigo-600));
+            color: #fff; font-size: 0.75rem; font-weight: 600;
+            padding: 0.25rem 1rem; border-radius: 999px;
+        }
+        .price-name { font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem; }
+        .price-desc { color: var(--neutral-500); font-size: 0.85rem; margin-bottom: 1.25rem; }
+        .price-amount { margin-bottom: 1.5rem; }
+        .price-amount .number { font-size: 2.5rem; font-weight: 800; }
+        .price-amount .period { color: var(--neutral-500); font-size: 0.85rem; }
+        .price-features { list-style: none; margin-bottom: 2rem; }
+        .price-features li {
+            padding: 0.4rem 0; font-size: 0.85rem; color: var(--neutral-300);
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .price-features .check { color: var(--emerald-400); }
+
+        /* ── CTA ─────────────────────────────────────────── */
+        .final-cta {
+            padding: 6rem 0; text-align: center;
+        }
+        .final-cta h2 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; }
+        .final-cta p { color: var(--neutral-400); font-size: 1.1rem; margin-bottom: 2rem; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+        /* ── Footer ──────────────────────────────────────── */
+        .footer {
+            border-top: 1px solid var(--border); padding: 3rem 0 2rem;
+            margin-top: 2rem;
+        }
+        .footer-inner {
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 1rem;
+        }
+        .footer-brand { color: var(--neutral-500); font-size: 0.85rem; }
+        .footer-links { display: flex; gap: 1.5rem; }
+        .footer-links a { color: var(--neutral-500); text-decoration: none; font-size: 0.85rem; }
+        .footer-links a:hover { color: #fff; }
+
+        /* ── Responsive ──────────────────────────────────── */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.2rem; }
+            .hero-sub { font-size: 1rem; }
+            .use-case-grid { grid-template-columns: 1fr; }
+            .platform-grid { grid-template-columns: 1fr; }
+            .steps { grid-template-columns: repeat(2, 1fr); }
+            .arch-grid { grid-template-columns: repeat(2, 1fr); }
+            .pricing-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
+            .proof-row { grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+            .nav-links { display: none; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
+    <!-- ── Nav ──────────────────────────────────────────── -->
+    <nav>
+        <div class="nav-inner">
+            <a href="/" class="nav-logo">
+                <img src="assets/luna-logo.png" alt="LunaOS" width="28" height="28">
+                LunaOS
+            </a>
+            <div class="nav-links">
+                <a href="#use-cases">Use Cases</a>
+                <a href="#platform">Platform</a>
+                <a href="#how-it-works">How It Works</a>
+                <a href="#pricing">Pricing</a>
+                <a href="#faq">FAQ</a>
+                <a href="https://docs.lunaos.ai" target="_blank" rel="noopener">Docs</a>
+                <a href="https://agents.lunaos.ai/auth/signup" class="btn btn-primary">Start Building</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ── Hero ────────────────────────────────────────── -->
+    <section class="hero" id="main-content">
+        <div class="container">
+            <div class="hero-badge">&#9889; Open source &middot; Free during launch &middot; No credit card</div>
+            <h1>Ship code <span class="gradient-text">AI already reviewed.</span><br>From your terminal.</h1>
+            <p class="hero-sub">
+                28 AI agents read your full codebase via RAG &mdash; catch security holes, write tests, audit deploys. One CLI. No context switching.
+            </p>
+            <div class="hero-actions">
+                <a href="https://agents.lunaos.ai/auth/signup" class="btn btn-primary btn-lg">Start Free &mdash; 30 sec setup</a>
+                <a href="https://github.com/lunaos-ai" target="_blank" rel="noopener" class="btn btn-ghost btn-lg">&#9733; Star on GitHub</a>
+            </div>
+            <div class="cli-bar">
+                <code><span class="dollar">$</span> npm install -g luna-agents</code>
+                <button class="cli-copy-btn" onclick="navigator.clipboard.writeText('npm install -g luna-agents').then(()=>this.textContent='Copied!').catch(()=>{})">Copy</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Social proof ────────────────────────────────── -->
+    <section class="proof">
+        <div class="container">
+            <div class="proof-row">
+                <div class="stat">
+                    <div class="stat-num">28</div>
+                    <div class="stat-label">AI Agents</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-num">232</div>
+                    <div class="stat-label">CLI Commands</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-num">&lt;200ms</div>
+                    <div class="stat-label">Global Latency</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-num">100%</div>
+                    <div class="stat-label">Open Source CLI</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Replaces ─────────────────────────────────────── -->
+    <section class="replaces">
+        <div class="container">
+            <div class="replaces-label">Replaces 5+ tools in your stack</div>
+            <div class="replaces-chips">
+                <span class="chip strike">CodeRabbit</span>
+                <span class="chip strike">Snyk</span>
+                <span class="chip strike">GitHub Copilot Review</span>
+                <span class="chip strike">Codecov</span>
+                <span class="chip strike">Sentry Code Scan</span>
+                <span class="chip">&#10003; LunaOS</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── What you can build ──────────────────────────── -->
+    <section class="use-cases" id="use-cases">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">What Developers Use It For</div>
+                <h2>Every stage of the SDLC, covered</h2>
+                <p>From your first commit to production deploy — AI handles the tedious parts.</p>
+            </div>
+
+            <div class="use-case-grid">
+                <div class="use-case-card">
+                    <div class="use-case-icon">&#128269;</div>
+                    <h3>Code Review</h3>
+                    <p>AI reviews your PRs with full codebase context. Finds security issues, bad patterns, and performance problems humans routinely miss.</p>
+                </div>
+                <div class="use-case-card">
+                    <div class="use-case-icon">&#129514;</div>
+                    <h3>Test Generation</h3>
+                    <p>Auto-generates test suites with edge-case coverage for any function or module. Jest, Vitest, pytest — your framework, your style.</p>
+                </div>
+                <div class="use-case-card">
+                    <div class="use-case-icon">&#128274;</div>
+                    <h3>Security Audits</h3>
+                    <p>Scans for OWASP Top 10, hardcoded secrets, SQL injection, and 50+ vulnerability patterns across your entire codebase in seconds.</p>
+                </div>
+                <div class="use-case-card">
+                    <div class="use-case-icon">&#128640;</div>
+                    <h3>Deployment Checks</h3>
+                    <p>Pre-deploy checklist: env vars, DB migrations, rollback plan, health checks. Never forget a critical step before going live again.</p>
+                </div>
+                <div class="use-case-card">
+                    <div class="use-case-icon">&#128196;</div>
+                    <h3>Documentation</h3>
+                    <p>Auto-generates README, API docs, and inline JSDoc from your actual codebase. Always in sync — never stale or out of date.</p>
+                </div>
+                <div class="use-case-card">
+                    <div class="use-case-icon">&#9881;</div>
+                    <h3>CI/CD Integration</h3>
+                    <p>Run any agent in GitHub Actions. Block merges when critical issues are found. Two lines of YAML — works in GitLab CI too.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Platform ──────────────────────────────────────── -->
+    <section class="platform" id="platform">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">Platform</div>
+                <h2>Everything you need. Nothing you don't.</h2>
+                <p>One CLI replaces five different AI tools in your workflow.</p>
+            </div>
+
+            <div class="platform-grid">
+                <div class="platform-card">
+                    <div class="platform-icon">&#129504;</div>
+                    <h3>RAG Pipeline</h3>
+                    <p>Index your entire codebase. Agents read your actual code — not just a pasted snippet — for context-aware results every time.</p>
+                    <span class="tag">Cloudflare Vectorize</span>
+                </div>
+                <div class="platform-card">
+                    <div class="platform-icon">&#9112;</div>
+                    <h3>CLI First</h3>
+                    <p>232 commands. Works in any terminal, any project, any language. Install once, use everywhere. No IDE plugin required.</p>
+                    <span class="tag">npm install -g luna-agents</span>
+                </div>
+                <div class="platform-card">
+                    <div class="platform-icon">&#128279;</div>
+                    <h3>Agent Chains</h3>
+                    <p>Chain code-review, test-gen, and security-audit in one command. Sequential or parallel — you design the workflow.</p>
+                    <span class="tag">Chain Executor</span>
+                </div>
+                <div class="platform-card">
+                    <div class="platform-icon">&#127912;</div>
+                    <h3>Visual Studio</h3>
+                    <p>Drag-and-drop workflow builder for teams who prefer a GUI. ReactFlow canvas with real-time execution preview.</p>
+                    <span class="tag">studio.lunaos.ai</span>
+                </div>
+                <div class="platform-card">
+                    <div class="platform-icon">&#128025;</div>
+                    <h3>GitHub Integration</h3>
+                    <p>Connect repos, trigger agents on every PR, post AI review comments automatically. Every install is a distribution node.</p>
+                    <span class="tag">GitHub OAuth</span>
+                </div>
+                <div class="platform-card">
+                    <div class="platform-icon">&#128273;</div>
+                    <h3>API &amp; CI/CD</h3>
+                    <p>REST API with API keys. Add luna-agents to any GitHub Actions or GitLab CI pipeline. Block merges on critical findings.</p>
+                    <span class="tag">api.lunaos.ai</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── How it works ──────────────────────────────────── -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">How It Works</div>
+                <h2>From zero to deployed in 4 steps</h2>
+            </div>
+
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <h3>Install</h3>
+                    <p>npm install -g luna-agents &mdash; one command, works globally in any project.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <h3>Index your codebase</h3>
+                    <p>luna init scans your project in 30 seconds. Agents now understand your full context.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <h3>Run any agent</h3>
+                    <p>luna run code-review streams AI analysis of your last commit in real-time.</p>
+                </div>
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <h3>Share &amp; integrate</h3>
+                    <p>Get a shareable report URL. Add to CI/CD to block merges on critical issues.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Demo ──────────────────────────────────────────── -->
+    <section class="demo" id="demo">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">See It</div>
+                <h2>Catch bugs before they reach production</h2>
+            </div>
+
+            <div class="demo-terminal">
+                <div class="comment"># Run in any git project — no account required</div>
+                <div class="cmd">$ npx luna-agents run code-review</div>
+                <div class="output">&nbsp;</div>
+                <div class="output">Analyzing last 5 commits in src/ ...</div>
+                <div class="output">&nbsp;</div>
+                <div class="sev-critical">&#10007; CRITICAL &nbsp; src/auth/login.ts:47 &nbsp;&nbsp;&nbsp; JWT secret hardcoded in source</div>
+                <div class="sev-high">&#10007; HIGH &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; src/api/users.ts:89 &nbsp;&nbsp;&nbsp;&nbsp; No rate limiting on POST /login</div>
+                <div class="sev-high">&#10007; HIGH &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; src/api/users.ts:102 &nbsp;&nbsp;&nbsp; Missing CSRF protection on form submit</div>
+                <div class="sev-pass">&#10003; PASS &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; src/middleware/cors.ts &nbsp; CORS headers correctly configured</div>
+                <div class="sev-pass">&#10003; PASS &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; src/db/queries.ts &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; No SQL injection vectors found</div>
+                <div class="output">&nbsp;</div>
+                <div class="output">Summary: 3 issues found (1 critical &middot; 2 high &middot; 0 medium)</div>
+                <div class="highlight">Report &#8594; https://luna.ai/r/7f3k2m &nbsp; [copy to share]</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Architecture ──────────────────────────────────── -->
+    <section class="architecture" id="architecture">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">Infrastructure</div>
+                <h2>Built on the edge. Scales to millions.</h2>
+                <p>Every request runs on Cloudflare's global network.</p>
+            </div>
+
+            <div class="arch-grid">
+                <div class="arch-item">
+                    <div class="arch-label">Gateway</div>
+                    <div class="arch-tech">Workers + Hono</div>
+                    <div class="arch-desc">Edge routing, auth, rate limiting</div>
+                </div>
+                <div class="arch-item">
+                    <div class="arch-label">Database</div>
+                    <div class="arch-tech">D1 + KV</div>
+                    <div class="arch-desc">SQL + key-value storage</div>
+                </div>
+                <div class="arch-item">
+                    <div class="arch-label">AI Engine</div>
+                    <div class="arch-tech">Multi-LLM</div>
+                    <div class="arch-desc">OpenAI, Anthropic, Workers AI</div>
+                </div>
+                <div class="arch-item">
+                    <div class="arch-label">Search</div>
+                    <div class="arch-tech">Vectorize</div>
+                    <div class="arch-desc">Semantic vector search</div>
+                </div>
+                <div class="arch-item">
+                    <div class="arch-label">Storage</div>
+                    <div class="arch-tech">R2</div>
+                    <div class="arch-desc">Files, artifacts, exports</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Pricing ───────────────────────────────────────── -->
+    <section class="pricing" id="pricing">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">Pricing</div>
+                <h2>Start free. Scale as you grow.</h2>
+                <p>No credit card required.</p>
+            </div>
+
+            <div class="pricing-grid">
+                <div class="price-card">
+                    <div class="price-name">Free</div>
+                    <div class="price-desc">For solo devs &amp; open source</div>
+                    <div class="price-amount">
+                        <span class="number">$0</span>
+                        <span class="period">/ forever</span>
+                    </div>
+                    <ul class="price-features">
+                        <li><span class="check">&#10003;</span> CLI + Dashboard + Studio</li>
+                        <li><span class="check">&#10003;</span> BYOK (OpenAI, Anthropic, local)</li>
+                        <li><span class="check">&#10003;</span> 1 project &middot; 500 runs/month</li>
+                        <li><span class="check">&#10003;</span> Community Discord support</li>
+                    </ul>
+                    <a href="https://agents.lunaos.ai/auth/signup" class="btn btn-ghost btn-full">Get Started</a>
+                </div>
+
+                <div class="price-card featured">
+                    <div class="price-name">Pro</div>
+                    <div class="price-desc">For indie devs &amp; freelancers</div>
+                    <div class="price-amount">
+                        <span class="number">$29</span>
+                        <span class="period">/ month &middot; cancel anytime</span>
+                    </div>
+                    <ul class="price-features">
+                        <li><span class="check">&#10003;</span> Everything in Free</li>
+                        <li><span class="check">&#10003;</span> 10 projects &middot; 10K runs/month</li>
+                        <li><span class="check">&#10003;</span> RAG &amp; vector search</li>
+                        <li><span class="check">&#10003;</span> Priority email support</li>
+                        <li><span class="check">&#10003;</span> Custom agents</li>
+                    </ul>
+                    <a href="https://agents.lunaos.ai/auth/signup?plan=pro" class="btn btn-primary btn-full">Start Pro Trial</a>
+                </div>
+
+                <div class="price-card">
+                    <div class="price-name">Team</div>
+                    <div class="price-desc">For startups &amp; teams</div>
+                    <div class="price-amount">
+                        <span class="number">$79</span>
+                        <span class="period">/ month &middot; per seat from 5</span>
+                    </div>
+                    <ul class="price-features">
+                        <li><span class="check">&#10003;</span> Everything in Pro</li>
+                        <li><span class="check">&#10003;</span> Unlimited projects &amp; runs</li>
+                        <li><span class="check">&#10003;</span> Team management &amp; RBAC</li>
+                        <li><span class="check">&#10003;</span> Audit logging &amp; SSO</li>
+                        <li><span class="check">&#10003;</span> Dedicated Slack channel</li>
+                    </ul>
+                    <a href="https://agents.lunaos.ai/auth/signup?plan=team" class="btn btn-ghost btn-full">Start Team Trial</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── FAQ ───────────────────────────────────────────── -->
+    <section class="faq" id="faq">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-label">FAQ</div>
+                <h2>Questions, answered</h2>
+            </div>
+            <div class="faq-grid">
+                <details class="faq-item">
+                    <summary>Does my code leave my machine?</summary>
+                    <p>The CLI runs locally. RAG indexing sends embeddings (not raw source) to Cloudflare Vectorize in your region. Bring-your-own-key mode keeps inference calls direct to OpenAI/Anthropic — we never see your code or prompts.</p>
+                </details>
+                <details class="faq-item">
+                    <summary>Which LLM providers are supported?</summary>
+                    <p>OpenAI, Anthropic Claude, Workers AI, and local llamafile. Pick per-agent. BYOK on Free, managed keys on Pro/Team.</p>
+                </details>
+                <details class="faq-item">
+                    <summary>How is this different from GitHub Copilot or CodeRabbit?</summary>
+                    <p>Copilot autocompletes lines. CodeRabbit reviews PRs in GitHub. LunaOS runs 28 specialised agents — review, test-gen, security audit, deploy checks, docs — from one CLI, with RAG over your full repo. Works in any project, any CI, any IDE.</p>
+                </details>
+                <details class="faq-item">
+                    <summary>What languages and frameworks does it support?</summary>
+                    <p>TypeScript, JavaScript, Python, Go, Rust, Java, Ruby, PHP, C#, Swift, Kotlin. Test generation supports Jest, Vitest, pytest, Go test, JUnit. New frameworks added monthly.</p>
+                </details>
+                <details class="faq-item">
+                    <summary>Can I self-host?</summary>
+                    <p>The CLI is open source — self-host the agent runner today. Hosted Studio + Dashboard self-host is on the roadmap for Q3 2026 (Team plan).</p>
+                </details>
+                <details class="faq-item">
+                    <summary>What's the refund policy?</summary>
+                    <p>30-day money-back on Pro and Team. Cancel anytime from the dashboard. No usage lock-in — export your data via API.</p>
+                </details>
+                <details class="faq-item">
+                    <summary>Is there a CI/CD integration?</summary>
+                    <p>Yes. Two lines in GitHub Actions, GitLab CI, or any runner. Block merges on critical findings, post review comments to PRs, write artifacts to S3/R2.</p>
+                </details>
+                <details class="faq-item">
+                    <summary>Free tier limits?</summary>
+                    <p>1 project, 500 agent runs/month, community Discord. Pro lifts both caps. No surprise overage charges — you hit the cap, runs queue until next cycle or you upgrade.</p>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Final CTA ─────────────────────────────────────── -->
+    <section class="final-cta">
+        <div class="container">
+            <h2>Your next commit could ship a critical bug.<br><span class="gradient-text">Catch it in 30 seconds.</span></h2>
+            <p>Free during launch. No credit card. Cancel anytime. Open source CLI on npm.</p>
+            <div class="hero-actions">
+                <a href="https://agents.lunaos.ai/auth/signup" class="btn btn-primary btn-lg">Start Free &mdash; 30 sec setup</a>
+                <a href="https://docs.lunaos.ai" class="btn btn-ghost btn-lg">Read the Docs</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Footer ────────────────────────────────────────── -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-brand">&copy; 2026 LunaOS. Built on Cloudflare.</div>
+                <div class="footer-links">
+                    <a href="https://docs.lunaos.ai">Docs</a>
+                    <a href="https://github.com/lunaos-ai" target="_blank" rel="noopener">GitHub</a>
+                    <a href="/blog.html">Blog</a>
+                    <a href="/privacy.html">Privacy</a>
+                    <a href="/terms.html">Terms</a>
+                    <a href="/contact.html">Contact</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(a => {
+            a.addEventListener('click', e => {
+                e.preventDefault();
+                const target = document.querySelector(a.getAttribute('href'));
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        });
+    </script>
+</body>
+</html>

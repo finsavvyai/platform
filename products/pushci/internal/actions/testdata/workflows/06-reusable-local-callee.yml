@@ -1,0 +1,27 @@
+name: reusable-local-callee
+on:
+  workflow_call:
+    inputs:
+      greeting:
+        description: Who to greet
+        required: true
+        type: string
+    secrets:
+      MY_TOKEN:
+        description: Secret inherited from caller
+        required: false
+    outputs:
+      message:
+        description: Greeting payload
+        value: ${{ jobs.greet.outputs.message }}
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    outputs:
+      message: ${{ steps.compose.outputs.message }}
+    steps:
+      - id: compose
+        shell: bash
+        run: |
+          echo "Greeting: Hello, ${{ inputs.greeting }}!"
+          echo "message=hello-${{ inputs.greeting }}" >> "$GITHUB_OUTPUT"

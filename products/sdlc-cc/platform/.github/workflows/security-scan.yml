@@ -1,0 +1,206 @@
+name: Security & Dependency Scanning
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 6 * * 1' # Weekly Monday 06:00 UTC
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # ── Go Vulnerability Scan ──────────────────────────────
+  go-vuln-check:
+    name: Go Vulnerability Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck — gateway
+        run: govulncheck ./...
+        working-directory: services/gateway
+
+  # ── Python Dependency Audit ────────────────────────────
+  python-safety-check:
+    name: Python Safety Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install safety
+        run: pip install safety pip-audit
+
+      - name: Audit rag dependencies
+        run: |
+          pip install -r requirements.txt 2>/dev/null || true
+          pip-audit --format=json --output=pip-audit-rag.json -r requirements.txt || true
+          pip-audit -r requirements.txt
+        working-directory: services/rag
+
+      - name: Audit embedding dependencies
+        continue-on-error: true
+        run: |
+          pip install -r requirements.txt 2>/dev/null || true
+          pip-audit -r requirements.txt || true
+        working-directory: services/embedding
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-audit-results
+          path: services/rag/pip-audit-rag.json
+
+  # ── Container Image Scanning ───────────────────────────
+  container-scan:
+    name: Container Image Scan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: gateway
+            dockerfile: Dockerfile.dev
+          - service: rag
+            dockerfile: Dockerfile.dev
+          - service: llm-gateway
+            dockerfile: Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        id: build
+        continue-on-error: true
+        run: docker build -t sdlc-${{ matrix.service }}:scan -f services/${{ matrix.service }}/${{ matrix.dockerfile }} services/${{ matrix.service }}
+
+      - name: Run Trivy vulnerability scanner
+        # Scan only runs when the image built. Surface findings via SARIF
+        # upload; do not block the pipeline (container build is tracked
+        # separately and the SARIF lands in the Security tab regardless).
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: sdlc-${{ matrix.service }}:scan
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}
+
+  # ── SBOM Generation ────────────────────────────────────
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Syft
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM — gateway
+        continue-on-error: true
+        run: syft dir:services/gateway -o spdx-json=sbom-gateway.spdx.json
+
+      - name: Generate SBOM — rag
+        continue-on-error: true
+        run: syft dir:services/rag -o spdx-json=sbom-rag.spdx.json
+
+      - name: Generate SBOM — llm-gateway
+        continue-on-error: true
+        run: syft dir:services/llm-gateway -o spdx-json=sbom-llm-gateway.spdx.json
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-artifacts
+          path: sbom-*.spdx.json
+          retention-days: 90
+
+  # ── Secret Scanning ────────────────────────────────────
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks
+        run: |
+          wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.0/gitleaks_8.18.0_linux_x64.tar.gz
+          tar -xzf gitleaks_8.18.0_linux_x64.tar.gz
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Run Gitleaks
+        # --redact hides secret values in logs even if a false-positive fires;
+        # --no-banner keeps output clean; exit 0 on findings so the SARIF is
+        # still uploaded and surfaced via the Security tab rather than just
+        # blocking the pipeline.
+        run: gitleaks detect --source=. --report-format=sarif --report-path=gitleaks.sarif --redact --no-banner --exit-code 0
+
+      - name: Upload Gitleaks SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+  # ── License Compliance ─────────────────────────────────
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses@latest
+
+      - name: Check Go licenses
+        run: |
+          go-licenses report ./... --template=csv 2>/dev/null > licenses-gateway.csv || true
+          echo "## License Report"
+          cat licenses-gateway.csv | head -50
+        working-directory: services/gateway
+
+      - name: Flag copyleft licenses
+        run: |
+          if grep -iE "GPL|AGPL|SSPL" licenses-gateway.csv 2>/dev/null; then
+            echo "::error::Copyleft license detected — review required"
+            exit 1
+          fi
+          echo "No copyleft licenses found"
+        working-directory: services/gateway
+
+      - name: Upload license report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-reports
+          path: services/gateway/licenses-*.csv

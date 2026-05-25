@@ -1,0 +1,339 @@
+{
+  "dashboard": {
+    "title": "FinSavvyAI SLO Dashboard",
+    "description": "Service Level Objectives: uptime, latency, error rate, error budget",
+    "tags": ["finsavvyai", "slo", "production"],
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "30s",
+    "time": {"from": "now-24h", "to": "now"},
+    "templating": {
+      "list": [
+        {
+          "name": "datasource",
+          "type": "datasource",
+          "query": "prometheus",
+          "current": {"text": "Prometheus", "value": "Prometheus"}
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Current Uptime %",
+        "type": "stat",
+        "datasource": {"uid": "${datasource}"},
+        "targets": [
+          {
+            "expr": "avg_over_time(up{job=\"finsavvyai-gateway\"}[24h]) * 100",
+            "legendFormat": "24h"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": {"calcs": ["lastNotNull"]},
+          "textMode": "value_and_name"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 99},
+                {"color": "yellow", "value": 99.5},
+                {"color": "green", "value": 99.9}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Uptime 7d",
+        "type": "stat",
+        "datasource": {"uid": "${datasource}"},
+        "targets": [
+          {
+            "expr": "avg_over_time(up{job=\"finsavvyai-gateway\"}[7d]) * 100",
+            "legendFormat": "7d"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": {"calcs": ["lastNotNull"]}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 99},
+                {"color": "green", "value": 99.9}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Uptime 30d",
+        "type": "stat",
+        "datasource": {"uid": "${datasource}"},
+        "targets": [
+          {
+            "expr": "avg_over_time(up{job=\"finsavvyai-gateway\"}[30d]) * 100",
+            "legendFormat": "30d"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": {"calcs": ["lastNotNull"]}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 99},
+                {"color": "green", "value": 99.9}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Error Budget Remaining",
+        "type": "gauge",
+        "datasource": {"uid": "${datasource}"},
+        "targets": [
+          {
+            "expr": "(1 - (sum(increase(http_responses_total{job=\"finsavvyai-gateway\",status=~\"5..\"}[30d])) / sum(increase(http_responses_total{job=\"finsavvyai-gateway\"}[30d]))) / 0.001) * 100",
+            "legendFormat": "Budget %"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+        "options": {
+          "orientation": "auto",
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 25},
+                {"color": "yellow", "value": 50},
+                {"color": "green", "value": 75}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Error Budget Burn Rate",
+        "type": "stat",
+        "datasource": {"uid": "${datasource}"},
+        "targets": [
+          {
+            "expr": "(sum(rate(http_responses_total{job=\"finsavvyai-gateway\",status=~\"5..\"}[1h])) / sum(rate(http_responses_total{job=\"finsavvyai-gateway\"}[1h]))) / 0.001",
+            "legendFormat": "Burn Rate"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "reduceOptions": {"calcs": ["lastNotNull"]}
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "x",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 2},
+                {"color": "orange", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Request Throughput",
+        "type": "stat",
+        "datasource": {"uid": "${datasource}"},
+        "targets": [
+          {
+            "expr": "sum(rate(http_responses_total{job=\"finsavvyai-gateway\"}[5m]))",
+            "legendFormat": "req/s"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "reduceOptions": {"calcs": ["lastNotNull"]}
+        },
+        "fieldConfig": {"defaults": {"unit": "reqps"}}
+      },
+      {
+        "id": 10,
+        "title": "Request Latency (P50 / P95 / P99)",
+        "type": "timeseries",
+        "datasource": {"uid": "${datasource}"},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"finsavvyai-gateway\",path=\"/v1/chat/completions\"}[5m])) by (le))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"finsavvyai-gateway\",path=\"/v1/chat/completions\"}[5m])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"finsavvyai-gateway\",path=\"/v1/chat/completions\"}[5m])) by (le))",
+            "legendFormat": "P99"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {"lineWidth": 2, "fillOpacity": 10}
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "P95"},
+              "properties": [{"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}]
+            },
+            {
+              "matcher": {"id": "byName", "options": "P99"},
+              "properties": [{"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]
+            }
+          ]
+        },
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"]},
+          "tooltip": {"mode": "multi"}
+        }
+      },
+      {
+        "id": 11,
+        "title": "Error Rate vs SLO (1%)",
+        "type": "timeseries",
+        "datasource": {"uid": "${datasource}"},
+        "targets": [
+          {
+            "expr": "sum(rate(http_responses_total{job=\"finsavvyai-gateway\",status=~\"5..\"}[5m])) / sum(rate(http_responses_total{job=\"finsavvyai-gateway\"}[5m])) * 100",
+            "legendFormat": "Error Rate %"
+          },
+          {
+            "expr": "1",
+            "legendFormat": "SLO Threshold (1%)"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {"lineWidth": 2, "fillOpacity": 10}
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "SLO Threshold (1%)"},
+              "properties": [
+                {"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}},
+                {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}},
+                {"id": "custom.fillOpacity", "value": 0}
+              ]
+            }
+          ]
+        },
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom"},
+          "tooltip": {"mode": "multi"}
+        }
+      },
+      {
+        "id": 12,
+        "title": "Request Throughput Over Time",
+        "type": "timeseries",
+        "datasource": {"uid": "${datasource}"},
+        "targets": [
+          {
+            "expr": "sum(rate(http_responses_total{job=\"finsavvyai-gateway\"}[5m]))",
+            "legendFormat": "Total RPS"
+          },
+          {
+            "expr": "sum(rate(http_responses_total{job=\"finsavvyai-gateway\",status=~\"2..\"}[5m]))",
+            "legendFormat": "Success RPS"
+          },
+          {
+            "expr": "sum(rate(http_responses_total{job=\"finsavvyai-gateway\",status=~\"5..\"}[5m]))",
+            "legendFormat": "Error RPS"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {"lineWidth": 2, "fillOpacity": 15}
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Error RPS"},
+              "properties": [{"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]
+            }
+          ]
+        },
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"]},
+          "tooltip": {"mode": "multi"}
+        }
+      },
+      {
+        "id": 13,
+        "title": "Latency Heatmap",
+        "type": "heatmap",
+        "datasource": {"uid": "${datasource}"},
+        "targets": [
+          {
+            "expr": "sum(increase(http_request_duration_seconds_bucket{job=\"finsavvyai-gateway\",path=\"/v1/chat/completions\"}[$__rate_interval])) by (le)",
+            "format": "heatmap",
+            "legendFormat": "{{le}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "options": {
+          "calculate": false,
+          "yAxis": {"unit": "s"},
+          "color": {"scheme": "Spectral", "reverse": true},
+          "tooltip": {"show": true, "yHistogram": true}
+        }
+      }
+    ]
+  }
+}

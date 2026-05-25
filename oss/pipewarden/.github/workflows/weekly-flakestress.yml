@@ -1,0 +1,114 @@
+name: weekly-flakestress
+
+# Complements the nightly per-package flake check with a full-suite stress
+# run using bradfitz/flakestress (interleaved iterations are better at
+# surfacing cross-package races than per-package -count=N).
+on:
+  schedule:
+    - cron: '23 5 * * 0'   # Sunday 05:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  flakestress-full:
+    name: flakestress full suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install flakestress
+        run: go install github.com/bradfitz/flakestress@latest
+
+      - name: Run flakestress (10 iterations, interleaved)
+        id: stress
+        run: |
+          set +e
+          flakestress -n=10 ./... 2>&1 | tee flakestress.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            echo "FLAKESTRESS_FAILED=1" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      - name: Upload log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flakestress-log
+          path: flakestress.log
+          retention-days: 14
+
+      - name: Open issue on failure
+        if: failure() && steps.stress.outputs.FLAKESTRESS_FAILED == '1'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            let log = '';
+            try { log = fs.readFileSync('flakestress.log', 'utf8').slice(-4000); }
+            catch (_) { log = '(log unavailable)'; }
+            const title = `flake: weekly full-suite flakestress failure`;
+            const body = [
+              '## Weekly full-suite flakestress failed',
+              '',
+              `Run: ${context.payload.repository.html_url}/actions/runs/${context.runId}`,
+              '',
+              '### Tail of flakestress.log',
+              '```',
+              log,
+              '```',
+              '',
+              '### Reproduce locally',
+              '```',
+              'go install github.com/bradfitz/flakestress@latest',
+              'flakestress -n=10 ./...',
+              '```',
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['flaky', 'automated', 'weekly'],
+            });
+
+      # Self-instrument: deposit a flake_spike event into pipewarden's own
+      # audit feed via the inbound /api/v1/audit/internal endpoint. Skips
+      # cleanly when the AUDIT_URL or token secret is unset so a fresh
+      # fork still gets the GitHub-issue notification path above.
+      - name: Notify pipewarden audit feed
+        if: failure() && steps.stress.outputs.FLAKESTRESS_FAILED == '1'
+        env:
+          AUDIT_URL: ${{ vars.PIPEWARDEN_AUDIT_URL }}
+          AUDIT_TOKEN: ${{ secrets.PIPEWARDEN_INTERNAL_AUDIT_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$AUDIT_URL" ] || [ -z "$AUDIT_TOKEN" ]; then
+            echo "audit feed not configured (PIPEWARDEN_AUDIT_URL / *_TOKEN unset) — skipping" >&2
+            exit 0
+          fi
+          payload=$(jq -nc \
+            --arg run_url "$RUN_URL" \
+            --arg sha "${GITHUB_SHA:-unknown}" \
+            '{
+               action: "flake_spike",
+               source: "weekly-flakestress",
+               severity: "high",
+               details: { run_url: $run_url, commit: $sha }
+             }')
+          sig=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$AUDIT_TOKEN" -hex | awk '{print $NF}')
+          curl -fsS -X POST "$AUDIT_URL/api/v1/audit/internal" \
+            -H "Content-Type: application/json" \
+            -H "X-Pipewarden-Audit-Signature: sha256=$sig" \
+            --data "$payload"

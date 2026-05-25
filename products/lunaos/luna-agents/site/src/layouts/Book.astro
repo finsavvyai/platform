@@ -1,0 +1,61 @@
+---
+import "../styles/global.css";
+import PipePrompt from "../components/PipePrompt.astro";
+import BookNav from "../components/BookNav.astro";
+
+interface Props {
+  title: string;
+  description?: string;
+  chapter?: string;
+}
+
+const { title, description = "Luna Pipes, a small concatenative language for composing AI agent skills.", chapter } = Astro.props;
+const fullTitle = chapter === "frontispiece" ? "Luna Pipes" : `${title} · Luna Pipes`;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Luna Pipes" />
+    <meta property="og:image" content={new URL("/og.svg", Astro.site).toString()} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={new URL("/og.svg", Astro.site).toString()} />
+    <meta name="theme-color" content="#f7e2c4" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site).toString()} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <BookNav chapter={chapter} />
+    <main id="main">
+      <slot />
+    </main>
+    <footer class="colophon wrap">
+      <hr />
+      <p class="dim">
+        <small>
+          Luna Pipes, first edition. Set in Instrument Serif, Inter Tight, JetBrains Mono.
+          Hosted on Cloudflare. <a href="https://github.com/lunaos/luna-agents">Source</a>.
+          <a href="/colophon">Colophon</a>.
+        </small>
+      </p>
+    </footer>
+    <PipePrompt />
+  </body>
+</html>
+
+<style>
+  .colophon {
+    padding: var(--t-8) clamp(1rem, 4vw, 3rem) var(--t-16);
+  }
+  .colophon p { max-width: var(--measure-wide); }
+</style>

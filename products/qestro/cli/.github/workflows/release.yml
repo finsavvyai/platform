@@ -1,0 +1,455 @@
+name: Questro CLI Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 2.0.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (don''t actually publish)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: 'https://registry.npmjs.org'
+
+jobs:
+  test:
+    name: Test CLI
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: ${{ env.REGISTRY }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run CLI tests
+        run: |
+          npm run build
+          node dist/index.js --version
+          node dist/index.js --help
+
+      - name: Test CLI functionality
+        run: |
+          # Test authentication requirements
+          if node dist/index.js projects list 2>&1 | grep -q "Unable to locate credentials"; then
+            echo "✅ AWS-style authentication working"
+          else
+            echo "❌ AWS-style authentication failed"
+            exit 1
+          fi
+
+          # Test environment variable authentication
+          if QESTRO_ACCESS_TOKEN=test-token node dist/index.js projects list > /dev/null 2>&1; then
+            echo "✅ Environment variable authentication working"
+          else
+            echo "❌ Environment variable authentication failed"
+            exit 1
+          fi
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION=${{ github.ref_name }}
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security audit
+        run: npm audit --audit-level=moderate
+
+      - name: Check for vulnerabilities
+        run: |
+          if npm audit --json | jq -r '.vulnerabilities | length' | grep -v '^0$'; then
+            echo "❌ Security vulnerabilities found"
+            exit 1
+          else
+            echo "✅ No security vulnerabilities"
+          fi
+
+  build:
+    name: Build CLI
+    runs-on: ${{ matrix.os }}
+    needs: [test, security]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build CLI
+        run: npm run build
+
+      - name: Test CLI on ${{ matrix.os }}
+        run: |
+          node dist/index.js --version
+          node dist/index.js --help
+          QESTRO_ACCESS_TOKEN=test-token node dist/index.js projects list
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: cli-${{ matrix.os }}
+          path: dist/
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: cli-ubuntu-latest
+          path: dist/
+
+      - name: Install CLI globally
+        run: npm pack && npm install -g qestro-cli-*.tgz
+
+      - name: Test global installation
+        run: |
+          qestro --version
+          qestro --help
+
+      - name: Test enhanced features
+        run: |
+          # Test configuration management
+          qestro config show
+          qestro config validate
+
+          # Test profile management
+          qestro profiles create test-profile || true
+          qestro profiles list
+
+          # Test plugin system
+          qestro plugin list
+
+      - name: Test authentication flow
+        run: |
+          # Test AWS-style authentication error
+          if qestro projects list 2>&1 | grep -q "Unable to locate credentials"; then
+            echo "✅ AWS-style authentication working"
+          else
+            echo "❌ Authentication test failed"
+            exit 1
+          fi
+
+          # Test environment variable authentication
+          if QESTRO_ACCESS_TOKEN=test-token qestro projects list; then
+            echo "✅ Environment authentication working"
+          else
+            echo "❌ Environment authentication failed"
+            exit 1
+          fi
+
+  publish-npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    needs: [test, security, integration]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: ${{ env.REGISTRY }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build CLI
+        run: npm run build
+
+      - name: Test package
+        run: npm pack --dry-run
+
+      - name: Publish to NPM
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify publication
+        run: npm view qestro-cli
+
+  create-github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [test, security, integration, publish-npm]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${{ github.ref_name }}
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          # Generate changelog
+          if [ -n "$PREVIOUS_TAG" ]; then
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)")
+          fi
+
+          # Save to file for the release
+          echo "$CHANGELOG" > changelog.md
+
+          # Also output as step output
+          {
+            echo 'changelog<<EOF'
+            echo "$CHANGELOG"
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Questro CLI v${{ steps.version.outputs.version }}
+          body: |
+            ## Questro CLI v${{ steps.version.outputs.version }}
+
+            ### AWS-Style Authentication ✅
+            - Professional CLI experience matching AWS standards
+            - Multiple authentication methods (environment variables, profiles, tokens)
+            - Enhanced error handling with actionable suggestions
+
+            ### Advanced Features 🔧
+            - Plugin system for extensibility
+            - Profile-based configuration management
+            - Configuration validation and import/export
+            - Hook system for event-driven extensibility
+            - Multiple output formats (JSON, YAML, table)
+
+            ### Installation
+            ```bash
+            npm install -g qestro-cli
+            qestro --version
+            ```
+
+            ### Quick Start
+            ```bash
+            # Authenticate
+            export QESTRO_ACCESS_TOKEN=your_token
+            qestro projects list
+
+            # Or use interactive login
+            qestro auth login --interactive
+            ```
+
+            ### Changes
+            ${{ steps.changelog.outputs.changelog }}
+
+            ### Documentation
+            - [Usage Examples](https://github.com/qestro/qestro-cli/blob/main/USAGE_EXAMPLES.md)
+            - [API Documentation](https://docs.qestro.com/cli)
+            - [Plugin Development](https://docs.qestro.com/cli/plugins)
+
+            ### Support
+            - [GitHub Issues](https://github.com/qestro/qestro-cli/issues)
+            - [Documentation](https://docs.qestro.com)
+            - [Community](https://community.qestro.com)
+          draft: false
+          prerelease: false
+
+  update-homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    needs: [publish-npm, create-github-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${{ github.ref_name }}
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Update Homebrew formula
+        uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: qestro-cli
+          base-branch: main
+          download-url: https://registry.npmjs.org/qestro-cli/-/qestro-cli-${{ steps.version.outputs.version }}.tgz
+          commit-message: |
+            {{formulaName}} {{version}}
+
+            Created by https://github.com/mislav/bump-homebrew-formula-action
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
+
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [publish-npm, create-github-release]
+    if: always() && (needs.publish-npm.result == 'success' || needs.create-github-release.result == 'success')
+    steps:
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${{ github.ref_name }}
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Send Slack notification
+        if: success()
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "text": "🚀 Questro CLI v${{ steps.version.outputs.version }} has been released!",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Questro CLI v${{ steps.version.outputs.version }} Released Successfully* 🎉"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*NPM Package:*\nhttps://www.npmjs.com/package/qestro-cli"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*GitHub Release:*\n${{ github.event.release.html_url }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Install with: `npm install -g qestro-cli`"
+                  }
+                }
+              ]
+            }' \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send Twitter notification
+        if: success()
+        uses: devin-petersohn/twitter-action@v1
+        with:
+          apiKey: ${{ secrets.TWITTER_API_KEY }}
+          apiKeySecret: ${{ secrets.TWITTER_API_KEY_SECRET }}
+          accessToken: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+          accessTokenSecret: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
+          tweet: |
+            🚀 Questro CLI v${{ steps.version.outputs.version }} is now live!
+
+            AWS-style authentication for testing automation
+            ✅ Professional CLI experience
+            ✅ Plugin system
+            ✅ Advanced configuration
+
+            Install: npm install -g qestro-cli
+
+            #TestingAutomation #CLI #DevOps
+
+  post-release:
+    name: Post Release Tasks
+    runs-on: ubuntu-latest
+    needs: [publish-npm, create-github-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${{ github.ref_name }}
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Update documentation
+        run: |
+          echo "Updating documentation for v${{ steps.version.outputs.version }}"
+          # This would typically trigger documentation updates
+          # curl -X POST "${{ secrets.DOCUMENTATION_WEBHOOK }}" -H "Content-Type: application/json" -d "{\"version\": \"${{ steps.version.outputs.version }}\"}"
+
+      - name: Trigger analytics tracking
+        run: |
+          echo "Tracking release analytics for v${{ steps.version.outputs.version }}"
+          # This would trigger analytics collection
+          # curl -X POST "${{ secrets.ANALYTICS_WEBHOOK }}" -H "Content-Type: application/json" -d "{\"event\": \"release\", \"version\": \"${{ steps.version.outputs.version }}\"}"
+
+      - name: Create next development version
+        run: |
+          echo "Preparing for next development cycle"
+          echo "Next version would be incremented based on semver rules"

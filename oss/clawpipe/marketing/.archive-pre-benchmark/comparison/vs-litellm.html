@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawPipe vs LiteLLM — Which LLM Gateway Should You Use?</title>
+  <meta name="description" content="Detailed comparison of ClawPipe and LiteLLM. SDK-local optimization vs proxy-based gateway. Feature-by-feature breakdown with honest analysis.">
+  <meta property="og:title" content="ClawPipe vs LiteLLM — Feature Comparison">
+  <meta property="og:description" content="SDK-local optimization pipeline vs proxy-based gateway. See which approach fits your architecture.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://clawpipe.ai/vs/litellm">
+  <link rel="canonical" href="https://clawpipe.ai/vs/litellm">
+  <meta name="color-scheme" content="dark light">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-primary: #000000; --bg-secondary: #1c1c1e; --bg-tertiary: #2c2c2e;
+      --separator: rgba(84, 84, 88, 0.65); --separator-opaque: #38383a;
+      --label-primary: #ffffff; --label-secondary: rgba(235, 235, 245, 0.6);
+      --label-tertiary: rgba(235, 235, 245, 0.3);
+      --accent: #8b5cf6; --accent-hover: #7c3aed; --green: #30d158; --red: #ff453a;
+      --tint: rgba(139, 92, 246, 0.15);
+      --fill-tertiary: rgba(120, 120, 128, 0.24);
+      --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px;
+      --space-xl: 32px; --space-2xl: 48px; --space-3xl: 64px; --space-4xl: 80px;
+      --font-caption1: 12px; --font-footnote: 13px; --font-subhead: 15px;
+      --font-body: 17px; --font-title3: 20px; --font-title2: 22px;
+      --font-title1: 28px; --font-large-title: 34px;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-primary: #f2f2f7; --bg-secondary: #ffffff; --bg-tertiary: #f2f2f7;
+        --separator: rgba(60, 60, 67, 0.29); --separator-opaque: #c6c6c8;
+        --label-primary: #000000; --label-secondary: rgba(60, 60, 67, 0.6);
+        --label-tertiary: rgba(60, 60, 67, 0.3);
+        --accent: #7c3aed; --accent-hover: #6d28d9; --green: #34c759; --red: #ff3b30;
+        --tint: rgba(124, 58, 237, 0.1);
+        --fill-tertiary: rgba(120, 120, 128, 0.12);
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+      background: var(--bg-primary); color: var(--label-primary);
+      line-height: 1.47; -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .container { max-width: 900px; margin: 0 auto; padding: 0 var(--space-lg); }
+    header {
+      padding: var(--space-md) 0; border-bottom: 0.5px solid var(--separator);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { font-size: var(--font-title3); font-weight: 700; color: var(--accent); }
+    nav a { margin-left: var(--space-xl); color: var(--label-secondary); font-size: var(--font-subhead); font-weight: 500; }
+    nav a:hover { color: var(--label-primary); text-decoration: none; }
+    .hero { text-align: center; padding: var(--space-4xl) 0 var(--space-2xl); }
+    .hero h1 { font-size: clamp(var(--font-title1), 4vw, 44px); font-weight: 700; letter-spacing: -0.5px; line-height: 1.15; margin-bottom: var(--space-md); }
+    .hero h1 span { background: linear-gradient(135deg, var(--accent), #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: var(--font-body); color: var(--label-secondary); max-width: 600px; margin: 0 auto; }
+    .section { padding: var(--space-2xl) 0; }
+    .section h2 { font-size: var(--font-title2); font-weight: 700; letter-spacing: -0.3px; margin-bottom: var(--space-lg); }
+    .section p, .section li { font-size: var(--font-subhead); color: var(--label-secondary); line-height: 1.6; }
+    .section p { margin-bottom: var(--space-md); }
+    .section ul { padding-left: var(--space-lg); margin-bottom: var(--space-md); }
+    .section li { margin-bottom: var(--space-sm); }
+    .table-wrap {
+      background: var(--bg-secondary); border-radius: var(--radius-lg);
+      border: 0.5px solid var(--separator); overflow-x: auto; margin: var(--space-lg) 0;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: var(--font-footnote); }
+    th, td { padding: var(--space-md); text-align: left; border-bottom: 0.5px solid var(--separator); }
+    th { color: var(--label-secondary); font-weight: 600; font-size: var(--font-caption1); text-transform: uppercase; letter-spacing: 0.04em; }
+    td:first-child { font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
+    .yes { color: var(--green); font-weight: 600; }
+    .no { color: var(--red); opacity: 0.7; }
+    .partial { color: #ff9f0a; font-weight: 500; }
+    .verdict {
+      background: var(--tint); border: 0.5px solid var(--accent);
+      border-radius: var(--radius-lg); padding: var(--space-xl);
+      margin: var(--space-xl) 0; text-align: center;
+    }
+    .verdict h3 { font-size: var(--font-title3); margin-bottom: var(--space-sm); color: var(--accent); }
+    .verdict p { font-size: var(--font-subhead); color: var(--label-secondary); max-width: 600px; margin: 0 auto; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: var(--space-md) var(--space-lg); min-height: 44px;
+      border-radius: var(--radius-md); font-weight: 600;
+      font-size: var(--font-subhead); cursor: pointer; border: none;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); text-decoration: none; }
+    .cta { text-align: center; padding: var(--space-3xl) 0; }
+    footer { padding: var(--space-xl) 0; text-align: center; color: var(--label-tertiary); font-size: var(--font-caption1); border-top: 0.5px solid var(--separator); }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; } }
+    @media (max-width: 768px) { .hero h1 { font-size: var(--font-title1); } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="https://clawpipe.ai" class="logo">ClawPipe</a>
+    <nav>
+      <a href="https://clawpipe.ai/#features">Features</a>
+      <a href="https://clawpipe.ai/#pricing">Pricing</a>
+      <a href="https://docs.clawpipe.ai">Docs</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>ClawPipe vs <span>LiteLLM</span></h1>
+      <p>Two different approaches to the same problem: managing multiple LLM providers. Here is an honest comparison to help you choose.</p>
+    </section>
+
+    <section class="section">
+      <h2>Architecture: SDK-Local vs Proxy</h2>
+      <p>The fundamental difference is where the optimization happens.</p>
+      <p><strong>ClawPipe</strong> runs as an SDK inside your application process. There are no extra network hops, no proxy servers to deploy, and no additional infrastructure to manage. The pipeline runs locally -- boosting, packing, caching, and routing all happen before any request leaves your machine.</p>
+      <p><strong>LiteLLM</strong> operates as a proxy server that sits between your app and LLM providers. It provides a unified OpenAI-compatible API and routes requests to the correct provider. This is a proven, battle-tested architecture that many teams rely on in production.</p>
+    </section>
+
+    <section class="section">
+      <h2>Feature Comparison</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Feature</th><th>ClawPipe</th><th>LiteLLM</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Multi-provider routing</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>OpenAI-compatible API</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>100+ model support</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Agent Booster (skip LLM)</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Context Packing</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Semantic Caching</td><td class="yes">Hash + embedding</td><td class="partial">Hash only (Redis)</td></tr>
+            <tr><td>Self-learning routing</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Swarm orchestration</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>RAG pipeline</td><td class="yes">Built-in</td><td class="no">No</td></tr>
+            <tr><td>Offline / local LLMs</td><td class="yes">Yes</td><td class="partial">Via proxy config</td></tr>
+            <tr><td>Voice I/O</td><td class="yes">Yes</td><td class="no">No</td></tr>
+            <tr><td>Pipeline tracing</td><td class="yes">Perfetto format</td><td class="partial">OpenTelemetry</td></tr>
+            <tr><td>Deployment model</td><td>SDK (no infra)</td><td>Proxy server</td></tr>
+            <tr><td>Added latency</td><td class="yes">Near zero</td><td class="partial">Network hop</td></tr>
+            <tr><td>Budget controls</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Load balancing</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+            <tr><td>Fallback / retry</td><td class="yes">Circuit breaker</td><td class="yes">Yes</td></tr>
+            <tr><td>Admin UI</td><td class="yes">Dashboard</td><td class="yes">Admin panel</td></tr>
+            <tr><td>Open source</td><td class="partial">SDK open, gateway hosted</td><td class="yes">Fully open source</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Where LiteLLM Shines</h2>
+      <ul>
+        <li><strong>Fully open source.</strong> You can self-host the entire stack with no vendor lock-in. ClawPipe's gateway is a hosted service.</li>
+        <li><strong>Mature ecosystem.</strong> LiteLLM has been in production longer and has a large community with extensive documentation.</li>
+        <li><strong>Drop-in proxy.</strong> If your team already uses the OpenAI SDK, LiteLLM's proxy works with zero code changes.</li>
+        <li><strong>Enterprise features.</strong> Virtual keys, team management, and spend tracking are well-developed.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>Where ClawPipe Shines</h2>
+      <ul>
+        <li><strong>Cost optimization pipeline.</strong> ClawPipe does not just route -- it actively reduces costs through boosting, packing, caching, and smart routing. LiteLLM routes but does not optimize the request itself.</li>
+        <li><strong>No infrastructure.</strong> ClawPipe is an SDK. Install it, import it, done. No proxy server to deploy, scale, or monitor.</li>
+        <li><strong>Lower latency.</strong> No extra network hop means requests are processed faster, especially for cached and boosted results.</li>
+        <li><strong>Self-learning.</strong> The router improves over time by tracking cost, quality, and latency outcomes per task type.</li>
+      </ul>
+    </section>
+
+    <section class="section">
+      <h2>When to Use Which</h2>
+      <p><strong>Choose LiteLLM if:</strong> You want a fully open-source, self-hosted proxy with battle-tested production reliability. Your team prefers a centralized gateway that multiple services call into. You need virtual key management for a large organization.</p>
+      <p><strong>Choose ClawPipe if:</strong> You want to actively reduce LLM costs, not just manage providers. You prefer an SDK approach with no extra infrastructure. You want self-learning routing that gets smarter over time. You need built-in RAG, swarm orchestration, or voice processing.</p>
+    </section>
+
+    <div class="verdict">
+      <h3>Different Tools, Different Approaches</h3>
+      <p>LiteLLM is a proven proxy gateway. ClawPipe is an optimization pipeline. If you only need unified provider access, either works well. If you want to actively cut costs 30-50%, ClawPipe's multi-stage pipeline delivers savings that routing alone cannot match.</p>
+    </div>
+
+    <div class="cta">
+      <p style="color: var(--label-secondary); margin-bottom: var(--space-md);">Try ClawPipe free. 1,000 calls/day, all pipeline stages.</p>
+      <a href="https://app.clawpipe.ai/signup" class="btn btn-primary">Start Free</a>
+    </div>
+  </main>
+
+  <footer><p>ClawPipe &copy; 2026. Built on Cloudflare.</p></footer>
+</div>
+</body>
+</html>

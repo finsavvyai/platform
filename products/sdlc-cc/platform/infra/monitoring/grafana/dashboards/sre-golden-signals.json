@@ -1,0 +1,449 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "sre-golden-signals",
+    "title": "SRE Golden Signals",
+    "description": "Latency, Traffic, Errors, Saturation — the four golden signals for SRE",
+    "tags": ["sdlc", "sre", "golden-signals", "production"],
+    "timezone": "browser",
+    "editable": true,
+    "refresh": "30s",
+    "time": { "from": "now-1h", "to": "now" },
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(http_requests_total, service)",
+          "current": { "text": "All", "value": "$__all" },
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "namespace",
+          "type": "query",
+          "query": "label_values(http_requests_total, namespace)",
+          "current": { "text": "sdlc-platform", "value": "sdlc-platform" }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Prometheus",
+          "expr": "changes(kube_deployment_status_observed_generation{namespace=\"$namespace\"}[5m]) > 0",
+          "tagKeys": "deployment",
+          "titleFormat": "Deploy: {{deployment}}"
+        },
+        {
+          "name": "Alerts",
+          "datasource": "Prometheus",
+          "expr": "ALERTS{namespace=\"$namespace\", alertstate=\"firing\"}",
+          "tagKeys": "alertname",
+          "titleFormat": "Alert: {{alertname}}"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 100,
+        "title": "SLO Status",
+        "type": "row",
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+        "collapsed": false
+      },
+      {
+        "id": 1,
+        "title": "Availability (SLO: 99.9%)",
+        "type": "gauge",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "1 - (sum(rate(http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[30m])) / sum(rate(http_requests_total{namespace=\"$namespace\"}[30m])))",
+            "legendFormat": "Availability"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0.99,
+            "max": 1,
+            "decimals": 4,
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "red", "value": null },
+                { "color": "orange", "value": 0.999 },
+                { "color": "green", "value": 0.9995 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 }
+      },
+      {
+        "id": 2,
+        "title": "Error Budget Remaining",
+        "type": "gauge",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "1 - ((sum(rate(http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[30d])) / sum(rate(http_requests_total{namespace=\"$namespace\"}[30d]))) / 0.001)",
+            "legendFormat": "Error Budget"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 1,
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "red", "value": null },
+                { "color": "orange", "value": 0.25 },
+                { "color": "green", "value": 0.5 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 }
+      },
+      {
+        "id": 3,
+        "title": "P50 / P95 / P99 Latency",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{namespace=\"$namespace\"}[5m])) by (le))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"$namespace\"}[5m])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{namespace=\"$namespace\"}[5m])) by (le))",
+            "legendFormat": "P99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.5 },
+                { "color": "red", "value": 1.0 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 }
+      },
+      {
+        "id": 4,
+        "title": "Request Rate",
+        "type": "stat",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{namespace=\"$namespace\"}[5m]))",
+            "legendFormat": "req/s"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 500 },
+                { "color": "red", "value": 1000 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 }
+      },
+      {
+        "id": 200,
+        "title": "Latency",
+        "type": "row",
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+        "collapsed": false
+      },
+      {
+        "id": 5,
+        "title": "Request Latency by Service",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{namespace=\"$namespace\", service=~\"$service\"}[5m])) by (le, service))",
+            "legendFormat": "{{service}} P95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{namespace=\"$namespace\", service=~\"$service\"}[5m])) by (le, service))",
+            "legendFormat": "{{service}} P50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10,
+              "showPoints": "never"
+            }
+          }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+      },
+      {
+        "id": 6,
+        "title": "Latency Heatmap",
+        "type": "heatmap",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(increase(http_request_duration_seconds_bucket{namespace=\"$namespace\"}[1m])) by (le)",
+            "legendFormat": "{{le}}",
+            "format": "heatmap"
+          }
+        ],
+        "options": {
+          "calculate": false,
+          "color": { "scheme": "Oranges" },
+          "yAxis": { "unit": "s" }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+      },
+      {
+        "id": 300,
+        "title": "Traffic",
+        "type": "row",
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+        "collapsed": false
+      },
+      {
+        "id": 7,
+        "title": "Request Rate by Service",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{namespace=\"$namespace\", service=~\"$service\"}[5m])) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": { "lineWidth": 2, "fillOpacity": 20, "stacking": { "mode": "normal" } }
+          }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 }
+      },
+      {
+        "id": 8,
+        "title": "Request Rate by Status Code",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{namespace=\"$namespace\", status=~\"2..\"}[5m]))",
+            "legendFormat": "2xx"
+          },
+          {
+            "expr": "sum(rate(http_requests_total{namespace=\"$namespace\", status=~\"4..\"}[5m]))",
+            "legendFormat": "4xx"
+          },
+          {
+            "expr": "sum(rate(http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[5m]))",
+            "legendFormat": "5xx"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": { "lineWidth": 2, "fillOpacity": 20 }
+          },
+          "overrides": [
+            { "matcher": { "id": "byName", "options": "2xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+            { "matcher": { "id": "byName", "options": "4xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+            { "matcher": { "id": "byName", "options": "5xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+          ]
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 }
+      },
+      {
+        "id": 400,
+        "title": "Errors",
+        "type": "row",
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+        "collapsed": false
+      },
+      {
+        "id": 9,
+        "title": "Error Rate by Service",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{namespace=\"$namespace\", service=~\"$service\", status=~\"5..\"}[5m])) by (service) / sum(rate(http_requests_total{namespace=\"$namespace\", service=~\"$service\"}[5m])) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "custom": { "lineWidth": 2, "fillOpacity": 10 },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.005 },
+                { "color": "red", "value": 0.01 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 }
+      },
+      {
+        "id": 10,
+        "title": "Top Error Endpoints",
+        "type": "table",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "topk(10, sum(rate(http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[15m])) by (method, handler))",
+            "legendFormat": "{{method}} {{handler}}",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "reqps" }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 26 }
+      },
+      {
+        "id": 500,
+        "title": "Saturation",
+        "type": "row",
+        "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+        "collapsed": false
+      },
+      {
+        "id": 11,
+        "title": "CPU Usage by Service",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"POD\", container!=\"\"}[5m])) by (container) / sum(kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"cpu\"}) by (container)",
+            "legendFormat": "{{container}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "max": 1,
+            "custom": { "lineWidth": 2, "fillOpacity": 15 },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.7 },
+                { "color": "red", "value": 0.9 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 }
+      },
+      {
+        "id": 12,
+        "title": "Memory Usage by Service",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"POD\", container!=\"\"}) by (container) / sum(kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"}) by (container)",
+            "legendFormat": "{{container}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "max": 1,
+            "custom": { "lineWidth": 2, "fillOpacity": 15 },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "yellow", "value": 0.7 },
+                { "color": "red", "value": 0.9 }
+              ]
+            }
+          }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 }
+      },
+      {
+        "id": 13,
+        "title": "Pod Replicas vs Desired",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "kube_deployment_status_replicas{namespace=\"$namespace\"}",
+            "legendFormat": "{{deployment}} current"
+          },
+          {
+            "expr": "kube_deployment_spec_replicas{namespace=\"$namespace\"}",
+            "legendFormat": "{{deployment}} desired"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": { "lineWidth": 2, "fillOpacity": 0 }
+          }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 43 }
+      },
+      {
+        "id": 14,
+        "title": "Network I/O",
+        "type": "timeseries",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "sum(rate(container_network_receive_bytes_total{namespace=\"$namespace\"}[5m])) by (pod)",
+            "legendFormat": "{{pod}} rx"
+          },
+          {
+            "expr": "-sum(rate(container_network_transmit_bytes_total{namespace=\"$namespace\"}[5m])) by (pod)",
+            "legendFormat": "{{pod}} tx"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "Bps",
+            "custom": { "lineWidth": 1, "fillOpacity": 10 }
+          }
+        },
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 43 }
+      }
+    ]
+  },
+  "overwrite": true
+}

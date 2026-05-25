@@ -1,0 +1,67 @@
+on:
+  - push
+  - pull_request
+
+stages:
+  - name: install
+    checks:
+      - name: npm-install
+        run: pnpm install --frozen-lockfile
+
+  - name: build
+    checks:
+      - name: build
+        run: pnpm run build
+    depends_on:
+      - install
+
+  - name: test
+    checks:
+      - name: test
+        run: pnpm test
+    depends_on:
+      - install
+    parallel: true
+
+  - name: lint
+    checks:
+      - name: lint
+        run: pnpm run lint
+    depends_on:
+      - install
+    parallel: true
+
+  - name: typecheck
+    checks:
+      - name: api-typecheck
+        run: npx tsc --noEmit -p apps/api/tsconfig.json
+      - name: line-limit
+        run: bash scripts/check-max-lines.sh
+    depends_on:
+      - install
+    parallel: true
+
+# Deploys are orchestrated by scripts/deploy-all.sh which auto-detects
+# changed paths and deploys only what needs to ship. PushCI's agent
+# daemon is not running locally, so these stages would otherwise be
+# skipped indefinitely. Run manually after push:
+#
+#   pnpm run deploy            # auto-detect + deploy changed surfaces
+#   pnpm run deploy:landing    # force landing only
+#   pnpm run deploy:api        # force API only
+#   pnpm run deploy:web        # force web only
+#   pnpm run deploy:all        # force everything
+#
+# Requires CLOUDFLARE_API_TOKEN with Pages:Edit + Workers:Edit scopes.
+deploy:
+  - name: all
+    trigger: merge to main
+    depends_on:
+      - test
+      - typecheck
+    run: pnpm run deploy
+    verify:
+      url: https://api.tenantiq.app/health
+      expect: "status.*healthy"
+      retries: 12
+      interval: 5s

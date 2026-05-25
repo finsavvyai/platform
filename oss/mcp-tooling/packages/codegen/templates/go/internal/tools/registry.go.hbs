@@ -1,0 +1,48 @@
+package tools
+
+import (
+	"sync"
+
+	"go.uber.org/zap"
+)
+
+type Registry struct {
+	mu    sync.RWMutex
+	tools map[string]Tool
+	logger *zap.Logger
+}
+
+func NewRegistry(logger *zap.Logger) *Registry {
+	return &Registry{
+		tools: make(map[string]Tool),
+		logger: logger,
+	}
+}
+
+func (r *Registry) Register(tool Tool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	name := tool.Name()
+	r.tools[name] = tool
+	r.logger.Info("Registered tool", zap.String("name", name))
+}
+
+func (r *Registry) GetTool(name string) Tool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return r.tools[name]
+}
+
+func (r *Registry) ListTools() []Tool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	tools := make([]Tool, 0, len(r.tools))
+	for _, tool := range r.tools {
+		tools = append(tools, tool)
+	}
+
+	return tools
+}

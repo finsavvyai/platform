@@ -1,0 +1,99 @@
+name = "opensyber-api"
+main = "src/index.ts"
+compatibility_date = "2025-02-18"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+workers_dev = false
+
+routes = [
+  { pattern = "api.opensyber.cloud/*", zone_name = "opensyber.cloud" },
+]
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "opensyber-db"
+database_id = "fb34a1a9-e91b-44f8-94f9-40a2ce6c7bcf"
+migrations_dir = "../../packages/db/migrations"
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "CREDENTIAL_VAULT"
+id = "dd99d826564342babdb2a3008b720f0f"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "59007c716b5d4ee481f2d5d061dbed01"
+
+[[kv_namespaces]]
+binding = "TF_NONCES"
+id = "251a5e1b1af3443caae9af765f156916"
+
+# Durable Objects (Agent instances)
+[durable_objects]
+bindings = [
+  { name = "AGENT_DO", class_name = "AgentInstance" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["AgentInstance"]
+
+# Vectorize (semantic search for skills + security findings)
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "opensyber-skills"
+
+# AI (embedding generation + NL query)
+[ai]
+binding = "AI"
+
+# R2 Bucket (for backups, skill packages, audit logs)
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "opensyber-storage"
+
+# Environment variables (set via wrangler secret)
+# AUTH_SECRET (Auth.js HMAC-SHA256 JWT secret)
+# LemonSqueezy (shared store — OPENSYBER_ prefixed product/variants)
+# LEMONSQUEEZY_API_KEY
+# LEMONSQUEEZY_WEBHOOK_SECRET
+# LEMONSQUEEZY_STORE_ID
+# OPENSYBER_LS_PRODUCT_ID
+# OPENSYBER_LS_VARIANT_PERSONAL
+# OPENSYBER_LS_VARIANT_PRO
+# OPENSYBER_LS_VARIANT_TEAM
+# CLOUDFLARE_ACCOUNT_ID
+# CLOUDFLARE_API_TOKEN
+# ENCRYPTION_KEY
+
+# Cron triggers (security score snapshots every hour)
+[triggers]
+crons = ["0 * * * *"]
+
+[vars]
+ENVIRONMENT = "production"
+
+# ─── Multi-region deployment (Sprint 28) ─────────────────────────────────────
+# Cloudflare Workers run on all 300+ edge locations by default.
+# These environment overrides enable region-specific D1/KV for data residency.
+
+# Regional deployments — uncomment and set real D1 database IDs when ready
+# [env.eu-west]
+# name = "opensyber-api-eu"
+# routes = [{ pattern = "eu.api.opensyber.cloud", zone_name = "opensyber.cloud" }]
+# vars = { ENVIRONMENT = "production", REGION = "eu-west" }
+# [[env.eu-west.d1_databases]]
+# binding = "DB"
+# database_name = "opensyber-db-eu"
+# database_id = "YOUR_EU_DB_ID_HERE"
+# migrations_dir = "../../packages/db/migrations"
+
+# [env.us-east]
+# name = "opensyber-api-us"
+# routes = [{ pattern = "us.api.opensyber.cloud", zone_name = "opensyber.cloud" }]
+# vars = { ENVIRONMENT = "production", REGION = "us-east" }
+# [[env.us-east.d1_databases]]
+# binding = "DB"
+# database_name = "opensyber-db-us"
+# database_id = "YOUR_US_DB_ID_HERE"
+# migrations_dir = "../../packages/db/migrations"

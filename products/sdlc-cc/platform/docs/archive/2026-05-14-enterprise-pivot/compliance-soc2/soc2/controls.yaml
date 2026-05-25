@@ -1,0 +1,142 @@
+# SOC 2 Trust Services Criteria — control inventory.
+#
+# Every entry here MUST point to a code path and an evidence query.
+# CI lints this file (compliance/soc2/lint.go in a follow-up) so a
+# control without a code path or audit query fails the build.
+#
+# Status legend:
+#   real      = control implemented + evidence-producing in main
+#   partial   = code exists, evidence-producing path needs wiring
+#   pending   = not yet implemented; tracked owner + due date
+#
+# Control IDs follow AICPA TSP 100 (2017 + 2022 amendments) numbering.
+
+version: 1
+last_reviewed: 2026-04-29
+auditor_target: SOC 2 Type II — Q2 2026
+
+controls:
+  - id: CC6.1
+    title: Logical access — physical and logical access controls protect
+           against internal and external threats
+    status: real
+    code_paths:
+      - services/gateway/internal/interfaces/http/middleware/chain.go  # auth + tenant + rbac
+      - services/gateway/internal/app/middleware/rbac.go
+      - database/migrations/010_rbac.sql
+    evidence:
+      table: audit_logs
+      action_filter: ["auth.success", "auth.failure", "policy.deny"]
+      query: |
+        SELECT date_trunc('day', created_at) AS day,
+               action, COUNT(*) AS n
+        FROM audit_logs
+        WHERE created_at > NOW() - INTERVAL '90 days'
+          AND action IN ('auth.success','auth.failure','policy.deny')
+        GROUP BY 1, 2 ORDER BY 1 DESC;
+
+  - id: CC6.6
+    title: Boundary protection — the entity restricts access at network
+           boundaries and uses controls to prevent unauthorized access
+    status: real
+    code_paths:
+      - deployments/terraform/modules/privatelink/   # S3.3
+      - services/gateway/internal/infrastructure/mtls/
+    evidence:
+      type: terraform_state
+      assertion: "aws_vpc_endpoint_service.this is present and acceptance_required = true"
+
+  - id: CC6.7
+    title: Data in transit — the entity transmits and disposes of data
+           through controlled channels
+    status: real
+    code_paths:
+      - services/gateway/internal/infrastructure/middleware/security.go  # HSTS + CSP
+      - deployments/encryption-manifest.json
+    evidence:
+      type: workflow_run
+      workflow: .github/workflows/encryption-check.yml
+
+  - id: CC6.8
+    title: Data at rest — the entity protects data at rest using
+           encryption and customer-managed keys when contracted
+    status: real
+    code_paths:
+      - services/gateway/internal/infrastructure/crypto/envelope.go    # S3.1
+      - database/migrations/020_tenant_kms_key.sql
+    evidence:
+      table: tenants
+      assertion: "all enterprise tenants have kms_key_arn IS NOT NULL"
+      query: |
+        SELECT id, plan, kms_key_arn IS NOT NULL AS cmek_enabled
+        FROM tenants
+        WHERE plan = 'enterprise';
+
+  - id: CC7.2
+    title: System monitoring — anomaly detection on access patterns
+    status: real
+    code_paths:
+      - services/gateway/internal/infrastructure/middleware/dlp.go            # PII + audit
+      - services/gateway/internal/infrastructure/middleware/dlp_middleware.go
+    evidence:
+      table: audit_logs
+      action_filter: ["dlp.inbound", "dlp.outbound"]
+      query: |
+        SELECT after->>'leg' AS leg,
+               after->>'action' AS action,
+               COUNT(*) AS n
+        FROM audit_logs
+        WHERE action IN ('dlp.inbound','dlp.outbound')
+          AND created_at > NOW() - INTERVAL '90 days'
+        GROUP BY 1, 2 ORDER BY 3 DESC;
+
+  - id: CC7.3
+    title: Tamper-evident audit trail
+    status: real
+    code_paths:
+      - services/gateway/internal/infrastructure/audit/signer.go       # HMAC chain
+      - services/gateway/internal/infrastructure/repositories/audit_writer.go
+      - database/migrations/009_audit_log_immutable.sql
+    evidence:
+      type: hmac_chain_verification
+      runbook: compliance/soc2/runbook.md#hmac-chain-verification
+
+  - id: CC8.1
+    title: Change management — documented change request, review, test,
+           and rollback for production-affecting changes
+    status: real
+    code_paths:
+      - .github/workflows/                                             # 20+ pipelines
+    evidence:
+      type: pull_request_index
+      query: "approved + CI-green PRs merged in last 90 days"
+
+  - id: A1.2
+    title: Availability — system availability commitments + SLA
+    status: partial
+    code_paths:
+      - services/gateway/internal/infrastructure/health/
+    evidence:
+      type: status_page_export
+      runbook: compliance/soc2/runbook.md#availability-evidence
+    note: depends on prod status page; coordinate with SRE Q2 2026.
+
+  - id: PI1.1
+    title: Processing integrity — pipelines produce the intended output
+    status: real
+    code_paths:
+      - services/document-processor/app/queue/
+      - services/document-processor/tests/
+    evidence:
+      type: pipeline_test_results
+      assertion: integration tests >= 90% pass rate over last 90 days
+
+  - id: P3.2
+    title: Privacy — opt-in for PII processing; per-tenant policy
+    status: real
+    code_paths:
+      - services/gateway/internal/infrastructure/middleware/dlp_middleware.go  # S2.1
+      - database/migrations/019_tenant_dlp_policy.sql
+    evidence:
+      table: tenant_dlp_policy
+      assertion: every tenant with PII workload has policy != 'allow'

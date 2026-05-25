@@ -1,0 +1,10 @@
+/Users/shaharsolomon/dev/projects/github/upm.plus/desktop-app/src-tauri/target/debug/deps/libhumantime-b47cfd4ef151aaa3.rmeta: /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/lib.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/date.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/duration.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/wrapper.rs
+
+/Users/shaharsolomon/dev/projects/github/upm.plus/desktop-app/src-tauri/target/debug/deps/libhumantime-b47cfd4ef151aaa3.rlib: /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/lib.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/date.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/duration.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/wrapper.rs
+
+/Users/shaharsolomon/dev/projects/github/upm.plus/desktop-app/src-tauri/target/debug/deps/humantime-b47cfd4ef151aaa3.d: /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/lib.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/date.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/duration.rs /Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/wrapper.rs
+
+/Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/lib.rs:
+/Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/date.rs:
+/Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/duration.rs:
+/Users/shaharsolomon/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/humantime-2.3.0/src/wrapper.rs:

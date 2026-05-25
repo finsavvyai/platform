@@ -1,0 +1,84 @@
+# OpenSyber Web - Production Dockerfile
+# Multi-stage build for Next.js 16 application
+
+# Stage 1: Dependencies
+FROM node:22-alpine AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+COPY packages/db/package.json ./packages/db/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/ui/package.json ./packages/ui/
+COPY apps/web/package.json ./apps/web/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Stage 2: Builder
+FROM node:22-alpine AS builder
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
+
+# Copy dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Build packages and app
+RUN pnpm build --filter=@opensyber/db...
+RUN pnpm build --filter=@opensyber/shared...
+RUN pnpm build --filter=@opensyber/ui...
+RUN pnpm build --filter=@opensyber/web
+
+# Stage 3: Production Runner
+FROM node:22-alpine AS runner
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 opensyber
+
+# Set environment
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Copy necessary files
+COPY --from=builder /app/apps/web/package.json ./apps/web/
+COPY --from=builder /app/apps/web/.next/standalone ./apps/web/.next/standalone
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
+
+# Install production dependencies only
+COPY package.json pnpm-lock.yaml ./
+COPY packages/db/package.json ./packages/db/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/ui/package.json ./packages/ui/
+COPY apps/web/package.json ./apps/web/
+
+RUN pnpm install --frozen-lockfile --prod
+
+# Set permissions
+RUN chown -R opensyber:nodejs /app
+USER opensyber
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Run the application
+WORKDIR /app/apps/web
+CMD ["node", "apps/web/.next/standalone/apps/web/server.js"]

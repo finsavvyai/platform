@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: lunaos-api
+    env: python
+    buildCommand: "pip3 install -r requirements.txt"
+    startCommand: "./start.sh"
+    healthCheckPath: "/health"
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lunaos-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: lunaos-redis
+          property: connectionString
+
+databases:
+  - name: lunaos-db
+    databaseName: lunaos
+    user: lunaos
+    plan: free
+
+  - name: lunaos-redis
+    plan: free

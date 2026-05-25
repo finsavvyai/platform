@@ -1,0 +1,160 @@
+name: Publish SDKs
+
+on:
+  push:
+    tags:
+      - "sdk-ts/v*"
+      - "sdk-py/v*"
+      - "sdk-go/v*"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Which SDK to publish"
+        required: true
+        type: choice
+        options: [ts, py, go, all]
+      version:
+        description: "Semver version (e.g. 1.2.3). Required for manual runs."
+        required: false
+        type: string
+
+# Least-privilege default. Individual jobs elevate only what they need:
+#   publish-go needs `contents: write` to push the pkg.go.dev tag on a
+#   workflow_dispatch run; publish-ts/py only need id-token for OIDC.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  resolve:
+    name: Resolve publish targets
+    runs-on: ubuntu-latest
+    outputs:
+      ts: ${{ steps.set.outputs.ts }}
+      py: ${{ steps.set.outputs.py }}
+      go: ${{ steps.set.outputs.go }}
+      version: ${{ steps.set.outputs.version }}
+    steps:
+      - id: set
+        name: Decide which SDKs to publish
+        run: |
+          ts=false; py=false; go=false; version=""
+          ref="${GITHUB_REF#refs/tags/}"
+          case "$ref" in
+            sdk-ts/v*) ts=true; version="${ref#sdk-ts/v}" ;;
+            sdk-py/v*) py=true; version="${ref#sdk-py/v}" ;;
+            sdk-go/v*) go=true; version="${ref#sdk-go/v}" ;;
+          esac
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            version="${{ inputs.version }}"
+            case "${{ inputs.target }}" in
+              ts)  ts=true ;;
+              py)  py=true ;;
+              go)  go=true ;;
+              all) ts=true; py=true; go=true ;;
+            esac
+          fi
+          echo "ts=$ts"         >> "$GITHUB_OUTPUT"
+          echo "py=$py"         >> "$GITHUB_OUTPUT"
+          echo "go=$go"         >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  publish-ts:
+    needs: resolve
+    if: needs.resolve.outputs.ts == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - name: Install deps
+        working-directory: packages/sdk-ts
+        run: npm ci
+      - name: Run tests
+        working-directory: packages/sdk-ts
+        run: npm test --if-present
+      - name: Build
+        working-directory: packages/sdk-ts
+        run: npm run build --if-present
+      - name: Set version
+        if: needs.resolve.outputs.version != ''
+        working-directory: packages/sdk-ts
+        run: npm version "${{ needs.resolve.outputs.version }}" --no-git-tag-version --allow-same-version
+      - name: Publish to npm
+        working-directory: packages/sdk-ts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
+
+  publish-py:
+    needs: resolve
+    if: needs.resolve.outputs.py == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: python -m pip install --upgrade build twine
+      - name: Set version
+        if: needs.resolve.outputs.version != ''
+        working-directory: packages/sdk-py
+        run: |
+          python - <<'PY'
+          import pathlib, re
+          p = pathlib.Path("pyproject.toml")
+          t = p.read_text()
+          t = re.sub(r'(?m)^version = ".*"$', 'version = "${{ needs.resolve.outputs.version }}"', t, count=1)
+          p.write_text(t)
+          PY
+      - name: Build
+        working-directory: packages/sdk-py
+        run: python -m build
+      - name: Publish to PyPI (trusted publisher)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/sdk-py/dist
+
+  publish-go:
+    needs: resolve
+    if: needs.resolve.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only this job needs write access — to push the versioned tag that
+    # pkg.go.dev discovers. Keep the workflow default at `contents: read`.
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Vet + test
+        working-directory: packages/sdk-go
+        run: |
+          go vet ./...
+          go test ./... -count=1
+      - name: Publish tag for pkg.go.dev
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ver="${{ needs.resolve.outputs.version }}"
+          if [ -z "$ver" ]; then
+            echo "::error::No version resolved"; exit 1
+          fi
+          # If triggered by tag push, nothing more to do; proxy.golang.org pulls it.
+          # Manual run: create the tag here.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            git tag "packages/sdk-go/v${ver}"
+            git push origin "packages/sdk-go/v${ver}"
+          fi
+          echo "pkg.go.dev index: https://pkg.go.dev/github.com/${GITHUB_REPOSITORY}/packages/sdk-go@v${ver}"

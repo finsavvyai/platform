@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LunaOS Status</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#e4e4eb;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh;padding:2rem 1rem}
+.container{max-width:640px;margin:0 auto}
+header{text-align:center;margin-bottom:2.5rem}
+header h1{font-size:1.5rem;font-weight:600;letter-spacing:-.02em;margin-bottom:.5rem}
+header p{font-size:.8rem;color:#8888a0}
+.banner{padding:.75rem 1.25rem;border-radius:12px;text-align:center;font-size:.9rem;font-weight:500;margin-bottom:2rem}
+.banner.ok{background:rgba(74,222,128,.1);color:#4ade80;border:1px solid rgba(74,222,128,.15)}
+.banner.warn{background:rgba(250,204,21,.1);color:#facc15;border:1px solid rgba(250,204,21,.15)}
+.banner.down{background:rgba(248,113,113,.1);color:#f87171;border:1px solid rgba(248,113,113,.15)}
+.card{background:#12121a;border:1px solid #1e1e2e;border-radius:12px;padding:1rem 1.25rem;margin-bottom:.75rem;display:flex;align-items:center;gap:1rem}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.dot.up{background:#4ade80;box-shadow:0 0 8px rgba(74,222,128,.4)}
+.dot.degraded{background:#facc15;box-shadow:0 0 8px rgba(250,204,21,.4)}
+.dot.down{background:#f87171;box-shadow:0 0 8px rgba(248,113,113,.4)}
+.dot.pending{background:#555}
+.info{flex:1;min-width:0}
+.info .name{font-size:.9rem;font-weight:500}
+.info .meta{font-size:.75rem;color:#6b6b80;margin-top:.15rem}
+.ms{font-size:.8rem;color:#8888a0;font-variant-numeric:tabular-nums;white-space:nowrap}
+footer{text-align:center;margin-top:2rem;font-size:.75rem;color:#4a4a5a}
+footer a{color:#818cf8;text-decoration:none}
+@media(max-width:480px){body{padding:1.5rem .75rem}.card{padding:.85rem 1rem}}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>LunaOS Status</h1>
+    <p>Real-time health of all LunaOS services</p>
+  </header>
+  <div id="banner" class="banner ok">Checking services...</div>
+  <div id="services"></div>
+  <footer>Refreshes every 60s &middot; <a href="https://lunaos.ai">lunaos.ai</a></footer>
+</div>
+<script>
+const SERVICES=[
+  {name:"API Gateway",url:"https://api.lunaos.ai/health"},
+  {name:"Dashboard",url:"https://agents.lunaos.ai"},
+  {name:"Studio IDE",url:"https://studio.lunaos.ai"},
+  {name:"Documentation",url:"https://docs.lunaos.ai"},
+  {name:"Marketing Site",url:"https://lunaos.ai"}
+];
+const container=document.getElementById("services");
+const banner=document.getElementById("banner");
+let results=SERVICES.map(s=>({...s,status:"pending",ms:null,checked:null}));
+
+function render(){
+  container.innerHTML=results.map(r=>{
+    const cls=r.status==="up"?"up":r.status==="degraded"?"degraded":r.status==="down"?"down":"pending";
+    const time=r.checked?r.checked.toLocaleTimeString():"--";
+    const ms=r.ms!==null?r.ms+"ms":"--";
+    return`<div class="card"><div class="dot ${cls}"></div><div class="info"><div class="name">${r.name}</div><div class="meta">Last checked: ${time}</div></div><div class="ms">${ms}</div></div>`;
+  }).join("");
+  const up=results.filter(r=>r.status==="up").length;
+  const down=results.filter(r=>r.status==="down").length;
+  if(up===results.length){banner.className="banner ok";banner.textContent="All Systems Operational";}
+  else if(down===results.length){banner.className="banner down";banner.textContent="Major Outage";}
+  else{banner.className="banner warn";banner.textContent="Some Services Degraded";}
+}
+
+async function checkService(svc,i){
+  const t0=performance.now();
+  try{
+    const r=await fetch(svc.url,{mode:"no-cors",cache:"no-store",signal:AbortSignal.timeout(10000)});
+    const ms=Math.round(performance.now()-t0);
+    results[i]={...svc,status:r.ok||r.type==="opaque"?"up":"degraded",ms,checked:new Date()};
+  }catch{
+    const ms=Math.round(performance.now()-t0);
+    results[i]={...svc,status:"down",ms,checked:new Date()};
+  }
+}
+
+async function checkAll(){
+  await Promise.allSettled(SERVICES.map((s,i)=>checkService(s,i)));
+  render();
+}
+
+render();
+checkAll();
+setInterval(checkAll,60000);
+</script>
+</body>
+</html>

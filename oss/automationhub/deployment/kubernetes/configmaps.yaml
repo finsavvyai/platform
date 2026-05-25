@@ -1,0 +1,343 @@
+# ConfigMaps for UPM.Plus AutomationHub
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: upm-plus-config
+  namespace: upm-plus-staging
+  labels:
+    app: upm-plus
+    component: config
+data:
+  # Application Configuration
+  APP_NAME: "UPM.Plus AutomationHub"
+  APP_VERSION: "1.0.0"
+  ENVIRONMENT: "staging"
+  DEBUG: "true"
+  LOG_LEVEL: "INFO"
+
+  # Database Configuration
+  DB_HOST: "upm-plus-postgres-staging"
+  DB_PORT: "5432"
+  DB_NAME: "upmplus_staging"
+  DB_POOL_SIZE: "10"
+  DB_MAX_OVERFLOW: "20"
+
+  # Redis Configuration
+  REDIS_HOST: "upm-plus-redis-staging"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+
+  # CORS Configuration
+  CORS_ORIGINS: "http://localhost:3000,https://staging.upm.plus"
+  CORS_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
+  CORS_HEADERS: "*"
+
+  # Celery Configuration
+  CELERY_BROKER_URL: "redis://upm-plus-redis-staging:6379/1"
+  CELERY_RESULT_BACKEND: "redis://upm-plus-redis-staging:6379/2"
+  CELERY_WORKER_CONCURRENCY: "4"
+  CELERY_TASK_SOFT_TIME_LIMIT: "300"
+  CELERY_TASK_TIME_LIMIT: "600"
+
+  # Monitoring Configuration
+  ENABLE_METRICS: "true"
+  METRICS_PORT: "9090"
+  HEALTH_CHECK_INTERVAL: "30"
+
+  # File Storage Configuration
+  UPLOAD_DIR: "/app/uploads"
+  MAX_UPLOAD_SIZE: "100MB"
+  ALLOWED_EXTENSIONS: "txt,pdf,png,jpg,jpeg,gif,doc,docx,xls,xlsx"
+
+  # Email Configuration
+  SMTP_HOST: "smtp.gmail.com"
+  SMTP_PORT: "587"
+  SMTP_USE_TLS: "true"
+  EMAIL_FROM: "noreply@upm.plus"
+
+  # AI Configuration
+  OPENAI_MODEL: "gpt-4-turbo-preview"
+  OPENAI_MAX_TOKENS: "4096"
+  OPENAI_TEMPERATURE: "0.7"
+
+  # Vector Database Configuration
+  CHROMA_HOST: "localhost"
+  CHROMA_PORT: "8000"
+  CHROMA_COLLECTION_NAME: "upm_plus_documents"
+  VECTOR_DIMENSION: "1536"
+
+  # Security Configuration
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  JWT_REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  PASSWORD_MIN_LENGTH: "8"
+  SESSION_TIMEOUT: "3600"
+
+  # API Rate Limiting
+  RATE_LIMIT_PER_MINUTE: "100"
+  RATE_LIMIT_BURST: "200"
+
+  # Cache Configuration
+  CACHE_TTL: "3600"
+  CACHE_MAX_SIZE: "1000"
+
+  # Worker Configuration
+  WORKER_TIMEOUT: "300"
+  WORKER_MAX_TASKS_PER_CHILD: "1000"
+  WORKER_PREFETCH_MULTIPLIER: "1"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: upm-plus-config
+  namespace: upm-plus-production
+  labels:
+    app: upm-plus
+    component: config
+data:
+  # Application Configuration
+  APP_NAME: "UPM.Plus AutomationHub"
+  APP_VERSION: "1.0.0"
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  LOG_LEVEL: "WARNING"
+
+  # Database Configuration
+  DB_HOST: "upm-plus-postgres-production"
+  DB_PORT: "5432"
+  DB_NAME: "upmplus_production"
+  DB_POOL_SIZE: "20"
+  DB_MAX_OVERFLOW: "40"
+
+  # Redis Configuration
+  REDIS_HOST: "upm-plus-redis-production"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+
+  # CORS Configuration
+  CORS_ORIGINS: "https://upm.plus,https://www.upm.plus"
+  CORS_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
+  CORS_HEADERS: "Content-Type,Authorization"
+
+  # Celery Configuration
+  CELERY_BROKER_URL: "redis://upm-plus-redis-production:6379/1"
+  CELERY_RESULT_BACKEND: "redis://upm-plus-redis-production:6379/2"
+  CELERY_WORKER_CONCURRENCY: "8"
+  CELERY_TASK_SOFT_TIME_LIMIT: "300"
+  CELERY_TASK_TIME_LIMIT: "600"
+
+  # Monitoring Configuration
+  ENABLE_METRICS: "true"
+  METRICS_PORT: "9090"
+  HEALTH_CHECK_INTERVAL: "15"
+
+  # File Storage Configuration
+  UPLOAD_DIR: "/app/uploads"
+  MAX_UPLOAD_SIZE: "50MB"
+  ALLOWED_EXTENSIONS: "txt,pdf,png,jpg,jpeg,gif,doc,docx,xls,xlsx"
+
+  # Email Configuration
+  SMTP_HOST: "smtp.sendgrid.net"
+  SMTP_PORT: "587"
+  SMTP_USE_TLS: "true"
+  EMAIL_FROM: "noreply@upm.plus"
+
+  # AI Configuration
+  OPENAI_MODEL: "gpt-4-turbo-preview"
+  OPENAI_MAX_TOKENS: "4096"
+  OPENAI_TEMPERATURE: "0.5"
+
+  # Vector Database Configuration
+  CHROMA_HOST: "localhost"
+  CHROMA_PORT: "8000"
+  CHROMA_COLLECTION_NAME: "upm_plus_documents"
+  VECTOR_DIMENSION: "1536"
+
+  # Security Configuration
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+  JWT_REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  PASSWORD_MIN_LENGTH: "12"
+  SESSION_TIMEOUT: "1800"
+
+  # API Rate Limiting
+  RATE_LIMIT_PER_MINUTE: "60"
+  RATE_LIMIT_BURST: "100"
+
+  # Cache Configuration
+  CACHE_TTL: "1800"
+  CACHE_MAX_SIZE: "5000"
+
+  # Worker Configuration
+  WORKER_TIMEOUT: "300"
+  WORKER_MAX_TASKS_PER_CHILD: "500"
+  WORKER_PREFETCH_MULTIPLIER: "2"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: upm-plus-staging
+  labels:
+    app: upm-plus
+    component: nginx
+data:
+  nginx.conf: |
+    upstream backend {
+        server upm-plus-backend:8000;
+    }
+
+    upstream frontend {
+        server upm-plus-frontend:80;
+    }
+
+    server {
+        listen 80;
+        server_name staging.upm.plus;
+
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+        # Frontend routes
+        location / {
+            proxy_pass http://frontend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # API routes
+        location /api/ {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # API timeout settings
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+        }
+
+        # Health checks
+        location /health {
+            proxy_pass http://backend/health;
+            access_log off;
+        }
+
+        # Static file caching
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            proxy_pass http://frontend;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: upm-plus-production
+  labels:
+    app: upm-plus
+    component: nginx
+data:
+  nginx.conf: |
+    upstream backend {
+        server upm-plus-backend:8000;
+    }
+
+    upstream frontend {
+        server upm-plus-frontend:80;
+    }
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=login:10m rate=1r/s;
+
+    server {
+        listen 80;
+        server_name upm.plus www.upm.plus;
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name upm.plus www.upm.plus;
+
+        # SSL configuration
+        ssl_certificate /etc/nginx/ssl/cert.pem;
+        ssl_certificate_key /etc/nginx/ssl/key.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+
+        # Security headers
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;" always;
+
+        # Frontend routes
+        location / {
+            proxy_pass http://frontend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # API routes with rate limiting
+        location /api/ {
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # API timeout settings
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+        }
+
+        # Login endpoint with stricter rate limiting
+        location /api/v1/auth/login {
+            limit_req zone=login burst=5 nodelay;
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Health checks
+        location /health {
+            proxy_pass http://backend/health;
+            access_log off;
+        }
+
+        # Static file caching
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            proxy_pass http://frontend;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # Deny access to sensitive files
+        location ~ /\. {
+            deny all;
+        }
+
+        location ~ \.(env|log|conf)$ {
+            deny all;
+        }
+    }

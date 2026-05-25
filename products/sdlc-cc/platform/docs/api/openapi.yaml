@@ -1,0 +1,1230 @@
+openapi: 3.1.0
+info:
+  title: SDLC.ai - Secure Data Learning Platform API
+  description: |
+    ## Overview
+    The SDLC.ai API provides secure, enterprise-grade access to AI-powered data learning capabilities.
+
+    ## Authentication
+    All API requests require authentication using Bearer tokens. Include your API key in the Authorization header:
+    ```
+    Authorization: Bearer your-api-key-here
+    ```
+
+    ## Rate Limiting
+    - Standard tier: 100 requests per minute
+    - Premium tier: 1000 requests per minute
+    - Enterprise tier: Custom limits
+
+    ## Base URL
+    - Production: https://api.sdlc.cc
+    - Staging: https://staging-api.sdlc.cc
+    - Development: https://dev-api.sdlc.cc
+
+  version: 3.0.0
+  contact:
+    name: SDLC.ai Support
+    email: support@sdlc.cc
+    url: https://sdlc.cc/support
+  license:
+    name: Commercial License
+    url: https://sdlc.cc/license
+
+servers:
+  - url: https://api.sdlc.cc/v3
+    description: Production server
+  - url: https://staging-api.sdlc.cc/v3
+    description: Staging server
+  - url: https://dev-api.sdlc.cc/v3
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization endpoints
+  - name: Documents
+    description: Document management and processing
+  - name: RAG
+    description: Retrieval-Augmented Generation operations
+  - name: LLM
+    description: Large Language Model interactions
+  - name: Users
+    description: User management
+  - name: Tenants
+    description: Tenant and organization management
+  - name: Policies
+    description: Policy and compliance management
+  - name: Monitoring
+    description: System monitoring and metrics
+  - name: Vector
+    description: Vector database operations
+  - name: DLP
+    description: Data Loss Prevention operations
+
+paths:
+  # Authentication endpoints
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Authenticate user
+      description: Authenticate a user with email and password
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Refresh an expired access token using a refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: Invalidate the current session
+      operationId: logout
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # Document endpoints
+  /documents:
+    get:
+      tags:
+        - Documents
+      summary: List documents
+      description: Retrieve a paginated list of documents
+      operationId: listDocuments
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - $ref: '#/components/parameters/SortByParam'
+        - $ref: '#/components/parameters/SortOrderParam'
+      responses:
+        '200':
+          description: Documents retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Documents
+      summary: Upload document
+      description: Upload and process a new document
+      operationId: uploadDocument
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentUploadRequest'
+      responses:
+        '201':
+          description: Document uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+
+  /documents/{documentId}:
+    get:
+      tags:
+        - Documents
+      summary: Get document
+      description: Retrieve details of a specific document
+      operationId: getDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      responses:
+        '200':
+          description: Document retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Documents
+      summary: Delete document
+      description: Delete a document and all associated data
+      operationId: deleteDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      responses:
+        '200':
+          description: Document deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /documents/{documentId}/process:
+    post:
+      tags:
+        - Documents
+      summary: Process document
+      description: Trigger document processing for RAG
+      operationId: processDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentProcessRequest'
+      responses:
+        '202':
+          description: Processing started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessResponse'
+
+  # RAG endpoints
+  /rag/query:
+    post:
+      tags:
+        - RAG
+      summary: Query with RAG
+      description: Submit a query with retrieval-augmented generation
+      operationId: ragQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RAGQueryRequest'
+      responses:
+        '200':
+          description: Query processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RAGQueryResponse'
+
+  /rag/context:
+    post:
+      tags:
+        - RAG
+      summary: Retrieve context only
+      description: Retrieve relevant context without LLM generation
+      operationId: getContext
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextRequest'
+      responses:
+        '200':
+          description: Context retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextResponse'
+
+  # LLM endpoints
+  /llm/chat:
+    post:
+      tags:
+        - LLM
+      summary: Chat with LLM
+      description: Send a message to the LLM
+      operationId: chatLLM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Chat response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+
+  /llm/models:
+    get:
+      tags:
+        - LLM
+      summary: List available models
+      description: Retrieve list of available LLM models
+      operationId: listModels
+      responses:
+        '200':
+          description: Models retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelListResponse'
+
+  # Vector endpoints
+  /vector/search:
+    post:
+      tags:
+        - Vector
+      summary: Vector search
+      description: Perform similarity search on vectors
+      operationId: vectorSearch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VectorSearchRequest'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VectorSearchResponse'
+
+  /vector/index:
+    post:
+      tags:
+        - Vector
+      summary: Create vector index
+      description: Create a new vector index
+      operationId: createVectorIndex
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIndexRequest'
+      responses:
+        '201':
+          description: Index created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexResponse'
+
+  # DLP endpoints
+  /dlp/scan:
+    post:
+      tags:
+        - DLP
+      summary: Scan for sensitive data
+      description: Scan text for sensitive information
+      operationId: dlpScan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DLPScanRequest'
+      responses:
+        '200':
+          description: Scan results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DLPScanResponse'
+
+  /dlp/redact:
+    post:
+      tags:
+        - DLP
+      summary: Redact sensitive data
+      description: Redact sensitive information from text
+      operationId: dlpRedact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DLPRedactRequest'
+      responses:
+        '200':
+          description: Redacted text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DLPRedactResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number for pagination
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of items per page
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    SearchParam:
+      name: search
+      in: query
+      description: Search query
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+
+    SortByParam:
+      name: sortBy
+      in: query
+      description: Field to sort by
+      required: false
+      schema:
+        type: string
+        enum: [createdAt, updatedAt, name, size]
+
+    SortOrderParam:
+      name: sortOrder
+      in: query
+      description: Sort order
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+
+    DocumentIdParam:
+      name: documentId
+      in: path
+      description: Document ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # Authentication schemas
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+        password:
+          type: string
+          minLength: 8
+          description: User password
+        tenantId:
+          type: string
+          format: uuid
+          description: Tenant ID for multi-tenant users
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            accessToken:
+              type: string
+              description: JWT access token
+            refreshToken:
+              type: string
+              description: JWT refresh token
+            expiresIn:
+              type: integer
+              description: Token expiration time in seconds
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          description: Refresh token
+
+    RefreshTokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+            expiresIn:
+              type: integer
+
+    # User schemas
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        name:
+          type: string
+          example: "John Doe"
+        role:
+          type: string
+          enum: [admin, user, viewer]
+          example: "user"
+        tenantId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # Document schemas
+    DocumentUploadRequest:
+      type: object
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Document file (max 50MB)
+        name:
+          type: string
+          description: Custom document name
+        description:
+          type: string
+          description: Document description
+        tags:
+          type: array
+          items:
+            type: string
+          description: Document tags
+        isPublic:
+          type: boolean
+          default: false
+          description: Whether document is publicly accessible
+
+    DocumentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Document'
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        size:
+          type: integer
+          format: int64
+        mimeType:
+          type: string
+        status:
+          type: string
+          enum: [uploading, processing, completed, failed]
+        tags:
+          type: array
+          items:
+            type: string
+        isPublic:
+          type: boolean
+        tenantId:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        processedAt:
+          type: string
+          format: date-time
+
+    DocumentListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            documents:
+              type: array
+              items:
+                $ref: '#/components/schemas/Document'
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+
+    DocumentProcessRequest:
+      type: object
+      properties:
+        options:
+          type: object
+          properties:
+            chunkSize:
+              type: integer
+              default: 1000
+            chunkOverlap:
+              type: integer
+              default: 200
+            extractTables:
+              type: boolean
+              default: true
+            extractImages:
+              type: boolean
+              default: true
+            language:
+              type: string
+              default: "en"
+
+    ProcessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Document processing started"
+        data:
+          type: object
+          properties:
+            jobId:
+              type: string
+              format: uuid
+            estimatedTime:
+              type: integer
+              description: Estimated processing time in seconds
+
+    # RAG schemas
+    RAGQueryRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: The question or prompt
+        documentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Specific documents to search within
+        contextLimit:
+          type: integer
+          minimum: 100
+          maximum: 10000
+          default: 4000
+          description: Maximum context length in tokens
+        model:
+          type: string
+          default: "gpt-4"
+          description: LLM model to use
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        includeSources:
+          type: boolean
+          default: true
+          description: Include source references in response
+
+    RAGQueryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            answer:
+              type: string
+              description: Generated answer
+            sources:
+              type: array
+              items:
+                $ref: '#/components/schemas/Source'
+            contextUsed:
+              type: integer
+              description: Number of context tokens used
+            model:
+              type: string
+            responseTime:
+              type: number
+              description: Response time in milliseconds
+
+    Source:
+      type: object
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        documentName:
+          type: string
+        chunkId:
+          type: string
+        content:
+          type: string
+        score:
+          type: number
+          description: Relevance score
+        pageNumber:
+          type: integer
+
+    ContextRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+        documentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+
+    ContextResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            contexts:
+              type: array
+              items:
+                $ref: '#/components/schemas/Source'
+
+    # LLM schemas
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        conversationId:
+          type: string
+          format: uuid
+          description: Continue existing conversation
+        model:
+          type: string
+          default: "gpt-4"
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+          default: 0.7
+        maxTokens:
+          type: integer
+          minimum: 1
+          maximum: 4000
+          default: 1000
+        systemPrompt:
+          type: string
+          description: Custom system prompt
+
+    ChatResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+            conversationId:
+              type: string
+              format: uuid
+            messageId:
+              type: string
+              format: uuid
+            model:
+              type: string
+            tokensUsed:
+              type: object
+              properties:
+                prompt:
+                  type: integer
+                completion:
+                  type: integer
+                total:
+                  type: integer
+            responseTime:
+              type: number
+
+    ModelListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            models:
+              type: array
+              items:
+                $ref: '#/components/schemas/Model'
+
+    Model:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+          enum: [openai, anthropic, google, azure]
+        contextWindow:
+          type: integer
+        inputCost:
+          type: number
+          description: Cost per 1K input tokens
+        outputCost:
+          type: number
+          description: Cost per 1K output tokens
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [chat, completion, embedding, vision]
+
+    # Vector schemas
+    VectorSearchRequest:
+      type: object
+      required:
+        - vector
+      properties:
+        vector:
+          type: array
+          items:
+            type: number
+            format: float
+          minItems: 128
+          maxItems: 3072
+        indexId:
+          type: string
+          format: uuid
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.7
+        filter:
+          type: object
+          description: Metadata filters
+
+    VectorSearchResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            results:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  score:
+                    type: number
+                  metadata:
+                    type: object
+
+    CreateIndexRequest:
+      type: object
+      required:
+        - name
+        - dimensions
+      properties:
+        name:
+          type: string
+          description: Index name
+        dimensions:
+          type: integer
+          description: Vector dimensions
+        metric:
+          type: string
+          enum: [cosine, euclidean, dotproduct]
+          default: cosine
+        description:
+          type: string
+        metadataConfig:
+          type: object
+          description: Metadata schema configuration
+
+    IndexResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            indexId:
+              type: string
+              format: uuid
+            name:
+              type: string
+            status:
+              type: string
+              enum: [creating, ready, error]
+
+    # DLP schemas
+    DLPScanRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 10000
+        infoTypes:
+          type: array
+          items:
+            type: string
+          description: Specific info types to scan for
+        includeQuote:
+          type: boolean
+          default: true
+          description: Include matching text in results
+
+    DLPScanResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            findings:
+              type: array
+              items:
+                type: object
+                properties:
+                  infoType:
+                    type: string
+                  confidence:
+                    type: number
+                    minimum: 0
+                    maximum: 1
+                  quote:
+                    type: string
+                  location:
+                    type: object
+                    properties:
+                      start:
+                        type: integer
+                      end:
+                        type: integer
+
+    DLPRedactRequest:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+        infoTypes:
+          type: array
+          items:
+            type: string
+        replacement:
+          type: string
+          default: "[REDACTED]"
+
+    DLPRedactResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            redactedText:
+              type: string
+            redactionCount:
+              type: integer
+
+    # Common schemas
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+            requestId:
+              type: string
+              format: uuid
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        hasNext:
+          type: boolean
+        hasPrev:
+          type: boolean
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized access
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Access forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    PayloadTooLarge:
+      description: Request payload too large
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+# Global tags for additional metadata
+tags:
+  - name: Authentication
+    description: |
+      Authentication endpoints support JWT-based authentication.
+      Tokens expire after 1 hour and can be refreshed using the refresh endpoint.
+
+      # Security Considerations
+      - Always use HTTPS
+      - Store tokens securely
+      - Implement proper token rotation
+      - Monitor for suspicious activity
+
+  - name: Documents
+    description: |
+      Document management supports various file formats:
+      - PDF, DOC, DOCX, TXT, MD
+      - Maximum file size: 50MB
+      - Processing time: 1-5 minutes per document
+
+      # Features
+      - Automatic text extraction
+      - Table detection and extraction
+      - Image OCR processing
+      - Chunking for RAG
+      - Metadata extraction
+
+  - name: RAG
+    description: |
+      Retrieval-Augmented Generation combines:
+      - Vector similarity search
+      - Context assembly
+      - LLM generation with sources
+
+      # Best Practices
+      - Use specific queries
+      - Limit context for better results
+      - Include relevant document filters
+      - Check source relevance
+
+  - name: LLM
+    description: |
+      LLM integration supports multiple providers:
+      - OpenAI (GPT-3.5, GPT-4)
+      - Anthropic (Claude)
+      - Google (Gemini)
+      - Azure OpenAI
+
+      # Features
+      - Token usage tracking
+      - Cost management
+      - Model fallback
+      - Response caching

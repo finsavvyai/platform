@@ -1,0 +1,415 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sdlc-platform-gp3
+  labels:
+    app: sdlc-platform
+  annotations:
+    description: "General Purpose SSD (gp3) storage class for SDLC Platform"
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  fsType: ext4
+  encrypted: "true"
+  kmsKeyId: "arn:aws:kms:us-west-1:ACCOUNT_ID:key/KMS_KEY_ID"
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sdlc-platform-io2
+  labels:
+    app: sdlc-platform
+  annotations:
+    description: "IO2 storage class for high-performance workloads"
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: io2
+  iops: "5000"
+  throughput: "250"
+  fsType: ext4
+  encrypted: "true"
+  kmsKeyId: "arn:aws:kms:us-west-1:ACCOUNT_ID:key/KMS_KEY_ID"
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sdlc-platform-st1
+  labels:
+    app: sdlc-platform
+  annotations:
+    description: "Throughput Optimized HDD (st1) for infrequent access"
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: st1
+  fsType: ext4
+  encrypted: "true"
+  kmsKeyId: "arn:aws:kms:us-west-1:ACCOUNT_ID:key/KMS_KEY_ID"
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sdlc-platform-uploads-pvc
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: uploads
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "sdlc-platform-gp3"
+    description: "PVC for file uploads"
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: sdlc-platform-gp3
+  resources:
+    requests:
+      storage: 500Gi
+  selector:
+    matchLabels:
+      app: sdlc-platform
+      component: uploads
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sdlc-platform-storage-pvc
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: storage
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "sdlc-platform-gp3"
+    description: "PVC for application storage"
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: sdlc-platform-gp3
+  resources:
+    requests:
+      storage: 1Ti
+  selector:
+    matchLabels:
+      app: sdlc-platform
+      component: storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sdlc-platform-backup-pvc
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: backup
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "sdlc-platform-st1"
+    description: "PVC for backup storage"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: sdlc-platform-st1
+  resources:
+    requests:
+      storage: 5Ti
+  selector:
+    matchLabels:
+      app: sdlc-platform
+      component: backup
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sdlc-platform-cache-pvc
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: cache
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "sdlc-platform-io2"
+    description: "PVC for high-performance cache"
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: sdlc-platform-io2
+  resources:
+    requests:
+      storage: 100Gi
+  selector:
+    matchLabels:
+      app: sdlc-platform
+      component: cache
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sdlc-platform-uploads-pv
+  labels:
+    app: sdlc-platform
+    component: uploads
+    type: gp3
+  annotations:
+    description: "PV for file uploads"
+spec:
+  capacity:
+    storage: 500Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: sdlc-platform-gp3
+  mountOptions:
+    - debug
+    - noatime
+    - nodiratime
+  awsElasticBlockStore:
+    volumeID: vol-UPLOADS_VOLUME_ID
+    fsType: ext4
+    encrypted: true
+    kmsKeyId: arn:aws:kms:us-west-1:ACCOUNT_ID:key/KMS_KEY_ID
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sdlc-platform-storage-pv
+  labels:
+    app: sdlc-platform
+    component: storage
+    type: gp3
+  annotations:
+    description: "PV for application storage"
+spec:
+  capacity:
+    storage: 1Ti
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: sdlc-platform-gp3
+  mountOptions:
+    - debug
+    - noatime
+    - nodiratime
+  awsElasticBlockStore:
+    volumeID: vol-STORAGE_VOLUME_ID
+    fsType: ext4
+    encrypted: true
+    kmsKeyId: arn:aws:kms:us-west-1:ACCOUNT_ID:key/KMS_KEY_ID
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sdlc-platform-backup-pv
+  labels:
+    app: sdlc-platform
+    component: backup
+    type: st1
+  annotations:
+    description: "PV for backup storage"
+spec:
+  capacity:
+    storage: 5Ti
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: sdlc-platform-st1
+  mountOptions:
+    - debug
+    - noatime
+    - nodiratime
+  awsElasticBlockStore:
+    volumeID: vol-BACKUP_VOLUME_ID
+    fsType: ext4
+    encrypted: true
+    kmsKeyId: arn:aws:kms:us-west-1:ACCOUNT_ID:key/KMS_KEY_ID
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sdlc-platform-cache-pv
+  labels:
+    app: sdlc-platform
+    component: cache
+    type: io2
+  annotations:
+    description: "PV for high-performance cache"
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: sdlc-platform-io2
+  mountOptions:
+    - debug
+    - noatime
+    - nodiratime
+  awsElasticBlockStore:
+    volumeID: vol-CACHE_VOLUME_ID
+    fsType: ext4
+    iops: 5000
+    throughput: 250
+    encrypted: true
+    kmsKeyId: arn:aws:kms:us-west-1:ACCOUNT_ID:key/KMS_KEY_ID
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-provisioner-config
+  namespace: kube-system
+data:
+  config.json: |
+    {
+      "nodeID": "${NODE_NAME}",
+      "provisioner": "sdlc-platform.io/aws-ebs",
+      "version": "v1.0.0",
+      "features": {
+        "topology": true,
+        "encryption": true,
+        "volumeExpansion": true
+      },
+      "defaultOptions": {
+        "type": "gp3",
+        "iops": 3000,
+        "throughput": 125,
+        "fsType": "ext4",
+        "encrypted": true
+      },
+      "volumeTypes": {
+        "gp3": {
+          "iopsRange": [3000, 16000],
+          "throughputRange": [125, 1000],
+          "maxSize": "16Ti"
+        },
+        "io2": {
+          "iopsRange": [500, 256000],
+          "throughputRange": [256, 4000],
+          "maxSize": "64Ti"
+        },
+        "st1": {
+          "maxSize": "16Ti",
+          "useCase": "infrequent access"
+        },
+        "sc1": {
+          "maxSize": "16Ti",
+          "useCase": "cold data"
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: storage-provisioner
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: storage-provisioner-role
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "csinodes", "csidrivers", "csistoragecapacities"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: storage-provisioner-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: storage-provisioner-role
+subjects:
+  - kind: ServiceAccount
+    name: storage-provisioner
+    namespace: kube-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storage-provisioner
+  namespace: kube-system
+  labels:
+    app: storage-provisioner
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: storage-provisioner
+  template:
+    metadata:
+      labels:
+        app: storage-provisioner
+    spec:
+      serviceAccountName: storage-provisioner
+      containers:
+        - name: provisioner
+          image: sdlc/storage-provisioner:v1.0.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --provisioner=sdlc-platform.io/aws-ebs
+            - --leader-election=true
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/kubelet/plugins/kubernetes.io/csi
+            - name: provisioner-config
+              mountPath: /etc/config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/kubernetes.io/csi
+            type: Directory
+        - name: provisioner-config
+          configMap:
+            name: storage-provisioner-config
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule

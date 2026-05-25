@@ -1,0 +1,141 @@
+---
+# Production Configuration Maps
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: upm-plus-config
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: config
+data:
+  # Environment Configuration
+  APP_ENV: "production"
+  DEBUG: "false"
+  LOG_LEVEL: "INFO"
+
+  # Database Configuration
+  DB_HOST: "postgres-primary.upm-plus-prod.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "upm_plus_prod"
+  DB_POOL_SIZE: "20"
+  DB_MAX_OVERFLOW: "30"
+  DB_POOL_TIMEOUT: "30"
+  DB_POOL_RECYCLE: "3600"
+
+  # Redis Configuration
+  REDIS_HOST: "redis-cluster.upm-plus-prod.svc.cluster.local"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_PASSWORD: ""
+  REDIS_MAX_CONNECTIONS: "100"
+
+  # Security Configuration
+  JWT_SECRET_KEY: ""
+  JWT_ALGORITHM: "HS256"
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  JWT_REFRESH_TOKEN_EXPIRE_DAYS: "7"
+
+  # Monitoring Configuration
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  HEALTH_CHECK_INTERVAL: "30"
+
+  # File Storage Configuration
+  UPLOAD_DIR: "/app/uploads"
+  MAX_UPLOAD_SIZE: "104857600"  # 100MB
+  ALLOWED_EXTENSIONS: "pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif"
+
+  # Browser Automation Configuration
+  BROWSER_POOL_SIZE: "10"
+  BROWSER_TIMEOUT: "30000"
+  BROWSER_HEADLESS: "true"
+
+  # AI Services Configuration
+  OPENAI_API_KEY: ""
+  OPENAI_MODEL: "gpt-4"
+  OPENAI_MAX_TOKENS: "4096"
+  OPENAI_TEMPERATURE: "0.7"
+
+  # Advanced Features Configuration
+  VISUAL_TESTING_ENABLED: "true"
+  CAPTCHA_SOLVING_ENABLED: "true"
+  NETWORK_SIMULATION_ENABLED: "true"
+  HUMAN_BEHAVIOR_ENABLED: "true"
+
+  # Performance Configuration
+  WORKER_PROCESSES: "4"
+  MAX_WORKER_CONNECTIONS: "1000"
+  KEEPALIVE_TIMEOUT: "65"
+
+  # Rate Limiting Configuration
+  RATE_LIMIT_PER_MINUTE: "1000"
+  RATE_LIMIT_BURST: "2000"
+
+  # CORS Configuration
+  CORS_ORIGINS: "https://app.upm.plus,https://admin.upm.plus"
+  CORS_METHODS: "GET,POST,PUT,DELETE,OPTIONS"
+  CORS_HEADERS: "Content-Type,Authorization,X-Requested-With"
+
+---
+# Secret Configuration Template
+apiVersion: v1
+kind: Secret
+metadata:
+  name: upm-plus-secrets
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: secrets
+type: Opaque
+data:
+  # Base64 encoded secrets (to be populated during deployment)
+  database-password: ""  # echo -n 'your-db-password' | base64
+  redis-password: ""      # echo -n 'your-redis-password' | base64
+  jwt-secret: ""          # echo -n 'your-jwt-secret-key' | base64
+  openai-api-key: ""      # echo -n 'your-openai-api-key' | base64
+  oauth-client-secret: ""  # echo -n 'your-oauth-client-secret' | base64
+  encryption-key: ""       # echo -n 'your-encryption-key' | base64
+
+---
+# Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: upm-plus-sa
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: service-account
+automountServiceAccountToken: true
+
+---
+# Role for Service Account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: upm-plus-role
+  namespace: upm-plus-prod
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Role Binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: upm-plus-rolebinding
+  namespace: upm-plus-prod
+subjects:
+- kind: ServiceAccount
+  name: upm-plus-sa
+  namespace: upm-plus-prod
+roleRef:
+  kind: Role
+  name: upm-plus-role
+  apiGroup: rbac.authorization.k8s.io

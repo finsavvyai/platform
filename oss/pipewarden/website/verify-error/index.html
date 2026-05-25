@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Verification failed — PipeWarden</title>
+<meta name="robots" content="noindex,nofollow" />
+<link rel="stylesheet" href="/auth.css" />
+<link rel="icon" href="/favicon.svg" />
+</head>
+<body>
+<main class="auth-shell">
+  <section class="auth-card">
+    <a href="/" class="auth-brand"><span class="dot"></span>PipeWarden</a>
+    <h1 class="auth-title">Verification failed</h1>
+    <p class="auth-sub" id="reason">The verification link couldn't be processed.</p>
+
+    <a class="btn-primary" href="/login/" style="display:block; text-align:center; text-decoration:none; margin-bottom: var(--s-3);">Sign in</a>
+    <button type="button" class="btn-secondary" id="resend-btn">Resend verification email</button>
+
+    <div class="error" id="err" style="margin-top: var(--s-4);"></div>
+  </section>
+</main>
+
+<script>
+const API_BASE = window.location.hostname === 'pipewarden.com' || window.location.hostname === 'pipewarden.io'
+  ? 'https://api.pipewarden.io'
+  : '';
+
+const reasons = {
+  missing: 'No verification token was provided. Use the link from your email.',
+  expired: 'This verification link is expired or has already been used. Click "Resend" below to get a new one.',
+  server:  'Something went wrong on our end. Try the link again, or resend the email.',
+};
+const r = new URLSearchParams(window.location.search).get('reason');
+if (reasons[r]) document.getElementById('reason').textContent = reasons[r];
+
+document.getElementById('resend-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('resend-btn');
+  const err = document.getElementById('err');
+  err.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const res = await fetch(API_BASE + '/api/v1/auth/verify/request', {
+      method: 'POST', credentials: 'include',
+    });
+    if (res.status === 401) {
+      window.location.href = '/login/?next=/verify-error/';
+      return;
+    }
+    if (!res.ok) throw new Error('Send failed');
+    btn.textContent = 'Sent — check your inbox';
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('visible');
+    btn.disabled = false;
+    btn.textContent = 'Resend verification email';
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+# PushCI — PipeWarden production pipeline
+# Eats its own dogfood: pushci runs PipeWarden's heuristic + DLP + OPA
+# scanners against this repo on every push, then deploys to Cloudflare.
+#
+# Required PushCI secrets (set via `pushci secret put`):
+#   GHCR_TOKEN                    — GitHub PAT with write:packages
+#   CLOUDFLARE_API_TOKEN          — Cloudflare deploy token
+#   CLOUDFLARE_ACCOUNT_ID         — Cloudflare account
+#   PIPEWARDEN_DATABASE_URL       — Postgres URL with sslmode=require
+#   PIPEWARDEN_VAULT_KEY          — 32+ byte AES-256-GCM
+#   PIPEWARDEN_SESSION_SECRET     — 32+ byte cookie signer
+#   PIPEWARDEN_SMTP_*             — Resend/SES credentials
+#   PIPEWARDEN_WEBAUTHN_RPID      — pipewarden.io
+#   PIPEWARDEN_WEBAUTHN_ORIGINS   — https://app.pipewarden.io
+#   CLAUDE_API_KEY                — Anthropic
+#   PUSHCI_API_KEY                — PushCI scan-back authentication
+
+"on":
+  - push
+  - pull_request
+  - tag
+
+stages:
+  - name: install
+    checks:
+      - name: go-mod-download
+        run: go mod download
+      - name: verify-go-version
+        run: go version | grep -q 'go1.26'
+
+  - name: build
+    depends_on: [install]
+    checks:
+      - name: go-build-server
+        run: go build -o bin/pipewarden ./cmd/pipewarden
+      - name: go-build-migrate
+        run: go build -o bin/pw-migrate ./cmd/migrate
+      - name: go-build-all
+        run: go build ./...
+
+  - name: test
+    depends_on: [install]
+    parallel: true
+    checks:
+      - name: go-test
+        run: go test -race -count=1 -timeout=10m ./...
+      - name: go-test-coverage
+        run: |
+          go test -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out | tail -1
+
+  - name: lint
+    depends_on: [install]
+    parallel: true
+    checks:
+      - name: go-vet
+        run: go vet ./...
+      - name: golangci-lint
+        run: golangci-lint run --timeout=5m
+      - name: gofmt-check
+        run: test -z "$(gofmt -l .)"
+
+  - name: security
+    depends_on: [install]
+    parallel: true
+    checks:
+      - name: pushci-scan-self
+        # Scan this repo with the heuristic + DLP + OPA stack we ship.
+        # Block on any Critical/High finding (release-gate per CLAUDE.md).
+        run: pushci scan --report=sarif --fail-on=high --output=pipewarden.sarif
+      - name: gitleaks
+        run: gitleaks detect --no-git --redact -s . --config=.gitleaks.toml
+      - name: trivy-fs
+        run: trivy fs --severity CRITICAL,HIGH --exit-code 1 --ignore-unfixed .
+      - name: govulncheck
+        run: govulncheck ./...
+
+  - name: container
+    depends_on: [build, test, lint, security]
+    only_on: [main, master, "v*"]
+    checks:
+      - name: docker-build
+        run: |
+          docker build --platform linux/amd64 \
+            -t ghcr.io/finsavvyai/pipewarden:${PUSHCI_GIT_SHA} \
+            -t ghcr.io/finsavvyai/pipewarden:latest .
+      - name: trivy-image
+        run: |
+          trivy image --severity CRITICAL,HIGH --exit-code 1 --ignore-unfixed \
+            ghcr.io/finsavvyai/pipewarden:${PUSHCI_GIT_SHA}
+      - name: docker-push
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u finsavvyai --password-stdin
+          docker push ghcr.io/finsavvyai/pipewarden:${PUSHCI_GIT_SHA}
+          docker push ghcr.io/finsavvyai/pipewarden:latest
+
+  - name: migrate
+    depends_on: [container]
+    only_on: ["v*"]
+    checks:
+      - name: postgres-schema
+        env:
+          PIPEWARDEN_DATABASE_URL: ${PIPEWARDEN_DATABASE_URL}
+          PIPEWARDEN_DATABASE_DRIVER: postgres
+        run: go run ./cmd/migrate
+
+deploy:
+  trigger: tag
+  environments:
+    - name: api-production
+      only_on: ["v*"]
+      approve: true
+      env:
+        CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+        CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
+        IMAGE_TAG: ${PUSHCI_GIT_TAG#v}
+      run: |
+        sed -i "s|ghcr.io/finsavvyai/pipewarden:[^\"]*|ghcr.io/finsavvyai/pipewarden:${IMAGE_TAG}|" wrangler.toml
+        npx wrangler@latest containers push ghcr.io/finsavvyai/pipewarden:${IMAGE_TAG}
+        npx wrangler@latest deploy
+
+    - name: marketing-production
+      only_on: ["v*"]
+      approve: true
+      env:
+        CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+        CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
+      run: |
+        npx wrangler@latest pages deploy website \
+          --project-name=pipewarden-website \
+          --branch=main
+
+    - name: smoke
+      only_on: ["v*"]
+      depends_on: [api-production, marketing-production]
+      run: |
+        sleep 30
+        curl -fsS --max-time 10 https://api.pipewarden.io/healthz
+        curl -fsSI --max-time 10 https://pipewarden.io | head -1
+        curl -fsS --max-time 10 https://pipewarden.io/llms.txt | grep -q 'PipeWarden'
+        curl -fsS --max-time 10 https://pipewarden.io/.well-known/security.txt | grep -q 'security@pipewarden.io'
+        curl -fsS --max-time 10 https://pipewarden.io/.well-known/ai-plugin.json | grep -q '"name_for_model"'
+        curl -fsS --max-time 10 https://api.pipewarden.io/api/v1/security/audit | grep -q '"RiskScore"'

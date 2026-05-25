@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OAuth Setup - ClawPipe Docs</title>
+  <meta name="description" content="Enable Google and GitHub sign-in for your ClawPipe deployment. Step-by-step runbook for provider console setup and wrangler secret configuration.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="docs-layout">
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Documentation">
+    <a href="/" class="logo">ClawPipe</a>
+    <nav>
+      <a href="index.html">Getting Started</a>
+      <a href="concepts.html">How It Works</a>
+      <div class="sep"></div>
+      <a href="typescript.html">TypeScript SDK</a>
+      <a href="python.html">Python SDK</a>
+      <a href="go.html">Go SDK</a>
+      <div class="sep"></div>
+      <a href="integrations.html">Integrations</a>
+      <a href="api.html">Gateway API</a>
+      <a href="oauth-setup.html" class="active">OAuth Setup</a>
+      <a href="migration.html">Migration</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="doc-header">
+      <div>
+        <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Toggle menu">&#9776;</button>
+        <span class="breadcrumb">Docs / OAuth Setup</span>
+      </div>
+      <div class="links">
+        <a href="https://github.com/finsavvyai/clawpipe">GitHub</a>
+        <a href="https://clawpipe.ai">Home</a>
+      </div>
+    </header>
+    <main id="main-content" class="content">
+      <h1>OAuth <span>Setup</span></h1>
+      <p>ClawPipe supports Google and GitHub sign-in on the dashboard. Both are optional: if no provider credentials are configured, the dashboard gracefully hides the buttons and falls back to email + password. This runbook shows how to enable each provider.</p>
+
+      <h2>How discovery works</h2>
+      <p>The dashboard calls <code>GET /auth/providers</code> on load. The gateway returns which providers have credentials configured, and the dashboard only renders the buttons for available providers. No code changes required on the frontend.</p>
+<pre><code><span class="code-dim">// Response when only GitHub is configured</span>
+{ <span class="code-green">"google"</span>: <span class="code-accent">false</span>, <span class="code-green">"github"</span>: <span class="code-accent">true</span> }</code></pre>
+
+      <h2>Google OAuth</h2>
+      <ol>
+        <li>Open the <a href="https://console.cloud.google.com/apis/credentials">Google Cloud Console Credentials</a> page for your project. Create one if needed.</li>
+        <li>Click <strong>Create Credentials → OAuth client ID</strong>.</li>
+        <li>Application type: <strong>Web application</strong>.</li>
+        <li>Authorized JavaScript origins: <code>https://app.clawpipe.ai</code> (and any staging hosts).</li>
+        <li>Authorized redirect URIs: <code>https://api.clawpipe.ai/auth/google/callback</code>.</li>
+        <li>Save. Copy the client ID and client secret.</li>
+      </ol>
+
+      <p>Set the secrets on the gateway Worker:</p>
+<pre><code><span class="code-dim"># From the gateway/ directory</span>
+wrangler secret put GOOGLE_CLIENT_ID
+wrangler secret put GOOGLE_CLIENT_SECRET</code></pre>
+
+      <p>Redeploy the Worker so the new bindings take effect:</p>
+<pre><code>wrangler deploy</code></pre>
+
+      <h2>GitHub OAuth</h2>
+      <ol>
+        <li>Open <a href="https://github.com/settings/developers">GitHub Developer settings → OAuth Apps</a>.</li>
+        <li>Click <strong>New OAuth App</strong>.</li>
+        <li>Application name: <code>ClawPipe</code>.</li>
+        <li>Homepage URL: <code>https://clawpipe.ai</code>.</li>
+        <li>Authorization callback URL: <code>https://api.clawpipe.ai/auth/github/callback</code>.</li>
+        <li>Save. On the app page, copy the client ID and generate a new client secret.</li>
+      </ol>
+
+      <p>Set the secrets on the gateway:</p>
+<pre><code>wrangler secret put GITHUB_CLIENT_ID
+wrangler secret put GITHUB_CLIENT_SECRET
+wrangler deploy</code></pre>
+
+      <h2>Verify it works</h2>
+      <p>Confirm the discovery endpoint reports the providers:</p>
+<pre><code>curl https://api.clawpipe.ai/auth/providers</code></pre>
+      <p>Open <a href="https://app.clawpipe.ai">app.clawpipe.ai</a> in an incognito window and confirm the sign-in buttons appear. The complete round-trip is:</p>
+      <ol>
+        <li>User clicks <strong>Continue with Google</strong>.</li>
+        <li>Browser hits <code>GET /auth/google</code> and is redirected to Google's consent screen.</li>
+        <li>Google redirects back to <code>/auth/google/callback</code> with an auth code.</li>
+        <li>Gateway exchanges the code, creates or links the user in D1, and sets a session cookie.</li>
+        <li>Dashboard loads with the user signed in.</li>
+      </ol>
+
+      <h2>Security notes</h2>
+      <ul>
+        <li><strong>Least privilege.</strong> Both providers issue tokens scoped only to <code>profile</code> and <code>email</code>. ClawPipe never requests repo or drive scopes.</li>
+        <li><strong>Rotation.</strong> Rotating a client secret is a single <code>wrangler secret put</code> plus redeploy — no downtime if you rotate during low traffic.</li>
+        <li><strong>Audit.</strong> OAuth link events are written to the <code>oauth_accounts</code> table in D1. Existing sessions are unaffected when a secret rotates.</li>
+        <li><strong>Removal.</strong> To fully disable a provider, delete both secrets and redeploy. The dashboard auto-hides the button on the next load.</li>
+      </ul>
+
+      <h2>Troubleshooting</h2>
+      <ul>
+        <li><strong>Buttons do not appear.</strong> Check <code>curl https://api.clawpipe.ai/auth/providers</code> — both fields must return <code>true</code>. If <code>false</code>, the secrets are missing or the Worker has not been redeployed since they were set.</li>
+        <li><strong>Redirect URI mismatch.</strong> The callback URL in the provider console must exactly match <code>https://api.clawpipe.ai/auth/{provider}/callback</code>, including protocol.</li>
+        <li><strong>Sign-in loops back to login.</strong> Session cookies require the <code>api.clawpipe.ai</code> and <code>app.clawpipe.ai</code> hosts to share a cookie domain. Confirm the Worker sets <code>Domain=.clawpipe.ai</code> on the session cookie.</li>
+      </ul>
+    </main>
+  </div>
+</div>
+</body>
+</html>

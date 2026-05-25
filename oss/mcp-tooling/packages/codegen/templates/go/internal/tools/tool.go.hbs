@@ -1,0 +1,62 @@
+package tools
+
+import "encoding/json"
+
+type Tool interface {
+	Name() string
+	Description() string
+	InputSchema() map[string]interface{}
+	Execute(args map[string]interface{}) (interface{}, error)
+}
+
+type BaseTool struct {
+	name        string
+	description string
+	schema      map[string]interface{}
+}
+
+func NewBaseTool(name, description string, schema map[string]interface{}) *BaseTool {
+	return &BaseTool{
+		name:        name,
+		description: description,
+		schema:      schema,
+	}
+}
+
+func (t *BaseTool) Name() string {
+	return t.name
+}
+
+func (t *BaseTool) Description() string {
+	return t.description
+}
+
+func (t *BaseTool) InputSchema() map[string]interface{} {
+	return t.schema
+}
+
+// Helper function to create input schema
+func CreateInputSchema(required []string, properties map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"required": required,
+		"properties": properties,
+	}
+}
+
+// Helper function to create property schema
+func CreateProperty(propType, description string, required bool) map[string]interface{} {
+	prop := map[string]interface{}{
+		"type": propType,
+	}
+
+	if description != "" {
+		prop["description"] = description
+	}
+
+	if required {
+		// This will be handled at the tool level
+	}
+
+	return prop
+}

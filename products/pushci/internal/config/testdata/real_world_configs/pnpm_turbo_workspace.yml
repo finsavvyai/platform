@@ -1,0 +1,45 @@
+# What `pushci init` generates for a pnpm + turborepo workspace.
+# Captures the opensyber dogfood output shape: install stage uses
+# the lockfile-detected package manager, downstream stages fan
+# out in parallel with depends_on, and the deploy target is
+# single-run pointing at wrangler. Regression guard: any change
+# to generatePipeline's turbo path must still load as a valid
+# Pipeline here.
+on:
+  - push
+  - pull_request
+
+stages:
+  - name: install
+    checks:
+      - name: deps
+        run: pnpm install --frozen-lockfile
+
+  - name: lint
+    depends_on:
+      - install
+    checks:
+      - name: turbo-lint
+        run: npx turbo lint
+
+  - name: test
+    depends_on:
+      - install
+    checks:
+      - name: turbo-test
+        run: npx turbo test
+
+  - name: build
+    depends_on:
+      - install
+    checks:
+      - name: turbo-build
+        run: npx turbo build
+
+deploy:
+  - name: deploy
+    trigger: push
+    only_on:
+      - main
+      - master
+    run: npx wrangler deploy

@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HeyGen → Pushci Transformation Guide</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d0d;--bg2:#141414;--bg3:#1a1a1a;--bg4:#222;
+  --border:#2a2a2a;--border2:#333;
+  --t1:#f0f0f0;--t2:#a0a0a0;--t3:#666;
+  --accent:#7c5cfc;--accent2:#6b4ef0;--glow:rgba(124,92,252,.15);
+  --green:#22c55e;--blue:#3b82f6;--orange:#f97316;--red:#ef4444;
+  --r-sm:6px;--r-md:10px;--r-lg:14px;--r-xl:20px;
+  --sidebar:220px;
+}
+html,body{height:100%;background:var(--bg);color:var(--t1);font-family:'SF Pro Display',system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.5}
+h1{font-size:22px;font-weight:600}
+h2{font-size:16px;font-weight:600;color:var(--t1);margin-bottom:14px}
+h3{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px}
+.layout{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;padding:12px 0}
+.main{flex:1;overflow-y:auto}
+.content{padding:28px 32px;max-width:1000px}
+
+/* Logo */
+.logo{padding:12px 16px 20px;display:flex;align-items:center;gap:10px}
+.logo-icon{width:28px;height:28px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.logo-name{font-size:15px;font-weight:600}
+
+/* Nav */
+.nav-section{padding:0 8px;margin-bottom:8px}
+.nav-label{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;padding:10px 8px 4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:var(--r-sm);cursor:pointer;color:var(--t2);transition:all .15s;font-size:13.5px;margin-bottom:2px;text-decoration:none}
+.nav-item:hover{background:var(--bg3);color:var(--t1)}
+.nav-item.active{background:rgba(124,92,252,.15);color:var(--accent);font-weight:500}
+.nav-ico{width:16px;height:16px;flex-shrink:0;text-align:center;font-size:12px}
+
+.sidebar-bottom{margin-top:auto;padding:12px 8px;border-top:1px solid var(--border)}
+.user-row{display:flex;align-items:center;gap:10px;padding:6px 8px}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.user-name{font-size:13px;font-weight:500}
+.user-plan{font-size:11px;color:var(--t3)}
+
+/* Top nav tabs */
+.page-nav{display:flex;border-bottom:1px solid var(--border);margin-bottom:28px;overflow-x:auto}
+.pnav{padding:10px 16px;font-size:13.5px;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:all .15s}
+.pnav:hover{color:var(--t2)}
+.pnav.on{color:var(--t1);border-bottom-color:var(--accent)}
+
+/* Panels */
+.panel{display:none}
+.panel.show{display:block}
+
+/* Page header */
+.page-header{margin-bottom:28px}
+.page-title{font-size:22px;font-weight:600;margin-bottom:4px}
+.page-sub{font-size:14px;color:var(--t2)}
+
+/* Sections */
+.section{margin-bottom:36px}
+.divider{height:1px;background:var(--border);margin:28px 0}
+
+/* Code blocks */
+.code{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 16px;font-size:12px;font-family:'SF Mono',monospace;color:#a8d8a8;overflow-x:auto;white-space:pre;line-height:1.7;margin-top:12px}
+
+/* Tables */
+.spec-table{width:100%;border-collapse:collapse;font-size:13px}
+.spec-table th{text-align:left;padding:8px 12px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border)}
+.spec-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+.spec-table td:first-child{font-weight:500;color:var(--t1);white-space:nowrap;width:35%}
+.spec-table td:last-child{color:var(--t2);font-size:12px}
+.spec-table tr:last-child td{border-bottom:none}
+
+/* Tokens */
+.tokens-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:20px}
+.token-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px}
+.swatch{height:32px;border-radius:var(--r-sm);margin-bottom:8px}
+.token-name{font-size:11px;font-weight:600;color:var(--t1);margin-bottom:2px}
+.token-val{font-size:10px;color:var(--t3);font-family:monospace}
+
+/* Components preview */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px}
+.tab{padding:9px 15px;font-size:13.5px;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s}
+.tab:hover{color:var(--t1)}
+.tab.active{color:var(--t1);border-bottom-color:var(--accent);font-weight:500}
+
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:var(--r-sm);font-size:13.5px;font-weight:500;cursor:pointer;border:none;transition:all .15s}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent2)}
+.btn-secondary{background:var(--bg3);color:var(--t1);border:1px solid var(--border2)}
+.btn-secondary:hover{background:var(--bg4)}
+.btn-ghost{background:transparent;color:var(--t2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--bg3);color:var(--t1)}
+.btn-round{background:var(--accent);color:#fff;width:42px;height:42px;padding:0;justify-content:center;border-radius:50%;font-size:18px}
+
+.apps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:20px}
+.app-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.app-card:hover{border-color:var(--border2);background:var(--bg3);transform:translateY(-1px)}
+.app-card-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:18px}
+.app-card-title{font-size:14px;font-weight:600;margin-bottom:4px}
+.app-card-desc{font-size:12px;color:var(--t2);line-height:1.5}
+.card-badge{position:absolute;top:14px;right:14px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px}
+.badge-new{background:rgba(34,197,94,.15);color:#22c55e}
+.badge-pro{background:rgba(124,92,252,.15);color:#7c5cfc}
+.badge-beta{background:rgba(249,115,22,.15);color:#f97316}
+
+.input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);padding:9px 12px;color:var(--t1);font-size:13.5px;outline:none;transition:all .15s;font-family:inherit}
+.input::placeholder{color:var(--t3)}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
+
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.pill{padding:6px 14px;border-radius:20px;font-size:13px;cursor:pointer;transition:all .15s;border:1px solid var(--border)}
+.pill:hover{background:var(--bg3)}
+.pill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+.hero{background:linear-gradient(135deg,rgba(124,92,252,.2) 0%,rgba(59,130,246,.1) 100%);border:1px solid rgba(124,92,252,.25);border-radius:var(--r-xl);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+
+/* Steps */
+.step-row{display:flex;gap:16px;align-items:flex-start;margin-bottom:24px}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.step-title{font-size:14px;font-weight:600;margin-bottom:5px}
+.step-desc{font-size:13px;color:var(--t2);line-height:1.6}
+
+/* Checklist */
+.checklist{list-style:none;display:flex;flex-direction:column;gap:8px}
+.checklist li{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--t2)}
+.chk{width:18px;height:18px;border-radius:50%;background:rgba(34,197,94,.15);color:var(--green);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;margin-top:1px}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:600px){.two-col{grid-template-columns:1fr}}
+
+/* Color chips */
+.color-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.chip{display:flex;flex-direction:column;align-items:center;gap:4px}
+.chip-swatch{width:44px;height:44px;border-radius:8px}
+.chip-label{font-size:10px;color:var(--t3);font-family:monospace;text-align:center}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">P</div>
+    <span class="logo-name">Pushci</span>
+  </div>
+  <div class="nav-section">
+    <a class="nav-item active" href="#" onclick="return false"><span class="nav-ico">◈</span> Guide</a>
+    <a class="nav-item" href="#" onclick="showP('tokens');return false"><span class="nav-ico">⬚</span> Tokens</a>
+    <a class="nav-item" href="#" onclick="showP('components');return false"><span class="nav-ico">⊞</span> Components</a>
+    <a class="nav-item" href="#" onclick="showP('flows');return false"><span class="nav-ico">↗</span> Flows</a>
+    <a class="nav-item" href="#" onclick="showP('motion');return false"><span class="nav-ico">◎</span> Motion</a>
+    <a class="nav-item" href="#" onclick="showP('checklist');return false"><span class="nav-ico">✓</span> Checklist</a>
+  </div>
+  <div class="nav-section" style="margin-top:8px">
+    <div class="nav-label">Pages</div>
+    <a class="nav-item" href="#" onclick="showP('pages');return false"><span class="nav-ico">⌂</span> Home</a>
+    <a class="nav-item" href="#" onclick="showP('pages');return false"><span class="nav-ico">⊞</span> Apps</a>
+    <a class="nav-item" href="#" onclick="showP('pages');return false"><span class="nav-ico">◎</span> Avatar</a>
+    <a class="nav-item" href="#" onclick="showP('flows');return false"><span class="nav-ico">▶</span> Video Gen</a>
+    <a class="nav-item" href="#" onclick="showP('flows');return false"><span class="nav-ico">⇄</span> Translate</a>
+    <a class="nav-item" href="#" onclick="showP('flows');return false"><span class="nav-ico">⊙</span> Video Agent</a>
+  </div>
+  <div class="sidebar-bottom">
+    <div class="user-row">
+      <div class="avatar">SH</div>
+      <div>
+        <div class="user-name">Shachar</div>
+        <div class="user-plan">Pro Plan</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+<div class="content">
+  <div class="page-header">
+    <div class="page-title">HeyGen → Pushci Transformation</div>
+    <div class="page-sub">Complete UX/UI specification — design tokens, components, page layouts, app flows, motion</div>
+  </div>
+
+  <div class="page-nav">
+    <div class="pnav on" onclick="showP('tokens')">Design Tokens</div>
+    <div class="pnav" onclick="showP('layout')">Layout System</div>
+    <div class="pnav" onclick="showP('components')">Components</div>
+    <div class="pnav" onclick="showP('pages')">Page Specs</div>
+    <div class="pnav" onclick="showP('flows')">App Flows</div>
+    <div class="pnav" onclick="showP('motion')">Motion</div>
+    <div class="pnav" onclick="showP('checklist')">Checklist</div>
+  </div>
+
+  <!-- ===== TOKENS ===== -->
+  <div class="panel show" id="panel-tokens">
+
+    <div class="section">
+      <h2>Core CSS Variables — paste into global stylesheet</h2>
+      <div class="code">/* ===================================================
+   PUSHCI DESIGN TOKENS  (HeyGen-pattern dark theme)
+   =================================================== */
+:root {
+  /* ── Backgrounds (3-level depth system) ── */
+  --bg-root:        #0d0d0d;   /* body / outermost container   */
+  --bg-surface:     #141414;   /* sidebar, card backgrounds    */
+  --bg-raised:      #1a1a1a;   /* inputs, dropdown, hover bg   */
+  --bg-hover:       #222222;   /* deepest raised / active bg   */
+
+  /* ── Borders ── */
+  --border:         #2a2a2a;   /* default subtle divider       */
+  --border-em:      #333333;   /* emphasized / hover border    */
+
+  /* ── Text ── */
+  --text-1:         #f0f0f0;   /* primary — headings, labels   */
+  --text-2:         #a0a0a0;   /* secondary — body, nav items  */
+  --text-3:         #666666;   /* tertiary — placeholder, meta */
+
+  /* ── Brand Accent (purple) ── */
+  --accent:         #7c5cfc;
+  --accent-dark:    #6b4ef0;   /* hover state                  */
+  --accent-glow:    rgba(124, 92, 252, 0.15);  /* focus ring  */
+
+  /* ── Semantic Colors ── */
+  --success:        #22c55e;
+  --info:           #3b82f6;
+  --warning:        #f97316;
+  --danger:         #ef4444;
+
+  /* ── Semantic Tinted Backgrounds ── */
+  --bg-success:     rgba(34, 197, 94, 0.12);
+  --bg-info:        rgba(59, 130, 246, 0.12);
+  --bg-warning:     rgba(249, 115, 22, 0.12);
+  --bg-danger:      rgba(239, 68, 68, 0.12);
+
+  /* ── Border Radius Scale ── */
+  --r-sm:     6px;    /* inputs, small buttons, badges        */
+  --r-md:    10px;    /* panels, medium buttons               */
+  --r-lg:    14px;    /* cards, modals, drawers               */
+  --r-xl:    20px;    /* hero banners, large containers       */
+
+  /* ── Layout ── */
+  --sidebar-w:  220px;
+  --content-p:  28px 32px;    /* main content padding          */
+  --card-p:     18px;         /* card inner padding            */
+
+  /* ── Transitions ── */
+  --t-fast:    all 0.15s ease;
+  --t-normal:  all 0.2s ease;
+  --t-slow:    all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --t-spring:  all 0.2s cubic-bezier(0.34, 1.3, 0.7, 1);
+
+  /* ── Typography ── */
+  --font-ui:  'SF Pro Display', system-ui, -apple-system, sans-serif;
+  --font-mono:'SF Mono', 'Fira Code', monospace;
+}</div>
+    </div>
+
+    <div class="section">
+      <h2>Color Palette</h2>
+      <div class="color-row">
+        <div class="chip"><div class="chip-swatch" style="background:#7c5cfc"></div><div class="chip-label">accent<br>#7c5cfc</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#0d0d0d;border:1px solid #333"></div><div class="chip-label">bg-root<br>#0d0d0d</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#141414;border:1px solid #333"></div><div class="chip-label">surface<br>#141414</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#1a1a1a;border:1px solid #333"></div><div class="chip-label">raised<br>#1a1a1a</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#2a2a2a"></div><div class="chip-label">border<br>#2a2a2a</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#f0f0f0"></div><div class="chip-label">text-1<br>#f0f0f0</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#a0a0a0"></div><div class="chip-label">text-2<br>#a0a0a0</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#666"></div><div class="chip-label">text-3<br>#666666</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#22c55e"></div><div class="chip-label">success<br>#22c55e</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#3b82f6"></div><div class="chip-label">info<br>#3b82f6</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#f97316"></div><div class="chip-label">warning<br>#f97316</div></div>
+        <div class="chip"><div class="chip-swatch" style="background:#ef4444"></div><div class="chip-label">danger<br>#ef4444</div></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Typography Scale</h2>
+      <table class="spec-table">
+        <tr><th>Role</th><th>Size / Weight / Color</th></tr>
+        <tr><td>Page title</td><td>22px · 600 · #f0f0f0</td></tr>
+        <tr><td>Section heading</td><td>18px · 600 · #f0f0f0</td></tr>
+        <tr><td>Card title</td><td>14px · 600 · #f0f0f0</td></tr>
+        <tr><td>Body / nav item</td><td>13.5px · 400 · #a0a0a0</td></tr>
+        <tr><td>Label / badge</td><td>12px · 600 · contextual</td></tr>
+        <tr><td>Caption / meta</td><td>11px · 400 · #666</td></tr>
+        <tr><td>Section divider label</td><td>10px · 600 · uppercase · tracking .1em · #666</td></tr>
+        <tr><td>Font stack</td><td>'SF Pro Display', system-ui, -apple-system, sans-serif</td></tr>
+        <tr><td>Mono stack</td><td>'SF Mono', 'Fira Code', 'JetBrains Mono', monospace</td></tr>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ===== LAYOUT ===== -->
+  <div class="panel" id="panel-layout">
+
+    <div class="section">
+      <h2>App Shell — 2-column fixed sidebar</h2>
+      <div class="code">/* ── Shell ── */
+.app-shell {
+  display: flex;
+  height: 100vh;
+  background: var(--bg-root);
+  overflow: hidden;
+}
+
+/* ── Left sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);           /* 220px, never shrinks  */
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 12px 0;
+}
+
+/* ── Main scrollable area ── */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-root);
+}
+
+/* ── Page content wrapper ── */
+.content {
+  padding: var(--content-p);      /* 28px 32px */
+  max-width: 1100px;
+}</div>
+    </div>
+
+    <div class="section">
+      <h2>Sidebar Anatomy</h2>
+      <div class="code">SIDEBAR STRUCTURE (top → bottom)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[Logo row]
+  • 28×28px icon (accent bg, rounded 8px)
+  • Brand name  15px / 600
+  • Padding: 12px 16px 20px
+
+[Nav Group — no label]
+  • Home
+  • Apps
+  • Projects
+
+[Nav Group — label "CREATE"]
+  • Generate AI Video
+  • Video Agent
+  • Translate
+  • UGC Ads
+
+[Nav Group — label "TOOLS"]
+  • Avatar Studio
+
+[Nav Group — label "ACCOUNT"]
+  • Settings
+  • Usage
+
+[Bottom bar — margin-top: auto]
+  • User avatar (28px circle, accent bg, initials)
+  • Name  13px / 500
+  • Plan label  11px / #666
+  • Padding: 12px 8px, border-top: 1px solid var(--border)</div>
+    </div>
+
+    <div class="section">
+      <h2>Navigation Item States</h2>
+      <table class="spec-table">
+        <tr><th>State</th><th>Background</th><th>Text</th><th>Transition</th></tr>
+        <tr><td>Default</td><td>transparent</td><td>#a0a0a0</td><td>—</td></tr>
+        <tr><td>Hover</td><td>#1a1a1a (--bg-raised)</td><td>#f0f0f0</td><td>all 0.15s ease</td></tr>
+        <tr><td>Active / current</td><td>rgba(124,92,252,0.15)</td><td>#7c5cfc (--accent)</td><td>all 0.15s ease</td></tr>
+        <tr><td>Padding</td><td colspan="3">8px 8px — items sit inside 8px horizontal gutters in sidebar</td></tr>
+        <tr><td>Border radius</td><td colspan="3">6px (--r-sm)</td></tr>
+        <tr><td>Icon size</td><td colspan="3">16×16px, 12px font-size for emoji/text icons</td></tr>
+        <tr><td>Gap</td><td colspan="3">10px between icon and label</td></tr>
+        <tr><td>Section labels</td><td colspan="3">10px uppercase 600 #666 tracking .1em — padding 10px 8px 4px</td></tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Content Grid Patterns</h2>
+      <div class="code">/* Apps marketplace grid */
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+/* Two-column page (config + preview) */
+.app-inner-layout {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 24px;
+  height: calc(100vh - 80px);  /* full height minus header */
+}
+
+/* Settings page */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 32px;
+}
+
+/* Translation / upload page */
+.upload-layout {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* Chat layout (Video Agent) */
+.chat-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  height: calc(100vh - 52px);  /* minus top bar */
+}</div>
+    </div>
+
+  </div>
+
+  <!-- ===== COMPONENTS ===== -->
+  <div class="panel" id="panel-components">
+
+    <div class="section">
+      <h2>App Cards</h2>
+      <div class="apps-grid">
+        <div class="app-card">
+          <div class="app-card-icon" style="background:rgba(124,92,252,.15);color:#7c5cfc">▶</div>
+          <div class="card-badge badge-new">New</div>
+          <div class="app-card-title">Generate AI Video</div>
+          <div class="app-card-desc">Create talking-head videos from text scripts</div>
+        </div>
+        <div class="app-card">
+          <div class="app-card-icon" style="background:rgba(59,130,246,.15);color:#3b82f6">⇄</div>
+          <div class="card-badge badge-pro">Pro</div>
+          <div class="app-card-title">Translate</div>
+          <div class="app-card-desc">Auto-translate video into 40+ languages</div>
+        </div>
+        <div class="app-card">
+          <div class="app-card-icon" style="background:rgba(249,115,22,.15);color:#f97316">⊙</div>
+          <div class="card-badge badge-beta">Beta</div>
+          <div class="app-card-title">Video Agent</div>
+          <div class="app-card-desc">Interactive AI-driven video chat workflows</div>
+        </div>
+        <div class="app-card">
+          <div class="app-card-icon" style="background:rgba(34,197,94,.15);color:#22c55e">◎</div>
+          <div class="app-card-title">Avatar Studio</div>
+          <div class="app-card-desc">Create and manage your AI avatars</div>
+        </div>
+      </div>
+      <div class="code">/* ── App Card ── */
+.app-card {
+  background: var(--bg-surface);        /* #141414  */
+  border: 1px solid var(--border);      /* #2a2a2a  */
+  border-radius: var(--r-lg);           /* 14px     */
+  padding: var(--card-p);               /* 18px     */
+  cursor: pointer;
+  transition: var(--t-normal);          /* 0.2s     */
+  position: relative;
+  overflow: hidden;
+}
+.app-card:hover {
+  border-color: var(--border-em);       /* #333333  */
+  background: var(--bg-raised);         /* #1a1a1a  */
+  transform: translateY(-1px);          /* lift     */
+}
+/* Icon container — tinted with app's semantic color */
+.app-card-icon {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+  /* bg = color at 15% opacity, text = full color */
+}
+/* Badge — absolute top-right */
+.card-badge {
+  position: absolute; top: 14px; right: 14px;
+  font-size: 10px; font-weight: 600;
+  padding: 3px 8px; border-radius: 20px;
+}
+.badge-new  { background: rgba(34, 197, 94, .15); color: #22c55e; }
+.badge-pro  { background: rgba(124, 92, 252, .15); color: #7c5cfc; }
+.badge-beta { background: rgba(249, 115, 22, .15); color: #f97316; }
+.badge-hot  { background: rgba(239, 68, 68, .15);  color: #ef4444; }</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>Tab Bar — underline style (HeyGen's primary navigation pattern)</h2>
+      <div class="tabs" style="margin-bottom:16px">
+        <div class="tab active">All</div>
+        <div class="tab">Create</div>
+        <div class="tab">Enhance</div>
+        <div class="tab">Edit</div>
+      </div>
+      <div class="code">/* ── Tab Container ── */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);  /* #2a2a2a */
+  gap: 0;
+  margin-bottom: 20px;
+  /* optional: sticky behavior */
+  position: sticky; top: 0; background: var(--bg-root); z-index: 10;
+}
+/* ── Tab Item ── */
+.tab {
+  padding: 10px 16px;
+  font-size: 13.5px;
+  color: var(--text-2);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;              /* overlap container's border */
+  transition: var(--t-fast);
+  white-space: nowrap;
+  user-select: none;
+}
+.tab:hover  { color: var(--text-1); }
+.tab.active {
+  color: var(--text-1);
+  border-bottom-color: var(--accent);   /* 2px purple underline */
+  font-weight: 500;
+}</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>Filter Pills (secondary filter, below tabs)</h2>
+      <div class="pills" style="margin-bottom:16px">
+        <div class="pill active">All</div>
+        <div class="pill">Featured</div>
+        <div class="pill">New</div>
+        <div class="pill">Popular</div>
+      </div>
+      <div class="code">/* ── Filter Pills ── */
+.pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--t-fast);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  background: transparent;
+}
+.pill:hover  { background: var(--bg-raised); border-color: var(--border-em); }
+.pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>Button System</h2>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+        <button class="btn btn-primary">Generate Video</button>
+        <button class="btn btn-secondary">Preview</button>
+        <button class="btn btn-ghost">Cancel</button>
+        <button class="btn btn-round">↑</button>
+      </div>
+      <div class="code">/* ── Base ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px;
+  border-radius: var(--r-sm);     /* 6px */
+  font-size: 13.5px; font-weight: 500;
+  cursor: pointer; border: none;
+  transition: var(--t-fast);
+  font-family: var(--font-ui);
+}
+.btn:active { transform: scale(0.97); }
+
+/* ── Variants ── */
+.btn-primary  { background: var(--accent);   color: #fff; }
+.btn-primary:hover  { background: var(--accent-dark); }
+
+.btn-secondary { background: var(--bg-raised); color: var(--text-1);
+                 border: 1px solid var(--border-em); }
+.btn-secondary:hover { background: var(--bg-hover); }
+
+.btn-ghost    { background: transparent; color: var(--text-2);
+                border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--bg-raised); color: var(--text-1); }
+
+/* ── Sizes ── */
+.btn-sm  { padding: 5px 10px;  font-size: 12px; border-radius: 5px; }
+.btn-lg  { padding: 11px 22px; font-size: 15px; }
+
+/* ── Full-width Generate button ── */
+.btn-generate {
+  width: 100%; height: 48px;
+  background: var(--accent); border-radius: var(--r-md);
+  font-size: 15px; font-weight: 600; border: none; color: #fff;
+  cursor: pointer; transition: var(--t-fast);
+}
+.btn-generate:hover { background: var(--accent-dark); }
+.btn-generate.loading { opacity: 0.8; pointer-events: none; }
+
+/* ── Round submit (script input, chat) ── */
+.btn-round {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: var(--accent); color: #fff; border: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; cursor: pointer; transition: var(--t-fast);
+  flex-shrink: 0;
+}
+.btn-round:hover { background: var(--accent-dark); transform: scale(1.05); }</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>Form Elements</h2>
+      <div style="max-width:380px;margin-bottom:16px">
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px">Video Title</label>
+          <input class="input" placeholder="Enter title...">
+        </div>
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px">Script</label>
+          <textarea class="input" style="min-height:90px;resize:vertical" placeholder="Write your script..."></textarea>
+        </div>
+      </div>
+      <div class="code">/* ── Base input / textarea / select ── */
+.input, .select, .textarea {
+  width: 100%;
+  background: var(--bg-raised);        /* #1a1a1a  */
+  border: 1px solid var(--border-em);  /* #333333  */
+  border-radius: var(--r-sm);          /* 6px      */
+  padding: 9px 12px;
+  color: var(--text-1);                /* #f0f0f0  */
+  font-size: 13.5px;
+  font-family: var(--font-ui);
+  outline: none;
+  transition: var(--t-fast);
+}
+.input::placeholder  { color: var(--text-3); }
+.input:hover         { border-color: #444; }
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);    /* purple glow ring */
+}
+
+/* ── Form group ── */
+.form-group       { margin-bottom: 16px; }
+.form-label       { display: block; font-size: 12px; font-weight: 600;
+                    color: var(--text-2); margin-bottom: 6px; }
+.form-hint        { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+
+/* ── Select arrow ── */
+.select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
+/* ── Script textarea with floating submit ── */
+.script-wrap { position: relative; }
+.script-textarea { min-height: 160px; padding-bottom: 60px; }
+.script-submit {
+  position: absolute; right: 12px; bottom: 12px;
+  /* use .btn-round styles */
+}</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>Modal / Dialog</h2>
+      <div style="background:rgba(0,0,0,.7);border-radius:var(--r-lg);padding:40px;display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-lg);padding:24px;width:100%;max-width:420px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <div style="font-size:16px;font-weight:600">Upload Script</div>
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2)">✕</div>
+          </div>
+          <textarea class="input" style="min-height:80px;margin-bottom:16px" placeholder="Paste your script..."></textarea>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn btn-ghost" style="padding:5px 12px;font-size:12px">Cancel</button>
+            <button class="btn btn-primary" style="padding:5px 12px;font-size:12px">Confirm</button>
+          </div>
+        </div>
+      </div>
+      <div class="code">/* ── Backdrop ── */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  animation: fade-in 0.15s ease;
+}
+@keyframes fade-in { from { opacity:0; } to { opacity:1; } }
+
+/* ── Modal container ── */
+.modal {
+  background: var(--bg-surface);        /* #141414  */
+  border: 1px solid var(--border-em);   /* #333333  */
+  border-radius: var(--r-lg);           /* 14px     */
+  padding: 24px;
+  width: 440px; max-width: calc(100vw - 32px);
+  animation: modal-in 0.2s cubic-bezier(0.34, 1.3, 0.7, 1);
+}
+@keyframes modal-in {
+  from { opacity:0; transform: scale(0.95) translateY(8px); }
+  to   { opacity:1; transform: scale(1)    translateY(0);   }
+}
+/* ── Modal close button ── */
+.modal-close {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  cursor: pointer; transition: var(--t-fast);
+}
+.modal-close:hover { background: var(--bg-hover); color: var(--text-1); }</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>Hero Banner</h2>
+      <div class="hero" style="margin-bottom:16px">
+        <div>
+          <div style="font-size:20px;font-weight:700;margin-bottom:6px">Turn text into video</div>
+          <div style="font-size:14px;color:var(--t2);margin-bottom:16px">Start with a template or create from scratch</div>
+          <button class="btn btn-primary">Create Video</button>
+        </div>
+        <svg width="120" height="80" viewBox="0 0 120 80" fill="none" style="opacity:.6">
+          <rect x="10" y="10" width="60" height="60" rx="8" fill="rgba(124,92,252,.4)"/>
+          <circle cx="90" cy="20" r="14" fill="rgba(59,130,246,.4)"/>
+          <rect x="70" y="50" width="40" height="22" rx="6" fill="rgba(249,115,22,.4)"/>
+        </svg>
+      </div>
+      <div class="code">/* ── Hero Banner ── */
+.hero-banner {
+  background: linear-gradient(135deg,
+    rgba(124, 92, 252, 0.18) 0%,
+    rgba(59,  130, 246, 0.08) 100%
+  );
+  border: 1px solid rgba(124, 92, 252, 0.25);
+  border-radius: var(--r-xl);           /* 20px  */
+  padding: 28px 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 28px;
+  overflow: hidden; position: relative;
+}
+/* Decorative SVG art on right — opacity 0.5-0.7, abstract shapes */</div>
+    </div>
+
+  </div>
+
+  <!-- ===== PAGES ===== -->
+  <div class="panel" id="panel-pages">
+
+    <div class="section">
+      <h2>Apps Page — Full Structure</h2>
+      <div class="code">APPS PAGE ANATOMY (top → bottom)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Page header
+   ├─ Title: "Apps"   22px 600
+   └─ Subtitle: "Choose a tool to get started"   14px #a0a0a0
+
+2. Hero banner (optional — only on first visit or promotions)
+   └─ gradient bg + decorative art + CTA button
+
+3. Primary filter tabs (underline style, STICKY on scroll)
+   └─ All · Create · Enhance · Edit · Translate · Business
+
+4. Secondary filter pills (below tabs)
+   └─ All · Featured · New · Popular
+
+5. Section heading
+   └─ e.g. "CREATE"   10px uppercase 600 #666 tracking .1em
+
+6. Apps grid
+   └─ auto-fill minmax(200px, 1fr) gap 14px
+   └─ Each = App Card (see component spec)
+
+7. Repeat sections 5–6 for each category
+
+SCROLL BEHAVIOR:
+   └─ Tabs stick to top after page header scrolls away
+   └─ Smooth scroll (scroll-behavior: smooth)
+   └─ Restore scroll position on back-navigation</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>Avatar Studio Page</h2>
+      <div class="code">AVATAR STUDIO LAYOUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌──────────────────────────────────────────────────────┐
+│ TOP TOOLBAR  (h:52px, border-bottom: 1px #2a2a2a)   │
+│  [← Back btn]  [Editable title input]  [⋯] [Save]  │
+│                                          [Share btn] │
+├─────────────────────────────────────────────────────┤
+│ LEFT PANEL (240px)   │  CENTER CANVAS               │
+│ border-right 1px     │  bg: #000000                 │
+│                      │  aspect-ratio locked 16:9    │
+│ Avatar selector grid │  video/image preview         │
+│ 3 cols, 80px thumbs  │  centered in dark container  │
+│ rounded 8px          │                              │
+│ selected = 2px       ├──────────────────────────────┤
+│ accent border ring   │  SCRIPT INPUT BAR (h:72px)   │
+│                      │  border-top: 1px #2a2a2a     │
+│ + "Create Avatar"    │  [textarea] [⚙ settings]    │
+│   link top of grid   │  [● record] [↑ round btn]   │
+└─────────────────────────────────────────────────────┘
+
+KEY CSS:
+  .canvas { background: #000; display: flex; align-items: center;
+            justify-content: center; aspect-ratio: 16/9; }
+  .script-bar { position: sticky; bottom: 0; background: var(--bg-surface);
+                border-top: 1px solid var(--border); padding: 14px 16px;
+                display: flex; align-items: flex-end; gap: 10px; }</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>App Inner Page (Generate AI Video, UGC Ads, etc.)</h2>
+      <div class="code">2-COLUMN APP INNER LAYOUT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌─ Page header (title + back button) ──────────────────┐
+│                                                      │
+├─────────────────────────────────────────────────────┤
+│  LEFT CONFIG PANEL (400px, scrollable)               │
+│  bg: var(--bg-surface)                              │
+│  border-right: 1px solid var(--border)              │
+│  padding: 20px                                      │
+│                                                     │
+│  Step accordion sections:                           │
+│  [1] Avatar selector                               │
+│  [2] Voice picker                                  │
+│  [3] Script editor                                 │
+│  [4] Captions toggle + style                       │
+│  [5] Background (color/upload)                     │
+│  [6] Aspect ratio (radio: 16:9 / 9:16 / 1:1)      │
+│                                                     │
+│  [Generate Video]  full-width 48px accent button   │
+├─────────────────────────────────────────────────────┤
+│  RIGHT PREVIEW (flex: 1)                            │
+│  bg: #0a0a0a (deep dark canvas)                    │
+│  Video/image preview centered                      │
+│  Placeholder: dashed border 1px #333 rounded-xl    │
+│  + icon + "Preview will appear here"               │
+└─────────────────────────────────────────────────────┘
+
+STEP INDICATOR (left of each accordion section):
+  Pending:   24px circle, bg #333, color #666
+  Active:    24px circle, bg var(--accent), color #fff
+  Complete:  24px circle, bg var(--success), color #fff, checkmark icon
+  Connected by 1px vertical line bg #2a2a2a</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>Translate Page</h2>
+      <div class="code">TRANSLATE PAGE FLOW (max-width: 640px, centered)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STATE 1: Upload
+  [Upload zone]
+    border: 2px dashed var(--border-em)  →  accent on dragover
+    border-radius: var(--r-xl)
+    height: 200px; text-align: center
+    icon (48px) + "Drop video here" + "or Browse files"
+
+STATE 2: Configure
+  [Source language chip — auto-detected]  →  [Target language select]
+  [Quality radio: Fast | Balanced | Quality]
+  [Lip-sync toggle: On / Off]
+  [Translate button — full width, accent, 48px]
+
+STATE 3: Processing
+  [Progress bar]
+    bg: var(--bg-raised)
+    fill: var(--accent)
+    border-radius: 20px; height: 6px
+    transition: width 0.4s cubic-bezier(.4,0,.2,1)
+  [Status text] e.g. "Translating audio... 45%"
+
+STATE 4: Complete
+  [Side-by-side player grid 2 cols]
+    Left: Original  |  Right: Translated
+    Each: video player + language label
+  [Download button (secondary)] [Share button (ghost)]</div>
+    </div>
+
+  </div>
+
+  <!-- ===== FLOWS ===== -->
+  <div class="panel" id="panel-flows">
+
+    <div class="section">
+      <h2>Generate AI Video — Step-by-Step</h2>
+      <div class="step-row">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-title">Select Avatar</div>
+          <div class="step-desc">Grid of avatar thumbnails (80×80px, rounded 8px). Click to select — selected state = 2px solid accent border + subtle scale(1.02). "Create Avatar" CTA link pinned at top of grid. Hover tooltip shows avatar name.</div>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-title">Choose Voice</div>
+          <div class="step-desc">Language dropdown (flag icon + language name) → Voice select. Preview button: 32px circle, ghost style, play icon. Secondary filter tabs inside panel: All / Male / Female / Neural / Cloned.</div>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-title">Write Script</div>
+          <div class="step-desc">Large textarea (min-height 180px). Top toolbar: character counter right, "Import" ghost button, "AI Write" accent ghost button. Round submit button (42px, accent) floats bottom-right inside textarea container.</div>
+          <div class="code">/* Script section */
+.script-section { position: relative; }
+.script-input   { min-height: 180px; padding-bottom: 60px; resize: vertical; }
+.script-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.char-count { font-size: 11px; color: var(--text-3); }
+.char-count.warn { color: var(--warning); }
+.char-count.over { color: var(--danger); }</div>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-title">Configure Options</div>
+          <div class="step-desc">Accordion panels (collapse/expand with chevron icon). Each section: Captions (toggle + font/position/color), Background (solid color picker OR upload image/video), Aspect ratio (3 segmented radio: 16:9 · 9:16 · 1:1).</div>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-num">5</div>
+        <div>
+          <div class="step-title">Generate</div>
+          <div class="step-desc">Full-width 48px accent button at bottom of left panel. On click → button = loading state (spinner animation + "Generating..." text). Estimated time label below button ("~ 45 seconds"). Right preview panel shows progress overlay on video container.</div>
+          <div class="code">/* Loading state */
+.btn-generate.loading::before {
+  content: '';
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>Video Agent — Chat Layout</h2>
+      <div class="code">VIDEO AGENT PAGE STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+┌── Top bar (52px) ────────────────────────────────────┐
+│  Agent avatar (32px) + name + status dot (green=live)│
+│  Settings gear  |  End session button               │
+├──────────────────────────────────┬───────────────────┤
+│  CHAT THREAD (flex: 1)           │  VIDEO PANEL      │
+│  overflow-y: auto                │  (380px, fixed)   │
+│  padding: 16px                   │                   │
+│  display: flex; flex-direction:  │  Avatar video     │
+│    column; gap: 12px             │  loop or idle     │
+│                                  │  bg: #000         │
+│  User messages: right-aligned    │  aspect 9:16      │
+│    bg: #222; border-radius:      │                   │
+│    14px 14px 0 14px              │  or 16:9          │
+│    max-width: 70%                │                   │
+│                                  │                   │
+│  Agent messages: left-aligned    │                   │
+│    bg: #1a1a1a; border:          │                   │
+│    1px solid #2a2a2a             │                   │
+│    border-radius: 14px 14px      │                   │
+│    14px 0; max-width: 70%        │                   │
+├──────────────────────────────────┴───────────────────┤
+│  INPUT BAR (64px, border-top: 1px solid #2a2a2a)    │
+│  [textarea flex:1] [📎 attach] [🎤 mic] [↑ round]  │
+└──────────────────────────────────────────────────────┘</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <h2>Product Placement / UGC Ads — Upload Flow</h2>
+      <div class="code">MULTI-STEP UPLOAD FLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1: Upload assets
+  Two upload zones side by side:
+  ┌─────────────────┐  ┌─────────────────┐
+  │  Product image  │  │  Background /   │
+  │  (drag & drop)  │  │  Video clip     │
+  └─────────────────┘  └─────────────────┘
+
+STEP 2: Configure
+  Positioning sliders (x, y, scale, rotation)
+  Blend mode select
+  Duration / timing settings
+
+STEP 3: Preview & Export
+  [Full preview player]
+  [Export settings: quality, format]
+  [Export button — accent, full width]
+
+UPLOAD ZONE STATES:
+  Empty:  dashed border #333, icon + text, bg: #1a1a1a
+  Hover:  dashed border var(--accent), bg: rgba(124,92,252,.05)
+  Active drag: solid border var(--accent), bg: rgba(124,92,252,.1)
+  Filled: solid border #333, thumbnail preview</div>
+    </div>
+
+  </div>
+
+  <!-- ===== MOTION ===== -->
+  <div class="panel" id="panel-motion">
+
+    <div class="section">
+      <h2>Transition Tokens</h2>
+      <table class="spec-table">
+        <tr><th>Token</th><th>Value</th><th>Use case</th></tr>
+        <tr><td>--t-fast</td><td>all 0.15s ease</td><td>Hover states, color changes, borders</td></tr>
+        <tr><td>--t-normal</td><td>all 0.2s ease</td><td>Card hover, panel toggles, tab switch</td></tr>
+        <tr><td>--t-slow</td><td>all 0.3s cubic-bezier(.4,0,.2,1)</td><td>Page transitions, sidebar expand</td></tr>
+        <tr><td>--t-spring</td><td>all 0.2s cubic-bezier(.34,1.3,.7,1)</td><td>Modal open, tooltip appear, badge pop</td></tr>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>All Animation Keyframes — copy this block</h2>
+      <div class="code">/* ================================================
+   PUSHCI ANIMATION SYSTEM (HeyGen-pattern)
+   ================================================ */
+
+/* Page route transition */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.page-enter { animation: fade-up 0.25s ease; }
+
+/* Modal open */
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+
+/* Backdrop fade */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Tooltip appear */
+@keyframes tooltip-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+.tooltip { animation: tooltip-up 0.15s ease; }
+
+/* Sidebar nav stagger on mount */
+@keyframes nav-slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+.nav-item { animation: nav-slide-in 0.3s ease both; }
+.nav-item:nth-child(1) { animation-delay: 0.04s; }
+.nav-item:nth-child(2) { animation-delay: 0.08s; }
+.nav-item:nth-child(3) { animation-delay: 0.12s; }
+.nav-item:nth-child(4) { animation-delay: 0.16s; }
+.nav-item:nth-child(5) { animation-delay: 0.20s; }
+.nav-item:nth-child(6) { animation-delay: 0.24s; }
+
+/* App card grid stagger */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.app-card { animation: card-in 0.3s ease both; }
+.app-card:nth-child(1) { animation-delay: 0.05s; }
+.app-card:nth-child(2) { animation-delay: 0.10s; }
+.app-card:nth-child(3) { animation-delay: 0.15s; }
+.app-card:nth-child(4) { animation-delay: 0.20s; }
+
+/* Skeleton shimmer (loading state) */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg,
+    #1a1a1a 25%, #252525 50%, #1a1a1a 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--r-sm);
+}
+
+/* Spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* Progress bar fill */
+.progress-fill {
+  height: 6px; border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hover interactions */
+.app-card:hover     { transform: translateY(-1px); }
+.btn:active         { transform: scale(0.97); }
+.btn-round:hover    { transform: scale(1.05); }
+.avatar-thumb:hover { transform: scale(1.03); }</div>
+    </div>
+
+  </div>
+
+  <!-- ===== CHECKLIST ===== -->
+  <div class="panel" id="panel-checklist">
+    <div class="two-col">
+      <div>
+        <div class="section">
+          <h2>Phase 1 — Foundation</h2>
+          <ul class="checklist">
+            <li><div class="chk">✓</div> Apply all CSS tokens (:root variables) globally</li>
+            <li><div class="chk">✓</div> Set body background: #0d0d0d, color: #f0f0f0</li>
+            <li><div class="chk">✓</div> Build sidebar shell (220px fixed + flex main)</li>
+            <li><div class="chk">✓</div> Implement 3-state nav items (default/hover/active)</li>
+            <li><div class="chk">✓</div> Logo row + bottom user avatar row in sidebar</li>
+            <li><div class="chk">✓</div> Page content padding: 28px 32px, max-width 1100px</li>
+            <li><div class="chk">✓</div> Global font: SF Pro Display → system-ui</li>
+          </ul>
+        </div>
+        <div class="section">
+          <h2>Phase 2 — Components</h2>
+          <ul class="checklist">
+            <li><div class="chk">✓</div> App card (icon tinted + title + desc + abs badge)</li>
+            <li><div class="chk">✓</div> Tab bar — underline style, 2px accent active</li>
+            <li><div class="chk">✓</div> Filter pills — rounded 20px, accent fill active</li>
+            <li><div class="chk">✓</div> Button variants: primary / secondary / ghost / round</li>
+            <li><div class="chk">✓</div> Input/select/textarea with accent focus ring</li>
+            <li><div class="chk">✓</div> Modal with blur backdrop + spring-in animation</li>
+            <li><div class="chk">✓</div> Hero banner — gradient bg + decorative art</li>
+            <li><div class="chk">✓</div> Skeleton shimmer for async loading states</li>
+          </ul>
+        </div>
+      </div>
+      <div>
+        <div class="section">
+          <h2>Phase 3 — Pages</h2>
+          <ul class="checklist">
+            <li><div class="chk">✓</div> Apps page: hero + sticky tabs + category sections</li>
+            <li><div class="chk">✓</div> App inner: 2-col config panel + preview canvas</li>
+            <li><div class="chk">✓</div> Avatar studio: toolbar + canvas + script bar</li>
+            <li><div class="chk">✓</div> Translate: upload → config → progress → output</li>
+            <li><div class="chk">✓</div> Video Agent: chat thread + video panel side-by-side</li>
+            <li><div class="chk">✓</div> Step indicator (pending/active/complete states)</li>
+          </ul>
+        </div>
+        <div class="section">
+          <h2>Phase 4 — Motion</h2>
+          <ul class="checklist">
+            <li><div class="chk">✓</div> Card hover: translateY(-1px) + border-color shift</li>
+            <li><div class="chk">✓</div> Modal: spring-in 0.2s cubic-bezier(.34,1.3,.7,1)</li>
+            <li><div class="chk">✓</div> Page route: fade-up 0.25s</li>
+            <li><div class="chk">✓</div> Nav stagger on mount (0.04s per item delay)</li>
+            <li><div class="chk">✓</div> Progress bar: width transition 0.4s cubic</li>
+            <li><div class="chk">✓</div> Button active: scale(0.97)</li>
+            <li><div class="chk">✓</div> Focus ring: 0 0 0 3px rgba(124,92,252,.15)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Critical Visual Rules — Never Break These</h2>
+      <table class="spec-table">
+        <tr><th>Rule</th><th>Correct value</th></tr>
+        <tr><td>3-level background depth</td><td>#0d0d0d root → #141414 surface → #1a1a1a raised</td></tr>
+        <tr><td>Never use white backgrounds</td><td>Darkest white = #222 for button hover ONLY</td></tr>
+        <tr><td>Border width</td><td>Always 1px solid — never 2px except featured card accent</td></tr>
+        <tr><td>Accent usage</td><td>CTAs · active nav · focus rings · tab underlines only — not decoration</td></tr>
+        <tr><td>Icon container tint</td><td>Semantic color at 15% opacity background</td></tr>
+        <tr><td>Border radius</td><td>6px sm · 10px md · 14px lg · 20px xl — never arbitrary values</td></tr>
+        <tr><td>Text contrast levels</td><td>#f0f0f0 primary · #a0a0a0 secondary · #666 tertiary</td></tr>
+        <tr><td>Section label style</td><td>10px · uppercase · weight 600 · letter-spacing .1em · color #666</td></tr>
+        <tr><td>Tab active indicator</td><td>2px border-bottom accent color — NOT background fill</td></tr>
+        <tr><td>Round submit button</td><td>42px circle · accent bg · absolute positioned in script/chat input</td></tr>
+        <tr><td>Card hover lift</td><td>translateY(-1px) ONLY — never translateY(-4px) or shadows</td></tr>
+        <tr><td>Modal backdrop blur</td><td>backdrop-filter: blur(4px) — disable on mobile for performance</td></tr>
+        <tr><td>Sidebar width</td><td>220px fixed — never collapsible unless ≤768px viewport</td></tr>
+        <tr><td>Form focus ring</td><td>box-shadow: 0 0 0 3px rgba(124,92,252,.15) — no hard glow</td></tr>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script>
+function showP(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('show'));
+  var el=document.getElementById('panel-'+id);
+  if(el) el.classList.add('show');
+  document.querySelectorAll('.pnav').forEach(n=>n.classList.remove('on'));
+}
+document.querySelectorAll('.pnav').forEach(n=>{
+  n.addEventListener('click',function(){
+    document.querySelectorAll('.pnav').forEach(x=>x.classList.remove('on'));
+    this.classList.add('on');
+  });
+});
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',function(){
+    this.closest('.tabs').querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+document.querySelectorAll('.pill').forEach(p=>{
+  p.addEventListener('click',function(){
+    this.closest('.pills').querySelectorAll('.pill').forEach(x=>x.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+document.querySelectorAll('.nav-item').forEach(n=>{
+  n.addEventListener('click',function(){
+    document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

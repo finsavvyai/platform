@@ -1,0 +1,69 @@
+name: Flakestress nightly
+
+# Stress-runs the gateway test packages most likely to harbour timing-
+# sensitive flakes (auth, ratelimit, audit, scim, sso, webhooks). The
+# job is non-blocking — its purpose is to surface flakes BEFORE the
+# regular CI sees them, not to gate merges. A summary of the run is
+# attached to the workflow summary.
+
+on:
+  schedule:
+    # 02:00 UTC every weekday (off-peak in Asia/Jerusalem too).
+    - cron: "0 2 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "Iterations per package"
+        required: false
+        default: "50"
+
+permissions:
+  contents: read
+
+jobs:
+  flakestress:
+    name: flakestress (${{ matrix.pkg }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg:
+          - ./services/gateway/internal/infrastructure/auth/...
+          - ./services/gateway/internal/infrastructure/ratelimit/...
+          - ./services/gateway/internal/infrastructure/audit/...
+          - ./services/gateway/internal/infrastructure/scim/...
+          - ./services/gateway/internal/infrastructure/sso/...
+          - ./services/gateway/internal/infrastructure/webhooks/...
+          - ./services/gateway/internal/interfaces/http/middleware/...
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+          cache-dependency-path: services/gateway/go.sum
+
+      - name: Install flakestress
+        run: go install github.com/bradfitz/flakestress@latest
+
+      - name: Run flakestress (${{ matrix.pkg }})
+        working-directory: services/gateway
+        run: |
+          set +e
+          # Translate workflow-relative path to module-relative.
+          pkg="${{ matrix.pkg }}"
+          pkg="${pkg#./services/gateway/}"
+          runs="${{ github.event.inputs.runs || '50' }}"
+          flakestress -n "$runs" -- "$pkg" 2>&1 | tee /tmp/flake.log
+          status=${PIPESTATUS[0]}
+          {
+            echo "## flakestress: $pkg"
+            echo ""
+            echo '```'
+            tail -n 60 /tmp/flake.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Don't fail the workflow on flakes — surfacing is the point.
+          exit 0

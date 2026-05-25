@@ -1,0 +1,183 @@
+# Production values for FinSavvyAI Helm chart
+# Usage: helm install finsavvyai ./helm/finsavvyai -f helm/finsavvyai/values-production.yaml
+
+replicaCount: 3
+
+image:
+  repository: finsavvyai/finsavvyai
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# ── Gateway ────────────────────────────────────────────────────────────────
+gateway:
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    FINSAVVYAI_LOG_LEVEL: INFO
+    FINSAVVYAI_AUTH_ENABLED: "true"
+    FINSAVVYAI_RATE_LIMIT_REQUESTS: "100"
+    FINSAVVYAI_RATE_LIMIT_WINDOW: "60"
+
+# ── Master ─────────────────────────────────────────────────────────────────
+master:
+  enabled: true
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ── Worker ─────────────────────────────────────────────────────────────────
+worker:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "1000m"
+      memory: 1Gi
+
+# ── Pod Disruption Budget ──────────────────────────────────────────────────
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# ── Autoscaling (HPA) ─────────────────────────────────────────────────────
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+
+# ── Health Probes ──────────────────────────────────────────────────────────
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
+
+startupProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 12
+
+# ── Ingress with TLS ──────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: api.finsavvyai.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: finsavvyai-tls
+      hosts:
+        - api.finsavvyai.com
+
+# ── Security ───────────────────────────────────────────────────────────────
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# ── Secrets (provide via --set or sealed-secrets) ─────────────────────────
+secrets:
+  openaiApiKey: ""
+  anthropicApiKey: ""
+  finsavvyaiApiKey: ""
+
+# ── Persistence ────────────────────────────────────────────────────────────
+persistence:
+  logs:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+
+# ── Topology Spread ───────────────────────────────────────────────────────
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: finsavvyai
+
+# ── Node Affinity (prefer dedicated nodes) ────────────────────────────────
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: finsavvyai
+          topologyKey: kubernetes.io/hostname
+
+nodeSelector: {}
+tolerations: []

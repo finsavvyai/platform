@@ -1,0 +1,77 @@
+# Local Temporal dev cluster for the SDLC RAG ingestion workflow.
+#
+# The `auto-setup` image bundles Temporal server + PostgreSQL schema bootstrap
+# in one container. It is for DEV ONLY — production should use a managed
+# cluster (Temporal Cloud) or a split-component Helm deployment.
+#
+# Usage:
+#   docker compose -f deployments/temporal/docker-compose.yml up -d
+#   open http://localhost:8233   # Temporal UI
+#   # then in another shell:
+#   TEMPORAL_ADDRESS=localhost:7233 python -m app.workflows.worker
+
+version: "3.9"
+
+services:
+  temporal-postgres:
+    image: postgres:15-alpine
+    container_name: sdlc-temporal-postgres
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes:
+      - temporal-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - sdlc-temporal
+
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: sdlc-temporal
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-postgres
+      DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/config/dynamicconfig/development.yaml
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CLI_ADDRESS: temporal:7233
+    ports:
+      - "7233:7233"  # gRPC API used by workers + clients
+    networks:
+      - sdlc-temporal
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  temporal-ui:
+    image: temporalio/ui:2.27.2
+    container_name: sdlc-temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8233:8080"  # Temporal Web UI (namespace visibility, workflow history)
+    networks:
+      - sdlc-temporal
+
+networks:
+  sdlc-temporal:
+    driver: bridge
+
+volumes:
+  temporal-pgdata:

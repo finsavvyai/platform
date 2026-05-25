@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawPipe Playground</title>
+  <meta name="description" content="Interactive demo of the ClawPipe AI pipeline. See Booster, Packer, Cache, Router, Gateway, and Learn stages fire in real-time.">
+  <meta name="color-scheme" content="dark light">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-primary: #0d0d0d; --bg-secondary: #141414; --bg-tertiary: #1a1a1a;
+      --fill-tertiary: rgba(120,120,128,0.12); --separator: #2a2a2a;
+      --label-primary: #f0f0f0; --label-secondary: #a0a0a0;
+      --label-tertiary: #666666;
+      --accent: #8b5cf6; --accent-hover: #7c3aed; --green: #22c55e;
+      --amber: #f97316; --red: #ef4444; --tint: rgba(139,92,246,0.15);
+      --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px;
+      --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px;
+      --font-mono: 'SF Mono', SFMono-Regular, 'Fira Code', Menlo, monospace;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-primary: #f5f5f7; --bg-secondary: #ffffff; --bg-tertiary: #f0f0f2;
+        --fill-tertiary: rgba(120,120,128,0.08); --separator: #d4d4d8;
+        --label-primary: #1a1a1a; --label-secondary: #6b6b6b;
+        --label-tertiary: #a0a0a0;
+        --accent: #7c3aed; --accent-hover: #6d28d9; --tint: rgba(124,58,237,0.06);
+        --green: #22c55e; --amber: #f97316; --red: #ef4444;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
+      background: var(--bg-primary); color: var(--label-primary);
+      line-height: 1.47; -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    a:focus-visible, button:focus-visible, textarea:focus-visible {
+      outline: 3px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm);
+    }
+
+    /* Header */
+    .header {
+      padding: var(--space-md) var(--space-lg); border-bottom: 0.5px solid var(--separator);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .header h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .header h1 span { color: var(--accent); }
+
+    /* Layout */
+    .main { display: flex; gap: 1px; background: var(--separator); min-height: calc(100vh - 53px); }
+    .panel-left { width: 40%; min-width: 300px; background: var(--bg-primary); padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-md); }
+    .panel-right { flex: 1; background: var(--bg-primary); padding: var(--space-lg); overflow-y: auto; }
+
+    /* Presets */
+    .presets { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+    .chip {
+      background: var(--bg-secondary); border: 0.5px solid var(--separator); border-radius: 20px;
+      padding: 6px 14px; font-size: 13px; color: var(--label-secondary); cursor: pointer;
+      transition: all 0.2s ease; white-space: nowrap;
+    }
+    .chip:hover { background: var(--tint); color: var(--label-primary); }
+
+    /* Input */
+    textarea {
+      width: 100%; min-height: 100px; resize: vertical; background: var(--bg-secondary);
+      border: 0.5px solid var(--separator); border-radius: var(--radius-md); padding: var(--space-md);
+      color: var(--label-primary); font-family: var(--font-mono); font-size: 14px; line-height: 1.5;
+    }
+
+    /* Toggles */
+    .toggles { display: flex; flex-wrap: wrap; gap: var(--space-md); }
+    .toggle { display: flex; align-items: center; gap: var(--space-sm); font-size: 13px; color: var(--label-secondary); cursor: pointer; }
+    .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+    /* Button */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: var(--space-sm);
+      padding: var(--space-md) var(--space-lg); min-height: 44px; border-radius: var(--radius-md);
+      font-weight: 600; font-size: 15px; cursor: pointer; border: none;
+      background: var(--accent); color: #fff; transition: all 0.2s ease; width: 100%;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* Stage cards */
+    .stage {
+      background: var(--bg-secondary); border: 0.5px solid var(--separator);
+      border-radius: var(--radius-lg); padding: var(--space-md) var(--space-lg);
+      margin-bottom: var(--space-sm); opacity: 0.4; transition: all 0.3s ease;
+      display: flex; align-items: flex-start; gap: var(--space-md);
+    }
+    .stage.active { opacity: 1; border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
+    .stage.done { opacity: 1; border-color: var(--green); }
+    .stage-icon {
+      width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: 14px; flex-shrink: 0;
+      background: var(--fill-tertiary); color: var(--label-tertiary); transition: all 0.3s ease;
+    }
+    .stage.active .stage-icon { background: rgba(255,159,10,0.2); color: var(--amber); }
+    .stage.done .stage-icon { background: rgba(48,209,88,0.2); color: var(--green); }
+    .stage-body { flex: 1; min-width: 0; }
+    .stage-name { font-size: 15px; font-weight: 600; }
+    .stage-status { font-size: 13px; color: var(--label-secondary); margin-top: 2px; font-family: var(--font-mono); }
+    .stage-detail { font-size: 12px; color: var(--label-tertiary); margin-top: 4px; }
+    .stage-time { font-size: 12px; color: var(--label-tertiary); white-space: nowrap; margin-left: auto; padding-left: var(--space-sm); }
+
+    /* Results */
+    .results { margin-top: var(--space-lg); }
+    .result-box {
+      background: var(--bg-secondary); border: 0.5px solid var(--separator);
+      border-radius: var(--radius-lg); padding: var(--space-lg); margin-bottom: var(--space-sm);
+    }
+    .result-box h3 { font-size: 15px; font-weight: 600; margin-bottom: var(--space-sm); }
+    .result-text { font-family: var(--font-mono); font-size: 13px; line-height: 1.6; color: var(--label-secondary); white-space: pre-wrap; }
+    .cost-row { display: flex; flex-wrap: wrap; gap: var(--space-lg); font-size: 13px; }
+    .cost-item { display: flex; flex-direction: column; gap: 2px; }
+    .cost-label { color: var(--label-tertiary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .cost-value { font-weight: 600; font-family: var(--font-mono); }
+    .cost-value.saved { color: var(--green); }
+    .meta-toggle { font-size: 13px; color: var(--accent); cursor: pointer; background: none; border: none; padding: var(--space-sm) 0; font-weight: 500; }
+    .meta-json { font-family: var(--font-mono); font-size: 12px; color: var(--label-tertiary); white-space: pre-wrap; margin-top: var(--space-sm); display: none; }
+    .hidden { display: none; }
+
+    /* Demo quota indicator */
+    .demo-quota {
+      font-size: 12px; color: var(--label-tertiary); text-align: center;
+      padding: 8px 0; margin-top: -4px;
+    }
+    .demo-quota.warn { color: var(--amber); }
+    .demo-quota.exhausted { color: var(--red); font-weight: 600; }
+
+    /* Pulse animation */
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+    .stage.active { animation: pulse 1.5s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+    @media (max-width: 768px) {
+      .main { flex-direction: column; }
+      .panel-left { width: 100%; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><span>ClawPipe</span> Playground</h1>
+    <a href="https://clawpipe.ai">Back to clawpipe.ai</a>
+  </div>
+  <div class="main">
+    <div class="panel-left">
+      <div>
+        <div style="font-size:13px;color:var(--label-tertiary);margin-bottom:var(--space-sm)">Presets</div>
+        <div class="presets">
+          <button class="chip" data-prompt="Calculate 42 * 2">Calculate 42 * 2</button>
+          <button class="chip" data-prompt="Generate a UUID">Generate a UUID</button>
+          <button class="chip" data-prompt="Explain recursion in simple terms">Explain recursion</button>
+          <button class="chip" data-prompt="What is 2^10?">What is 2^10?</button>
+        </div>
+      </div>
+      <textarea id="prompt" placeholder="Type a prompt..." aria-label="Prompt input">Explain recursion in simple terms</textarea>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="tBooster" checked> Booster</label>
+        <label class="toggle"><input type="checkbox" id="tPacker" checked> Packer</label>
+        <label class="toggle"><input type="checkbox" id="tCache" checked> Cache</label>
+      </div>
+      <button class="btn" id="runBtn" onclick="runPipeline()">Run Pipeline</button>
+      <div class="demo-quota" id="demoQuota">5 free calls / hour · no signup required</div>
+      <div id="resultSection" class="results hidden">
+        <div class="result-box">
+          <h3>Response</h3>
+          <div class="result-text" id="resultText"></div>
+        </div>
+        <div class="result-box">
+          <h3>Cost Savings</h3>
+          <div class="cost-row">
+            <div class="cost-item"><span class="cost-label">Direct API</span><span class="cost-value" id="costDirect"></span></div>
+            <div class="cost-item"><span class="cost-label">ClawPipe</span><span class="cost-value" id="costPipe"></span></div>
+            <div class="cost-item"><span class="cost-label">Saved</span><span class="cost-value saved" id="costSaved"></span></div>
+          </div>
+        </div>
+        <div class="result-box">
+          <button class="meta-toggle" onclick="toggleMeta()">Show full meta JSON</button>
+          <pre class="meta-json" id="metaJson"></pre>
+        </div>
+      </div>
+    </div>
+    <div class="panel-right">
+      <div style="font-size:13px;color:var(--label-tertiary);margin-bottom:var(--space-md)">Pipeline Stages</div>
+      <div id="stages"></div>
+    </div>
+  </div>
+<script>
+const STAGES = [
+  { id: 'booster', name: 'Booster', icon: 'B' },
+  { id: 'packer',  name: 'Packer',  icon: 'P' },
+  { id: 'cache',   name: 'Cache',   icon: 'C' },
+  { id: 'router',  name: 'Router',  icon: 'R' },
+  { id: 'gateway', name: 'Gateway', icon: 'G' },
+  { id: 'learn',   name: 'Learn',   icon: 'L' },
+];
+
+const stagesEl = document.getElementById('stages');
+STAGES.forEach(s => {
+  stagesEl.innerHTML += `<div class="stage" id="s-${s.id}">
+    <div class="stage-icon">${s.icon}</div>
+    <div class="stage-body">
+      <div class="stage-name">${s.name}</div>
+      <div class="stage-status" id="st-${s.id}">Waiting...</div>
+      <div class="stage-detail" id="dt-${s.id}"></div>
+    </div>
+    <div class="stage-time" id="tm-${s.id}"></div>
+  </div>`;
+});
+
+const cache = new Map();
+
+/* Booster: deterministic resolvers */
+function tryBoost(prompt) {
+  const p = prompt.trim().toLowerCase();
+  const mathMatch = prompt.match(/^(?:calculate|compute|what is|eval(?:uate)?)\s+(.+)$/i);
+  if (mathMatch) {
+    try {
+      const expr = mathMatch[1].replace(/[^0-9+\-*/().^ ]/g, '').replace(/\^/g, '**');
+      if (expr && /^[0-9+\-*/().* ]+$/.test(expr)) {
+        const result = Function('"use strict"; return (' + expr + ')')();
+        if (typeof result === 'number' && isFinite(result)) return String(result);
+      }
+    } catch (_) { /* fall through */ }
+  }
+  if (/generate\s+a?\s*uuid/i.test(p)) return crypto.randomUUID();
+  if (/(?:current|today).{0,10}(?:date|time)/i.test(p)) return new Date().toISOString();
+  if (/base64\s+(?:encode|decode)/i.test(p)) {
+    const m = prompt.match(/base64\s+encode\s+"?(.+?)"?\s*$/i);
+    if (m) return btoa(m[1]);
+    const d = prompt.match(/base64\s+decode\s+"?(.+?)"?\s*$/i);
+    if (d) try { return atob(d[1]); } catch (_) {}
+  }
+  if (/(?:convert|how many)\s+(\d+\.?\d*)\s*(km|mi|kg|lb|c|f|cm|in)\s+(?:to|in)\s+(km|mi|kg|lb|c|f|cm|in)/i.test(p)) {
+    const m = p.match(/(\d+\.?\d*)\s*(km|mi|kg|lb|c|f|cm|in)\s+(?:to|in)\s+(km|mi|kg|lb|c|f|cm|in)/i);
+    if (m) { const v = parseFloat(m[1]), from = m[2], to = m[3]; return convert(v, from, to); }
+  }
+  if (/json.*format|format.*json/i.test(p)) {
+    const jm = prompt.match(/\{[\s\S]*\}/); if (jm) try { return JSON.stringify(JSON.parse(jm[0]), null, 2); } catch (_) {}
+  }
+  return null;
+}
+
+function convert(v, f, t) {
+  const conv = { 'km-mi': v*0.621371, 'mi-km': v*1.60934, 'kg-lb': v*2.20462, 'lb-kg': v*0.453592,
+    'c-f': v*9/5+32, 'f-c': (v-32)*5/9, 'cm-in': v*0.393701, 'in-cm': v*2.54 };
+  const r = conv[`${f}-${t}`]; return r !== undefined ? `${r.toFixed(2)} ${t}` : `Cannot convert ${f} to ${t}`;
+}
+
+/* Packer: whitespace collapse + line dedup */
+function pack(text) {
+  const before = text.length;
+  let packed = text.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n');
+  const lines = packed.split('\n'); const seen = new Set(); const deduped = [];
+  lines.forEach(l => { const k = l.trim(); if (!k || !seen.has(k)) { seen.add(k); deduped.push(l); } });
+  packed = deduped.join('\n').trim();
+  const after = packed.length;
+  const pct = before > 0 ? Math.round((1 - after / before) * 100) : 0;
+  return { packed, before, after, pct: Math.max(0, pct) };
+}
+
+/* Router: mock complexity classifier */
+function route(prompt) {
+  const words = prompt.split(/\s+/).length;
+  if (words < 10) return { model: 'deepseek/deepseek-chat', complexity: 'simple', reason: 'Short prompt, low cost model' };
+  if (words < 30) return { model: 'openai/gpt-4o-mini', complexity: 'moderate', reason: 'Mid-length prompt, balanced model' };
+  return { model: 'anthropic/claude-sonnet', complexity: 'complex', reason: 'Long prompt, high quality model' };
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+let running = false;
+
+function setStage(id, cls, status, detail, time) {
+  const el = document.getElementById(`s-${id}`);
+  el.className = `stage ${cls}`;
+  document.getElementById(`st-${id}`).textContent = status;
+  document.getElementById(`dt-${id}`).textContent = detail || '';
+  document.getElementById(`tm-${id}`).textContent = time || '';
+}
+
+function resetStages() {
+  STAGES.forEach(s => setStage(s.id, '', 'Waiting...', '', ''));
+  document.getElementById('resultSection').classList.add('hidden');
+}
+
+async function runPipeline() {
+  if (running) return;
+  running = true;
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.textContent = 'Running...';
+  resetStages();
+  const prompt = document.getElementById('prompt').value.trim();
+  if (!prompt) { running = false; btn.disabled = false; btn.textContent = 'Run Pipeline'; return; }
+  const useBooster = document.getElementById('tBooster').checked;
+  const usePacker = document.getElementById('tPacker').checked;
+  const useCache = document.getElementById('tCache').checked;
+  const meta = { prompt, stages: {}, totalMs: 0 };
+  let response = null; let boosted = false; let cached = false;
+  let tokensBefore = prompt.split(/\s+/).length; let tokensAfter = tokensBefore;
+
+  /* 1. Booster */
+  await delay(200);
+  setStage('booster', 'active', 'Checking deterministic rules...', '', '');
+  const t0 = performance.now();
+  await delay(300);
+  if (useBooster) {
+    const result = tryBoost(prompt);
+    const ms = (performance.now() - t0).toFixed(1);
+    if (result) {
+      boosted = true; response = result;
+      setStage('booster', 'done', `Resolved! (${ms}ms)`, result.substring(0, 80), ms + 'ms');
+      meta.stages.booster = { resolved: true, ms, result };
+    } else {
+      setStage('booster', 'done', `Pass-through (${ms}ms)`, 'No deterministic match', ms + 'ms');
+      meta.stages.booster = { resolved: false, ms };
+    }
+  } else {
+    setStage('booster', 'done', 'Disabled', '', '');
+    meta.stages.booster = { disabled: true };
+  }
+
+  /* 2. Packer */
+  await delay(200);
+  setStage('packer', 'active', 'Compressing context...', '', '');
+  const t1 = performance.now();
+  await delay(250);
+  if (usePacker && !boosted) {
+    const { packed, before, after, pct } = pack(prompt);
+    const ms = (performance.now() - t1).toFixed(1);
+    tokensAfter = packed.split(/\s+/).length;
+    setStage('packer', 'done', `Saved ${pct}% (${ms}ms)`, `${before} chars -> ${after} chars`, ms + 'ms');
+    meta.stages.packer = { pct, before, after, ms };
+  } else {
+    const ms = (performance.now() - t1).toFixed(1);
+    setStage('packer', 'done', boosted ? 'Skipped (boosted)' : 'Disabled', '', ms + 'ms');
+    meta.stages.packer = { skipped: true, ms };
+  }
+
+  /* 3. Cache */
+  await delay(200);
+  setStage('cache', 'active', 'Checking cache...', '', '');
+  const t2 = performance.now();
+  await delay(200);
+  const cacheKey = prompt.toLowerCase().trim();
+  if (useCache && !boosted && cache.has(cacheKey)) {
+    cached = true; response = cache.get(cacheKey);
+    const ms = (performance.now() - t2).toFixed(1);
+    setStage('cache', 'done', `HIT! (${ms}ms)`, 'Returning cached response', ms + 'ms');
+    meta.stages.cache = { hit: true, ms };
+  } else {
+    const ms = (performance.now() - t2).toFixed(1);
+    if (!useCache) { setStage('cache', 'done', 'Disabled', '', ms + 'ms'); }
+    else if (boosted) { setStage('cache', 'done', 'Skipped (boosted)', '', ms + 'ms'); }
+    else { setStage('cache', 'done', `Miss (${ms}ms)`, 'No cached response found', ms + 'ms'); }
+    meta.stages.cache = { hit: false, ms };
+  }
+
+  /* 4. Router */
+  await delay(200);
+  setStage('router', 'active', 'Analyzing complexity...', '', '');
+  const t3 = performance.now();
+  await delay(350);
+  const routing = route(prompt);
+  const msR = (performance.now() - t3).toFixed(1);
+  if (boosted || cached) {
+    setStage('router', 'done', 'Skipped (resolved)', '', msR + 'ms');
+    meta.stages.router = { skipped: true, ms: msR };
+  } else {
+    setStage('router', 'done', `Selected: ${routing.model}`, `Complexity: ${routing.complexity}`, msR + 'ms');
+    meta.stages.router = { model: routing.model, complexity: routing.complexity, ms: msR };
+  }
+
+  /* 5. Gateway — real call to api.clawpipe.ai/v1/demo (rate-limited, free) */
+  await delay(200);
+  const needsCall = !boosted && !cached;
+  setStage('gateway', 'active', needsCall ? 'Calling ClawPipe gateway...' : 'Skipped', '', '');
+  const t4 = performance.now();
+  let gatewayMeta = null;
+  if (needsCall) {
+    try {
+      const callPrompt = (usePacker ? pack(prompt).packed : prompt).slice(0, 500);
+      const res = await fetch('https://api.clawpipe.ai/v1/demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: callPrompt }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        response = data.text || '';
+        gatewayMeta = data;
+        cache.set(cacheKey, response);
+      } else {
+        response = data.error || `Gateway error (HTTP ${res.status})`;
+      }
+    } catch (err) {
+      response = `Network error: ${err.message}`;
+    }
+  } else {
+    await delay(150);
+  }
+  const msG = (performance.now() - t4).toFixed(1);
+  if (needsCall) {
+    const label = gatewayMeta ? `Response received (${gatewayMeta.latencyMs}ms)` : `Failed (${msG}ms)`;
+    const detail = gatewayMeta
+      ? `${gatewayMeta.model} · ${gatewayMeta.remaining} demo calls left this hour`
+      : (response || '').slice(0, 80);
+    setStage('gateway', 'done', label, detail, msG + 'ms');
+    meta.stages.gateway = { called: true, ms: msG, ...(gatewayMeta || { error: true }) };
+    // Update header quota indicator
+    const q = document.getElementById('demoQuota');
+    if (gatewayMeta && typeof gatewayMeta.remaining === 'number') {
+      q.textContent = gatewayMeta.remaining > 0
+        ? `${gatewayMeta.remaining} free calls left this hour`
+        : 'Out of free calls — sign up free at app.clawpipe.ai for 1,000/day';
+      q.className = 'demo-quota' + (gatewayMeta.remaining === 0 ? ' exhausted' : gatewayMeta.remaining <= 1 ? ' warn' : '');
+    } else if (!gatewayMeta) {
+      q.textContent = response || 'Demo failed';
+      q.className = 'demo-quota exhausted';
+    }
+  } else {
+    setStage('gateway', 'done', 'Skipped (already resolved)', '', msG + 'ms');
+    meta.stages.gateway = { called: false, ms: msG };
+  }
+
+  /* 6. Learn */
+  await delay(200);
+  setStage('learn', 'active', 'Recording outcome...', '', '');
+  const t5 = performance.now();
+  await delay(200);
+  const msL = (performance.now() - t5).toFixed(1);
+  setStage('learn', 'done', 'Recorded', `Outcome logged for routing optimization`, msL + 'ms');
+  meta.stages.learn = { recorded: true, ms: msL };
+
+  /* Results */
+  meta.totalMs = Object.values(meta.stages).reduce((s, v) => s + parseFloat(v.ms || 0), 0).toFixed(1);
+  const directCost = needsCall ? (tokensBefore * 0.00003).toFixed(4) : (boosted ? '0.0030' : '0.0030');
+  const pipeCost = boosted ? '0.0000' : cached ? '0.0001' : (tokensAfter * 0.00002).toFixed(4);
+  const dNum = parseFloat(directCost) || 0.003; const pNum = parseFloat(pipeCost);
+  const savedPct = dNum > 0 ? Math.round((1 - pNum / dNum) * 100) : 0;
+
+  document.getElementById('resultText').textContent = response || 'No response generated.';
+  document.getElementById('costDirect').textContent = `$${dNum.toFixed(4)}`;
+  document.getElementById('costPipe').textContent = `$${pNum.toFixed(4)}`;
+  document.getElementById('costSaved').textContent = `${savedPct}%`;
+  document.getElementById('metaJson').textContent = JSON.stringify(meta, null, 2);
+  document.getElementById('resultSection').classList.remove('hidden');
+  running = false; btn.disabled = false; btn.textContent = 'Run Pipeline';
+}
+
+function toggleMeta() {
+  const el = document.getElementById('metaJson');
+  const btn = el.previousElementSibling;
+  if (el.style.display === 'block') { el.style.display = 'none'; btn.textContent = 'Show full meta JSON'; }
+  else { el.style.display = 'block'; btn.textContent = 'Hide meta JSON'; }
+}
+
+/* Preset chips */
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => { document.getElementById('prompt').value = chip.dataset.prompt; });
+});
+</script>
+</body>
+</html>

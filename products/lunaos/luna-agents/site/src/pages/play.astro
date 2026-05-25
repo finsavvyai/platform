@@ -1,0 +1,231 @@
+---
+import Book from "../layouts/Book.astro";
+import ChapterOpener from "../components/ChapterOpener.astro";
+
+const samples: { title: string; expr: string; note: string }[] = [
+  { title: "Launch post fan-out",
+    expr: 'persona generate >> ghost "launch post" * 4 >> publish notion',
+    note: "Drafts personas, writes one post per persona, publishes all to Notion." },
+  { title: "Security pipeline",
+    expr: "security scan >> fix all >> create pr",
+    note: "Scans the repo, applies fixes, opens a PR." },
+  { title: "Issue triage",
+    expr: "github issues >> summarize >> publish notion",
+    note: "Pulls open issues, condenses to a sprint summary, posts to Notion." },
+  { title: "Code review",
+    expr: "code-review >> lint >> deploy staging",
+    note: "Reviews changes, lints, deploys to staging on green." },
+  { title: "Competitor research",
+    expr: "research competitor >> summarize",
+    note: "Maps competitors, extracts feature matrix, writes a brief." },
+];
+---
+
+<Book
+  title="Playground"
+  chapter="play"
+  description="Try Luna Pipes in the browser. Simulated execution; install luna-agents to run for real."
+>
+  <ChapterOpener
+    num="05"
+    word="Playground"
+    subtitle={`Type a pipe; watch each stage. v1 is simulated, deterministic outputs for ${"~"}10 popular verbs. No LLM calls, no keys, no rate limits. Real execution arrives behind a toggle once a provider is wired.`}
+  />
+
+  <section class="wrap">
+    <form class="pg" id="pg-form" autocomplete="off">
+      <label for="pg-input" class="pg-prompt" aria-hidden="true">&gt;&gt;</label>
+      <input
+        id="pg-input"
+        name="pipe"
+        type="text"
+        spellcheck="false"
+        autocorrect="off"
+        placeholder='persona generate >> ghost "launch post" >> publish notion'
+        aria-label="Type a Luna Pipes expression"
+      />
+      <button type="submit" class="pg-go">run</button>
+    </form>
+    <div class="pg-panes">
+      <output id="pg-tree" class="pg-tree" data-label="Execution tree" aria-label="Parsed execution tree"></output>
+      <output id="pg-trace" class="pg-trace" data-label="Stage trace" role="log" aria-live="polite"></output>
+    </div>
+  </section>
+
+  <section class="wrap samples">
+    <h2 class="samples-title">Starters.</h2>
+    <ul class="samples-list">
+      {samples.map((s) => (
+        <li>
+          <button class="sample" type="button" data-pipe={s.expr}>
+            <code>{s.expr}</code>
+            <span class="sample-note">{s.note}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  </section>
+</Book>
+
+<style>
+  .pg {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: baseline;
+    gap: 0.75ch;
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: var(--t-3) 0;
+    margin-top: var(--t-6);
+  }
+  .pg-prompt {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: var(--step-2);
+    letter-spacing: -0.05em;
+    color: var(--saffron-deep);
+  }
+  #pg-input {
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    padding: 0.35rem 0;
+    font-family: var(--font-mono);
+    font-size: var(--step-0);
+    color: var(--ink);
+    width: 100%;
+  }
+  #pg-input:focus { outline: 0; border-bottom-color: var(--saffron-deep); }
+  .pg-go {
+    background: var(--ink);
+    color: var(--paper);
+    border: 0;
+    padding: 0.45rem 1rem;
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    cursor: pointer;
+  }
+  .pg-panes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--t-3);
+    margin-top: var(--t-3);
+  }
+  @media (max-width: 760px) { .pg-panes { grid-template-columns: 1fr; } }
+  .pg-tree, .pg-trace {
+    display: block;
+    padding: var(--t-3);
+    min-height: 12em;
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 2px;
+    white-space: pre;
+    color: var(--ink);
+    overflow-x: auto;
+  }
+  .pg-tree::before, .pg-trace::before {
+    content: attr(data-label);
+    display: block;
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--muted);
+    margin-bottom: var(--t-1);
+    font-size: var(--step--1);
+  }
+  .pg-trace { white-space: pre-wrap; }
+  .samples { padding-top: var(--t-6); padding-bottom: var(--t-8); }
+  .samples-title {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: var(--step-2);
+    margin: 0 0 var(--t-3);
+  }
+  .samples-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-top: 1px solid var(--rule);
+  }
+  .samples-list li { border-bottom: 1px solid var(--rule); margin: 0; }
+  .sample {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    padding: var(--t-2) 0;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--ink);
+  }
+  .sample:hover { background: rgba(0, 0, 0, 0.03); }
+  .sample code {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--step-0);
+    color: var(--ink);
+    background: none;
+    border: 0;
+    padding: 0;
+  }
+  .sample-note {
+    display: block;
+    font-size: var(--step--1);
+    color: var(--muted);
+    margin-top: 0.25rem;
+  }
+</style>
+
+<script>
+  import { simulate, renderTree } from "../lib/pipe-sim";
+
+  const form = document.getElementById("pg-form") as HTMLFormElement;
+  const input = document.getElementById("pg-input") as HTMLInputElement;
+  const trace = document.getElementById("pg-trace") as HTMLElement;
+  const tree = document.getElementById("pg-tree") as HTMLElement;
+
+  const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  async function append(line: string) {
+    trace.textContent = (trace.textContent ?? "") + line + "\n";
+    if (!reduced()) await sleep(40);
+  }
+
+  async function run(expr: string) {
+    trace.textContent = "";
+    tree.textContent = renderTree(expr);
+    for (const ev of simulate(expr)) {
+      if (ev.kind === "parsed") {
+        await append(`parsed: ${ev.stageCount} stage${ev.stageCount === 1 ? "" : "s"}`);
+      } else if (ev.kind === "stage-start") {
+        const tag = `[${String(ev.index + 1).padStart(2, "0")}]`;
+        const argTxt = ev.stage.args.length ? " " + ev.stage.args.map((a) => `"${a}"`).join(" ") : "";
+        await append(`${tag} ${ev.stage.verb}${argTxt}`);
+      } else if (ev.kind === "stage-line") {
+        await append(`     ${ev.text}`);
+      } else if (ev.kind === "stage-end") {
+        await append(`     ok (${ev.ms}ms)`);
+      } else if (ev.kind === "done") {
+        await append(`done in ${ev.totalMs}ms. simulated; install luna-agents to run for real.`);
+      }
+    }
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const expr = input.value.trim();
+    if (expr) run(expr);
+  });
+
+  for (const btn of document.querySelectorAll<HTMLButtonElement>(".sample")) {
+    btn.addEventListener("click", () => {
+      const expr = btn.dataset.pipe ?? "";
+      input.value = expr;
+      run(expr);
+      input.scrollIntoView({ behavior: reduced() ? "auto" : "smooth", block: "start" });
+    });
+  }
+</script>

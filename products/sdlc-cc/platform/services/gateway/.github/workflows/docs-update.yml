@@ -1,0 +1,296 @@
+name: Update API Documentation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'api/openapi.yaml'
+      - 'internal/interfaces/http/routes/**'
+      - 'internal/interfaces/http/swagger/**'
+      - 'internal/infrastructure/middleware/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'api/openapi.yaml'
+      - 'internal/interfaces/http/routes/**'
+      - 'internal/interfaces/http/swagger/**'
+      - 'internal/infrastructure/middleware/**'
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force update documentation'
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  update-docs:
+    name: Update Documentation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: |
+          go mod download
+          go install github.com/swaggo/swag/cmd/swag@latest
+          go install github.com/oapi-codegen/oapi-codegen@latest
+
+      - name: Build docs updater
+        run: |
+          go build -o bin/docs-updater ./cmd/docs-updater
+
+      - name: Update documentation
+        run: |
+          ./bin/docs-updater \
+            --output=./docs \
+            --spec=./api/openapi.yaml \
+            --sources="./internal/interfaces/http/routes,./internal/interfaces/http/swagger,./internal/infrastructure/middleware" \
+            --force=${{ github.event.inputs.force_update || 'false' }} \
+            --verbose
+
+      - name: Validate OpenAPI spec
+        run: |
+          npx @apidevtools/swagger-parser validate ./docs/openapi.json
+
+      - name: Check for changes
+        id: verify-changed-files
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Documentation has been updated"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No documentation changes detected"
+          fi
+
+      - name: Commit and push changes
+        if: steps.verify-changed-files.outputs.changed == 'true' && github.event_name != 'pull_request'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add -A
+          git commit -m "docs: auto-update API documentation
+
+          - Updated OpenAPI specification
+          - Regenerated documentation
+          - Updated: $(date -u)"
+
+          git push
+
+      - name: Create PR for documentation update
+        if: steps.verify-changed-files.outputs.changed == 'true' && github.event_name == 'pull_request'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "docs: auto-update API documentation"
+          title: "docs: Update API documentation"
+          body: |
+            ## 📚 API Documentation Update
+
+            This PR contains automated documentation updates triggered by changes to:
+            - OpenAPI specification
+            - API routes
+            - Middleware implementations
+
+            ### Changes:
+            - [x] Updated OpenAPI specification
+            - [x] Regenerated HTML documentation
+            - [x] Updated examples
+            - [x] Validated specification
+
+            ### Review Checklist:
+            - [ ] Documentation is accurate
+            - [ ] Examples are correct
+            - [ ] No breaking changes without proper documentation
+            - [ ] Version numbers are updated if needed
+
+            ---
+
+            This PR was created automatically by the [Update API Documentation](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) workflow.
+          branch: docs/auto-update-${{ github.run_number }}
+          delete-branch: true
+
+      - name: Generate documentation artifacts
+        if: always()
+        run: |
+          mkdir -p artifacts
+          tar -czf artifacts/documentation.tar.gz docs/
+
+      - name: Upload documentation artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation
+          path: artifacts/
+          retention-days: 30
+
+      - name: Post to Slack
+        if: steps.verify-changed-files.outputs.changed == 'true' && env.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"📚 API documentation has been updated for ${{ github.repository }}!\n\nSee changes: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: update-docs
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download documentation artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: documentation
+          path: artifacts/
+
+      - name: Extract documentation
+        run: |
+          tar -xzf artifacts/documentation.tar.gz
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          destination_dir: api/v1
+          keep_files: true
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+
+      - name: Deploy to Cloudflare Pages
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: sdlc-api-docs
+          directory: ./docs
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Update API version in DNS
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          # Create DNS record for API version
+          curl -X PUT "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/dns_records" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{
+              "type": "CNAME",
+              "name": "api-v1",
+              "content": "sdlc-api-docs.pages.dev",
+              "ttl": 300
+            }'
+
+  notify:
+    name: Notify Teams
+    runs-on: ubuntu-latest
+    needs: [update-docs, deploy-docs]
+    if: always()
+
+    steps:
+      - name: Notify success
+        if: needs.update-docs.result == 'success' && (needs.deploy-docs.result == 'success' || needs.deploy-docs.result == 'skipped')
+        run: |
+          echo "✅ Documentation update completed successfully"
+
+      - name: Notify failure
+        if: needs.update-docs.result == 'failure' || needs.deploy-docs.result == 'failure'
+        run: |
+          echo "❌ Documentation update failed"
+          exit 1
+
+  validate-links:
+    name: Validate Documentation Links
+    runs-on: ubuntu-latest
+    needs: update-docs
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download documentation
+        uses: actions/download-artifact@v3
+        with:
+          name: documentation
+          path: artifacts/
+
+      - name: Extract documentation
+        run: |
+          tar -xzf artifacts/documentation.tar.gz
+
+      - name: Check for broken links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'yes'
+          config-file: '.github/workflows/mlc_config.json'
+          folder-path: 'docs/'
+          check-modified-files-only: 'yes'
+
+      - name: Validate OpenAPI spec
+        run: |
+          # Install swagger-codegen
+          wget https://repo1.maven.org/maven2/io/swagger/codegen/v3/swagger-codegen-cli/3.0.34/swagger-codegen-cli-3.0.34.jar -O swagger-codegen-cli.jar
+
+          # Validate spec
+          java -jar swagger-codegen-cli.jar validate -i docs/openapi.json
+
+      - name: Generate SDK test
+        run: |
+          # Test SDK generation
+          npx @apidevtools/swagger-codegen generate \
+            -i docs/openapi.json \
+            -l javascript \
+            -o /tmp/sdk-test \
+            --additional-properties=npmName=@sdlc/api-sdk-test,npmVersion=1.0.0-test
+
+      - name: Report results
+        run: |
+          echo "📊 Documentation Validation Report"
+          echo "=================================="
+          echo "✅ Links validated"
+          echo "✅ OpenAPI spec validated"
+          echo "✅ SDK generation tested"
+          echo ""
+          echo "Documentation is ready for deployment!"

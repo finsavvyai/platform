@@ -1,0 +1,68 @@
+{
+  "name": "ClawPipe",
+  "tagline": "The only AI gateway that skips LLM calls entirely.",
+  "description": "SDK-local LLM optimization pipeline (Booster -> Pack -> Cache -> Route -> Call -> Learn) plus multi-provider gateway. Public measured benchmark in progress at https://github.com/finsavvyai/clawpipe-booster-benchmark; pre-registered methodology v1.0 locked 2026-05-18.",
+  "version": "3.6.1",
+  "license": "MIT",
+  "homepage": "https://clawpipe.ai",
+  "capabilities": [
+    { "stage": "Booster", "summary": "246 deterministic rules across 29 packs (math, regex, JWT, ISO, dates, JSON) skip the LLM at <1 ms.", "evidence": "Skip rate per workload bucket pending public measured benchmark (in progress)." },
+    { "stage": "Packer", "summary": "Compresses context windows; deduplicates content.", "evidence": "Per-bucket savings pending public measured benchmark." },
+    { "stage": "Cache", "summary": "Hash + Cloudflare Workers AI BGE-small embedding semantic cache with TTL + LRU eviction.", "evidence": "Per-bucket hit rate pending public measured benchmark." },
+    { "stage": "Router", "summary": "Cost/quality/latency-aware model selection with self-learning weights and recursive fallback.", "evidence": "Routing distribution pending public measured benchmark." },
+    { "stage": "Gateway", "summary": "Multi-provider dispatch with circuit breaker and fair-share rate limiting.", "evidence": "21 providers including Bedrock (SigV4) and Vertex (RS256 JWT)." },
+    { "stage": "Learner", "summary": "Tracks outcomes; refines weights; optional LLM-as-judge quality scoring.", "evidence": "scoreResponse() default judge gpt-4o-mini, 10s timeout, 0.5 safe fallback." }
+  ],
+  "providers": [
+    "ai21", "anthropic", "azure-openai", "bedrock", "cerebras", "cohere",
+    "databricks", "deepseek", "fireworks", "gemini", "groq", "huggingface",
+    "mistral", "openai", "openrouter", "perplexity", "replicate", "together",
+    "vertex", "writer", "xai"
+  ],
+  "endpoints": [
+    { "method": "POST", "path": "/v1/prompt", "auth": "bearer", "summary": "Send a prompt through the pipeline. Honors `Idempotency-Key` header." },
+    { "method": "POST", "path": "/v1/stream", "auth": "bearer", "summary": "Streaming variant (SSE) with `Last-Event-ID` resume." },
+    { "method": "GET",  "path": "/v1/weights", "auth": "bearer", "summary": "Load router weights for project." },
+    { "method": "PUT",  "path": "/v1/weights", "auth": "bearer", "summary": "Persist router weights." },
+    { "method": "POST", "path": "/v1/quality", "auth": "bearer", "summary": "Push LLM-as-judge quality scores." },
+    { "method": "GET",  "path": "/v1/savings", "auth": "bearer", "summary": "Per-project saved-USD aggregates (this month + lifetime)." },
+    { "method": "GET",  "path": "/v1/analytics/overview", "auth": "bearer", "summary": "Aggregate request and savings metrics." },
+    { "method": "GET",  "path": "/v1/webhooks/dlq", "auth": "bearer", "summary": "Pending + dead webhook deliveries (retry/replay)." },
+    { "method": "POST", "path": "/v1/webhooks/dlq/{id}/replay", "auth": "bearer", "summary": "Manually replay a parked webhook delivery." },
+    { "method": "POST", "path": "/v1/billing/checkout", "auth": "bearer", "summary": "Create LemonSqueezy checkout URL." },
+    { "method": "GET",  "path": "/v1/billing/portal", "auth": "bearer", "summary": "Get LemonSqueezy customer portal URL." },
+    { "method": "GET",  "path": "/v1/index", "auth": "none", "summary": "Public anonymized aggregate stats across all projects." },
+    { "method": "GET",  "path": "/v1/openapi.json", "auth": "none", "summary": "Self-served OpenAPI 3.1 spec." },
+    { "method": "GET",  "path": "/health", "auth": "none", "summary": "Liveness check." }
+  ],
+  "pricing": [
+    { "tier": "Free",       "monthlyUsd": 0,    "callsPerDay": 1000,    "highlights": ["All pipeline stages", "1 project"] },
+    { "tier": "Dev",        "monthlyUsd": 79,   "callsPerDay": 15000,   "highlights": ["Unlimited projects", "Quality analytics", "Prompt versioning"] },
+    { "tier": "Growth",     "monthlyUsd": 299,  "callsPerDay": 150000,  "highlights": ["Unlimited projects", "Global weight sync", "Priority support"] },
+    { "tier": "Scale",      "monthlyUsd": 799,  "callsPerDay": 1500000, "highlights": ["Unlimited projects", "SLA", "Team management"] },
+    { "tier": "Enterprise", "monthlyUsd": null, "callsPerDay": null,    "highlights": ["SSO/OIDC", "Audit logs", "Dedicated infrastructure"] }
+  ],
+  "benchmark": {
+    "status": "in-progress",
+    "methodologyUrl": "https://github.com/finsavvyai/clawpipe-booster-benchmark/blob/main/METHODOLOGY.md",
+    "publicReviewWindowClosesAt": "2026-05-18",
+    "priorSyntheticRun": {
+      "note": "Prior in-house synthetic run on 200 unique prompts (2 passes, mocked gateway). Preserved for transparency; superseded by the measured run when it lands.",
+      "source": "benchmarks/results/summary.json"
+    }
+  },
+  "links": {
+    "docs": "https://docs.clawpipe.ai",
+    "openapi": "https://clawpipe.ai/openapi.json",
+    "benchmarks": "https://clawpipe.ai/benchmarks.html",
+    "dashboard": "https://app.clawpipe.ai",
+    "api": "https://api.clawpipe.ai",
+    "github": "https://github.com/finsavvyai/clawpipe-sdk",
+    "npm": "https://www.npmjs.com/package/clawpipe-ai",
+    "pypi": "https://pypi.org/project/clawpipe-ai",
+    "mcp": "https://www.npmjs.com/package/clawpipe-mcp-server",
+    "status": "https://status.clawpipe.ai",
+    "security": "https://clawpipe.ai/.well-known/security.txt",
+    "support": "mailto:support@clawpipe.ai"
+  }
+}

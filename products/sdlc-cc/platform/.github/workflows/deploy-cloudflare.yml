@@ -1,0 +1,47 @@
+# Deploy Proxy Worker + Landing Page to Cloudflare (production).
+# Runs ./scripts/deploy-production-cloudflare.sh.
+# Secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+
+name: Deploy Cloudflare (Proxy + Landing)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/proxy-worker/**"
+      - "landing-page/**"
+      - "scripts/deploy-production-cloudflare.sh"
+      - ".github/workflows/deploy-cloudflare.yml"
+  workflow_dispatch:
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  deploy:
+    name: Deploy to Cloudflare
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Proxy Worker dependencies
+        working-directory: services/proxy-worker
+        run: npm install
+
+      - name: Deploy (Proxy + Landing)
+        run: ./scripts/deploy-production-cloudflare.sh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Health check (Landing)
+        run: curl -sfI https://sdlc.cc || curl -sfI https://sdlc-landing-page.pages.dev
+        continue-on-error: true

@@ -1,0 +1,160 @@
+# CI — lint, typecheck, unit tests w/ coverage, E2E, build
+# Branch protection: require "All Checks Passed" status check
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  line-limit:
+    name: File Line Limits (200 max)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-max-lines.sh
+
+  lint:
+    name: Lint + Svelte Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm lint
+
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm check
+
+  test:
+    name: Unit Tests + Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Run tests with coverage
+        run: pnpm test -- --coverage --coverage.reporter=json-summary --coverage.reporter=text
+      - name: Enforce coverage thresholds (90% lines, 85% branches)
+        run: |
+          set -e
+          for f in apps/api/coverage/coverage-summary.json apps/web/coverage/coverage-summary.json; do
+            if [ ! -f "$f" ]; then
+              echo "FAIL: missing coverage summary at $f — vitest did not emit a report"
+              exit 1
+            fi
+            lines=$(node -e "const c=require('./$f');console.log(c.total.lines.pct)")
+            branches=$(node -e "const c=require('./$f');console.log(c.total.branches.pct)")
+            echo "$f — lines: $lines%, branches: $branches%"
+            node -e "
+              const c=require('./$f');
+              if(c.total.lines.pct<90){console.error('lines below 90');process.exit(1)}
+              if(c.total.branches.pct<85){console.error('branches below 85');process.exit(1)}
+            "
+          done
+          echo "Coverage thresholds met"
+
+  e2e:
+    name: Playwright E2E (Chromium)
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm build
+      - run: npx playwright install --with-deps chromium
+      - name: Run E2E tests
+        run: pnpm test:e2e:chromium
+        env:
+          CI: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  build:
+    name: Build All Packages
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            apps/api/dist
+            apps/web/.svelte-kit/cloudflare
+          retention-days: 7
+
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Semgrep SAST
+        run: semgrep scan --config=p/security-audit --error .
+
+  dependency-audit:
+    name: Dependency Audit (pnpm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  status-check:
+    name: All Checks Passed
+    runs-on: ubuntu-latest
+    needs: [line-limit, lint, typecheck, test, e2e, build, sast, dependency-audit, secret-scan]
+    if: always()
+    steps:
+      - name: Evaluate job results
+        run: |
+          results=(
+            "${{ needs.line-limit.result }}"
+            "${{ needs.lint.result }}"
+            "${{ needs.typecheck.result }}"
+            "${{ needs.test.result }}"
+            "${{ needs.e2e.result }}"
+            "${{ needs.build.result }}"
+            "${{ needs.sast.result }}"
+            "${{ needs.dependency-audit.result }}"
+            "${{ needs.secret-scan.result }}"
+          )
+          for r in "${results[@]}"; do
+            if [[ "$r" != "success" ]]; then
+              echo "FAIL: one or more required checks did not pass"
+              exit 1
+            fi
+          done
+          echo "All CI checks passed"

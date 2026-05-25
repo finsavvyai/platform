@@ -1,0 +1,59 @@
+name: DLP CI
+
+on:
+  pull_request:
+    paths:
+      - "services/dlp/**"
+      - ".github/workflows/dlp-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/dlp/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: pytest (python ${{ matrix.py }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        py: ["3.11", "3.12"]
+    env:
+      # Coverage floor — rises as detector tests land.
+      # Current focus: fast_pii_patterns + fast_pii_metrics (agent-booster layer).
+      MIN_COVERAGE: "30"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.py }}
+
+      - name: Install deps
+        working-directory: services/dlp
+        run: |
+          python -m pip install --upgrade pip
+          # Avoid heavy ML deps (presidio, spacy, torch) in unit suite —
+          # tests here are regex/metrics and don't need them.
+          pip install pytest pytest-cov pytest-asyncio pydantic fastapi
+          pip install email-validator phonenumbers regex
+
+      - name: Run pytest with coverage
+        working-directory: services/dlp
+        run: |
+          pytest tests/test_fast_pii_patterns.py tests/test_fast_pii_metrics.py \
+            --cov=app.services.fast_pii_patterns \
+            --cov=app.services.fast_pii_metrics \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=${MIN_COVERAGE}
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dlp-coverage-${{ matrix.py }}
+          path: services/dlp/coverage.xml
+          retention-days: 14

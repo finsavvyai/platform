@@ -1,0 +1,304 @@
+name: Performance Testing
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 1 * * 0'  # Run weekly on Sunday at 1 AM UTC
+  workflow_dispatch:
+
+jobs:
+  # Lighthouse performance audit
+  lighthouse-audit:
+    name: Lighthouse Performance Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Start application
+        run: |
+          pnpm start &
+          sleep 60
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            http://localhost:3000
+            http://localhost:3000/dashboard
+            http://localhost:3000/projects
+          configPath: './.lighthouserc.json'
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Upload Lighthouse results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: lighthouse-results
+          path: .lighthouseci
+          retention-days: 30
+
+  # Load testing with k6
+  load-testing:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and start application
+        run: |
+          pnpm build
+          pnpm start &
+          sleep 60
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
+
+      - name: Run load tests
+        run: |
+          k6 run --out json=load-test-results.json tests/performance/load-test.js
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: load-test-results
+          path: load-test-results.json
+          retention-days: 30
+
+      - name: Analyze performance metrics
+        run: |
+          node tests/performance/analyze-results.js load-test-results.json
+
+  # Bundle size analysis
+  bundle-analysis:
+    name: Bundle Size Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Analyze bundle size
+        run: |
+          npx bundlesize
+
+      - name: Compare with previous bundle size
+        run: |
+          # Get previous bundle size from cache or API
+          # Compare and report significant increases
+          node scripts/compare-bundle-size.js
+
+      - name: Upload bundle analysis
+        uses: actions/upload-artifact@v3
+        with:
+          name: bundle-analysis
+          path: bundle-analysis.json
+          retention-days: 30
+
+  # Memory profiling
+  memory-profiling:
+    name: Memory Profiling
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        run: pnpm build
+
+      - name: Run memory profiling
+        run: |
+          node --inspect tests/performance/memory-profile.js
+
+      - name: Upload memory profile
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: memory-profile
+          path: memory-profile.cpuprofile
+          retention-days: 30
+
+  # API performance testing
+  api-performance:
+    name: API Performance Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start services
+        run: |
+          docker-compose -f docker-compose.test.yml up -d
+          sleep 60
+
+      - name: Run API performance tests
+        run: |
+          pnpm test:performance:api
+
+      - name: Upload API performance results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: api-performance-results
+          path: api-performance-results.json
+          retention-days: 30
+
+      - name: Stop services
+        if: always()
+        run: docker-compose -f docker-compose.test.yml down -v
+
+  # Performance regression detection
+  regression-detection:
+    name: Performance Regression Detection
+    runs-on: ubuntu-latest
+    needs: [lighthouse-audit, load-testing, bundle-analysis]
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download performance results
+        uses: actions/download-artifact@v3
+        with:
+          name: lighthouse-results
+          path: performance-results/
+
+      - name: Compare with baseline
+        run: |
+          # Compare current performance with baseline
+          node scripts/compare-performance.js
+
+      - name: Comment PR with performance results
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const performanceResults = JSON.parse(fs.readFileSync('performance-results/summary.json', 'utf8'));
+
+            const comment = `
+            ## Performance Test Results
+
+            ### Lighthouse Scores
+            - Performance: ${performanceResults.lighthouse.performance}
+            - Accessibility: ${performanceResults.lighthouse.accessibility}
+            - Best Practices: ${performanceResults.lighthouse.bestPractices}
+            - SEO: ${performanceResults.lighthouse.seo}
+
+            ### Load Testing
+            - Average Response Time: ${performanceResults.loadTest.avgResponseTime}ms
+            - Throughput: ${performanceResults.loadTest.throughput} req/s
+            - Error Rate: ${performanceResults.loadTest.errorRate}%
+
+            ${performanceResults.regression ? '⚠️ **Performance regression detected!**' : '✅ **No performance regression detected**'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Performance monitoring setup
+  setup-monitoring:
+    name: Setup Performance Monitoring
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure performance monitoring
+        run: |
+          # Setup performance monitoring alerts
+          # Configure dashboard thresholds
+          # Setup automated performance reports
+          echo "Performance monitoring configured"

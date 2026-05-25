@@ -1,0 +1,53 @@
+"on":
+    - push
+    - pull_request
+stages:
+    - name: install
+      checks:
+        - name: npm-install
+          run: npm ci
+    - name: unit
+      depends_on:
+        - install
+      checks:
+        - name: unit
+          run: npm run test -- --coverage
+    - name: build
+      depends_on:
+        - install
+      checks:
+        - name: build
+          run: npm run build
+    - name: e2e
+      depends_on:
+        - install
+      timeout: 15m
+      checks:
+        - name: playwright-install
+          run: npx playwright install --with-deps chromium
+        - name: playwright-test
+          run: bash scripts/playwright-ci.sh
+    - name: security
+      depends_on:
+        - install
+      checks:
+        - name: audit
+          run: npm audit --audit-level=high
+        - name: licenses
+          run: bash scripts/license-check.sh
+    # - name: flake-stress
+    #   depends_on:
+    #     - install
+    #   timeout: 20m
+    #   checks:
+    #     - name: flake-stress
+    #       run: bash scripts/playwright-ci.sh --repeat-each=5 --workers=4
+deploy:
+    - name: cloudflare-pages
+      trigger: push
+      run: npx wrangler pages deploy dist --project-name=amliq --branch=main
+      depends_on:
+        - build
+        - unit
+      only_on:
+        - main

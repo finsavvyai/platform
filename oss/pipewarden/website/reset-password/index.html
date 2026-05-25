@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reset password — PipeWarden</title>
+<meta name="robots" content="noindex,nofollow" />
+<link rel="stylesheet" href="/auth.css" />
+<link rel="icon" href="/favicon.svg" />
+</head>
+<body>
+<main class="auth-shell">
+  <section class="auth-card">
+    <a href="/" class="auth-brand"><span class="dot"></span>PipeWarden</a>
+    <h1 class="auth-title">Choose a new password</h1>
+    <p class="auth-sub">This link is one-shot and expires in an hour. After resetting, you'll be signed in automatically.</p>
+
+    <div class="error" id="err"></div>
+
+    <form id="reset-form" novalidate>
+      <div class="field">
+        <label for="password">New password</label>
+        <input type="password" id="password" name="password" autocomplete="new-password" required minlength="12" placeholder="At least 12 characters" />
+        <div class="hint">12+ characters. Use a passphrase you can remember.</div>
+      </div>
+      <button type="submit" class="btn-primary" id="submit-btn">Reset password</button>
+    </form>
+
+    <div class="auth-footer">
+      Remembered it? <a href="/login/">Sign in</a>
+    </div>
+  </section>
+</main>
+
+<script>
+const API_BASE = window.location.hostname === 'pipewarden.com' || window.location.hostname === 'pipewarden.io'
+  ? 'https://api.pipewarden.io'
+  : '';
+
+const params = new URLSearchParams(window.location.search);
+const token = params.get('token');
+
+if (!token) {
+  document.getElementById('err').textContent = 'Missing reset token. Use the link from your email.';
+  document.getElementById('err').classList.add('visible');
+  document.getElementById('submit-btn').disabled = true;
+}
+
+document.getElementById('reset-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const err = document.getElementById('err');
+  err.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Resetting…';
+
+  try {
+    const res = await fetch(API_BASE + '/api/v1/auth/password/reset/finish', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        token,
+        password: document.getElementById('password').value,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data && data.error) || 'Reset failed');
+    window.location.href = (data && data.next) || '/dashboard/';
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('visible');
+    btn.disabled = false;
+    btn.textContent = 'Reset password';
+  }
+});
+</script>
+</body>
+</html>

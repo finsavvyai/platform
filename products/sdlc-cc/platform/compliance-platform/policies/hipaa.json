@@ -1,0 +1,136 @@
+{
+  "name": "hipaa-policy",
+  "version": "2.1.0",
+  "description": "HIPAA compliance policy for healthcare organizations",
+  "framework": "HIPAA",
+  "risk_level": "critical",
+  "retention_years": 7,
+  "rules": [
+    {
+      "name": "phi_access_control",
+      "description": "Control access to Protected Health Information",
+      "condition": {
+        "type": "data_classification",
+        "value": "phi"
+      },
+      "effect": "allow",
+      "actions": {
+        "authorization_required": true,
+        "allowed_roles": ["doctor", "nurse", "admin", "medical_staff", "healthcare_provider"],
+        "audit_level": "high",
+        "transformations": ["redact_phi", "audit_retention_7y"]
+      },
+      "on_violation": {
+        "block": true,
+        "alert": true,
+        "escalation": "immediate"
+      }
+    },
+    {
+      "name": "phi_redaction",
+      "description": "Automatically redetect and redact PHI",
+      "condition": {
+        "type": "content_contains",
+        "patterns": [
+          "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+          "\\b[A-Z]{2,4}\\d{6,8}\\b",
+          "\\b(?:Mr|Mrs|Ms|Dr)\\.?\\s+[A-Z][a-z]+\\s+[A-Z][a-z]+\\b"
+        ]
+      },
+      "effect": "transform",
+      "actions": {
+        "transformations": [
+          {"type": "redact", "pattern": "ssn", "replacement": "[REDACTED SSN]"},
+          {"type": "redact", "pattern": "medical_id", "replacement": "[REDACTED MEDICAL ID]"},
+          {"type": "redact", "pattern": "patient_name", "replacement": "[REDACTED NAME]"}
+        ],
+        "audit": true,
+        "compliance_score_impact": -5
+      }
+    },
+    {
+      "name": "minimum_necessary",
+      "description": "Enforce minimum necessary standard",
+      "condition": {
+        "type": "data_classification",
+        "value": "phi"
+      },
+      "effect": "transform",
+      "actions": {
+        "data_minimization": true,
+        "purpose_verification": true,
+        "transformations": ["filter_relevant_phi", "audit_access_purpose"]
+      }
+    },
+    {
+      "name": "audit_trail",
+      "description": "Create comprehensive audit trail for PHI access",
+      "condition": {
+        "type": "data_classification",
+        "value": "phi"
+      },
+      "effect": "enhance",
+      "actions": {
+        "audit_level": "critical",
+        "retention_years": 7,
+        "include_context": true,
+        "include_user_intent": true,
+        "compliance_reporting": true
+      }
+    },
+    {
+      "name": "business_associate",
+      "description": "Apply business associate agreement requirements",
+      "condition": {
+        "type": "organization_type",
+        "value": ["business_associate", "vendor", "third_party"]
+      },
+      "effect": "enhance",
+      "actions": {
+        "baa_verification": true,
+        "enhanced_audit": true,
+        "limit_data_sharing": true,
+        "require_detailed_purpose": true
+      }
+    }
+  ],
+  "pii_patterns": {
+    "ssn": {
+      "pattern": "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+      "confidence": "high",
+      "action": "redact"
+    },
+    "medical_id": {
+      "pattern": "\\b[A-Z]{2,4}\\d{6,8}\\b",
+      "confidence": "medium",
+      "action": "redact"
+    },
+    "patient_name": {
+      "pattern": "\\b(?:Mr|Mrs|Ms|Dr)\\.?\\s+[A-Z][a-z]+\\s+[A-Z][a-z]+\\b",
+      "confidence": "medium",
+      "action": "redact"
+    },
+    "diagnosis_code": {
+      "pattern": "\\b[A-Z]\\d{2}\\.\\d{1,3}\\b",
+      "confidence": "high",
+      "action": "redact"
+    }
+  },
+  "compliance_requirements": {
+    "administrative_safeguards": true,
+    "physical_safeguards": true,
+    "technical_safeguards": true,
+    "breach_notification": true,
+    "privacy_policies": true,
+    "risk_assessments": true
+  },
+  "penalties": {
+    "civil_penalties": true,
+    "criminal_penalties": true,
+    "enforcement": true
+  },
+  "created_at": "2025-11-07T21:50:00Z",
+  "updated_at": "2025-11-07T21:50:00Z",
+  "author": "SDLC Compliance Team",
+  "approved_by": "Compliance Officer"
+}

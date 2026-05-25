@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo - LunaOS</title>
+    <link rel="icon" type="image/png" href="assets/luna-logo.png">
+    <meta name="description" content="See LunaOS in action - interactive demo of AI agent deployment and management.">
+    <script defer data-domain="lunaos.ai" src="https://plausible.io/js/script.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --violet-500: #8b5cf6; --violet-600: #7c3aed;
+            --indigo-500: #6366f1; --indigo-600: #4f46e5;
+            --emerald-400: #34d399; --amber-400: #fbbf24;
+            --neutral-900: #0a0a0f; --neutral-800: #141420;
+            --neutral-700: #1e1e2e; --neutral-500: #6b7280;
+            --neutral-400: #9ca3af; --border: rgba(139, 92, 246, 0.15);
+        }
+        :focus-visible { outline: 2px solid var(--violet-500); outline-offset: 2px; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--neutral-900); color: #fff;
+               line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+        nav { position: fixed; top: 0; width: 100%; z-index: 100; padding: 1rem 0;
+              background: rgba(10, 10, 15, 0.9); backdrop-filter: blur(20px);
+              border-bottom: 1px solid var(--border); }
+        nav .container { display: flex; justify-content: space-between; align-items: center; }
+        .logo { text-decoration: none; display: flex; align-items: center; gap: 0.5rem; color: white; }
+        .logo-moon { font-size: 1.5rem; }
+        .logo-text { font-size: 1.2rem; font-weight: 700;
+                    background: linear-gradient(135deg, #fff 30%, var(--violet-500));
+                    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .nav-links { display: flex; gap: 2rem; align-items: center; }
+        .nav-links a { color: var(--neutral-400); text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+        .nav-links a:hover { color: #fff; }
+        .btn { display: inline-flex; align-items: center; padding: 0.6rem 1.4rem; border-radius: 8px;
+               font-size: 0.9rem; font-weight: 600; text-decoration: none; border: none; cursor: pointer;
+               transition: all 0.25s; }
+        .btn-glow { background: linear-gradient(135deg, var(--violet-600), var(--indigo-600));
+                    color: white; box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
+        .btn-glow:hover { transform: translateY(-1px); box-shadow: 0 0 30px rgba(99, 102, 241, 0.5); }
+        .btn-ghost { background: rgba(255,255,255,0.06); color: white; border: 1px solid rgba(255,255,255,0.1); }
+        .btn-lg { padding: 0.9rem 2rem; font-size: 1rem; border-radius: 10px; }
+        .btn-sm { padding: 0.5rem 1rem; font-size: 0.85rem; border-radius: 6px; }
+        .hero { padding: 8rem 0 4rem; text-align: center; }
+        .hero h1 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 1rem; }
+        .gradient-text { background: linear-gradient(135deg, var(--violet-500), var(--indigo-500), var(--emerald-400));
+                        -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { color: var(--neutral-400); font-size: 1.1rem; max-width: 600px; margin: 0 auto 2rem; }
+        .divider { border: none; height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 0; }
+        section { padding: 4rem 0; }
+        .demo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; }
+        .demo-step { background: var(--neutral-800); border: 1px solid var(--border); border-radius: 12px;
+                    padding: 1.5rem; margin-bottom: 1.25rem; opacity: 0.4; transform: translateY(8px);
+                    transition: all 0.4s ease; border-left: 3px solid var(--neutral-700); }
+        .demo-step.active { opacity: 1; transform: translateY(0); border-left-color: var(--violet-500);
+                           box-shadow: 0 4px 20px rgba(139, 92, 246, 0.1); }
+        .step-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+        .step-num { width: 28px; height: 28px; background: linear-gradient(135deg, var(--violet-600), var(--indigo-600));
+                   border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                   font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+        .step-header h3 { font-size: 1rem; font-weight: 700; }
+        .step-desc { color: var(--neutral-400); font-size: 0.85rem; margin-bottom: 0.75rem; }
+        .terminal { background: #111119; border: 1px solid var(--border); border-radius: 8px; padding: 1rem;
+                   font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; line-height: 1.6; overflow-x: auto; }
+        .terminal .cmd { color: var(--emerald-400); }
+        .terminal .out { color: var(--neutral-400); }
+        .response-panel { background: var(--neutral-800); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; }
+        .response-panel h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+        .response-terminal { background: #111119; border: 1px solid var(--border); border-radius: 10px;
+                            padding: 1.5rem; min-height: 350px; font-family: 'JetBrains Mono', monospace;
+                            font-size: 0.8rem; line-height: 1.6; }
+        .response-actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+        .card { background: var(--neutral-800); border: 1px solid var(--border); border-radius: 16px;
+                padding: 2rem; text-align: center; transition: all 0.3s; }
+        .card:hover { border-color: rgba(139, 92, 246, 0.3); transform: translateY(-2px); }
+        .card-icon { font-size: 1.5rem; margin-bottom: 0.75rem; }
+        .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.4rem; }
+        .card p { color: var(--neutral-400); font-size: 0.85rem; }
+        .cta { padding: 5rem 0; text-align: center; }
+        .cta h2 { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; margin-bottom: 0.75rem; }
+        .cta p { color: var(--neutral-400); margin-bottom: 2rem; }
+        .cta-buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        footer { padding: 3rem 0; border-top: 1px solid var(--border); }
+        .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 3rem; margin-bottom: 2rem; }
+        .footer-brand p { color: var(--neutral-400); font-size: 0.85rem; margin-top: 0.75rem; }
+        .footer-heading { font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+                         letter-spacing: 0.08em; color: var(--neutral-400); margin-bottom: 1rem; }
+        .footer-col a { display: block; color: var(--neutral-400); text-decoration: none;
+                       font-size: 0.85rem; padding: 0.3rem 0; }
+        .footer-col a:hover { color: white; }
+        .footer-bottom { border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1.5rem;
+                        display: flex; justify-content: space-between; color: var(--neutral-400); font-size: 0.8rem; }
+        .footer-bottom a { color: var(--neutral-400); text-decoration: none; }
+        .footer-bottom a:hover { color: white; }
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .demo-grid, .grid-3 { grid-template-columns: 1fr; }
+            .footer-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<nav>
+    <div class="container">
+        <a href="index.html" class="logo"><span class="logo-moon">🌙</span><span class="logo-text">LunaOS</span></a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="docs.html">Docs</a>
+            <a href="sdk.html">SDK</a>
+            <a href="pricing.html">Pricing</a>
+            <a href="https://agents.lunaos.ai/auth/signup" class="btn btn-glow">Get Started</a>
+        </div>
+    </div>
+</nav>
+
+<section class="hero">
+    <div class="container">
+        <h1>See LunaOS <span class="gradient-text">in Action</span></h1>
+        <p>Watch how easy it is to deploy and manage AI agents with LunaOS</p>
+        <button id="startDemo" class="btn btn-glow btn-lg">&#9654; Start Interactive Demo</button>
+    </div>
+</section>
+<hr class="divider">
+
+<section>
+    <div class="container">
+        <div class="demo-grid">
+            <div>
+                <div class="demo-step" id="step1">
+                    <div class="step-header"><div class="step-num">1</div><h3>Check API Health</h3></div>
+                    <p class="step-desc">Verify that LunaOS is running and healthy.</p>
+                    <div class="terminal"><div class="cmd">$ curl https://api.lunaos.ai/health</div>
+                        <div class="out" id="healthResponse">Click "Start Demo" to see the response...</div></div>
+                </div>
+                <div class="demo-step" id="step2">
+                    <div class="step-header"><div class="step-num">2</div><h3>Create an AI Agent</h3></div>
+                    <p class="step-desc">Deploy your first AI agent with a simple API call.</p>
+                    <div class="terminal"><div class="cmd">$ curl -X POST https://api.lunaos.ai/agents \</div>
+                        <div class="cmd">&nbsp;&nbsp;-H "Content-Type: application/json" \</div>
+                        <div class="cmd">&nbsp;&nbsp;-d '{"name": "demo-agent", "type": "chat"}'</div>
+                        <div class="out" id="agentResponse">Click "Start Demo" to see the response...</div></div>
+                </div>
+                <div class="demo-step" id="step3">
+                    <div class="step-header"><div class="step-num">3</div><h3>Send a Message</h3></div>
+                    <p class="step-desc">Interact with your AI agent by sending a message.</p>
+                    <div class="terminal"><div class="cmd">$ curl -X POST https://api.lunaos.ai/agents/demo-agent/messages \</div>
+                        <div class="cmd">&nbsp;&nbsp;-H "Content-Type: application/json" \</div>
+                        <div class="cmd">&nbsp;&nbsp;-d '{"message": "Hello, how are you?"}'</div>
+                        <div class="out" id="messageResponse">Click "Start Demo" to see the response...</div></div>
+                </div>
+                <div class="demo-step" id="step4">
+                    <div class="step-header"><div class="step-num">4</div><h3>Monitor Agent Status</h3></div>
+                    <p class="step-desc">Check the status and metrics of your running agents.</p>
+                    <div class="terminal"><div class="cmd">$ curl https://api.lunaos.ai/agents/demo-agent/status</div>
+                        <div class="out" id="statusResponse">Click "Start Demo" to see the response...</div></div>
+                </div>
+            </div>
+            <div class="response-panel">
+                <h3>Live API Response</h3>
+                <div class="response-terminal">
+                    <div id="liveResponse" style="color: var(--amber-400);">// Click "Start Demo" to see live API responses</div>
+                </div>
+                <div class="response-actions">
+                    <button id="resetDemo" class="btn btn-ghost btn-sm">&#8634; Reset Demo</button>
+                    <a href="https://api.lunaos.ai/docs" class="btn btn-glow btn-sm">View API Docs</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<hr class="divider">
+
+<section>
+    <div class="container" style="text-align: center;">
+        <h2 style="font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; margin-bottom: 0.5rem;">What You Just Saw</h2>
+        <p style="color: var(--neutral-400); margin-bottom: 2.5rem;">LunaOS makes AI agent deployment and management incredibly simple</p>
+        <div class="grid-3">
+            <div class="card"><div class="card-icon">&#9889;</div><h3>Lightning Fast</h3><p>Deploy AI agents in seconds with our optimized runtime</p></div>
+            <div class="card"><div class="card-icon">&#128187;</div><h3>Developer Friendly</h3><p>Simple REST API with comprehensive documentation</p></div>
+            <div class="card"><div class="card-icon">&#128274;</div><h3>Production Ready</h3><p>Built for scale with enterprise-grade security</p></div>
+        </div>
+    </div>
+</section>
+<hr class="divider">
+
+<section class="cta">
+    <div class="container">
+        <h2>Ready to Build Your Own?</h2>
+        <p>Start building AI-native applications with LunaOS today</p>
+        <div class="cta-buttons">
+            <a href="https://agents.lunaos.ai/auth/signup" class="btn btn-glow btn-lg">Get Started Free &rarr;</a>
+            <a href="https://api.lunaos.ai/docs" class="btn btn-ghost btn-lg">API Documentation</a>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <div class="container">
+        <div class="footer-grid">
+            <div class="footer-brand">
+                <a href="/" class="logo"><span class="logo-moon">🌙</span><span class="logo-text">LunaOS</span></a>
+                <p>AI-Native Backend Platform.<br>28 AI agents. Deploy on the edge.</p>
+            </div>
+            <div class="footer-col"><p class="footer-heading">Product</p>
+                <a href="index.html#agents">Agents</a><a href="language.html">Language</a>
+                <a href="https://docs.lunaos.ai" target="_blank" rel="noopener">Docs</a><a href="pricing.html">Pricing</a></div>
+            <div class="footer-col"><p class="footer-heading">Developers</p>
+                <a href="https://docs.lunaos.ai/getting-started/quickstart" target="_blank" rel="noopener">Quickstart</a>
+                <a href="https://docs.lunaos.ai/api/" target="_blank" rel="noopener">API Reference</a>
+                <a href="https://github.com/lunaos-ai" target="_blank" rel="noopener">GitHub</a></div>
+            <div class="footer-col"><p class="footer-heading">Company</p>
+                <a href="contact.html">Contact</a><a href="investors.html">Investors</a>
+                <a href="mailto:hello@lunaos.ai">hello@lunaos.ai</a></div>
+        </div>
+        <div class="footer-bottom">
+            <span>&copy; 2026 LunaOS. Built with love for developers.</span>
+            <a href="https://github.com/lunaos-ai" target="_blank" rel="noopener">GitHub</a>
+        </div>
+    </div>
+</footer>
+
+<script>
+let currentStep = 0;
+const steps = ['step1', 'step2', 'step3', 'step4'];
+const responses = {
+    health: { status: 'healthy', timestamp: new Date().toISOString(), version: '1.0.0', uptime: '2h 15m 30s' },
+    agent: { id: 'demo-agent-123', name: 'demo-agent', type: 'chat', status: 'running', created_at: new Date().toISOString() },
+    message: { id: 'msg-456', message: 'Hello, how are you?', response: "Hello! I'm doing great. How can I help you today?", timestamp: new Date().toISOString() },
+    status: { id: 'demo-agent-123', status: 'running', messages_processed: 1, uptime: '5m 30s', memory_usage: '45MB', cpu_usage: '12%' }
+};
+const resKeys = ['health', 'agent', 'message', 'status'];
+const resEls = ['healthResponse', 'agentResponse', 'messageResponse', 'statusResponse'];
+
+function startDemo() {
+    currentStep = 0;
+    document.getElementById('startDemo').disabled = true;
+    document.getElementById('startDemo').textContent = 'Demo Running...';
+    steps.forEach(s => document.getElementById(s).classList.remove('active'));
+    document.getElementById('liveResponse').innerHTML = '<span style="color:var(--neutral-400)">Starting demo...</span>';
+    runStep();
+}
+function runStep() {
+    if (currentStep >= steps.length) {
+        document.getElementById('startDemo').disabled = false;
+        document.getElementById('startDemo').textContent = 'Demo Complete - Restart';
+        return;
+    }
+    document.getElementById(steps[currentStep]).classList.add('active');
+    const json = JSON.stringify(responses[resKeys[currentStep]], null, 2);
+    document.getElementById(resEls[currentStep]).innerHTML = '<span style="color:var(--emerald-400)">' + json + '</span>';
+    document.getElementById('liveResponse').innerHTML = '<span style="color:var(--emerald-400)">' + json + '</span>';
+    currentStep++;
+    setTimeout(runStep, 3000);
+}
+function resetDemo() {
+    currentStep = 0;
+    document.getElementById('startDemo').disabled = false;
+    document.getElementById('startDemo').innerHTML = '&#9654; Start Interactive Demo';
+    steps.forEach(s => document.getElementById(s).classList.remove('active'));
+    resEls.forEach(id => document.getElementById(id).textContent = 'Click "Start Demo" to see the response...');
+    document.getElementById('liveResponse').innerHTML = '<span style="color:var(--amber-400)">// Click "Start Demo" to see live API responses</span>';
+}
+document.getElementById('startDemo').addEventListener('click', startDemo);
+document.getElementById('resetDemo').addEventListener('click', resetDemo);
+</script>
+</body>
+</html>

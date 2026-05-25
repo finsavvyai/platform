@@ -1,0 +1,438 @@
+{
+  "version": "1.0.0",
+  "project": "Questro AI-Powered Testing Platform",
+  "description": "Unified deployment configuration for all Questro components",
+  "environments": {
+    "development": {
+      "name": "Development",
+      "type": "local",
+      "infrastructure": {
+        "docker": {
+          "enabled": true,
+          "composeFile": "docker-compose.dev.yml",
+          "services": ["postgres", "redis", "backend", "frontend"]
+        }
+      },
+      "components": {
+        "frontend": {
+          "enabled": true,
+          "port": 3000,
+          "build": true,
+          "healthCheck": {
+            "path": "/",
+            "timeout": 30000,
+            "retries": 10
+          }
+        },
+        "backend": {
+          "enabled": true,
+          "port": 8000,
+          "build": true,
+          "healthCheck": {
+            "path": "/api/health",
+            "timeout": 30000,
+            "retries": 10
+          }
+        },
+        "agent": {
+          "enabled": true,
+          "build": true,
+          "healthCheck": {
+            "path": "/health",
+            "timeout": 15000,
+            "retries": 5
+          }
+        },
+        "vscode-extension": {
+          "enabled": false,
+          "publish": false
+        },
+        "browser-extension": {
+          "enabled": false,
+          "build": true
+        }
+      },
+      "tests": {
+        "enabled": true,
+        "parallel": true,
+        "coverage": false,
+        "timeout": 300000
+      },
+      "monitoring": {
+        "enabled": true,
+        "logs": true,
+        "metrics": true,
+        "healthChecks": true
+      }
+    },
+    "staging": {
+      "name": "Staging",
+      "type": "cloud",
+      "provider": "render",
+      "infrastructure": {
+        "docker": {
+          "enabled": true,
+          "composeFile": "docker-compose.staging.yml"
+        },
+        "services": {
+          "database": {
+            "type": "postgresql",
+            "version": "15",
+            "instance": "free"
+          },
+          "cache": {
+            "type": "redis",
+            "version": "7",
+            "instance": "free"
+          }
+        }
+      },
+      "components": {
+        "frontend": {
+          "enabled": true,
+          "port": 3000,
+          "build": true,
+          "healthCheck": {
+            "path": "/",
+            "timeout": 60000,
+            "retries": 15
+          }
+        },
+        "backend": {
+          "enabled": true,
+          "port": 8000,
+          "build": true,
+          "healthCheck": {
+            "path": "/api/health",
+            "timeout": 60000,
+            "retries": 15
+          }
+        },
+        "agent": {
+          "enabled": true,
+          "build": true,
+          "healthCheck": {
+            "path": "/health",
+            "timeout": 30000,
+            "retries": 10
+          }
+        },
+        "vscode-extension": {
+          "enabled": true,
+          "publish": false,
+          "channel": "beta"
+        },
+        "browser-extension": {
+          "enabled": true,
+          "build": true,
+          "channel": "beta"
+        }
+      },
+      "tests": {
+        "enabled": true,
+        "parallel": true,
+        "coverage": true,
+        "timeout": 600000
+      },
+      "monitoring": {
+        "enabled": true,
+        "logs": true,
+        "metrics": true,
+        "healthChecks": true,
+        "errorReporting": true,
+        "performanceMonitoring": true
+      }
+    },
+    "production": {
+      "name": "Production",
+      "type": "cloud",
+      "provider": "render",
+      "infrastructure": {
+        "docker": {
+          "enabled": true,
+          "composeFile": "docker-compose.prod.yml"
+        },
+        "services": {
+          "database": {
+            "type": "postgresql",
+            "version": "15",
+            "instance": "standard"
+          },
+          "cache": {
+            "type": "redis",
+            "version": "7",
+            "instance": "standard"
+          },
+          "cdn": {
+            "enabled": true,
+            "provider": "cloudflare"
+          }
+        }
+      },
+      "components": {
+        "frontend": {
+          "enabled": true,
+          "port": 3000,
+          "build": true,
+          "healthCheck": {
+            "path": "/",
+            "timeout": 120000,
+            "retries": 20
+          },
+          "cdn": {
+            "enabled": true,
+            "cache": {
+              "ttl": 86400,
+              "bypass": ["/api/*"]
+            }
+          }
+        },
+        "backend": {
+          "enabled": true,
+          "port": 8000,
+          "build": true,
+          "healthCheck": {
+            "path": "/api/health",
+            "timeout": 120000,
+            "retries": 20
+          },
+          "scaling": {
+            "minInstances": 2,
+            "maxInstances": 10,
+            "targetCPU": 70,
+            "targetMemory": 80
+          }
+        },
+        "agent": {
+          "enabled": true,
+          "build": true,
+          "healthCheck": {
+            "path": "/health",
+            "timeout": 60000,
+            "retries": 15
+          },
+          "scaling": {
+            "minInstances": 1,
+            "maxInstances": 5,
+            "targetCPU": 80
+          }
+        },
+        "vscode-extension": {
+          "enabled": true,
+          "publish": true,
+          "channel": "stable",
+          "marketplace": "vscode"
+        },
+        "browser-extension": {
+          "enabled": true,
+          "build": true,
+          "publish": true,
+          "stores": ["chrome", "firefox", "edge"]
+        }
+      },
+      "tests": {
+        "enabled": true,
+        "parallel": true,
+        "coverage": true,
+        "timeout": 900000,
+        "smokeTests": true,
+        "loadTests": true
+      },
+      "monitoring": {
+        "enabled": true,
+        "logs": true,
+        "metrics": true,
+        "healthChecks": true,
+        "errorReporting": true,
+        "performanceMonitoring": true,
+        "alerting": {
+          "enabled": true,
+          "channels": ["email", "slack"],
+          "rules": [
+            {
+              "name": "High Error Rate",
+              "condition": "error_rate > 0.05",
+              "severity": "warning",
+              "threshold": 0.05
+            },
+            {
+              "name": "Slow Response Time",
+              "condition": "response_time > 5000",
+              "severity": "warning",
+              "threshold": 5000
+            },
+            {
+              "name": "Service Down",
+              "condition": "health_check_failed",
+              "severity": "critical",
+              "threshold": 0
+            }
+          ]
+        }
+      },
+      "security": {
+        "ssl": true,
+        "firewall": true,
+        "rateLimiting": true,
+        "securityHeaders": true,
+        "vulnerabilityScanning": true
+      }
+    }
+  },
+  "build": {
+    "optimization": {
+      "minification": true,
+      "treeShaking": true,
+      "codeSplitting": true,
+      "compression": true
+    },
+    "artifacts": {
+      "frontend": {
+        "output": "dist",
+        "assets": ["css", "js", "images", "fonts"]
+      },
+      "backend": {
+        "output": "dist",
+        "dependencies": "node_modules"
+      },
+      "extensions": {
+        "vscode": "out",
+        "browser": "dist"
+      }
+    }
+  },
+  "testing": {
+    "unit": {
+      "framework": "jest",
+      "coverage": {
+        "enabled": true,
+        "threshold": 80,
+        "formats": ["lcov", "html", "text"]
+      }
+    },
+    "integration": {
+      "framework": "jest",
+      "timeout": 30000,
+      "database": "test"
+    },
+    "e2e": {
+      "framework": "playwright",
+      "browsers": ["chromium", "firefox", "webkit"],
+      "parallel": true,
+      "retries": 2
+    },
+    "performance": {
+      "framework": "lighthouse",
+      "thresholds": {
+        "performance": 90,
+        "accessibility": 95,
+        "bestPractices": 90,
+        "seo": 85
+      }
+    }
+  },
+  "deployment": {
+    "strategy": "blueGreen",
+    "rollback": {
+      "enabled": true,
+      "automatic": false,
+      "healthCheck": true
+    },
+    "zeroDowntime": {
+      "enabled": true,
+      "loadBalancer": true,
+      "warmup": true
+    },
+    "hooks": {
+      "preDeploy": [
+        "npm run lint",
+        "npm run test",
+        "npm run audit"
+      ],
+      "postDeploy": [
+        "npm run health-check",
+        "npm run smoke-test",
+        "npm run notify-success"
+      ],
+      "onFailure": [
+        "npm run rollback",
+        "npm run notify-failure"
+      ]
+    }
+  },
+  "monitoring": {
+    "logs": {
+      "level": "info",
+      "format": "json",
+      "retention": 30,
+      "destinations": ["console", "file"]
+    },
+    "metrics": {
+      "enabled": true,
+      "interval": 30,
+      "retention": 90,
+      "providers": ["prometheus", "grafana"]
+    },
+    "alerts": {
+      "enabled": true,
+      "channels": ["email", "slack"],
+      "escalation": {
+        "warning": ["email"],
+        "error": ["email", "slack"],
+        "critical": ["email", "slack", "sms"]
+      }
+    }
+  },
+  "secrets": {
+    "provider": "environment",
+    "required": [
+      "DATABASE_URL",
+      "REDIS_URL",
+      "JWT_SECRET",
+      "JWT_REFRESH_SECRET",
+      "OPENAI_API_KEY",
+      "FRONTEND_URL",
+      "CORS_ORIGIN"
+    ],
+    "optional": [
+      "HUGGINGFACE_API_KEY",
+      "STRIPE_API_KEY",
+      "LEMONSQUEEZY_API_KEY",
+      "SLACK_WEBHOOK_URL",
+      "SENTRY_DSN",
+      "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY"
+    ]
+  },
+  "notifications": {
+    "channels": {
+      "email": {
+        "enabled": true,
+        "smtp": {
+          "host": "smtp.gmail.com",
+          "port": 587,
+          "secure": false
+        }
+      },
+      "slack": {
+        "enabled": false,
+        "webhookUrl": "",
+        "channel": "#deployments"
+      }
+    },
+    "events": {
+      "deploymentStarted": true,
+      "deploymentCompleted": true,
+      "deploymentFailed": true,
+      "testsFailed": true,
+      "healthCheckFailed": true,
+      "securityAlert": true
+    }
+  },
+  "backup": {
+    "enabled": true,
+    "schedule": "0 2 * * *",
+    "retention": 30,
+    "components": ["database", "uploads", "logs"]
+  }
+}

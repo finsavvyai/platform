@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawPipe Benchmarks — Interim Synthetic Run</title>
+  <meta name="description" content="Interim synthetic benchmark (200 unique prompts × 2 passes against a mocked gateway). Public measured benchmark in progress at github.com/finsavvyai/clawpipe-booster-benchmark.">
+  <meta name="color-scheme" content="dark light">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #000000;
+      --bg-secondary: #1c1c1e;
+      --bg-tertiary: #2c2c2e;
+      --bg-elevated: #1c1c1e;
+      --fill-primary: rgba(120, 120, 128, 0.36);
+      --fill-secondary: rgba(120, 120, 128, 0.32);
+      --fill-tertiary: rgba(120, 120, 128, 0.24);
+      --separator: rgba(84, 84, 88, 0.65);
+      --separator-opaque: #38383a;
+      --label-primary: #ffffff;
+      --label-secondary: rgba(235, 235, 245, 0.6);
+      --label-tertiary: rgba(235, 235, 245, 0.3);
+      --label-quaternary: rgba(235, 235, 245, 0.18);
+      --accent: #8b5cf6;
+      --accent-hover: #7c3aed;
+      --green: #30d158;
+      --red: #ff453a;
+      --blue: #0a84ff;
+      --orange: #ff9f0a;
+      --tint: rgba(139, 92, 246, 0.15);
+      --material-regular: rgba(36, 36, 38, 0.82);
+      --space-xs: 4px; --space-sm: 8px; --space-md: 16px;
+      --space-lg: 24px; --space-xl: 32px; --space-2xl: 48px;
+      --space-3xl: 64px; --space-4xl: 80px;
+      --font-caption2: 11px; --font-caption1: 12px; --font-footnote: 13px;
+      --font-subhead: 15px; --font-body: 17px; --font-title3: 20px;
+      --font-title2: 22px; --font-title1: 28px; --font-large-title: 34px;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-xl: 20px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-primary: #f2f2f7;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #f2f2f7;
+        --bg-elevated: #ffffff;
+        --fill-primary: rgba(120, 120, 128, 0.2);
+        --fill-secondary: rgba(120, 120, 128, 0.16);
+        --fill-tertiary: rgba(120, 120, 128, 0.12);
+        --separator: rgba(60, 60, 67, 0.29);
+        --separator-opaque: #c6c6c8;
+        --label-primary: #000000;
+        --label-secondary: rgba(60, 60, 67, 0.6);
+        --label-tertiary: rgba(60, 60, 67, 0.3);
+        --label-quaternary: rgba(60, 60, 67, 0.18);
+        --material-regular: rgba(255, 255, 255, 0.82);
+        --accent: #7c3aed;
+        --accent-hover: #6d28d9;
+        --tint: rgba(124, 58, 237, 0.1);
+        --green: #34c759;
+        --red: #ff3b30;
+        --blue: #007aff;
+        --orange: #ff9500;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display',
+        'SF Pro Text', system-ui, sans-serif;
+      background: var(--bg-primary);
+      color: var(--label-primary);
+      line-height: 1.47;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container { max-width: 1120px; margin: 0 auto; padding: 0 var(--space-lg); }
+
+    header {
+      padding: var(--space-md) 0;
+      border-bottom: 0.5px solid var(--separator);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo {
+      font-size: var(--font-title3); font-weight: 700;
+      color: var(--accent); letter-spacing: -0.3px;
+    }
+    nav a {
+      margin-left: var(--space-xl); color: var(--label-secondary);
+      font-size: var(--font-subhead); font-weight: 500;
+    }
+    nav a:hover { color: var(--label-primary); text-decoration: none; }
+
+    .hero {
+      text-align: center;
+      padding: var(--space-4xl) 0 var(--space-2xl);
+    }
+    .hero h1 {
+      font-size: clamp(var(--font-large-title), 5vw, 48px);
+      font-weight: 700; letter-spacing: -0.8px; line-height: 1.1;
+      margin-bottom: var(--space-md);
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--accent), #c084fc);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: var(--font-body); color: var(--label-secondary);
+      max-width: 600px; margin: 0 auto; line-height: 1.53;
+    }
+
+    /* Stat cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--space-md);
+      padding: var(--space-xl) 0;
+    }
+    .stat-card {
+      background: var(--bg-secondary);
+      border: 0.5px solid var(--separator);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+      text-align: center;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    }
+    .stat-value {
+      font-size: clamp(var(--font-title1), 4vw, 48px);
+      font-weight: 800; letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--accent), #c084fc);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-value.green {
+      background: linear-gradient(135deg, var(--green), #6ee7b7);
+      -webkit-background-clip: text; background-clip: text;
+    }
+    .stat-label {
+      font-size: var(--font-footnote);
+      color: var(--label-secondary);
+      margin-top: var(--space-xs);
+    }
+
+    /* Sections */
+    section { padding: var(--space-3xl) 0; }
+    section h2 {
+      font-size: var(--font-title2); font-weight: 700;
+      letter-spacing: -0.3px; margin-bottom: var(--space-xl);
+      text-align: center;
+    }
+
+    /* Chart containers */
+    .chart-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: var(--space-lg);
+    }
+    .chart-card {
+      background: var(--bg-secondary);
+      border: 0.5px solid var(--separator);
+      border-radius: var(--radius-lg);
+      padding: var(--space-lg);
+    }
+    .chart-card h3 {
+      font-size: var(--font-subhead); font-weight: 600;
+      margin-bottom: var(--space-md); color: var(--accent);
+    }
+
+    /* Bar chart */
+    .bar-chart { display: flex; flex-direction: column; gap: var(--space-sm); }
+    .bar-row {
+      display: flex; align-items: center; gap: var(--space-sm);
+    }
+    .bar-label {
+      width: 100px; font-size: var(--font-caption1);
+      color: var(--label-secondary); text-align: right; flex-shrink: 0;
+    }
+    .bar-track {
+      flex: 1; height: 28px; background: var(--fill-tertiary);
+      border-radius: var(--radius-sm); overflow: hidden; position: relative;
+    }
+    .bar-fill {
+      height: 100%; border-radius: var(--radius-sm);
+      transition: width 1s ease;
+      display: flex; align-items: center; padding-left: var(--space-sm);
+      font-size: var(--font-caption1); font-weight: 600; color: #fff;
+      min-width: fit-content;
+    }
+    .bar-fill.purple { background: var(--accent); }
+    .bar-fill.green { background: var(--green); }
+    .bar-fill.blue { background: var(--blue); }
+    .bar-fill.orange { background: var(--orange); }
+    .bar-fill.red { background: var(--red); }
+
+    /* Pie / donut chart via CSS conic-gradient */
+    .donut-wrap {
+      display: flex; align-items: center; justify-content: center;
+      gap: var(--space-xl); flex-wrap: wrap;
+    }
+    .donut {
+      width: 180px; height: 180px; border-radius: 50%;
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .donut-inner {
+      width: 110px; height: 110px; border-radius: 50%;
+      background: var(--bg-secondary);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; position: absolute;
+    }
+    .donut-inner .pct {
+      font-size: var(--font-title1); font-weight: 800;
+    }
+    .donut-inner .lbl {
+      font-size: var(--font-caption1); color: var(--label-secondary);
+    }
+    .donut-legend {
+      display: flex; flex-direction: column; gap: var(--space-sm);
+      font-size: var(--font-footnote);
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: var(--space-sm);
+    }
+    .legend-dot {
+      width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+    }
+
+    /* Stage timing */
+    .timing-bars { display: flex; flex-direction: column; gap: 6px; }
+    .timing-row {
+      display: flex; align-items: center; gap: var(--space-sm);
+    }
+    .timing-label {
+      width: 80px; font-size: var(--font-caption1);
+      color: var(--label-secondary); text-align: right; flex-shrink: 0;
+    }
+    .timing-bar {
+      height: 22px; border-radius: 4px;
+      display: flex; align-items: center; padding: 0 var(--space-sm);
+      font-size: var(--font-caption2); font-weight: 600; color: #fff;
+      min-width: 40px; transition: width 1s ease;
+    }
+
+    /* Table */
+    .table-wrap {
+      background: var(--bg-secondary); border-radius: var(--radius-lg);
+      border: 0.5px solid var(--separator); overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: var(--font-footnote); }
+    th, td {
+      padding: var(--space-md); text-align: left;
+      border-bottom: 0.5px solid var(--separator);
+    }
+    th {
+      color: var(--label-secondary); font-weight: 600;
+      font-size: var(--font-caption1); text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    td:first-child { font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
+    .yes { color: var(--green); font-weight: 600; }
+
+    /* Loading state */
+    .loading {
+      text-align: center; padding: var(--space-4xl);
+      color: var(--label-tertiary); font-size: var(--font-body);
+    }
+
+    footer {
+      padding: var(--space-xl) 0; text-align: center;
+      color: var(--label-tertiary); font-size: var(--font-caption1);
+      border-top: 0.5px solid var(--separator);
+    }
+
+    .skip-link {
+      position: absolute; top: -48px; left: 0;
+      background: var(--accent); color: #fff;
+      padding: var(--space-sm) var(--space-md); z-index: 100;
+      border-radius: 0 0 var(--space-xs) 0; font-size: var(--font-footnote);
+      transition: top 0.2s ease;
+    }
+    .skip-link:focus { top: 0; }
+    a:focus-visible, .stat-card:focus-visible {
+      outline: 3px solid var(--accent); outline-offset: 2px;
+      border-radius: var(--radius-sm);
+    }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0;
+      margin: -1px; overflow: hidden; clip: rect(0,0,0,0);
+      white-space: nowrap; border: 0;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .hero { padding: var(--space-2xl) 0 var(--space-xl); }
+      .hero h1 { font-size: var(--font-title1); }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .chart-row { grid-template-columns: 1fr; }
+      nav a { margin-left: var(--space-md); font-size: var(--font-footnote); }
+    }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="container">
+  <header role="banner">
+    <a class="logo" href="/" aria-label="ClawPipe benchmarks home">ClawPipe</a>
+    <nav aria-label="Main navigation">
+      <a href="https://clawpipe.ai">Home</a>
+      <a href="#cost">Cost</a>
+      <a href="#stages">Stages</a>
+      <a href="#charts">Charts</a>
+      <a href="#categories">Categories</a>
+    </nav>
+  </header>
+
+  <main id="main-content">
+    <section class="hero" aria-labelledby="hero-heading">
+      <h1 id="hero-heading">Pipeline <span>Benchmarks</span></h1>
+      <p><strong>Interim synthetic run.</strong> 200 unique prompts × 2 passes against a mocked gateway, with arithmetic against published per-token prices. Preserved here for transparency; not measured customer savings. Public measured benchmark is in progress at <a href="https://github.com/finsavvyai/clawpipe-booster-benchmark">clawpipe-booster-benchmark</a>.</p>
+    </section>
+
+    <div id="app" class="loading" aria-live="polite">Loading benchmark data...</div>
+
+    <section id="charts" aria-labelledby="charts-heading">
+      <h2 id="charts-heading">Charts</h2>
+      <div class="chart-row">
+        <div class="chart-card">
+          <h3>Cost Comparison</h3>
+          <img src="../results/charts/cost.svg"
+               alt="Bar chart comparing Direct API vs ClawPipe cost across 400 prompts"
+               width="640" height="360"
+               style="width:100%;height:auto;border-radius:8px;">
+        </div>
+        <div class="chart-card">
+          <h3>Request Resolution</h3>
+          <img src="../results/charts/hitrate.svg"
+               alt="Donut chart showing Booster, Cache, and API call distribution"
+               width="640" height="360"
+               style="width:100%;height:auto;border-radius:8px;">
+        </div>
+      </div>
+      <div class="chart-row" style="margin-top:var(--space-lg)">
+        <div class="chart-card">
+          <h3>Stage Latency</h3>
+          <img src="../results/charts/latency.svg"
+               alt="Horizontal bar chart of average milliseconds per pipeline stage"
+               width="640" height="360"
+               style="width:100%;height:auto;border-radius:8px;">
+        </div>
+        <div class="chart-card">
+          <h3>Category Breakdown</h3>
+          <img src="../results/charts/breakdown.svg"
+               alt="Table-chart showing cost comparison by prompt category"
+               width="640" height="360"
+               style="width:100%;height:auto;border-radius:8px;">
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer role="contentinfo">
+    <p>ClawPipe Benchmarks &copy; 2026. Data generated from
+       <code>run-benchmark.ts</code>.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var BASE = '';
+  var paths = ['../results/summary.json', 'results/summary.json', './results/summary.json'];
+
+  function tryLoad(idx) {
+    if (idx >= paths.length) {
+      document.getElementById('app').innerHTML =
+        '<p>Could not load benchmark data. Run the benchmark first:<br>' +
+        '<code>npx tsx run-benchmark.ts && npx tsx analyze.ts</code></p>';
+      return;
+    }
+    fetch(paths[idx])
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(render)
+      .catch(function () { tryLoad(idx + 1); });
+  }
+
+  function render(d) {
+    var app = document.getElementById('app');
+    app.className = '';
+    app.innerHTML = buildStats(d) + buildCost(d) + buildDonut(d) +
+      buildTiming(d) + buildCategories(d) + buildRoutes(d);
+    animateBars();
+  }
+
+  function buildStats(d) {
+    return '<div class="stats-grid" role="list">' +
+      stat(d.boosterHitRate + '%', 'Prompts resolved without AI', '') +
+      stat(d.avgPackerSavings + '%', 'Avg token reduction (Packer)', '') +
+      stat(d.costSavingsPercent + '%', 'Estimated cost savings', 'green') +
+      stat(d.pipelineOverheadMs + 'ms', 'Avg pipeline overhead', '') +
+      '</div>';
+  }
+
+  function stat(value, label, cls) {
+    return '<div class="stat-card" role="listitem">' +
+      '<div class="stat-value ' + cls + '">' + value + '</div>' +
+      '<div class="stat-label">' + label + '</div></div>';
+  }
+
+  function buildCost(d) {
+    var max = d.totalDirectCostUsd;
+    var cpPct = max > 0 ? (d.totalClawPipeCostUsd / max * 100) : 0;
+    var saved = (d.totalDirectCostUsd - d.totalClawPipeCostUsd).toFixed(2);
+    return '<section id="cost"><h2>Cost Comparison</h2>' +
+      '<div class="chart-row"><div class="chart-card">' +
+      '<h3>Total estimated cost across ' + d.totalPrompts + ' prompts</h3>' +
+      '<div class="bar-chart">' +
+      barRow('Direct API', 100, '$' + d.totalDirectCostUsd, 'red') +
+      barRow('ClawPipe', cpPct, '$' + d.totalClawPipeCostUsd, 'green') +
+      '</div>' +
+      '<p style="margin-top:var(--space-md);font-size:var(--font-footnote);color:var(--label-secondary)">' +
+      'Saved <strong style="color:var(--green)">$' + saved + '</strong> ' +
+      '(' + d.costSavingsPercent + '% reduction)</p>' +
+      '</div></div></section>';
+  }
+
+  function barRow(label, pct, text, cls) {
+    return '<div class="bar-row">' +
+      '<span class="bar-label">' + label + '</span>' +
+      '<div class="bar-track"><div class="bar-fill ' + cls + '" ' +
+      'data-width="' + Math.max(pct, 8) + '%" style="width:0%">' + text +
+      '</div></div></div>';
+  }
+
+  function buildDonut(d) {
+    var boost = d.boosterHitRate;
+    var cache = d.cacheHitRate;
+    var api = Math.max(0, 100 - boost - cache);
+    var gradient = 'conic-gradient(' +
+      'var(--accent) 0% ' + boost + '%, ' +
+      'var(--blue) ' + boost + '% ' + (boost + cache) + '%, ' +
+      'var(--fill-secondary) ' + (boost + cache) + '% 100%)';
+    return '<section><h2>Request Resolution</h2>' +
+      '<div class="chart-row"><div class="chart-card">' +
+      '<h3>How prompts were handled</h3>' +
+      '<div class="donut-wrap">' +
+      '<div class="donut" style="background:' + gradient + '">' +
+      '<div class="donut-inner"><span class="pct" style="color:var(--green)">' +
+      d.costSavingsPercent + '%</span><span class="lbl">saved</span></div></div>' +
+      '<div class="donut-legend">' +
+      legendItem('var(--accent)', 'Booster (no AI) — ' + boost + '%') +
+      legendItem('var(--blue)', 'Cache hit — ' + cache + '%') +
+      legendItem('var(--fill-secondary)', 'API call — ' + api.toFixed(1) + '%') +
+      '</div></div></div></div></section>';
+  }
+
+  function legendItem(color, text) {
+    return '<div class="legend-item">' +
+      '<div class="legend-dot" style="background:' + color + '"></div>' +
+      '<span>' + text + '</span></div>';
+  }
+
+  function buildTiming(d) {
+    var l = d.avgLatency;
+    var maxMs = Math.max(l.boosterMs, l.packerMs, l.cacheMs, l.routerMs, l.gatewayMs, 1);
+    var colors = ['purple', 'green', 'blue', 'orange', 'red'];
+    var stages = [
+      ['Booster', l.boosterMs],
+      ['Packer', l.packerMs],
+      ['Cache', l.cacheMs],
+      ['Router', l.routerMs],
+      ['Gateway', l.gatewayMs]
+    ];
+    var rows = '';
+    for (var i = 0; i < stages.length; i++) {
+      var pct = (stages[i][1] / maxMs * 100);
+      rows += '<div class="timing-row">' +
+        '<span class="timing-label">' + stages[i][0] + '</span>' +
+        '<div class="timing-bar ' + colors[i] + '" ' +
+        'data-width="' + Math.max(pct, 5) + '%" style="width:0%">' +
+        stages[i][1] + 'ms</div></div>';
+    }
+    return '<section id="stages"><h2>Stage Timing Breakdown</h2>' +
+      '<div class="chart-row"><div class="chart-card">' +
+      '<h3>Average time per pipeline stage</h3>' +
+      '<div class="timing-bars">' + rows + '</div>' +
+      '<p style="margin-top:var(--space-md);font-size:var(--font-footnote);color:var(--label-secondary)">' +
+      'Pipeline overhead (Booster + Packer + Cache + Router): <strong>' +
+      d.pipelineOverheadMs + 'ms</strong></p>' +
+      '</div></div></section>';
+  }
+
+  function buildCategories(d) {
+    var cats = d.categoryBreakdown || [];
+    var rows = '';
+    for (var i = 0; i < cats.length; i++) {
+      var c = cats[i];
+      rows += '<tr><td>' + c.category + '</td><td>' + c.count + '</td>' +
+        '<td>' + c.boosterHits + '</td><td>' + c.cacheHits + '</td>' +
+        '<td>' + c.avgPackerSavings + '%</td>' +
+        '<td>$' + c.totalDirectCost + '</td>' +
+        '<td class="yes">$' + c.totalClawPipeCost + '</td></tr>';
+    }
+    return '<section id="categories"><h2>Category Breakdown</h2>' +
+      '<div class="table-wrap"><table>' +
+      '<caption class="sr-only">Benchmark results by prompt category</caption>' +
+      '<thead><tr><th>Category</th><th>Count</th><th>Booster</th>' +
+      '<th>Cache</th><th>Packer Savings</th><th>Direct Cost</th>' +
+      '<th>ClawPipe Cost</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div></section>';
+  }
+
+  function buildRoutes(d) {
+    var routes = d.topRoutes || [];
+    var rows = '';
+    for (var i = 0; i < routes.length; i++) {
+      rows += '<tr><td>' + routes[i].model + '</td>' +
+        '<td>' + routes[i].count + '</td></tr>';
+    }
+    return '<section><h2>Router Decisions</h2>' +
+      '<div class="table-wrap"><table>' +
+      '<caption class="sr-only">Most frequently selected models</caption>' +
+      '<thead><tr><th>Model</th><th>Times Selected</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div></section>';
+  }
+
+  function animateBars() {
+    var bars = document.querySelectorAll('[data-width]');
+    requestAnimationFrame(function () {
+      for (var i = 0; i < bars.length; i++) {
+        bars[i].style.width = bars[i].getAttribute('data-width');
+      }
+    });
+  }
+
+  tryLoad(0);
+})();
+</script>
+</body>
+</html>

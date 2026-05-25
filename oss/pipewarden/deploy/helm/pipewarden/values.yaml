@@ -1,0 +1,153 @@
+image:
+  repository: ghcr.io/finsavvyai/pipewarden
+  tag: ""                      # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: pipewarden.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Vault key handling for on-prem / air-gapped installs.
+# Options:
+#   existingSecret: "my-secret"    — reference an existing Secret with key `vault-key`
+#   autoGenerate: true             — helm generates on first install, stores in Secret
+#   value: "..."                   — inline (discouraged, demo only)
+vault:
+  existingSecret: ""
+  autoGenerate: true
+  value: ""
+
+database:
+  driver: sqlite                  # sqlite | postgres
+  sqlite:
+    path: /app/data/pipewarden.db
+  postgres:
+    host: ""
+    port: 5432
+    database: pipewarden
+    user: pipewarden
+    existingSecret: ""            # must expose key `password`
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessModes: ["ReadWriteOnce"]
+  size: 10Gi
+
+airGap:
+  enabled: false                  # blocks egress to claude.ai & external LLM, enforces offline LLM
+  offlineLLM:
+    provider: ollama              # ollama | llamafile | lmstudio | none
+    endpoint: "http://ollama.ollama:11434"
+    model: "llama3.1:8b"
+
+# Optional llamafile sidecar — when airGap.enabled=true and provider=llamafile.
+# Runs a prebuilt Meta-Llama-3.1-8B-Instruct binary at http://localhost:8081.
+llamafile:
+  enabled: false
+  image:
+    repository: ghcr.io/finsavvyai/pipewarden-llamafile
+    tag: "llama-3.1-8b"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 8Gi
+    limits:
+      cpu: 4000m
+      memory: 16Gi
+
+# Tailscale embedded mesh VPN for Enterprise+ egress to on-prem SIEMs.
+# Requires building the binary with `-tags pipewarden_mesh` and providing an auth key.
+tailscale:
+  enabled: false
+  authKey: ""                     # inline (dev only)
+  existingSecret: ""              # reference an existing Secret with key `authkey`
+  hostname: "pipewarden"
+  stateDir: "/var/lib/pipewarden/mesh"
+
+# RuVector semantic+graph search sidecar for "similar findings" on Pro+ tiers.
+# Inert until enabled; set rvector.existingSecret with key `apikey`.
+rvector:
+  enabled: false
+  url: ""                         # external or in-cluster (http://rvector:6333)
+  collection: "findings"
+  existingSecret: ""              # Secret with key `apikey`
+
+billing:
+  enabled: false
+  lemonsqueezy:
+    existingSecret: ""            # keys: api-key, store-id, webhook-secret
+
+claude:
+  enabled: false
+  existingSecret: ""              # key: api-key
+
+github:
+  appEnabled: false
+  existingSecret: ""              # keys: app-id, client-id, client-secret, webhook-secret, private-key
+
+gitlab:
+  oauthEnabled: false
+  existingSecret: ""              # keys: client-id, client-secret
+  baseURL: "https://gitlab.com"
+
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+  name: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+probes:
+  liveness:
+    httpGet: { path: /health, port: http }
+    initialDelaySeconds: 15
+    periodSeconds: 30
+  readiness:
+    httpGet: { path: /readiness, port: http }
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+networkPolicy:
+  enabled: false
+  allowedNamespaces: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

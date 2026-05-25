@@ -1,0 +1,65 @@
+# Load test (k6) — manual or scheduled. See docs/PRODUCTION_READINESS_DAYS_5-10.md Day 8
+name: Load Test (k6)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Base URL (e.g. https://api.sdlc.cc or staging)'
+        required: true
+        default: 'https://api.sdlc.cc'
+      duration:
+        description: 'Steady-state duration (e.g. 1m, 5m)'
+        required: false
+        default: '1m'
+  schedule:
+    - cron: '0 4 * * 6'  # Weekly Saturday 04:00 UTC (staging recommended via env)
+
+env:
+  K6_TARGET_URL: ${{ github.event.inputs.target_url || 'https://api.sdlc.cc' }}
+
+jobs:
+  k6-load:
+    name: k6 Load Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        uses: grafana/setup-k6-action@v1
+        with:
+          version: latest
+
+      - name: Run k6 (gateway)
+        run: |
+          k6 run --env BASE_URL="${{ env.K6_TARGET_URL }}" \
+            tests/load/k6-gateway.js \
+            --out json=load-results-gateway.json \
+            --summary-trend-stats="avg,p(95),p(99)" \
+            || true
+        continue-on-error: true
+
+      - name: Run k6 (rag)
+        env:
+          RAG_URL: ${{ secrets.RAG_LOAD_URL }}
+          API_TOKEN: ${{ secrets.LOAD_TEST_TOKEN }}
+        if: env.RAG_URL != ''
+        run: |
+          k6 run --env BASE_URL="$RAG_URL" --env API_TOKEN="$API_TOKEN" \
+            tests/load/k6-rag.js \
+            --out json=load-results-rag.json \
+            --summary-trend-stats="avg,p(95),p(99)" \
+            || true
+        continue-on-error: true
+
+      - name: Upload load results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-load-results
+          path: |
+            load-results-gateway.json
+            load-results-rag.json
+            tests/load/results/*.json
+          retention-days: 30

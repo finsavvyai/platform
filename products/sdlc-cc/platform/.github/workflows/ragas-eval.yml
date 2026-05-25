@@ -1,0 +1,132 @@
+name: RAGAS Nightly Eval
+
+# Nightly quality gate for the RAG pipeline. Runs the RAGAS harness at
+# services/rag/evals against the staging RAG service, uploads per-question
+# scores to Langfuse, and fails if faithfulness or answer_relevancy fall
+# below the release thresholds.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"  # 02:00 UTC nightly
+  workflow_dispatch:
+    inputs:
+      rag_base_url:
+        description: "Override RAG base URL (defaults to staging)"
+        required: false
+        type: string
+
+concurrency:
+  group: ragas-eval
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.11"
+  DEFAULT_RAG_BASE_URL: "https://staging-rag.sdlc-platform.dev/api/v1"
+
+jobs:
+  ragas:
+    name: RAGAS quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: services/rag/requirements.txt
+
+      - name: Install RAG + eval dependencies
+        working-directory: services/rag
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Resolve RAG base URL
+        id: resolve
+        run: |
+          if [ -n "${{ inputs.rag_base_url }}" ]; then
+            echo "url=${{ inputs.rag_base_url }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=${DEFAULT_RAG_BASE_URL}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run RAGAS evaluation
+        id: ragas
+        env:
+          RAG_BASE_URL: ${{ steps.resolve.outputs.url }}
+          RAG_TENANT_ID: ${{ secrets.RAGAS_EVAL_TENANT_ID }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          RAGAS_OPENAI_MODEL: gpt-4o-mini
+        run: |
+          python services/rag/evals/run_ragas.py \
+            --golden services/rag/evals/golden_set.yaml \
+            --out services/rag/evals/ragas_summary.json
+
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ragas-summary
+          path: services/rag/evals/ragas_summary.json
+          retention-days: 30
+
+      - name: Post scores to Langfuse
+        if: always()
+        env:
+          LANGFUSE_ENABLED: "true"
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+          RAGAS_RUN_NAME: "nightly-${{ github.run_id }}"
+        run: |
+          python services/rag/evals/ragas_to_langfuse.py \
+            --summary services/rag/evals/ragas_summary.json \
+            --run-name "nightly-${{ github.run_id }}"
+
+      - name: Build commit comment body
+        if: always()
+        id: comment_body
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          path = "services/rag/evals/ragas_summary.json"
+          try:
+              with open(path) as fh:
+                  s = json.load(fh)
+          except Exception as exc:
+              print(f"body<<EOF")
+              print(f"RAGAS eval failed before producing a summary: {exc}")
+              print("EOF")
+              raise SystemExit(0)
+          agg = s.get("aggregate", {})
+          th = s.get("thresholds", {})
+          lines = [
+              f"### RAGAS nightly eval ({s.get('num_questions', 0)} questions)",
+              "",
+              "| Metric | Score | Threshold | Status |",
+              "| --- | --- | --- | --- |",
+          ]
+          for m, v in agg.items():
+              t = th.get(m)
+              status = "n/a"
+              if t is not None:
+                  status = "pass" if v >= t else "FAIL"
+              t_str = f"{t:.2f}" if t is not None else "-"
+              lines.append(f"| {m} | {v:.3f} | {t_str} | {status} |")
+          body = "\n".join(lines)
+          print("body<<EOF")
+          print(body)
+          print("EOF")
+          PY
+
+      - name: Comment summary on last commit
+        if: always()
+        uses: peter-evans/commit-comment@v3
+        with:
+          sha: ${{ github.sha }}
+          body: ${{ steps.comment_body.outputs.body }}

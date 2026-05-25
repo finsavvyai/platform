@@ -1,0 +1,54 @@
+# Cloudflare Pages — pipewarden.io marketing site
+# Deploy: wrangler pages deploy website/ --project-name pipewarden-website
+
+name = "pipewarden-website"
+pages_build_output_dir = "website"
+
+[env.production]
+# Custom domain: pipewarden.io → set in Cloudflare Pages dashboard
+# Workers Routes: pipewarden.io/* → pipewarden-website.pages.dev
+
+[[redirects]]
+from = "/app"
+to = "https://app.pipewarden.io"
+status = 301
+
+[[redirects]]
+from = "/docs"
+to = "https://github.com/finsavvyai/pipewarden/wiki"
+status = 301
+
+# Default headers — covers the marketing pages.
+[[headers]]
+for = "/*"
+[headers.values]
+  Strict-Transport-Security = "max-age=63072000; includeSubDomains; preload"
+  X-Frame-Options = "DENY"
+  X-Content-Type-Options = "nosniff"
+  Referrer-Policy = "strict-origin-when-cross-origin"
+  Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+  Cross-Origin-Opener-Policy = "same-origin"
+  Cross-Origin-Resource-Policy = "same-site"
+  X-DNS-Prefetch-Control = "off"
+  Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.pipewarden.io https://app.pipewarden.io; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; form-action 'self' https://app.pipewarden.io; base-uri 'self'; object-src 'none'; upgrade-insecure-requests"
+
+# .well-known files served as text/plain so curl + agents read them.
+[[headers]]
+for = "/.well-known/security.txt"
+[headers.values]
+  Content-Type = "text/plain; charset=utf-8"
+  Cache-Control = "public, max-age=86400"
+
+[[headers]]
+for = "/llms.txt"
+[headers.values]
+  Content-Type = "text/plain; charset=utf-8"
+  Cache-Control = "public, max-age=3600"
+  X-Robots-Tag = "all"
+
+[[headers]]
+for = "/.well-known/ai-plugin.json"
+[headers.values]
+  Content-Type = "application/json; charset=utf-8"
+  Cache-Control = "public, max-age=3600"
+  Access-Control-Allow-Origin = "*"

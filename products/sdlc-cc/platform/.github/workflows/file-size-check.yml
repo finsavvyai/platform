@@ -1,0 +1,29 @@
+name: file-size-check
+
+on:
+  pull_request:
+    paths:
+      - 'services/**'
+      - 'packages/**'
+      - 'scripts/check-file-size.sh'
+      - '.github/workflows/file-size-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Enforce 200-LOC cap (delta vs main)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run file-size fitness function
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: |
+          chmod +x scripts/check-file-size.sh
+          scripts/check-file-size.sh delta

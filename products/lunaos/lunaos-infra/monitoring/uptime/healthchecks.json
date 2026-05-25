@@ -1,0 +1,98 @@
+{
+  "name": "LunaOS Uptime Monitoring",
+  "description": "Health checks for all LunaOS subdomains",
+  "interval": "60s",
+  "timeout": "10s",
+  "retries": 3,
+  "alertChannels": ["email:ops@lunaos.ai", "slack:#alerts"],
+  "checks": [
+    {
+      "name": "API Health",
+      "url": "https://api.lunaos.ai/health",
+      "method": "GET",
+      "expectedStatus": 200,
+      "expectedBody": "\"status\":\"ok\"",
+      "interval": "30s",
+      "critical": true
+    },
+    {
+      "name": "Marketing Site",
+      "url": "https://lunaos.ai",
+      "method": "GET",
+      "expectedStatus": 200,
+      "interval": "60s",
+      "critical": true
+    },
+    {
+      "name": "Dashboard",
+      "url": "https://agents.lunaos.ai",
+      "method": "GET",
+      "expectedStatus": 200,
+      "interval": "60s",
+      "critical": true
+    },
+    {
+      "name": "Studio",
+      "url": "https://studio.lunaos.ai",
+      "method": "GET",
+      "expectedStatus": 200,
+      "interval": "60s",
+      "critical": false
+    },
+    {
+      "name": "Docs",
+      "url": "https://docs.lunaos.ai",
+      "method": "GET",
+      "expectedStatus": 200,
+      "interval": "120s",
+      "critical": false
+    },
+    {
+      "name": "API Auth Endpoint",
+      "url": "https://api.lunaos.ai/auth/login",
+      "method": "POST",
+      "headers": { "Content-Type": "application/json" },
+      "body": "{\"email\":\"healthcheck@test.com\",\"password\":\"invalid\"}",
+      "expectedStatus": 401,
+      "interval": "120s",
+      "critical": true,
+      "description": "Verifies auth endpoint is responsive (expects 401 for bad creds)"
+    },
+    {
+      "name": "API Billing Endpoint",
+      "url": "https://api.lunaos.ai/billing/subscription",
+      "method": "GET",
+      "expectedStatus": 401,
+      "interval": "300s",
+      "critical": false,
+      "description": "Verifies billing endpoint is responsive (expects 401 without auth)"
+    }
+  ],
+  "alerts": {
+    "downtime": {
+      "threshold": "2 consecutive failures",
+      "severity": "critical",
+      "channels": ["email", "slack"]
+    },
+    "degraded": {
+      "threshold": "response time > 2000ms for 5 minutes",
+      "severity": "warning",
+      "channels": ["slack"]
+    },
+    "recovery": {
+      "notify": true,
+      "channels": ["slack"]
+    }
+  },
+  "statusPage": {
+    "enabled": true,
+    "url": "https://status.lunaos.ai",
+    "components": [
+      { "name": "API", "check": "API Health" },
+      { "name": "Dashboard", "check": "Dashboard" },
+      { "name": "Studio", "check": "Studio" },
+      { "name": "Documentation", "check": "Docs" },
+      { "name": "Website", "check": "Marketing Site" }
+    ]
+  }
+}

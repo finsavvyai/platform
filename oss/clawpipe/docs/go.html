@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Go SDK - ClawPipe Docs</title>
+  <meta name="description" content="ClawPipe Go SDK guide: context-based API, configuration, and examples.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="docs-layout">
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Documentation">
+    <a href="/" class="logo">ClawPipe</a>
+    <nav>
+      <a href="index.html">Getting Started</a>
+      <a href="concepts.html">How It Works</a>
+      <div class="sep"></div>
+      <a href="typescript.html">TypeScript SDK</a>
+      <a href="python.html">Python SDK</a>
+      <a href="go.html" class="active">Go SDK</a>
+      <div class="sep"></div>
+      <a href="integrations.html">Integrations</a>
+      <a href="api.html">Gateway API</a>
+      <a href="oauth-setup.html">OAuth Setup</a>
+      <a href="migration.html">Migration</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="doc-header">
+      <div>
+        <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Toggle menu">&#9776;</button>
+        <span class="breadcrumb">Docs / Go SDK</span>
+      </div>
+      <div class="links">
+        <a href="https://github.com/finsavvyai/clawpipe">GitHub</a>
+        <a href="https://clawpipe.ai">Home</a>
+      </div>
+    </header>
+    <main id="main-content" class="content">
+      <h1><span>Go</span> SDK Guide</h1>
+      <p>The ClawPipe Go SDK uses idiomatic Go patterns: context-based cancellation, functional options, and explicit error handling.</p>
+
+      <h2>Install</h2>
+<pre><code>go get github.com/finsavvyai/clawpipe-go</code></pre>
+      <p>Requires Go 1.21+.</p>
+
+      <h2>Quick Start</h2>
+<pre><code><span class="code-accent">package</span> main
+
+<span class="code-accent">import</span> (
+    <span class="code-green">"context"</span>
+    <span class="code-green">"fmt"</span>
+    <span class="code-green">"log"</span>
+
+    clawpipe <span class="code-green">"github.com/finsavvyai/clawpipe-go"</span>
+)
+
+<span class="code-accent">func</span> main() {
+    pipe := clawpipe.New(clawpipe.Config{
+        APIKey:    <span class="code-green">"cp_xxx"</span>,
+        ProjectID: <span class="code-green">"my-app"</span>,
+    })
+
+    ctx := context.Background()
+    result, err := pipe.Prompt(ctx, <span class="code-green">"Explain recursion"</span>,
+        clawpipe.WithSystem(<span class="code-green">"You are a helpful tutor"</span>),
+        clawpipe.WithMaxTokens(2000),
+    )
+    <span class="code-accent">if</span> err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Println(result.Text)
+    fmt.Printf(<span class="code-green">"Cost: $%.4f\n"</span>, result.Meta.EstimatedCostUSD)
+}</code></pre>
+
+      <h2>Configuration</h2>
+<pre><code>pipe := clawpipe.New(clawpipe.Config{
+    APIKey:                   <span class="code-green">"cp_xxx"</span>,
+    ProjectID:                <span class="code-green">"my-app"</span>,
+    GatewayURL:               <span class="code-green">"https://api.clawpipe.ai/v1"</span>,
+    CacheTTL:                 5 * time.Minute,
+    EnableBooster:            <span class="code-accent">true</span>,
+    EnablePacker:             <span class="code-accent">true</span>,
+    EnableCache:              <span class="code-accent">true</span>,
+    EnableTrace:              <span class="code-accent">false</span>,
+    LocalModelURL:            <span class="code-green">""</span>,
+    EnableLocalFallback:      <span class="code-accent">false</span>,
+    BudgetCapUSD:             100.0,
+    BudgetWarnUSD:            80.0,
+    RateLimitPerDay:          100_000,
+    CircuitBreakerThreshold:  5,
+    CircuitBreakerRecovery:   30 * time.Second,
+    Allowlist: []clawpipe.AllowlistEntry{
+        {Provider: <span class="code-green">"openai"</span>},
+        {Provider: <span class="code-green">"anthropic"</span>},
+    },
+})</code></pre>
+
+      <h2>Functional Options</h2>
+      <p>Prompt options use the functional options pattern for clean, extensible calls.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Option</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>WithSystem(s string)</td><td>Set the system prompt</td></tr>
+            <tr><td>WithMaxTokens(n int)</td><td>Set max output tokens</td></tr>
+            <tr><td>WithTemperature(t float64)</td><td>Set sampling temperature (0-2)</td></tr>
+            <tr><td>WithModel(m string)</td><td>Force a specific model</td></tr>
+            <tr><td>WithProvider(p string)</td><td>Force a specific provider</td></tr>
+            <tr><td>WithTaskType(t string)</td><td>Hint for the router</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Streaming</h2>
+<pre><code>ch, err := pipe.Stream(ctx, <span class="code-green">"Analyze this code"</span>,
+    clawpipe.WithSystem(<span class="code-green">"You are a code reviewer"</span>),
+)
+<span class="code-accent">if</span> err != nil {
+    log.Fatal(err)
+}
+
+<span class="code-accent">for</span> chunk := <span class="code-accent">range</span> ch {
+    fmt.Print(chunk)
+}</code></pre>
+
+      <h2>Context Cancellation</h2>
+      <p>All SDK methods accept a <code>context.Context</code> for timeout and cancellation support.</p>
+<pre><code>ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+<span class="code-accent">defer</span> cancel()
+
+result, err := pipe.Prompt(ctx, <span class="code-green">"Quick question"</span>)
+<span class="code-accent">if</span> err != nil {
+    <span class="code-accent">if</span> errors.Is(err, context.DeadlineExceeded) {
+        fmt.Println(<span class="code-green">"Request timed out"</span>)
+    }
+}</code></pre>
+
+      <h2>Error Handling</h2>
+<pre><code><span class="code-accent">import</span> <span class="code-green">"errors"</span>
+
+result, err := pipe.Prompt(ctx, <span class="code-green">"Hello"</span>)
+<span class="code-accent">if</span> err != nil {
+    <span class="code-accent">var</span> budgetErr *clawpipe.BudgetExceededError
+    <span class="code-accent">var</span> rateErr   *clawpipe.RateLimitError
+    <span class="code-accent">var</span> gwErr     *clawpipe.GatewayError
+
+    <span class="code-accent">switch</span> {
+    <span class="code-accent">case</span> errors.As(err, &budgetErr):
+        fmt.Println(<span class="code-green">"Budget cap reached"</span>)
+    <span class="code-accent">case</span> errors.As(err, &rateErr):
+        fmt.Println(<span class="code-green">"Rate limit exceeded"</span>)
+    <span class="code-accent">case</span> errors.As(err, &gwErr):
+        fmt.Printf(<span class="code-green">"Provider error: %s\n"</span>, gwErr)
+    <span class="code-accent">default</span>:
+        log.Fatal(err)
+    }
+}</code></pre>
+
+      <h2>Observability</h2>
+<pre><code>stats := pipe.Stats()           <span class="code-dim">// TelemetrySnapshot</span>
+budget := pipe.BudgetStatus()   <span class="code-dim">// BudgetStatus</span>
+rate := pipe.RateLimitStatus()  <span class="code-dim">// RateLimitStatus</span>
+circuit := pipe.CircuitStatus() <span class="code-dim">// map[string]CircuitStatus</span>
+logs := pipe.AuditLogs()        <span class="code-dim">// []AuditLogEntry</span></code></pre>
+    </main>
+  </div>
+</div>
+</body>
+</html>

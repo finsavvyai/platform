@@ -1,0 +1,17 @@
+export const COUNTRIES = [
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'IL', name: 'Israel' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'HK', name: 'Hong Kong' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'LU', name: 'Luxembourg' },
+  { code: 'IE', name: 'Ireland' },
+]

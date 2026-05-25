@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEO Playbook — OpenSyber & TokenForge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void: #080B0F; --panel: #0D1117; --surface: #141B24;
+  --border: #1E2A38; --wire: #243344;
+  --signal: #00E5C3; --alert: #FF4D4D; --warn: #FFB347;
+  --ok: #2ECC7B; --info: #4D9EFF; --purple: #A78BFA;
+  --text-p: #E8F0F8; --text-s: #7A96B2; --text-m: #3D5470;
+  --font-d: 'Bebas Neue', sans-serif;
+  --font-m: 'Space Mono', monospace;
+  --font-b: 'DM Sans', sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--void);color:var(--text-p);font-family:var(--font-b);font-size:14px;line-height:1.6;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,229,195,.012) 2px,rgba(0,229,195,.012) 4px);pointer-events:none;z-index:1000}
+
+/* Nav */
+nav{position:fixed;top:0;left:0;right:0;background:rgba(8,11,15,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);z-index:900;padding:0 24px}
+.nav-i{max-width:1160px;margin:0 auto;display:flex;align-items:center;gap:32px;height:52px}
+.nav-logo{font-family:var(--font-m);font-size:12px;color:var(--signal);letter-spacing:.08em;white-space:nowrap}
+.nav-links{display:flex;gap:20px;list-style:none;margin-left:auto}
+.nav-links a{font-family:var(--font-m);font-size:10px;letter-spacing:.1em;color:var(--text-s);text-decoration:none;text-transform:uppercase;transition:color .2s}
+.nav-links a:hover{color:var(--signal)}
+
+/* Layout */
+.wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+.section{padding:72px 0;border-top:1px solid var(--border)}
+
+/* Hero */
+.hero{padding:140px 0 72px;position:relative;overflow:hidden;background:linear-gradient(180deg,rgba(0,229,195,.04) 0%,transparent 60%)}
+.hero-tag{font-family:var(--font-m);font-size:10px;color:var(--signal);letter-spacing:.2em;text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.hero-tag::before{content:'';display:block;width:28px;height:1px;background:var(--signal)}
+.hero-h{font-family:var(--font-d);font-size:clamp(56px,8vw,110px);line-height:.92;letter-spacing:.03em;margin-bottom:8px}
+.hero-h .s{color:var(--signal)}
+.hero-sub{font-family:var(--font-d);font-size:clamp(24px,3.5vw,44px);color:var(--text-m);letter-spacing:.06em;margin-bottom:32px}
+.hero-desc{max-width:580px;color:var(--text-s);font-size:15px;line-height:1.7;margin-bottom:40px}
+.stat-row{display:flex;gap:32px;flex-wrap:wrap;margin-bottom:40px}
+.stat{text-align:center}
+.stat-v{font-family:var(--font-d);font-size:52px;color:var(--signal);line-height:1}
+.stat-l{font-family:var(--font-m);font-size:10px;color:var(--text-m);letter-spacing:.08em;margin-top:4px}
+
+/* Tabs */
+.tab-wrap{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:40px;overflow-x:auto;padding-bottom:0}
+.tab-btn{font-family:var(--font-m);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;border:none;background:transparent;color:var(--text-m);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
+.tab-btn:hover{color:var(--text-s)}
+.tab-btn.active{color:var(--signal);border-bottom-color:var(--signal)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* Section labels */
+.slbl{font-family:var(--font-m);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--signal);margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.slbl::after{content:'';flex:1;height:1px;background:var(--border);max-width:160px}
+.stit{font-family:var(--font-d);font-size:clamp(32px,4.5vw,54px);letter-spacing:.04em;color:var(--text-p);margin-bottom:12px;line-height:1}
+.sdesc{color:var(--text-s);max-width:600px;margin-bottom:40px;font-size:14px}
+
+/* Cards */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:24px;position:relative}
+.card::before{content:'';position:absolute;top:0;left:0;width:28px;height:2px;background:var(--signal);border-radius:0 0 2px 0}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+
+/* Platform cards */
+.platform-card{background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.platform-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.platform-icon{width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-m);font-size:13px;font-weight:700;flex-shrink:0}
+.platform-name{font-family:var(--font-m);font-size:13px;color:var(--text-p);font-weight:700;letter-spacing:.04em}
+.platform-how{font-size:11px;color:var(--text-s);margin-top:2px}
+.platform-body{padding:16px 20px}
+.tactic{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.tactic:last-child{border-bottom:none}
+.tactic-num{font-family:var(--font-m);font-size:10px;color:var(--signal);flex-shrink:0;margin-top:2px}
+.tactic-t{font-size:12px;color:var(--text-p);font-weight:500;margin-bottom:3px}
+.tactic-d{font-size:11px;color:var(--text-s);line-height:1.5}
+
+/* Prompt examples */
+.prompt-box{background:#05080C;border:1px solid var(--wire);border-radius:4px;padding:16px 20px;margin:8px 0;font-family:var(--font-m);font-size:12px}
+.prompt-q{color:var(--signal);margin-bottom:6px}
+.prompt-a{color:var(--text-s);font-size:11px;line-height:1.6}
+.prompt-badge{display:inline-block;font-size:9px;padding:2px 8px;border-radius:2px;margin-left:8px;vertical-align:middle}
+.pb-os{background:rgba(0,229,195,.12);color:var(--signal)}
+.pb-tf{background:rgba(167,139,250,.12);color:var(--purple)}
+
+/* Content matrix */
+.matrix{width:100%;border-collapse:collapse;font-size:12px}
+.matrix th{font-family:var(--font-m);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-m);padding:10px 12px;border-bottom:1px solid var(--border);text-align:left;background:var(--surface)}
+.matrix td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text-s);vertical-align:top}
+.matrix td:first-child{color:var(--text-p);font-weight:500}
+.matrix tr:last-child td{border-bottom:none}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
+
+/* Timeline */
+.timeline{position:relative;padding-left:32px}
+.timeline::before{content:'';position:absolute;left:10px;top:0;bottom:0;width:1px;background:var(--border)}
+.tl-item{position:relative;margin-bottom:32px}
+.tl-item::before{content:'';position:absolute;left:-26px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid var(--signal)}
+.tl-month{font-family:var(--font-m);font-size:10px;color:var(--signal);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.tl-title{font-size:14px;font-weight:600;color:var(--text-p);margin-bottom:8px}
+.tl-body{font-size:12px;color:var(--text-s);line-height:1.6}
+
+/* Highlight boxes */
+.hl{border-left:2px solid;border-radius:0 4px 4px 0;padding:12px 16px;margin:12px 0}
+.hl-signal{border-color:var(--signal);background:rgba(0,229,195,.06)}
+.hl-alert{border-color:var(--alert);background:rgba(255,77,77,.06)}
+.hl-warn{border-color:var(--warn);background:rgba(255,179,71,.06)}
+.hl-info{border-color:var(--info);background:rgba(77,158,255,.06)}
+.hl-purple{border-color:var(--purple);background:rgba(167,139,250,.06)}
+.hl-lbl{font-family:var(--font-m);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.hl-txt{font-size:12px;color:var(--text-s);line-height:1.5}
+
+/* Content pill */
+.cpill{display:inline-block;font-family:var(--font-m);font-size:10px;padding:3px 10px;border-radius:2px;margin:2px}
+.cp-green{background:rgba(46,204,123,.12);color:var(--ok)}
+.cp-blue{background:rgba(77,158,255,.12);color:var(--info)}
+.cp-amber{background:rgba(255,179,71,.12);color:var(--warn)}
+.cp-red{background:rgba(255,77,77,.12);color:var(--alert)}
+.cp-purple{background:rgba(167,139,250,.12);color:var(--purple)}
+.cp-teal{background:rgba(0,229,195,.12);color:var(--signal)}
+
+/* Rank badge */
+.rank{display:inline-block;font-family:var(--font-m);font-size:10px;font-weight:700;padding:2px 8px;border-radius:2px;vertical-align:middle}
+.r-critical{background:rgba(255,77,77,.15);color:var(--alert)}
+.r-high{background:rgba(255,179,71,.15);color:var(--warn)}
+.r-med{background:rgba(77,158,255,.15);color:var(--info)}
+
+/* Util */
+.lbl{font-family:var(--font-m);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-m);margin-bottom:8px}
+.gap-sm{height:16px} .gap-md{height:28px} .gap-lg{height:44px}
+.mono{font-family:var(--font-m)} .signal{color:var(--signal)}
+strong{color:var(--text-p);font-weight:600}
+
+/* Scan anim */
+@keyframes scan{from{left:-30%}to{left:100%}}
+.scan-bar{width:100%;height:2px;background:var(--border);border-radius:1px;overflow:hidden;position:relative}
+.scan-bar::after{content:'';position:absolute;top:0;left:-30%;width:30%;height:100%;background:linear-gradient(90deg,transparent,var(--signal),transparent);animation:scan 2s ease-in-out infinite}
+
+/* Footer */
+footer{border-top:1px solid var(--border);padding:32px 0;font-family:var(--font-m);font-size:10px;color:var(--text-m)}
+.footer-i{max-width:1160px;margin:0 auto;padding:0 24px;display:flex;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-i">
+    <div class="nav-logo">OPEN<span style="color:var(--text-m)">//</span>SYBER · GEO PLAYBOOK</div>
+    <ul class="nav-links">
+      <li><a href="#what">What is GEO</a></li>
+      <li><a href="#engines">By Engine</a></li>
+      <li><a href="#content">Content</a></li>
+      <li><a href="#prompts">Target Prompts</a></li>
+      <li><a href="#technical">Technical</a></li>
+      <li><a href="#roadmap">Roadmap</a></li>
+      <li><a href="#measure">Measure</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="wrap">
+    <div class="hero-tag">AI Engine Visibility Strategy</div>
+    <div class="hero-h">GEO<br><span class="s">PLAYBOOK</span></div>
+    <div class="hero-sub">OPENSYBER & TOKENFORGE</div>
+    <p class="hero-desc">
+      Yes — there is SEO for AI engines. It's called <strong>Generative Engine Optimization (GEO)</strong>.
+      When someone asks Claude, ChatGPT, or Gemini "what's the best AI agent security tool?" your product
+      either appears in the answer or it doesn't. There is no page two. This playbook is how you get in the answer.
+    </p>
+    <div class="stat-row">
+      <div class="stat"><div class="stat-v">70%</div><div class="stat-l">searches now zero-click<br>AI answers the question</div></div>
+      <div class="stat"><div class="stat-v">527%</div><div class="stat-l">YoY growth in<br>AI-referred sessions</div></div>
+      <div class="stat"><div class="stat-v">&lt;20%</div><div class="stat-l">overlap between Google #1<br>and AI-cited sources</div></div>
+      <div class="stat"><div class="stat-v">30%</div><div class="stat-l">brands stay visible<br>across consecutive AI runs</div></div>
+    </div>
+    <div class="scan-bar"></div>
+  </div>
+</div>
+
+<!-- WHAT IS GEO -->
+<section class="section" id="what">
+  <div class="wrap">
+    <div class="slbl">Foundation</div>
+    <div class="stit">WHAT IS GEO</div>
+    <p class="sdesc">Traditional SEO gets you on Google's list. GEO gets you inside the AI's answer. These are fundamentally different problems requiring different strategies.</p>
+
+    <div class="g2" style="margin-bottom:20px">
+      <div class="card">
+        <div class="lbl">Traditional SEO (you already do this)</div>
+        <div style="margin-top:12px;font-size:13px;color:var(--text-s);line-height:1.7">
+          User types query → Google shows ranked list → User clicks a link → Your site gets traffic.<br><br>
+          Optimise for: <strong>keywords, backlinks, page speed, click-through rate</strong>.<br><br>
+          Success metric: <strong>ranking position, organic traffic</strong>.
+        </div>
+      </div>
+      <div class="card" style="border-color:var(--signal)">
+        <div class="lbl" style="color:var(--signal)">GEO — the new layer</div>
+        <div style="margin-top:12px;font-size:13px;color:var(--text-s);line-height:1.7">
+          User asks AI a question → AI synthesises an answer → AI either names OpenSyber or doesn't → No click needed, recommendation is instant trust.<br><br>
+          Optimise for: <strong>citations, authority signals, structured data, community presence</strong>.<br><br>
+          Success metric: <strong>AI share of voice, citation frequency, brand accuracy in AI responses</strong>.
+        </div>
+      </div>
+    </div>
+
+    <div class="hl hl-alert">
+      <div class="hl-lbl" style="color:var(--alert)">The brutal reality</div>
+      <div class="hl-txt">Research from Brandlight shows that overlap between top Google links and AI-cited sources has dropped from 70% to below 20%. You can rank #1 on Google and be completely invisible when someone asks ChatGPT the same question. They are now different channels with different rules.</div>
+    </div>
+
+    <div class="gap-md"></div>
+    <div class="g3">
+      <div class="card">
+        <div class="lbl">How AI engines pick sources</div>
+        <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+          <span style="color:var(--signal);font-family:var(--font-m);font-size:10px">01</span> Fan-out queries — AI breaks your prompt into 3–8 sub-queries and searches each separately<br><br>
+          <span style="color:var(--signal);font-family:var(--font-m);font-size:10px">02</span> Authority evaluation — recency, third-party mentions, author credentials, factual density<br><br>
+          <span style="color:var(--signal);font-family:var(--font-m);font-size:10px">03</span> Extraction — AI pulls passages that are self-contained and directly answer the sub-query<br><br>
+          <span style="color:var(--signal);font-family:var(--font-m);font-size:10px">04</span> Synthesis — assembles answer and decides what to name, cite, or recommend
+        </div>
+      </div>
+      <div class="card">
+        <div class="lbl">The citation rule that changes everything</div>
+        <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+          44.2% of all LLM citations come from the <strong>first 30% of text</strong>.<br><br>
+          31.1% from the middle. Only 24.7% from conclusions.<br><br>
+          → Put your key claim, differentiator, and data point in the <strong>first two paragraphs</strong> of every page. Not the intro, not the setup — the answer.<br><br>
+          <span style="color:var(--warn)">Most content buries the answer. AI never reads that far.</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="lbl">Reddit is your biggest competitor</div>
+        <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+          Reddit accounts for <strong>22.9% of top-cited domains</strong> across all AI models.<br><br>
+          Wikipedia: 47.9% of ChatGPT factual citations.<br><br>
+          → Community presence on Reddit, GitHub, HN, and Stack Overflow is not optional — it's the primary way AI engines learn that your product exists and what it does.<br><br>
+          <span style="color:var(--signal)">Your competitors' subreddits are teaching AI about your category.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BY ENGINE -->
+<section class="section" id="engines">
+  <div class="wrap">
+    <div class="slbl">Platform-specific strategy</div>
+    <div class="stit">HOW EACH ENGINE WORKS</div>
+    <p class="sdesc">Claude, ChatGPT, Gemini, and Perplexity pull from different sources and favour different signals. One-size-fits-all GEO doesn't work. Each needs its own approach.</p>
+
+    <div class="tab-wrap">
+      <button class="tab-btn active" onclick="showTab('claude')">Claude (Anthropic)</button>
+      <button class="tab-btn" onclick="showTab('chatgpt')">ChatGPT / OpenAI</button>
+      <button class="tab-btn" onclick="showTab('gemini')">Google Gemini</button>
+      <button class="tab-btn" onclick="showTab('perplexity')">Perplexity AI</button>
+    </div>
+
+    <!-- CLAUDE -->
+    <div id="claude" class="tab-panel active">
+      <div class="platform-card">
+        <div class="platform-hdr">
+          <div class="platform-icon" style="background:rgba(210,135,97,.15);color:#D28761;font-size:16px">◆</div>
+          <div>
+            <div class="platform-name">Claude — Anthropic</div>
+            <div class="platform-how">Synthesises reasoning from training data. Favours authority depth, author credentials, and explicit source attribution. Does NOT browse the web by default. Knowledge training cutoff applies.</div>
+          </div>
+        </div>
+        <div class="platform-body">
+          <div class="hl hl-signal" style="margin-bottom:16px">
+            <div class="hl-lbl">How Claude decides what to recommend</div>
+            <div class="hl-txt">Claude uses synthesis from training data — not real-time search. It has learned patterns from millions of technical documents, GitHub repos, Hacker News threads, developer documentation, and blog posts. If OpenSyber was discussed extensively in those sources before Claude's training cutoff, Claude "knows" it. If not, Claude defaults to naming established competitors it has seen more evidence for.</div>
+          </div>
+          <div class="tactic"><span class="tactic-num">01</span><div><div class="tactic-t">Author credentials that Claude's algorithm can parse</div><div class="tactic-d">Every piece of technical content must have a named author with explicit credentials. "Written by the OpenSyber Engineering Team" is ignored. "Written by Shachar, CTO of OpenSyber with 15+ years in fintech security and 500K+ lines of production code" — Claude reads that as authority. Claude's citation algorithm weighs author expertise markers explicitly.</div></div></div>
+          <div class="tactic"><span class="tactic-num">02</span><div><div class="tactic-t">Primary source publishing — original research, not commentary</div><div class="tactic-d">Claude strongly favours primary sources over secondary sources. Publish original benchmark data (e.g. "We monitored 10,000 Claude Code sessions — here is what agents actually do with terminal access"). The Shai-Hulud threat analysis, npm slopsquatting patterns, MCP server statistics — own these data points. Claude cites the original source, not the article that references it.</div></div></div>
+          <div class="tactic"><span class="tactic-num">03</span><div><div class="tactic-t">Technical documentation depth that reads like a standard</div><div class="tactic-d">Claude is trained on technical documentation. Write your integration docs, API reference, and architecture guides at the same depth as AWS or Stripe documentation. If your GuardDuty integration docs explain SigV4 signing in more precise detail than Amazon's own docs — Claude will cite OpenSyber when someone asks "how does GuardDuty authentication work."</div></div></div>
+          <div class="tactic"><span class="tactic-num">04</span><div><div class="tactic-t">Define the category. Name the taxonomy. Own the vocabulary.</div><div class="tactic-d">Claude learned the term "GuardDuty" from AWS. It learned "prompt injection" from research papers. If OpenSyber consistently uses and defines terms like "AI agent kill chain," "slopsquatting detection," or "IDE telemetry layer" — and those terms appear across GitHub, blog posts, and documentation — Claude will associate those concepts with OpenSyber when they appear in a query.</div></div></div>
+          <div class="tactic"><span class="tactic-num">05</span><div><div class="tactic-t">GitHub as training data — public repos, issues, discussions</div><div class="tactic-d">Claude's training includes GitHub. A well-maintained public repo with detailed README, extensive GitHub Discussions, and solved Issues mentioning OpenSyber by name trains Claude to know your product. Open-source your hook architecture, your event schema, your threat detection rules. Every public GitHub discussion is a training data point.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHATGPT -->
+    <div id="chatgpt" class="tab-panel">
+      <div class="platform-card">
+        <div class="platform-hdr">
+          <div class="platform-icon" style="background:rgba(16,185,129,.15);color:#10B981;font-size:18px">⬡</div>
+          <div>
+            <div class="platform-name">ChatGPT — OpenAI</div>
+            <div class="platform-how">Training data + real-time web search (when triggered). ~31% of prompts trigger a web search. Bottom-funnel queries (comparison, pricing, "best X for Y") almost always search. Strongly influenced by Reddit, community forums, and review sites.</div>
+          </div>
+        </div>
+        <div class="platform-body">
+          <div class="hl hl-info" style="margin-bottom:16px">
+            <div class="hl-lbl">How ChatGPT decides what to recommend</div>
+            <div class="hl-txt">ChatGPT uses a hybrid of training knowledge and web search. When someone asks "what's the best AI agent security tool for AWS," ChatGPT triggers a web search, finds relevant pages, and synthesises an answer. Reddit threads, G2 reviews, Hacker News discussions, and comparison pages are disproportionately cited. The more your product is discussed in those communities, the more ChatGPT surfaces it.</div>
+          </div>
+          <div class="tactic"><span class="tactic-num">01</span><div><div class="tactic-t">Reddit is table stakes — not optional, not delegatable</div><div class="tactic-d">Reddit accounts for 22.9% of top AI citations. Create a presence in r/netsec, r/devops, r/kubernetes, r/aws, r/cybersecurity, r/ClaudeAI, r/ChatGPT. Don't spam — genuinely answer questions about AI agent security, npm supply chain threats, MCP monitoring. Mention OpenSyber only when directly relevant. Authentic Reddit presence is worth 10x any blog post for ChatGPT visibility.</div></div></div>
+          <div class="tactic"><span class="tactic-num">02</span><div><div class="tactic-t">Comparison pages optimised for fan-out queries</div><div class="tactic-d">ChatGPT fan-out breaks "best AI agent security tool" into: "AI agent security tools comparison," "OpenSyber vs Wiz," "MCP monitoring tools," "IDE agent security monitoring." Create dedicated comparison pages: OpenSyber vs Cyata, OpenSyber vs Noma, OpenSyber vs Qualys TotalAI. Answer-first format: lead with a verdict, then evidence.</div></div></div>
+          <div class="tactic"><span class="tactic-num">03</span><div><div class="tactic-t">G2 and review platform presence</div><div class="tactic-d">ChatGPT heavily cites G2, Capterra, and Trustpilot for software recommendations. Get 10+ G2 reviews minimum. Reviews should mention specific use cases: "We use OpenSyber to monitor Claude Code sessions and got alerted to a Shai-Hulud package install within 30 seconds." Specific, technical, credible reviews that sound like an engineer wrote them — not marketing copy.</div></div></div>
+          <div class="tactic"><span class="tactic-num">04</span><div><div class="tactic-t">Hacker News — the single highest ROI community</div><div class="tactic-d">A well-received Show HN post ("Show HN: We built a real-time terminal monitor for Claude Code agents") generates backlinks, Reddit shares, tech blog coverage, and GitHub stars — all of which ChatGPT indexes. The HN community is adversarial but authentic. One genuinely useful launch post on HN is worth months of content marketing.</div></div></div>
+          <div class="tactic"><span class="tactic-num">05</span><div><div class="tactic-t">Use definite language, questions, and entity density</div><div class="tactic-d">Research shows ChatGPT is more likely to cite content that: uses definite language ("OpenSyber monitors" not "can help with monitoring"), contains a question mark in the heading, has high entity density (specific product names, CVE numbers, threat names), and uses simple sentence structures. Write like an engineer documenting a system, not a marketer selling a product.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GEMINI -->
+    <div id="gemini" class="tab-panel">
+      <div class="platform-card">
+        <div class="platform-hdr">
+          <div class="platform-icon" style="background:rgba(66,133,244,.15);color:#4285F4;font-size:18px">◈</div>
+          <div>
+            <div class="platform-name">Google Gemini + AI Overviews</div>
+            <div class="platform-how">Deep Google Search integration. Strong traditional SEO performance translates directly to Gemini visibility. E-E-A-T signals (Experience, Expertise, Authoritativeness, Trust) are the primary ranking factor. Schema markup is mandatory.</div>
+          </div>
+        </div>
+        <div class="platform-body">
+          <div class="hl hl-info" style="margin-bottom:16px">
+            <div class="hl-lbl">How Gemini decides what to recommend</div>
+            <div class="hl-txt">Gemini is the most SEO-adjacent of all AI engines — Google's John Mueller confirmed "AI systems rely on search." Strong Google rankings translate directly. But AI Overviews (the box at the top of Google results) and Gemini chat both heavily weight E-E-A-T signals, schema markup, and structured data. The fastest-growing AI search platform as of March 2026.</div>
+          </div>
+          <div class="tactic"><span class="tactic-num">01</span><div><div class="tactic-t">E-E-A-T signals — Experience, Expertise, Authoritativeness, Trust</div><div class="tactic-d">Gemini weights these explicitly. Experience: publish content from someone who has actually built AI agent security systems (Shachar has 55+ projects, 500K lines of code — this is the content). Expertise: author credentials prominently displayed. Authoritativeness: cited by other authoritative sources. Trust: HTTPS, privacy policy, real company, real team.</div></div></div>
+          <div class="tactic"><span class="tactic-num">02</span><div><div class="tactic-t">Schema markup — Organisation, Product, FAQ, HowTo</div><div class="tactic-d">Implement JSON-LD schema: Organization (company details, founding date, description), Product (OpenSyber, TokenForge with features and pricing), FAQ (for every major question a buyer would ask), HowTo (integration setup guides). Google AI Overviews extract directly from schema markup. This is a technical implementation, not content — do it once, benefit indefinitely.</div></div></div>
+          <div class="tactic"><span class="tactic-num">03</span><div><div class="tactic-t">Google's Knowledge Graph — claim your entity</div><div class="tactic-d">Create a Google Business Profile, ensure Wikipedia-style structured data is available about OpenSyber (Wikidata entry if possible), get mentioned in Crunchbase and AngelList with consistent entity data. When Gemini "knows" OpenSyber as an entity with consistent metadata across the web, it can confidently recommend it without uncertainty hedging.</div></div></div>
+          <div class="tactic"><span class="tactic-num">04</span><div><div class="tactic-t">YouTube — Gemini's second-largest source</div><div class="tactic-d">Gemini surfaces YouTube video content in answers. Create: "How to set up OpenSyber with AWS GuardDuty" (technical walkthrough), "Claude Code security monitoring demo," "npm supply chain attack detection live demo." YouTube descriptions and transcripts are indexed. One 10-minute technical demo on YouTube is often cited more than a 3000-word blog post.</div></div></div>
+          <div class="tactic"><span class="tactic-num">05</span><div><div class="tactic-t">Press coverage and earned media</div><div class="tactic-d">Princeton research shows AI engines strongly favour earned media over brand-owned content. A TechCrunch article, a Dark Reading mention, a SecurityWeek case study, a CISO magazine feature — these create the "third-party validation" signals that Gemini weights heavily. Target one press placement per quarter minimum. Even a Beehiiv or Substack newsletter in the security space counts.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PERPLEXITY -->
+    <div id="perplexity" class="tab-panel">
+      <div class="platform-card">
+        <div class="platform-hdr">
+          <div class="platform-icon" style="background:rgba(100,200,255,.15);color:#64C8FF;font-size:16px">◎</div>
+          <div>
+            <div class="platform-name">Perplexity AI</div>
+            <div class="platform-how">Real-time web search for every query. "Top-4 Citation" logic — pulls from 4 high-authority sources maximum. Fastest to respond to new content. Strong backlink profile + factual density = highest citation probability.</div>
+          </div>
+        </div>
+        <div class="platform-body">
+          <div class="hl hl-purple" style="margin-bottom:16px">
+            <div class="hl-lbl">How Perplexity decides what to recommend</div>
+            <div class="hl-txt">Perplexity searches the live web for every query and synthesises 4 sources maximum. It's the most "SEO-responsive" AI engine — new content indexes within hours not months. Strong backlink profiles, high factual density, and direct answer mapping are the three ranking factors. Perplexity is where buyers research before purchases — bottom-funnel citation here drives the most direct conversions.</div>
+          </div>
+          <div class="tactic"><span class="tactic-num">01</span><div><div class="tactic-t">Factual density — numbers, specifics, proper nouns everywhere</div><div class="tactic-d">Perplexity rewards "high factual density" content. Replace vague claims with specific data: not "monitors AI agents" but "monitors 39 integration sources across AWS GuardDuty, Claude Code CLI, M365 Copilot Studio, and 36 others in a single normalised pipeline." Every sentence should contain at least one specific, verifiable fact.</div></div></div>
+          <div class="tactic"><span class="tactic-num">02</span><div><div class="tactic-t">Backlinks from developer tools and security publications</div><div class="tactic-d">Perplexity weights backlink authority highly. Target: CISA.gov (if relevant), OWASP (contribute to AI threat taxonomy), Dark Reading, SecurityWeek, The Hacker News, Bleeping Computer, KrebsOnSecurity. One link from Bleeping Computer about the Shai-Hulud detection case study = significant Perplexity visibility boost.</div></div></div>
+          <div class="tactic"><span class="tactic-num">03</span><div><div class="tactic-t">Direct answer mapping — H2 headings that are exact questions</div><div class="tactic-d">Format every major page with H2 headings as the exact questions a buyer would ask Perplexity: "What is the best AI agent security platform for AWS?" / "How do I monitor Claude Code terminal commands?" / "What tools detect npm supply chain attacks in real time?" The heading + first paragraph answering it directly = Perplexity's ideal extraction target.</div></div></div>
+          <div class="tactic"><span class="tactic-num">04</span><div><div class="tactic-t">Publish immediately after major security events</div><div class="tactic-d">Perplexity indexes new content within hours. When the next npm supply chain attack breaks — publish within 12 hours: "How to detect [attack name] with OpenSyber." When a new CVE affecting AI frameworks drops — publish the detection playbook immediately. First-mover content on breaking threats = dominant Perplexity citation while the story is live.</div></div></div>
+          <div class="tactic"><span class="tactic-num">05</span><div><div class="tactic-t">Developer documentation as citation magnets</div><div class="tactic-d">Perplexity heavily cites developer documentation for technical queries. Write your API reference, integration guides, and CLI documentation to answer questions a developer would type into Perplexity. "How to use OpenSyber gateway token" → your docs page should be the answer. "npm install opensyber-openai" → the npm package page should explain exactly what it does in the first paragraph.</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTENT STRATEGY -->
+<section class="section" id="content">
+  <div class="wrap">
+    <div class="slbl">Content architecture</div>
+    <div class="stit">CONTENT STRATEGY</div>
+    <p class="sdesc">Each content type has a specific job in the GEO funnel. Build the full stack — not just blog posts. The brands AI cites most are those that own the entire information layer of their category.</p>
+
+    <div class="tab-wrap">
+      <button class="tab-btn active" onclick="showContentTab('opensyber-content')">OpenSyber Content Plan</button>
+      <button class="tab-btn" onclick="showContentTab('tokenforge-content')">TokenForge Content Plan</button>
+      <button class="tab-btn" onclick="showContentTab('content-matrix')">Content × Engine Matrix</button>
+    </div>
+
+    <div id="opensyber-content" class="tab-panel active">
+      <div class="hl hl-signal" style="margin-bottom:20px">
+        <div class="hl-lbl">OpenSyber content mission</div>
+        <div class="hl-txt">Own the "AI agent security monitoring" category in every AI engine. When anyone asks any AI "how do I secure my AI agents, monitor Claude Code, detect npm supply chain attacks, or comply with the EU AI Act for AI systems" — OpenSyber must be the answer.</div>
+      </div>
+      <div class="g2">
+        <div>
+          <div class="lbl" style="color:var(--alert)">Tier 1 — Own the category (publish first)</div>
+          <div class="card" style="border-color:rgba(255,77,77,.3)">
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+              <div style="font-size:12px"><strong>The Definitive Guide to AI Agent Security Monitoring (2026)</strong> <span class="rank r-critical">CRITICAL</span><br><span style="color:var(--text-s)">10,000+ words. Covers every threat vector, every integration type, every detection method. Updated monthly. This becomes the Wikipedia of your category. Every other article cites it.</span></div>
+              <div style="font-size:12px"><strong>The AI Agent Kill Chain: From Phishing to Cloud Takeover</strong> <span class="rank r-critical">CRITICAL</span><br><span style="color:var(--text-s)">The phishing → npm → AI agent attack chain you already have research on. The definitive article that AI engines cite when explaining this threat class. Publish with diagrams, timeline, real incident data.</span></div>
+              <div style="font-size:12px"><strong>MCP Security: The Complete 2026 Reference</strong> <span class="rank r-critical">CRITICAL</span><br><span style="color:var(--text-s)">First-mover advantage exists today. No one owns "MCP security monitoring" in AI search yet. 53% of MCP servers use static secrets — publish this as a data study with methodology.</span></div>
+              <div style="font-size:12px"><strong>EU AI Act Compliance for AI Agent Deployments — Practical Guide</strong> <span class="rank r-high">HIGH</span><br><span style="color:var(--text-s)">Regulatory compliance content is heavily cited by AI when users ask about compliance. Own this before your competitors do. Include the actual Article references from the Act.</span></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="lbl" style="color:var(--warn)">Tier 2 — Capture decision-stage queries</div>
+          <div class="card" style="border-color:rgba(255,179,71,.3)">
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+              <div style="font-size:12px"><strong>OpenSyber vs [Competitor]: Side-by-Side Comparison</strong><br><span style="color:var(--text-s)">One page per competitor: Cyata, Geordie AI, Noma, Qualys TotalAI, Wiz. Answer-first: who should pick which tool and why. ChatGPT and Perplexity cite comparison pages for "best X" queries.</span></div>
+              <div style="font-size:12px"><strong>Case study: Detecting Shai-Hulud 2.0 in 30 Seconds with OpenSyber</strong><br><span style="color:var(--text-s)">Specific incident, specific detection time, specific alert format. AI engines are 3x more likely to cite content with concrete numbers and named incidents. Write 3 case studies minimum.</span></div>
+              <div style="font-size:12px"><strong>Threat Alert Series: [Breaking incident] + OpenSyber Detection</strong><br><span style="color:var(--text-s)">Publish within 12 hours of every major AI/npm/security incident. Perplexity indexes within hours. This is how you become the go-to citation for breaking threat coverage.</span></div>
+              <div style="font-size:12px"><strong>How to Monitor [Specific Agent] Security: Complete Setup Guide</strong><br><span style="color:var(--text-s)">One guide per supported agent: Claude Code, GitHub Copilot, Cursor, OpenAI Agents SDK. These answer fan-out queries from buyers evaluating specific use cases.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="gap-md"></div>
+      <div class="g3">
+        <div class="card">
+          <div class="lbl">Community content (Reddit/HN/GH)</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+            <strong>r/netsec:</strong> "We monitored 10,000 Claude Code sessions. Here's what we found." — post the data, not the product<br><br>
+            <strong>r/aws:</strong> "How we detect GuardDuty findings + IDE agent activity as one incident timeline" — technical, no sales pitch<br><br>
+            <strong>Hacker News Show HN:</strong> Launch every major feature as a Show HN. Engage authentically with every comment.<br><br>
+            <strong>GitHub Discussions:</strong> Open threads on AI agent security best practices. Tag OpenSyber as a reference implementation.
+          </div>
+        </div>
+        <div class="card">
+          <div class="lbl">Original research (highest citation value)</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+            Quarterly "State of AI Agent Security" report — your telemetry data, anonymised and aggregated.<br><br>
+            "AI Agent Threat Benchmark 2026" — rate and classify threats seen across monitored environments.<br><br>
+            "npm Slopsquatting Index" — track and publish new slopsquatting attempts detected by OpenSyber's Socket.dev integration.<br><br>
+            Original data = AI engines must cite you because <strong>you are the primary source</strong>.
+          </div>
+        </div>
+        <div class="card">
+          <div class="lbl">YouTube / video content</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+            "OpenSyber in 90 Seconds" — demo video. No narration, just the control room UI working in real time.<br><br>
+            "AI Agent Attack Live Demo" — show the kill chain happening and OpenSyber detecting it. The most shareable format.<br><br>
+            "Integration Setup: [Platform] in 5 Minutes" — one per major integration. YouTube transcripts = Gemini and Perplexity citation fodder.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tokenforge-content" class="tab-panel">
+      <div class="hl hl-purple" style="margin-bottom:20px">
+        <div class="hl-lbl">TokenForge content mission</div>
+        <div class="hl-txt">Own the "token management for AI systems," "fintech token security," and "programmable money infrastructure" categories in AI search. When anyone asks about token-based payment rails, AI-native payment systems, or programmable financial instruments — TokenForge must appear.</div>
+      </div>
+      <div class="g2">
+        <div>
+          <div class="lbl" style="color:var(--purple)">Tier 1 — Define the category</div>
+          <div class="card" style="border-color:rgba(167,139,250,.3)">
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+              <div style="font-size:12px"><strong>The Complete Guide to AI Agent Payment Infrastructure (2026)</strong><br><span style="color:var(--text-s)">When an AI agent needs to transact — pay for API calls, handle subscriptions, manage escrow — what infrastructure does it use? TokenForge owns this answer. No one has written it definitively yet.</span></div>
+              <div style="font-size:12px"><strong>Programmable Tokens vs Traditional Payments: The Technical Comparison</strong><br><span style="color:var(--text-s)">A deeply technical comparison — latency, settlement, programmability, compliance. The kind of content a fintech CTO would reference. AI engines cite technical comparisons heavily for infrastructure buying decisions.</span></div>
+              <div style="font-size:12px"><strong>Building Compliant AI Agent Wallets: VASP, MiCA, and FATF Compliance</strong><br><span style="color:var(--text-s)">Regulatory content = high authority signal. Covers MiCA (EU), FinCEN (US), FATF travel rule. Fintech compliance content is cited extensively by AI when users ask about building compliant payment systems.</span></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="lbl" style="color:var(--info)">Tier 2 — Capture use case queries</div>
+          <div class="card" style="border-color:rgba(77,158,255,.3)">
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+              <div style="font-size:12px"><strong>How AI Agents Handle Money: The Infrastructure Stack</strong><br><span style="color:var(--text-s)">When AI agents act autonomously on behalf of users — how do they transact? This is a question being asked right now. TokenForge should own the answer with a clear explanation of the infrastructure layer.</span></div>
+              <div style="font-size:12px"><strong>TokenForge API: From Zero to Production-Grade Token System in 30 Minutes</strong><br><span style="color:var(--text-s)">Developer tutorial content is heavily cited by Perplexity and Claude for implementation queries. Concrete, code-heavy, with real API calls. If it appears in the first search result for "programmable token API tutorial" — it gets cited in every AI answer about this topic.</span></div>
+              <div style="font-size:12px"><strong>Real-time Settlement for Remittance: How TokenForge Compares to SWIFT and Ripple</strong><br><span style="color:var(--text-s)">Leverages Global Remit domain expertise. Comparisons to known systems (SWIFT, Ripple, Stellar) help AI engines understand what TokenForge does by association with known entities.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="gap-md"></div>
+      <div class="g2">
+        <div class="card">
+          <div class="lbl">Developer community (TokenForge-specific)</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+            <strong>r/fintech, r/webdev, r/programming:</strong> Answer questions about payment infrastructure, token systems, and AI agent transactions authentically<br><br>
+            <strong>Dev.to / Hashnode:</strong> Technical blog posts about building with TokenForge API. Cross-posting developer content here gets indexed by Claude, ChatGPT, and Perplexity faster than on your own domain<br><br>
+            <strong>npm package page:</strong> opensyber-openai equivalent for TokenForge — the npm package description is a GEO asset. Write it like documentation, not a tagline
+          </div>
+        </div>
+        <div class="card">
+          <div class="lbl">Strategic association content</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+            AI engines understand what TokenForge is partly by what it's <strong>associated with</strong> in content. Consistently co-mention in the same sentences as: Stripe, SWIFT, Ripple, MiCA, FinCEN, BIS, FATF, ISO 20022, and CBDC infrastructure.<br><br>
+            If 50 articles co-mention "TokenForge" and "ISO 20022" — AI engines learn that TokenForge operates in the ISO 20022 standards space. This is entity association training, not keyword stuffing.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="content-matrix" class="tab-panel">
+      <div style="overflow-x:auto">
+        <table class="matrix">
+          <thead>
+            <tr>
+              <th>Content type</th>
+              <th>Claude</th>
+              <th>ChatGPT</th>
+              <th>Gemini</th>
+              <th>Perplexity</th>
+              <th>Priority</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Definitive category guide (10K+ words, data-rich)</td>
+              <td><dot style="color:var(--ok)">●</dot> High — training data</td>
+              <td><dot style="color:var(--ok)">●</dot> High — web search</td>
+              <td><dot style="color:var(--ok)">●</dot> High — E-E-A-T</td>
+              <td><dot style="color:var(--ok)">●</dot> High — factual density</td>
+              <td><span class="rank r-critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+              <td>Original research / data reports</td>
+              <td><span style="color:var(--ok)">●</span> Very high — primary source</td>
+              <td><span style="color:var(--ok)">●</span> Very high — cites originals</td>
+              <td><span style="color:var(--ok)">●</span> Very high — authority</td>
+              <td><span style="color:var(--ok)">●</span> Very high — fresh data</td>
+              <td><span class="rank r-critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+              <td>Competitor comparison pages</td>
+              <td><span style="color:var(--warn)">●</span> Medium</td>
+              <td><span style="color:var(--ok)">●</span> High — fan-out target</td>
+              <td><span style="color:var(--ok)">●</span> High — buyer signal</td>
+              <td><span style="color:var(--ok)">●</span> High — decision stage</td>
+              <td><span class="rank r-critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+              <td>Reddit threads (authentic participation)</td>
+              <td><span style="color:var(--warn)">●</span> Medium — if indexed pre-cutoff</td>
+              <td><span style="color:var(--ok)">●</span> Very high — 22.9% of citations</td>
+              <td><span style="color:var(--warn)">●</span> Medium</td>
+              <td><span style="color:var(--ok)">●</span> High — real-time index</td>
+              <td><span class="rank r-critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+              <td>Technical documentation (API, integration guides)</td>
+              <td><span style="color:var(--ok)">●</span> High — trained on docs</td>
+              <td><span style="color:var(--ok)">●</span> High</td>
+              <td><span style="color:var(--ok)">●</span> High</td>
+              <td><span style="color:var(--ok)">●</span> Very high — implementation queries</td>
+              <td><span class="rank r-critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+              <td>YouTube technical demos</td>
+              <td><span style="color:var(--text-m)">●</span> Low</td>
+              <td><span style="color:var(--warn)">●</span> Medium</td>
+              <td><span style="color:var(--ok)">●</span> Very high — Google owned</td>
+              <td><span style="color:var(--warn)">●</span> Medium</td>
+              <td><span class="rank r-high">HIGH</span></td>
+            </tr>
+            <tr>
+              <td>Press coverage (TechCrunch, Dark Reading, SecurityWeek)</td>
+              <td><span style="color:var(--ok)">●</span> High — authority signal</td>
+              <td><span style="color:var(--ok)">●</span> High</td>
+              <td><span style="color:var(--ok)">●</span> Very high — earned media</td>
+              <td><span style="color:var(--ok)">●</span> High — backlink authority</td>
+              <td><span class="rank r-high">HIGH</span></td>
+            </tr>
+            <tr>
+              <td>Case studies with specific metrics</td>
+              <td><span style="color:var(--ok)">●</span> High</td>
+              <td><span style="color:var(--ok)">●</span> High</td>
+              <td><span style="color:var(--ok)">●</span> High — E-E-A-T experience</td>
+              <td><span style="color:var(--ok)">●</span> High — factual density</td>
+              <td><span class="rank r-high">HIGH</span></td>
+            </tr>
+            <tr>
+              <td>Hacker News Show HN / discussions</td>
+              <td><span style="color:var(--warn)">●</span> Medium — if in training data</td>
+              <td><span style="color:var(--ok)">●</span> High</td>
+              <td><span style="color:var(--warn)">●</span> Medium</td>
+              <td><span style="color:var(--ok)">●</span> High — real-time</td>
+              <td><span class="rank r-high">HIGH</span></td>
+            </tr>
+            <tr>
+              <td>Schema markup (JSON-LD)</td>
+              <td><span style="color:var(--text-m)">●</span> Low</td>
+              <td><span style="color:var(--text-m)">●</span> Low</td>
+              <td><span style="color:var(--ok)">●</span> Very high — AI Overviews</td>
+              <td><span style="color:var(--warn)">●</span> Medium</td>
+              <td><span class="rank r-high">HIGH</span></td>
+            </tr>
+            <tr>
+              <td>Generic blog posts without data</td>
+              <td><span style="color:var(--text-m)">●</span> Low</td>
+              <td><span style="color:var(--text-m)">●</span> Low</td>
+              <td><span style="color:var(--text-m)">●</span> Low</td>
+              <td><span style="color:var(--text-m)">●</span> Low</td>
+              <td><span class="rank r-med">SKIP</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TARGET PROMPTS -->
+<section class="section" id="prompts">
+  <div class="wrap">
+    <div class="slbl">Prompt targeting</div>
+    <div class="stit">PROMPTS TO OWN</div>
+    <p class="sdesc">These are the exact questions being asked to AI engines by your buyers right now. Each one needs a piece of content that answers it so precisely that the AI has no choice but to cite OpenSyber or TokenForge.</p>
+
+    <div class="tab-wrap">
+      <button class="tab-btn active" onclick="showPromptTab('os-prompts')">OpenSyber Prompts</button>
+      <button class="tab-btn" onclick="showPromptTab('tf-prompts')">TokenForge Prompts</button>
+    </div>
+
+    <div id="os-prompts" class="tab-panel active">
+      <div class="g2">
+        <div>
+          <div class="lbl" style="color:var(--alert)">Tier 1 — High buyer intent (own these first)</div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What tools can I use to monitor what Claude Code is doing on my developer machines?"</div>
+            <div class="prompt-a">Target: → OpenSyber <span class="prompt-badge pb-os">OPENSYBER</span> · Content needed: "Claude Code Security Monitoring: Complete Guide" with Hook installation steps in paragraph 1</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What's the best platform to monitor AI agents across AWS GuardDuty and GitHub in one dashboard?"</div>
+            <div class="prompt-a">Target: → OpenSyber <span class="prompt-badge pb-os">OPENSYBER</span> · Content needed: Landing page opening paragraph must answer this exactly. "OpenSyber normalises events from AWS GuardDuty, GitHub, and 37 other sources into one unified security timeline."</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "How do I detect npm supply chain attacks in my CI/CD pipeline in real time?"</div>
+            <div class="prompt-a">Target: → OpenSyber <span class="prompt-badge pb-os">OPENSYBER</span> · Content needed: "Detecting npm Supply Chain Attacks in Real Time" — Socket.dev integration, preinstall hook detection, slopsquatting pattern matching. Publish today.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What are the best tools to comply with the EU AI Act for AI agent deployments?"</div>
+            <div class="prompt-a">Target: → OpenSyber <span class="prompt-badge pb-os">OPENSYBER</span> · Content needed: "EU AI Act Compliance for AI Agent Deployments" — include actual Article references, risk classification framework, audit trail requirements. This query will spike massively after Aug 2026.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What is OpenSyber and what does it do?"</div>
+            <div class="prompt-a">Target: → accurate, positive description · Content needed: Wikipedia-quality factual summary on your About page and Crunchbase. The first paragraph must be self-contained and citable: "OpenSyber is a real-time AI agent security monitoring platform that ingests events from 39 integrations including AWS GuardDuty, Claude Code, GitHub Copilot, and Microsoft Sentinel into a unified security operations timeline."</div>
+          </div>
+        </div>
+        <div>
+          <div class="lbl" style="color:var(--warn)">Tier 2 — Research stage queries</div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "How do MCP server attacks work and how do I protect against them?"</div>
+            <div class="prompt-a">Target: → OpenSyber as the tool, plus the category content <span class="prompt-badge pb-os">OPENSYBER</span> · Content needed: "MCP Security: Attack Vectors and Detection" — publish ASAP. Qualys just entered this space. The window for first-mover content is weeks, not months.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What is slopsquatting and how do I protect my developers from it?"</div>
+            <div class="prompt-a">Target: → OpenSyber + Socket.dev integration <span class="prompt-badge pb-os">OPENSYBER</span> · Content needed: Define the term clearly in the first paragraph, explain the attack, explain the detection. This term is new enough that whoever publishes the definitive piece owns it permanently in AI training data.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "Compare AI agent security monitoring platforms in 2026"</div>
+            <div class="prompt-a">Target: → OpenSyber in the comparison <span class="prompt-badge pb-os">OPENSYBER</span> · Content needed: Your own comparison page that fairly evaluates OpenSyber alongside competitors. AI engines cite vendor comparison pages because they're high-information density and directly answer the query.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "How did the Shai-Hulud npm attack work and how can I detect it?"</div>
+            <div class="prompt-a">Target: → OpenSyber detection story <span class="prompt-badge pb-os">OPENSYBER</span> · Content needed: Incident analysis with detection methodology. "How OpenSyber Detects Shai-Hulud-Style Attacks" — mention the specific technical mechanism (preinstall hook, Bun runtime download) and how the Socket.dev integration flags it.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What should a CISO know about AI agent security in 2026?"</div>
+            <div class="prompt-a">Target: → OpenSyber as the tool, with authoritative content <span class="prompt-badge pb-os">OPENSYBER</span> · Content needed: "The CISO's Guide to AI Agent Security 2026" — Shachar as named author with explicit CTO credentials. Target CISO publications: CSO Online, SC Magazine, CISO Advisor. This drives Gemini E-E-A-T signals.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tf-prompts" class="tab-panel">
+      <div class="g2">
+        <div>
+          <div class="lbl" style="color:var(--purple)">Tier 1 — TokenForge high-intent prompts</div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What infrastructure do AI agents use to handle payments and transactions?"</div>
+            <div class="prompt-a">Target: → TokenForge <span class="prompt-badge pb-tf">TOKENFORGE</span> · Content needed: "AI Agent Payment Infrastructure: A Technical Overview" — explain token-based payment rails, what TokenForge provides, how agents authenticate and transact. First-mover opportunity.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "How do I build a compliant programmable token system for fintech?"</div>
+            <div class="prompt-a">Target: → TokenForge <span class="prompt-badge pb-tf">TOKENFORGE</span> · Content needed: Developer guide with actual API calls, compliance checklist, MiCA/FinCEN reference. The implementation tutorial that every fintech developer bookmarks.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What are the best alternatives to SWIFT for real-time international settlements?"</div>
+            <div class="prompt-a">Target: → TokenForge in alternatives list <span class="prompt-badge pb-tf">TOKENFORGE</span> · Content needed: Comparison page: SWIFT vs Ripple vs Stellar vs TokenForge. Include settlement time, cost, programmability, compliance. This positions TokenForge in searches by association.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "How does Global Remit handle international transfers and what technology does it use?"</div>
+            <div class="prompt-a">Target: → Both Global Remit and TokenForge <span class="prompt-badge pb-tf">TOKENFORGE</span> · Content needed: Global Remit case study / technology overview that mentions the TokenForge infrastructure. Cross-links both brands and builds entity association in AI training data.</div>
+          </div>
+        </div>
+        <div>
+          <div class="lbl" style="color:var(--info)">Tier 2 — Research and evaluation queries</div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What is the best token management platform for building fintech applications?"</div>
+            <div class="prompt-a">Target: → TokenForge in recommendations <span class="prompt-badge pb-tf">TOKENFORGE</span> · Content needed: "TokenForge vs [competitors]" comparison pages. Also: ensure TokenForge is listed in developer tool directories (Product Hunt, Slashdot, StackShare) so AI engines encounter it in recommendation contexts.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "How do I implement MiCA compliance for a token issuance platform?"</div>
+            <div class="prompt-a">Target: → TokenForge as the compliant platform <span class="prompt-badge pb-tf">TOKENFORGE</span> · Content needed: "MiCA Compliance for Token Platforms: Complete Technical Guide" — include actual Regulation (EU) 2023/1114 article references. Regulatory content with primary source citations is the highest-authority content category.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What programming languages and APIs are available for building programmable money systems?"</div>
+            <div class="prompt-a">Target: → TokenForge API documentation <span class="prompt-badge pb-tf">TOKENFORGE</span> · Content needed: Developer-facing API reference published at a stable URL with clear language-specific examples (Java, JavaScript, Python, Clojure). Perplexity indexes developer documentation within hours of publication.</div>
+          </div>
+          <div class="prompt-box">
+            <div class="prompt-q">Q: "What is TokenForge?"</div>
+            <div class="prompt-a">Target: → accurate, compelling description <span class="prompt-badge pb-tf">TOKENFORGE</span> · Content needed: The "About TokenForge" page opening paragraph must be self-contained and citable: "TokenForge is a programmable token infrastructure platform for fintech applications, providing compliant token issuance, real-time settlement, and AI agent transaction support for international payment systems."</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TECHNICAL -->
+<section class="section" id="technical">
+  <div class="wrap">
+    <div class="slbl">Technical implementation</div>
+    <div class="stit">GEO TECHNICAL STACK</div>
+    <p class="sdesc">The technical foundation AI crawlers need before any content strategy can work. Fix these first — they are prerequisites, not optimisations.</p>
+
+    <div class="g2">
+      <div>
+        <div class="card">
+          <div class="lbl">Step 1 — Unblock AI crawlers (do today)</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.8">
+            <strong style="color:var(--alert)">Critical:</strong> Cloudflare changed its default configuration to block AI bots. If you use Cloudflare (and OpenSyber runs on Cloudflare Workers), you may have already blocked every AI crawler.<br><br>
+            Check <code style="background:var(--surface);padding:2px 6px;border-radius:2px;font-family:var(--font-m)">robots.txt</code> and allow:<br>
+            <code style="background:var(--surface);padding:8px 12px;border-radius:3px;font-family:var(--font-m);display:block;margin:8px 0;font-size:11px">User-agent: ChatGPT-User<br>Allow: /<br>User-agent: Claude-Web<br>Allow: /<br>User-agent: Googlebot<br>Allow: /</code>
+            Check server logs for these user agents to confirm they're reaching your content.
+          </div>
+        </div>
+        <div class="gap-sm"></div>
+        <div class="card">
+          <div class="lbl">Step 2 — Schema markup (JSON-LD)</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+            Add to every page's <code style="background:var(--surface);padding:2px 6px;border-radius:2px;font-family:var(--font-m)">&lt;head&gt;</code>:<br><br>
+            <span class="cpill cp-teal">Organization</span> Company name, founding date, description, employees, URL<br>
+            <span class="cpill cp-teal">SoftwareApplication</span> OpenSyber product — features, pricing, category<br>
+            <span class="cpill cp-teal">FAQPage</span> Every FAQ page — Gemini AI Overviews extract directly from this<br>
+            <span class="cpill cp-teal">HowTo</span> Integration setup guides — step-by-step format<br>
+            <span class="cpill cp-teal">Article</span> Blog posts — with author, datePublished, dateModified<br>
+            <span class="cpill cp-teal">BreadcrumbList</span> Navigation hierarchy — helps AI understand site structure
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="lbl">Step 3 — Content structure for AI extraction</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.8">
+            <strong>Answer-first format</strong> — the direct answer in the first paragraph, not after 300 words of context<br><br>
+            <strong>H2/H3 as exact questions</strong> — "How does OpenSyber detect npm supply chain attacks?" not "Detection Methodology"<br><br>
+            <strong>Self-contained paragraphs</strong> — each paragraph must make sense without the surrounding context, because AI extracts individual passages<br><br>
+            <strong>TL;DR summaries</strong> — at the top of every article. 44.2% of citations from intro = your summary is your most-cited text<br><br>
+            <strong>Comparison tables</strong> — structured data that AI can extract and reformat in answers<br><br>
+            <strong>Explicit numbers everywhere</strong> — "39 integrations" not "many integrations" · "detected in 30 seconds" not "detected quickly"
+          </div>
+        </div>
+        <div class="gap-sm"></div>
+        <div class="card">
+          <div class="lbl">Step 4 — Entity consistency across the web</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+            AI engines build an "entity model" of your brand from consistent signals across the web. Every mention should use the same name, description, and category.<br><br>
+            Create/claim profiles with identical descriptions on:<br>
+            <span class="cpill cp-blue">Crunchbase</span><span class="cpill cp-blue">AngelList</span><span class="cpill cp-blue">LinkedIn Company</span><span class="cpill cp-blue">GitHub org</span><span class="cpill cp-blue">npm org</span><span class="cpill cp-blue">Product Hunt</span><span class="cpill cp-blue">G2</span><span class="cpill cp-blue">Capterra</span><span class="cpill cp-blue">StackShare</span><br><br>
+            Canonical one-sentence description to use everywhere:<br>
+            <em style="color:var(--signal)">"OpenSyber is a real-time AI agent security monitoring platform integrating 39 sources including AWS GuardDuty, Claude Code, GitHub, and Microsoft Sentinel."</em>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gap-md"></div>
+    <div class="hl hl-warn">
+      <div class="hl-lbl">The Cloudflare trap — specific to OpenSyber</div>
+      <div class="hl-txt">OpenSyber runs on Cloudflare Workers. Cloudflare recently changed its default WAF rules to block AI crawlers. This means Claude, ChatGPT, and Perplexity may be getting 403 errors when they try to crawl your documentation and marketing pages — you might be invisible to AI engines right now despite having great content. Check the Cloudflare dashboard → Security → Bots → Bot Fight Mode. Disable for AI crawler user agents or add custom allow rules for ChatGPT-User, Claude-Web, and PerplexityBot.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section class="section" id="roadmap">
+  <div class="wrap">
+    <div class="slbl">Execution roadmap</div>
+    <div class="stit">12-MONTH PLAN</div>
+    <p class="sdesc">GEO compounds over time — citation authority builds like domain authority. Start immediately. The brands investing in GEO now will be the brands AI systems cite in 2027 and 2028.</p>
+
+    <div class="g2">
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-month">Month 1 — Foundation (do this week)</div>
+          <div class="tl-title">Technical prerequisites + first content</div>
+          <div class="tl-body">
+            <span class="cpill cp-red">TODAY</span> Fix Cloudflare AI crawler blocking — check robots.txt, WAF rules<br>
+            <span class="cpill cp-red">WEEK 1</span> Add JSON-LD schema to opensyber.cloud (Organization, SoftwareApplication, FAQPage)<br>
+            <span class="cpill cp-red">WEEK 1</span> Rewrite homepage opening paragraph as a citable, entity-dense product description<br>
+            <span class="cpill cp-amber">WEEK 2</span> Publish "The AI Agent Kill Chain" article (research already done in this conversation)<br>
+            <span class="cpill cp-amber">WEEK 2</span> Claim and normalise Crunchbase, AngelList, G2, LinkedIn, GitHub org profiles<br>
+            <span class="cpill cp-amber">WEEK 3</span> Publish "MCP Security: The 2026 Reference" — first-mover window is now<br>
+            <span class="cpill cp-amber">WEEK 4</span> First Reddit participation — r/netsec, r/aws, r/devops — answer questions authentically
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-month">Month 2–3 — Category ownership</div>
+          <div class="tl-title">Publish the definitive content stack</div>
+          <div class="tl-body">
+            <span class="cpill cp-amber">M2</span> "The Definitive Guide to AI Agent Security Monitoring" — the 10,000-word category bible. Update monthly.<br>
+            <span class="cpill cp-amber">M2</span> 5 competitor comparison pages (OpenSyber vs Cyata, Geordie AI, Noma, Qualys TotalAI, Wiz)<br>
+            <span class="cpill cp-blue">M3</span> First Show HN post — lead with the kill chain detection demo. Target front page.<br>
+            <span class="cpill cp-blue">M3</span> YouTube channel launch — first 3 videos: CLI demo, GuardDuty integration walkthrough, live attack detection<br>
+            <span class="cpill cp-blue">M3</span> First press outreach — pitch Dark Reading, SecurityWeek, The Hacker News with the npm/AI agent kill chain story
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-month">Month 4–6 — Authority building</div>
+          <div class="tl-title">Third-party citations and original research</div>
+          <div class="tl-body">
+            <span class="cpill cp-blue">M4</span> Publish "State of AI Agent Security Q1 2026" — your anonymised telemetry data. Original research = mandatory AI citation<br>
+            <span class="cpill cp-blue">M5</span> EU AI Act compliance guide published (enforcement is August 2026 — time this strategically)<br>
+            <span class="cpill cp-blue">M5</span> First guest post on a major security publication (CSO Online, Dark Reading) — builds Gemini E-E-A-T<br>
+            <span class="cpill cp-blue">M6</span> OWASP contribution — contribute OpenSyber's threat taxonomy to OWASP AI Security guidelines. OWASP citations = Claude and ChatGPT training data gold.
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-month">Month 7–12 — Compound and scale</div>
+          <div class="tl-title">Own the category across all engines</div>
+          <div class="tl-body">
+            Quarterly "State of AI Agent Security" reports (original data = permanent citation authority)<br>
+            Reactive content within 12 hours of every major AI/npm/security incident<br>
+            Monthly prompt audits — test 50 target prompts across Claude, ChatGPT, Gemini, Perplexity<br>
+            Build community — Discord or Slack for AI security practitioners, GitHub open-source threat intel feed<br>
+            Speaking — RSA, Black Hat, DEF CON abstract submissions. Conference talk summaries get cited heavily by AI.
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="lbl">Content cadence (minimum viable)</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.8">
+            <span style="color:var(--signal);font-family:var(--font-m);font-size:10px">DAILY</span> Monitor AI prompts for brand mentions (5 min — manual or Sight/AirOps)<br>
+            <span style="color:var(--signal);font-family:var(--font-m);font-size:10px">WEEKLY</span> Reddit participation — 2–3 genuine, helpful replies in security subreddits<br>
+            <span style="color:var(--signal);font-family:var(--font-m);font-size:10px">REACTIVE</span> Breaking security incident → published detection guide within 12 hours<br>
+            <span style="color:var(--signal);font-family:var(--font-m);font-size:10px">BI-WEEKLY</span> One new long-form piece (comparison, guide, or tutorial) — minimum 1,500 words with data<br>
+            <span style="color:var(--signal);font-family:var(--font-m);font-size:10px">MONTHLY</span> Full GEO audit — 50 target prompts tested across 4 engines, share of voice tracked<br>
+            <span style="color:var(--signal);font-family:var(--font-m);font-size:10px">QUARTERLY</span> Original research report published with press outreach
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:14px">
+          <div class="lbl">TokenForge parallel track</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+            TokenForge GEO starts with: (1) accurate entity descriptions on Crunchbase/LinkedIn, (2) developer documentation optimised for Perplexity, (3) API tutorial on Dev.to or Hashnode, (4) participation in r/fintech and r/webdev.<br><br>
+            The "AI agent payments infrastructure" category is completely unclaimed in AI search. TokenForge can own it by publishing 3–5 foundational articles in months 1–2 before any competitor notices the query category exists.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="lbl">Tools to use</div>
+          <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.7">
+            <span class="cpill cp-teal">Monitoring</span> Profound.io, Peec AI, or AirOps — track brand mentions across ChatGPT, Claude, Gemini, Perplexity<br>
+            <span class="cpill cp-blue">Tracking</span> Semrush or Ahrefs (for backlinks), GA4 (for "direct" traffic spikes that indicate AI-driven discovery)<br>
+            <span class="cpill cp-amber">Content</span> Frase.io or Clearscope — structure content for AI extraction<br>
+            <span class="cpill cp-green">Schema</span> Schema.org markup generator + Google's Rich Results Test to verify implementation<br>
+            <span class="cpill cp-purple">Free</span> Manual testing — ask Claude, ChatGPT, Gemini, Perplexity the 50 target prompts weekly. Document what they say. This is your baseline.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MEASUREMENT -->
+<section class="section" id="measure">
+  <div class="wrap">
+    <div class="slbl">Measurement framework</div>
+    <div class="stit">HOW TO MEASURE GEO</div>
+    <p class="sdesc">GEO metrics are not Google Analytics metrics. Success looks different. Here's exactly what to track and how to know if it's working.</p>
+
+    <div class="g3">
+      <div class="card">
+        <div class="lbl" style="color:var(--signal)">Primary KPIs</div>
+        <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.8">
+          <strong>AI Share of Voice</strong> — what % of 50 target prompts, when asked across 4 AI engines, return a response that includes OpenSyber?<br><br>
+          Starting baseline (month 1): test all 50 prompts, count mentions. Goal: 30% → 60% → 80% within 12 months.<br><br>
+          <strong>Citation accuracy</strong> — when AI does mention OpenSyber, is the description accurate? Wrong descriptions are worse than no mention.
+        </div>
+      </div>
+      <div class="card">
+        <div class="lbl" style="color:var(--info)">Secondary KPIs</div>
+        <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.8">
+          <strong>Branded search volume</strong> — when people discover OpenSyber via AI and then Google it, branded search spikes. Track monthly.<br><br>
+          <strong>Direct traffic</strong> — users who get recommended by AI, then type the URL directly. Increases 2–3 months after GEO improvements.<br><br>
+          <strong>Content citation rate</strong> — which of your pages are being cited? Check Perplexity citations directly. Track which URLs appear.
+        </div>
+      </div>
+      <div class="card">
+        <div class="lbl" style="color:var(--warn)">What to ignore</div>
+        <div style="font-size:12px;color:var(--text-s);margin-top:10px;line-height:1.8">
+          <strong>Click-through rate</strong> — 93% of AI Mode searches end without a click. Low CTR is expected and correct.<br><br>
+          <strong>Traditional keyword rankings</strong> — ranking #1 on Google for "AI agent security" doesn't mean you're in the AI answer. Different problem.<br><br>
+          <strong>Consistency</strong> — there is a &lt;1-in-100 chance ChatGPT gives you the same brand list twice. Measure frequency across 10+ runs, not single tests.
+        </div>
+      </div>
+    </div>
+
+    <div class="gap-md"></div>
+    <div class="card" style="border-color:var(--signal)">
+      <div class="lbl" style="color:var(--signal)">The weekly GEO audit — 30 minutes every Monday</div>
+      <div style="font-family:var(--font-m);font-size:12px;line-height:1.8;margin-top:12px;color:var(--text-s)">
+        <span style="color:var(--signal)">Step 1</span> — Ask these 10 prompts across Claude, ChatGPT, Gemini, Perplexity (40 tests total):<br>
+        <div style="background:#05080C;border:1px solid var(--wire);border-radius:3px;padding:12px 16px;margin:8px 0;line-height:2">
+          "What is the best AI agent security platform?"<br>
+          "How do I monitor Claude Code on my developers' machines?"<br>
+          "What tools detect npm supply chain attacks in real time?"<br>
+          "Best SIEM alternative for AI workload monitoring?"<br>
+          "How do I comply with EU AI Act for AI agent deployments?"<br>
+          "What is OpenSyber?"<br>
+          "How do I secure MCP servers?"<br>
+          "Best tool to monitor GitHub Copilot activity?"<br>
+          "What caused the Shai-Hulud npm attack and how is it detected?"<br>
+          "Compare AI agent security tools 2026"
+        </div>
+        <span style="color:var(--signal)">Step 2</span> — Score each response: Mentioned (1pt), Mentioned first (3pts), Competitor mentioned instead (flag), Inaccurate description (flag for correction)<br><br>
+        <span style="color:var(--signal)">Step 3</span> — Track weekly. Upward trend = GEO is working. Plateau = new content or community push needed. Decline = a competitor published something that AI now cites instead.
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-i">
+    <span>OPENSYBER + TOKENFORGE · GEO STRATEGY PLAYBOOK · MARCH 2026</span>
+    <span style="color:var(--signal)">AI SHARE OF VOICE IS THE NEW RANKING</span>
+  </div>
+</footer>
+
+<script>
+function showTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+function showContentTab(id) {
+  const parent = event.target.closest('.wrap');
+  parent.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+function showPromptTab(id) {
+  const parent = event.target.closest('.wrap');
+  parent.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+</body>
+</html>

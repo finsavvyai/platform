@@ -1,0 +1,56 @@
+"""
+Task model
+"""
+
+from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import JSON
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+import uuid
+
+from app.core.database import Base
+
+
+class Task(Base):
+    """Task model"""
+    
+    __tablename__ = "tasks"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    
+    # Relationships
+    workflow_id = Column(UUID(as_uuid=True), ForeignKey("workflows.id"), nullable=False)
+    workflow = relationship("Workflow", back_populates="tasks")
+    
+    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True)
+    agent = relationship("Agent", back_populates="tasks")
+    
+    # Task configuration
+    task_type = Column(String, nullable=False)  # browser, infrastructure, llm, etc.
+    parameters = Column(JSON, default=dict)
+    dependencies = Column(JSON, default=list)  # List of task IDs
+    
+    # Execution
+    status = Column(String, default="pending")  # pending, running, completed, failed, cancelled
+    result = Column(JSON, nullable=True)
+    error_message = Column(Text, nullable=True)
+    execution_log = Column(JSON, default=list)
+    
+    # Timing
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    timeout_seconds = Column(Integer, default=300)
+    
+    # Retry configuration
+    retry_count = Column(Integer, default=0)
+    max_retries = Column(Integer, default=3)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    def __repr__(self):
+        return f"<Task(id={self.id}, name={self.name}, status={self.status})>"

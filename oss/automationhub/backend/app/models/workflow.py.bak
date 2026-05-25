@@ -1,0 +1,60 @@
+"""
+Workflow model
+"""
+
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Integer, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import JSON
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+import uuid
+
+from app.core.database import Base
+
+
+class Workflow(Base):
+    """Workflow model"""
+    
+    __tablename__ = "workflows"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    
+    # Ownership
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    owner = relationship("User", back_populates="workflows")
+    
+    organization_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=True)
+    organization = relationship("Organization", back_populates="workflows")
+    
+    # Workflow definition
+    nodes = Column(JSONB, default=list)
+    connections = Column(JSONB, default=list)
+    variables = Column(JSONB, default=dict)
+    triggers = Column(JSONB, default=list)
+    
+    # Status and versioning
+    status = Column(String, default="draft")  # draft, active, paused, archived
+    version = Column(Integer, default=1)
+    is_template = Column(Boolean, default=False)
+    is_public = Column(Boolean, default=False)
+    
+    # Execution settings
+    execution_settings = Column(JSONB, default=dict)
+    retry_settings = Column(JSONB, default=dict)
+    
+    # Metadata
+    tags = Column(JSONB, default=list)
+    category = Column(String, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    last_executed = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    tasks = relationship("Task", back_populates="workflow")
+    
+    def __repr__(self):
+        return f"<Workflow(id={self.id}, name={self.name})>"

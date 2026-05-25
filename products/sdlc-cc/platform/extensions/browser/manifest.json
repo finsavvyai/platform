@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Privacy Gateway",
+  "short_name": "PrivacyGW",
+  "version": "0.1.0",
+  "description": "Scrub PII and secrets from prompts before they reach ChatGPT, Claude, Gemini, or Copilot.",
+  "permissions": ["storage", "scripting", "activeTab", "notifications"],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://copilot.microsoft.com/*",
+    "http://localhost/*",
+    "https://*/v1/redact"
+  ],
+  "background": { "service_worker": "src/background.ts", "type": "module" },
+  "options_page": "src/options/options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://chat.openai.com/*", "https://chatgpt.com/*"],
+      "js": ["src/content/chatgpt.ts"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["src/content/claude.ts"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["src/content/gemini.ts"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://copilot.microsoft.com/*"],
+      "js": ["src/content/copilot.ts"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Privacy Gateway"
+  }
+}

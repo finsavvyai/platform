@@ -1,0 +1,363 @@
+name: Deploy Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_run:
+    workflows: [ "CI Pipeline" ]
+    types:
+      - completed
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      version:
+        description: 'Version to deploy (optional, defaults to latest)'
+        required: false
+        type: string
+
+env:
+  NODE_VERSION: '20'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: claude-agent-platform
+
+jobs:
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || (github.event.inputs.environment == 'staging')
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name claude-agent-staging
+
+      - name: Deploy to staging
+        run: |
+          # Set environment variables
+          export ENVIRONMENT=staging
+          export NAMESPACE=claude-agent-staging
+          export VERSION=${{ github.event.inputs.version || github.sha }}
+
+          # Deploy database migrations
+          kubectl apply -f infrastructure/kubernetes/staging/database/
+
+          # Wait for database to be ready
+          kubectl wait --for=condition=ready pod -l app=postgres -n $NAMESPACE --timeout=300s
+
+          # Deploy application services
+          helm upgrade --install claude-agent-platform ./helm/claude-agent-platform \
+            --namespace $NAMESPACE \
+            --create-namespace \
+            --set image.tag=$VERSION \
+            --set environment=$ENVIRONMENT \
+            --set ingress.host=staging.claude-agent.com \
+            --set database.host=$STAGING_DB_HOST \
+            --set database.password=$STAGING_DB_PASSWORD \
+            --set redis.host=$STAGING_REDIS_HOST \
+            --set redis.password=$STAGING_REDIS_PASSWORD \
+            --set qdrant.host=$STAGING_QDRANT_HOST \
+            --set qdrant.apiKey=$STAGING_QDRANT_API_KEY \
+            --wait --timeout=10m
+
+      - name: Run health checks
+        run: |
+          # Wait for deployment to be ready
+          kubectl wait --for=condition=available deployment/claude-agent-platform -n claude-agent-staging --timeout=600s
+
+          # Run health check endpoint
+          kubectl port-forward -n claude-agent-staging svc/claude-agent-platform 8080:80 &
+          sleep 30
+
+          # Health check
+          curl -f http://localhost:8080/health || exit 1
+
+          # API health check
+          curl -f http://localhost:8080/api/v1/health || exit 1
+
+      - name: Run smoke tests
+        run: |
+          # Install test dependencies
+          pnpm install --frozen-lockfile
+
+          # Run smoke tests against staging
+          pnpm test:smoke --env=staging
+
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: '🚀 Successfully deployed to staging environment!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event.inputs.environment == 'production')
+    environment: production
+    needs: deploy-staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: '8'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: us-east-1
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name claude-agent-production
+
+      - name: Create backup before deployment
+        run: |
+          # Create database backup
+          export BACKUP_NAME="pre-deploy-$(date +%Y%m%d-%H%M%S)"
+          aws rds create-db-snapshot \
+            --db-instance-identifier claude-agent-prod-db \
+            --db-snapshot-identifier $BACKUP_NAME
+
+          echo "BACKUP_NAME=$BACKUP_NAME" >> $GITHUB_ENV
+
+      - name: Deploy to production (Blue-Green)
+        run: |
+          # Set environment variables
+          export ENVIRONMENT=production
+          export NAMESPACE=claude-agent-production
+          export VERSION=${{ github.event.inputs.version || github.ref_name }}
+          export GREEN_NAMESPACE=claude-agent-green
+
+          # Create green namespace if doesn't exist
+          kubectl create namespace $GREEN_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+          # Deploy to green environment
+          helm upgrade --install claude-agent-platform-green ./helm/claude-agent-platform \
+            --namespace $GREEN_NAMESPACE \
+            --set image.tag=$VERSION \
+            --set environment=$ENVIRONMENT \
+            --set ingress.host=claude-agent.com \
+            --set database.host=$PROD_DB_HOST \
+            --set database.password=$PROD_DB_PASSWORD \
+            --set redis.host=$PROD_REDIS_HOST \
+            --set redis.password=$PROD_REDIS_PASSWORD \
+            --set qdrant.host=$PROD_QDRANT_HOST \
+            --set qdrant.apiKey=$PROD_QDRANT_API_KEY \
+            --wait --timeout=15m
+
+      - name: Health check green environment
+        run: |
+          # Wait for green deployment to be ready
+          kubectl wait --for=condition=available deployment/claude-agent-platform -n claude-agent-green --timeout=600s
+
+          # Port forward for health checks
+          kubectl port-forward -n claude-agent-green svc/claude-agent-platform 8081:80 &
+          sleep 30
+
+          # Health checks
+          curl -f http://localhost:8081/health || exit 1
+          curl -f http://localhost:8081/api/v1/health || exit 1
+
+      - name: Run comprehensive tests
+        run: |
+          # Install test dependencies
+          pnpm install --frozen-lockfile
+
+          # Run smoke tests against green environment
+          pnpm test:smoke --env=production-green
+
+          # Run integration tests
+          pnpm test:integration:prod
+
+      - name: Switch traffic to green
+        run: |
+          # Update ingress to point to green environment
+          kubectl patch ingress claude-agent-platform -n claude-agent-production \
+            -p '{"spec":{"rules":[{"host":"claude-agent.com","http":{"paths":[{"path":"/","pathType":"Prefix","backend":{"service":{"name":"claude-agent-platform","port":{"number":80}}}}]}}]}}'
+
+          # Wait for DNS propagation
+          sleep 60
+
+      - name: Final production verification
+        run: |
+          # Final health check against production URL
+          curl -f https://claude-agent.com/health || exit 1
+          curl -f https://claude-agent.com/api/v1/health || exit 1
+
+          # Run smoke tests against production
+          pnpm test:smoke --env=production
+
+      - name: Cleanup blue environment
+        run: |
+          # Keep blue environment for rollback (7 days)
+          kubectl scale deployment claude-agent-platform --replicas=0 -n claude-agent-production
+
+          # Schedule cleanup job
+          cat <<EOF | kubectl apply -f -
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: cleanup-blue-$(date +%Y%m%d)
+            namespace: claude-agent-production
+          spec:
+            schedule: "0 2 * * 7"  # Run weekly on Sunday at 2 AM
+            jobTemplate:
+              spec:
+                template:
+                  spec:
+                    containers:
+                    - name: cleanup
+                      image: bitnami/kubectl
+                      command:
+                      - /bin/sh
+                      - -c
+                      - |
+                        helm uninstall claude-agent-platform -n claude-agent-production || true
+                        kubectl delete namespace claude-agent-green || true
+                    restartPolicy: OnFailure
+          EOF
+
+      - name: Update deployment status
+        run: |
+          # Create GitHub release if tag deployment
+          if [[ ${{ github.ref }} == refs/tags/* ]]; then
+            gh release create ${{ github.ref_name }} \
+              --title "Release ${{ github.ref_name }}" \
+              --notes "Automated deployment of version ${{ github.ref_name }} to production"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: '🎉 Successfully deployed to production environment! Version: ${{ github.ref_name || github.sha }}'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text: '❌ Production deployment failed! Backup available: ${{ env.BACKUP_NAME }}'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Rollback job
+  rollback:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    if: failure() && github.ref == 'refs/heads/main'
+    needs: deploy-production
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_PROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}
+          aws-region: us-east-1
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name claude-agent-production
+
+      - name: Rollback deployment
+        run: |
+          # Rollback to previous deployment
+          helm rollback claude-agent-platform -n claude-agent-production
+
+          # Scale up blue environment
+          kubectl scale deployment claude-agent-platform --replicas=3 -n claude-agent-production
+
+          # Wait for rollback to complete
+          kubectl wait --for=condition=available deployment/claude-agent-platform -n claude-agent-production --timeout=600s
+
+      - name: Restore database if needed
+        run: |
+          # Check if we need to restore from backup
+          if [[ "${{ needs.deploy-production.outputs.backup_required }}" == "true" ]]; then
+            # Restore from the backup created before deployment
+            aws rds restore-db-instance-from-db-snapshot \
+              --db-instance-identifier claude-agent-prod-db \
+              --db-snapshot-identifier ${{ needs.deploy-production.outputs.backup_name }} \
+              --no-multi-az
+          fi
+
+      - name: Verify rollback
+        run: |
+          # Health check after rollback
+          kubectl port-forward -n claude-agent-production svc/claude-agent-platform 8082:80 &
+          sleep 30
+
+          curl -f http://localhost:8082/health || exit 1
+          curl -f https://claude-agent.com/health || exit 1
+
+      - name: Notify rollback success
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          text: '🔄 Successfully rolled back production deployment!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

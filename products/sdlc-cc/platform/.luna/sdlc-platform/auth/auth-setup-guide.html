@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDLC.ai OAuth Provider Setup Guide</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --border: #262626;
+      --text: #fafafa;
+      --text-muted: #a1a1aa;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #22c55e;
+      --warning: #eab308;
+      --danger: #ef4444;
+      --code-bg: #1e1e2e;
+      --radius: 8px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 0;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+    h1 { font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
+    h2 { font-size: 1.5rem; font-weight: 600; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    h3 { font-size: 1.125rem; font-weight: 600; margin: 24px 0 12px; }
+    p { margin-bottom: 12px; color: var(--text-muted); }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .subtitle { color: var(--text-muted); font-size: 1.125rem; margin-bottom: 32px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .step {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+    }
+    .step-num {
+      background: var(--primary);
+      color: white;
+      font-weight: 700;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .step-content { flex: 1; }
+    .step-content p { margin-bottom: 4px; }
+    code {
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    pre {
+      background: var(--code-bg);
+      padding: 16px;
+      border-radius: var(--radius);
+      overflow-x: auto;
+      margin: 12px 0;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    .callout {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      margin: 12px 0;
+      font-size: 0.875rem;
+    }
+    .callout-warning { background: rgba(234,179,8,0.1); border-left: 3px solid var(--warning); }
+    .callout-danger { background: rgba(239,68,68,0.1); border-left: 3px solid var(--danger); }
+    .callout-success { background: rgba(34,197,94,0.1); border-left: 3px solid var(--success); }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.875rem; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    th { color: var(--text); font-weight: 600; }
+    td { color: var(--text-muted); }
+    td code { font-size: 0.8125rem; }
+    .provider-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .provider-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .toc { list-style: none; }
+    .toc li { margin-bottom: 8px; }
+    .toc a { color: var(--text-muted); font-size: 0.9375rem; }
+    .toc a:hover { color: var(--primary); }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-required { background: rgba(239,68,68,0.15); color: var(--danger); }
+    .badge-optional { background: rgba(34,197,94,0.15); color: var(--success); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SDLC.ai OAuth Setup Guide</h1>
+    <p class="subtitle">Complete setup instructions for all OAuth providers used in the SDLC.ai Admin UI.</p>
+
+    <div class="card">
+      <h3>Table of Contents</h3>
+      <ul class="toc">
+        <li><a href="#prerequisites">0. Prerequisites</a></li>
+        <li><a href="#google">1. Google OAuth</a></li>
+        <li><a href="#github">2. GitHub OAuth</a></li>
+        <li><a href="#microsoft">3. Microsoft Entra ID</a></li>
+        <li><a href="#linkedin">4. LinkedIn OAuth</a></li>
+        <li><a href="#env-reference">5. Environment Variable Reference</a></li>
+        <li><a href="#troubleshooting">6. Troubleshooting</a></li>
+      </ul>
+    </div>
+
+    <!-- Prerequisites -->
+    <h2 id="prerequisites">0. Prerequisites</h2>
+    <div class="card">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <p><strong>Install Auth.js v5</strong></p>
+          <pre>npm install next-auth@beta @auth/prisma-adapter</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <p><strong>Generate AUTH_SECRET</strong></p>
+          <pre>npx auth secret</pre>
+          <p>Copy the generated value to your <code>.env.local</code> file.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <p><strong>Set AUTH_URL</strong></p>
+          <pre>AUTH_URL=http://localhost:3000    # Development
+AUTH_URL=https://admin.sdlc.cc   # Production</pre>
+        </div>
+      </div>
+      <div class="callout callout-warning">
+        <strong>Callback URL pattern:</strong> All providers use the format<br>
+        <code>{AUTH_URL}/api/auth/callback/{provider-id}</code>
+      </div>
+    </div>
+
+    <!-- Google -->
+    <h2 id="google">1. Google OAuth</h2>
+    <div class="card">
+      <div class="provider-header">
+        <div class="provider-icon" style="background:#4285F4;color:white;">G</div>
+        <div>
+          <strong>Google Cloud Console</strong><br>
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank">console.cloud.google.com/apis/credentials</a>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <p><strong>Create or select a Google Cloud project.</strong></p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <p><strong>Configure OAuth consent screen.</strong></p>
+          <p>Go to <em>APIs & Services > OAuth consent screen</em>. Select <strong>External</strong> user type. Fill in app name ("SDLC.ai"), user support email, and developer contact.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <p><strong>Add scopes:</strong> <code>openid</code>, <code>email</code>, <code>profile</code></p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <p><strong>Create OAuth 2.0 Client ID.</strong></p>
+          <p>Go to <em>Credentials > Create Credentials > OAuth client ID</em>. Application type: <strong>Web application</strong>.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <p><strong>Set Authorized redirect URIs:</strong></p>
+          <pre>http://localhost:3000/api/auth/callback/google
+https://admin.sdlc.cc/api/auth/callback/google</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-content">
+          <p><strong>Copy Client ID and Client Secret to your environment:</strong></p>
+          <pre>AUTH_GOOGLE_ID=your-client-id.apps.googleusercontent.com
+AUTH_GOOGLE_SECRET=GOCSPX-your-client-secret</pre>
+        </div>
+      </div>
+      <div class="callout callout-warning">
+        <strong>Pitfall:</strong> Google requires the OAuth consent screen to be published (not in testing mode) for non-test users to authenticate. During development, add your test emails under "Test users".
+      </div>
+    </div>
+
+    <!-- GitHub -->
+    <h2 id="github">2. GitHub OAuth</h2>
+    <div class="card">
+      <div class="provider-header">
+        <div class="provider-icon" style="background:#24292e;color:white;">GH</div>
+        <div>
+          <strong>GitHub Developer Settings</strong><br>
+          <a href="https://github.com/settings/developers" target="_blank">github.com/settings/developers</a>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <p><strong>Go to Settings > Developer settings > OAuth Apps > New OAuth App.</strong></p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <p><strong>Fill in application details:</strong></p>
+          <table>
+            <tr><th>Field</th><th>Value</th></tr>
+            <tr><td>Application name</td><td>SDLC.ai Admin</td></tr>
+            <tr><td>Homepage URL</td><td><code>https://sdlc.cc</code></td></tr>
+            <tr><td>Authorization callback URL</td><td><code>http://localhost:3000/api/auth/callback/github</code></td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <p><strong>After creation, generate a Client Secret.</strong></p>
+          <pre>AUTH_GITHUB_ID=Ov23li...
+AUTH_GITHUB_SECRET=your-github-client-secret</pre>
+        </div>
+      </div>
+      <div class="callout callout-warning">
+        <strong>Pitfall:</strong> GitHub OAuth Apps only allow one callback URL. Create separate OAuth Apps for development and production.
+      </div>
+    </div>
+
+    <!-- Microsoft -->
+    <h2 id="microsoft">3. Microsoft Entra ID (Azure AD)</h2>
+    <div class="card">
+      <div class="provider-header">
+        <div class="provider-icon" style="background:#00a4ef;color:white;">MS</div>
+        <div>
+          <strong>Azure Portal - App Registrations</strong><br>
+          <a href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank">portal.azure.com > App registrations</a>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <p><strong>Register a new application.</strong></p>
+          <p>Name: "SDLC.ai". Supported account types: <strong>Accounts in any organizational directory and personal Microsoft accounts</strong>.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <p><strong>Set Redirect URI:</strong> Platform = <strong>Web</strong></p>
+          <pre>http://localhost:3000/api/auth/callback/microsoft-entra-id
+https://admin.sdlc.cc/api/auth/callback/microsoft-entra-id</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <p><strong>Create a Client Secret.</strong></p>
+          <p>Go to <em>Certificates & secrets > New client secret</em>. Set expiry (24 months recommended).</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <p><strong>Find your IDs on the Overview page:</strong></p>
+          <pre>AUTH_MICROSOFT_ENTRA_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx     # Application (client) ID
+AUTH_MICROSOFT_ENTRA_SECRET=your-client-secret-value              # Client secret Value
+AUTH_MICROSOFT_TENANT_ID=common                                   # Use "common" for multi-tenant</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-content">
+          <p><strong>Configure API permissions:</strong> <code>openid</code>, <code>email</code>, <code>profile</code>, <code>User.Read</code></p>
+          <p>These are added by default. Grant admin consent if required by your organization.</p>
+        </div>
+      </div>
+      <div class="callout callout-danger">
+        <strong>Important:</strong> Use <code>AUTH_MICROSOFT_TENANT_ID=common</code> for multi-tenant (personal + work accounts). Use a specific tenant ID for single-org deployments.
+      </div>
+    </div>
+
+    <!-- LinkedIn -->
+    <h2 id="linkedin">4. LinkedIn OAuth</h2>
+    <div class="card">
+      <div class="provider-header">
+        <div class="provider-icon" style="background:#0A66C2;color:white;">in</div>
+        <div>
+          <strong>LinkedIn Developer Portal</strong><br>
+          <a href="https://www.linkedin.com/developers/apps" target="_blank">linkedin.com/developers/apps</a>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <p><strong>Create a new app.</strong></p>
+          <p>App name: "SDLC.ai". Associate with your LinkedIn company page. Select a logo.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <p><strong>Request "Sign In with LinkedIn using OpenID Connect" product.</strong></p>
+          <p>Go to the <em>Products</em> tab and request access. This is required for the <code>openid</code> scope.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <p><strong>Configure OAuth 2.0 settings under the Auth tab.</strong></p>
+          <p>Add authorized redirect URLs:</p>
+          <pre>http://localhost:3000/api/auth/callback/linkedin
+https://admin.sdlc.cc/api/auth/callback/linkedin</pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <p><strong>Copy credentials:</strong></p>
+          <pre>AUTH_LINKEDIN_ID=your-linkedin-client-id
+AUTH_LINKEDIN_SECRET=your-linkedin-client-secret</pre>
+        </div>
+      </div>
+      <div class="callout callout-warning">
+        <strong>Pitfall:</strong> LinkedIn requires a verified company page to create an app. The "Sign In with LinkedIn using OpenID Connect" product must be explicitly requested and approved (usually instant).
+      </div>
+    </div>
+
+    <!-- Env Reference -->
+    <h2 id="env-reference">5. Environment Variable Reference</h2>
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>AUTH_SECRET</code></td><td><span class="badge badge-required">Required</span></td><td>Encryption key for JWTs and cookies. Generate with <code>npx auth secret</code>.</td></tr>
+          <tr><td><code>AUTH_URL</code></td><td><span class="badge badge-required">Required</span></td><td>Base URL. <code>http://localhost:3000</code> in dev.</td></tr>
+          <tr><td><code>GATEWAY_URL</code></td><td><span class="badge badge-required">Required</span></td><td>SDLC Gateway API for credentials auth.</td></tr>
+          <tr><td><code>DATABASE_URL</code></td><td><span class="badge badge-required">Required</span></td><td>PostgreSQL connection string for Prisma adapter.</td></tr>
+          <tr><td><code>AUTH_GOOGLE_ID</code></td><td><span class="badge badge-optional">Optional</span></td><td>Google OAuth Client ID.</td></tr>
+          <tr><td><code>AUTH_GOOGLE_SECRET</code></td><td><span class="badge badge-optional">Optional</span></td><td>Google OAuth Client Secret.</td></tr>
+          <tr><td><code>AUTH_GITHUB_ID</code></td><td><span class="badge badge-optional">Optional</span></td><td>GitHub OAuth Client ID.</td></tr>
+          <tr><td><code>AUTH_GITHUB_SECRET</code></td><td><span class="badge badge-optional">Optional</span></td><td>GitHub OAuth Client Secret.</td></tr>
+          <tr><td><code>AUTH_MICROSOFT_ENTRA_ID</code></td><td><span class="badge badge-optional">Optional</span></td><td>Microsoft Entra Application (client) ID.</td></tr>
+          <tr><td><code>AUTH_MICROSOFT_ENTRA_SECRET</code></td><td><span class="badge badge-optional">Optional</span></td><td>Microsoft Entra Client Secret.</td></tr>
+          <tr><td><code>AUTH_MICROSOFT_TENANT_ID</code></td><td><span class="badge badge-optional">Optional</span></td><td>Azure AD Tenant ID. Use <code>common</code> for multi-tenant.</td></tr>
+          <tr><td><code>AUTH_LINKEDIN_ID</code></td><td><span class="badge badge-optional">Optional</span></td><td>LinkedIn OAuth Client ID.</td></tr>
+          <tr><td><code>AUTH_LINKEDIN_SECRET</code></td><td><span class="badge badge-optional">Optional</span></td><td>LinkedIn OAuth Client Secret.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Troubleshooting -->
+    <h2 id="troubleshooting">6. Troubleshooting</h2>
+    <div class="card">
+      <h3>Common Issues</h3>
+
+      <div style="margin-bottom:20px;">
+        <p><strong>Error: "OAuthCallbackError" / redirect_uri_mismatch</strong></p>
+        <p>The callback URL in your provider console does not match. Ensure the URL is exactly:</p>
+        <pre>{AUTH_URL}/api/auth/callback/{provider-id}</pre>
+        <p>Provider IDs: <code>google</code>, <code>github</code>, <code>microsoft-entra-id</code>, <code>linkedin</code></p>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <p><strong>Error: "CSRF token mismatch" / "state mismatch"</strong></p>
+        <p>Usually caused by <code>AUTH_URL</code> not matching the actual URL. Check that <code>AUTH_URL</code> in your <code>.env.local</code> matches the URL you access in the browser (including protocol and port).</p>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <p><strong>Error: "Missing AUTH_SECRET"</strong></p>
+        <p>Generate one with <code>npx auth secret</code> and add it to <code>.env.local</code>.</p>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <p><strong>Microsoft: "AADSTS50011: The redirect URI does not match"</strong></p>
+        <p>Azure requires exact URI match including trailing slash behavior. The callback is <code>/api/auth/callback/microsoft-entra-id</code> (note the dashes, not underscores).</p>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <p><strong>LinkedIn: "Invalid redirect_uri"</strong></p>
+        <p>Ensure you have requested the "Sign In with LinkedIn using OpenID Connect" product under the Products tab. Without it, the <code>openid</code> scope will fail.</p>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <p><strong>OAuth works in dev but not production</strong></p>
+        <p>Add the production callback URL to every provider console. Update <code>AUTH_URL</code> to your production domain.</p>
+      </div>
+    </div>
+
+    <div class="card" style="text-align:center; color:var(--text-muted); font-size:0.875rem;">
+      <p>Generated for SDLC.ai Admin UI &mdash; Auth.js v5 &mdash; April 2026</p>
+    </div>
+  </div>
+</body>
+</html>

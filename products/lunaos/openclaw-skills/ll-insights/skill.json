@@ -1,0 +1,91 @@
+{
+  "name": "ll-insights",
+  "version": "0.1.0",
+  "description": "Ingest analytics/support/feedback via luna-rag, run chain analysis, emit impact-scored backlog. LunaOS's open answer to Cepien's discovery loop.",
+  "author": "LunaOS",
+  "license": "MIT",
+  "runtime": "openhands",
+  "homepage": "https://agents.lunaos.ai/skills/ll-insights",
+  "tools": [
+    {
+      "name": "rag-ingestor",
+      "description": "Ingest analytics, support tickets, and user feedback into luna-rag vector store"
+    },
+    {
+      "name": "pattern-detector",
+      "description": "Cluster + tag issues via luna-agents chain (rag + graph-rag)"
+    },
+    {
+      "name": "impact-scorer",
+      "description": "Apply engine impact-scoring primitive across business/product/usability/environmental dimensions"
+    },
+    {
+      "name": "backlog-emitter",
+      "description": "Emit prioritized backlog as JSON, webhook, or LunaOS workflow dispatch"
+    }
+  ],
+  "environment": {
+    "LUNAOS_API_URL": "https://api.lunaos.ai",
+    "LUNAOS_API_KEY": "${LUNAOS_API_KEY}",
+    "RAG_INDEX_NAME": "insights"
+  },
+  "config": {
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "enum",
+        "values": ["analytics", "support", "feedback", "surveys", "sales", "research"]
+      },
+      "default": ["analytics", "support", "feedback"],
+      "description": "Data sources to ingest"
+    },
+    "window_days": {
+      "type": "number",
+      "default": 30,
+      "description": "Lookback window for ingestion (days)"
+    },
+    "min_impact_score": {
+      "type": "number",
+      "default": 70,
+      "description": "Min combined impact score to include in backlog"
+    },
+    "impact_dimension": {
+      "type": "enum",
+      "values": ["business", "product", "usability", "environmental", "combined"],
+      "default": "combined"
+    },
+    "limit": {
+      "type": "number",
+      "default": 20,
+      "description": "Max recommendations in emitted backlog"
+    },
+    "impact_weights": {
+      "type": "object",
+      "default": { "business": 0.35, "product": 0.30, "usability": 0.25, "environmental": 0.10 },
+      "description": "Override default impact weights (must sum to ~1)"
+    },
+    "emit_to": {
+      "type": "enum",
+      "values": ["json", "webhook", "workflow", "stdout"],
+      "default": "json"
+    },
+    "target_workflow_id": {
+      "type": "string",
+      "default": "",
+      "description": "LunaOS workflow to dispatch top recommendation (when emit_to=workflow)"
+    }
+  },
+  "outputs": {
+    "backlog": {
+      "type": "array",
+      "description": "Impact-scored and ranked recommendations"
+    },
+    "summary": {
+      "type": "object",
+      "description": "Totals: ingested, clustered, scored, emitted"
+    }
+  },
+  "permissions": {
+    "lunaos": ["read:rag", "write:rag", "execute:chain", "write:runs"]
+  }
+}

@@ -1,0 +1,202 @@
+name = "tenantiq-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Custom Domain Routes (must be top-level)
+routes = [
+  { pattern = "api.tenantiq.app/*", zone_id = "d711cb577fe6313bd77b8739427bc599" }
+]
+# Per-tenant branded-subdomain routing intentionally NOT enabled at the zone
+# wildcard level — *.tenantiq.app/* would intercept app.tenantiq.app (Pages)
+# because workers routes outrank Pages bindings on the same zone. Bind tenant
+# subdomains under a dedicated namespace (e.g. *.t.tenantiq.app/*) or via CF
+# for SaaS hostname API per customer.
+
+# Cron Triggers
+[triggers]
+crons = [
+  "0 */6 * * *",   # Every 6 hours - user & license sync
+  "0 * * * *",     # Every hour - security scan
+  "*/15 * * * *",  # Every 15 min - workflow trigger check + tenant health
+  "*/5 * * * *",   # Every 5 min - webhook delivery retries
+  "0 2 * * *",     # Daily at 2am - nightly backup + scheduled snapshots
+  "0 3 * * *",     # Daily at 3am - compliance scan + drift detection
+  "0 3 * * SUN",     # Weekly Sunday 3am - storage scan
+  "0 4 * * *",     # Daily at 4am UTC — SSO cert expiry monitor
+]
+
+# KV Namespace — sessions, rate limits, feature flags
+[[kv_namespaces]]
+binding = "KV"
+id = "076f621177dc42aeb922218782abf3e3"
+
+# R2 Bucket — exports, reports
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "tenantiq-exports"
+
+# Queues — producers
+[[queues.producers]]
+binding = "SCAN_QUEUE"
+queue = "scan-results"
+
+[[queues.producers]]
+binding = "REMEDIATION_QUEUE"
+queue = "remediation-jobs"
+
+[[queues.producers]]
+binding = "NOTIFICATION_QUEUE"
+queue = "notifications"
+
+# Queues — consumers (with DLQ + bounded retries to avoid poison-message loops)
+[[queues.consumers]]
+queue = "scan-results"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 5
+dead_letter_queue = "scan-results-dlq"
+
+[[queues.consumers]]
+queue = "remediation-jobs"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "remediation-jobs-dlq"
+
+[[queues.consumers]]
+queue = "notifications"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 5
+dead_letter_queue = "notifications-dlq"
+
+# Durable Objects
+[durable_objects]
+bindings = [
+  { name = "TENANT_EVENTS", class_name = "TenantEvents" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["TenantEvents"]
+
+# D1 Database — Serverless SQLite (Cloudflare-native)
+[[d1_databases]]
+binding = "DB"
+database_name = "tenantiq-production"
+database_id = "039e58ce-ed35-4efd-9e1d-ef060b46c632"
+migrations_dir = "drizzle/migrations"
+
+# Service Bindings — Worker-to-Worker calls (faster than fetch, no network hop)
+[[services]]
+binding = "AI_ENGINE"
+service = "tenantiq-ai-engine"
+
+# Environment variables (use `wrangler secret put` for secrets)
+# RS256 JWT keys: set RS256_PRIVATE_KEY and RS256_PUBLIC_KEY via `wrangler secret put`
+# When both are set, JWT signing/verification uses RS256 (asymmetric).
+# Existing HS256 tokens remain valid during migration (dual-verify fallback).
+[vars]
+ENVIRONMENT = "production"
+APP_VERSION = "1.0.0"
+VAPID_CONTACT = "mailto:support@tenantiq.app"
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+head_sampling_rate = 1
+
+# ---------------------------------------------------------------------------
+# Staging Environment
+# Run: npx wrangler d1 create tenantiq-staging → replace STAGING_D1_ID_PLACEHOLDER
+# Run: npx wrangler kv:namespace create tenantiq-kv-staging → replace STAGING_KV_ID_PLACEHOLDER
+# ---------------------------------------------------------------------------
+[env.staging]
+name = "tenantiq-api-staging"
+
+routes = [
+  { pattern = "staging-api.tenantiq.app/*", zone_id = "d711cb577fe6313bd77b8739427bc599" }
+]
+
+[env.staging.triggers]
+crons = [
+  "0 */6 * * *",   # Every 6 hours - user & license sync
+  "0 * * * *",     # Every hour - security scan
+  "*/15 * * * *",  # Every 15 min - workflow trigger check + tenant health
+  "*/5 * * * *",   # Every 5 min - webhook delivery retries
+  "0 2 * * *",     # Daily at 2am - nightly backup + scheduled snapshots
+  "0 3 * * *",     # Daily at 3am - compliance scan + drift detection
+  "0 3 * * SUN",   # Weekly Sunday 3am - storage scan
+]
+
+[[env.staging.kv_namespaces]]
+binding = "KV"
+id = "2687d2dec2d34456b25296b28c963482"
+
+[[env.staging.r2_buckets]]
+binding = "R2"
+bucket_name = "tenantiq-exports-staging"
+
+[[env.staging.queues.producers]]
+binding = "SCAN_QUEUE"
+queue = "scan-results-staging"
+
+[[env.staging.queues.producers]]
+binding = "REMEDIATION_QUEUE"
+queue = "remediation-jobs-staging"
+
+[[env.staging.queues.producers]]
+binding = "NOTIFICATION_QUEUE"
+queue = "notifications-staging"
+
+[[env.staging.queues.consumers]]
+queue = "scan-results-staging"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 5
+dead_letter_queue = "scan-results-staging-dlq"
+
+[[env.staging.queues.consumers]]
+queue = "remediation-jobs-staging"
+max_batch_size = 1
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "remediation-jobs-staging-dlq"
+
+[[env.staging.queues.consumers]]
+queue = "notifications-staging"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 5
+dead_letter_queue = "notifications-staging-dlq"
+
+[env.staging.durable_objects]
+bindings = [
+  { name = "TENANT_EVENTS", class_name = "TenantEvents" }
+]
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "tenantiq-staging"
+database_id = "9a5556a9-1ed6-45d1-9cbd-9a6618b2a9e4"
+migrations_dir = "drizzle/migrations"
+
+[[env.staging.services]]
+binding = "AI_ENGINE"
+service = "tenantiq-ai-engine"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+APP_VERSION = "1.0.0"
+
+[env.staging.observability]
+enabled = true
+
+[env.staging.observability.logs]
+enabled = true
+invocation_logs = true
+head_sampling_rate = 1

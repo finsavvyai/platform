@@ -1,0 +1,98 @@
+"""
+SDLC.ai Python SDK v3
+
+The official Python SDK for the SDLC.ai Secure Data Learning Platform v3.
+A Cloudflare-native, zero-trust middleware fabric for secure AI-data interactions.
+"""
+
+__version__ = "3.0.0"
+__author__ = "SDLC.ai Team"
+__email__ = "sdk@sdlc.cc"
+
+from .auth.api_key import APIKeyAuth
+
+# Import auth classes
+from .auth.base import BaseAuth
+from .auth.mtls import MTLSAuth
+from .auth.oauth import OAuthAuth
+from .client import AsyncSDLCClient, SDLCClient
+from .config import Config
+from .exceptions import (
+    APIError,
+    AuthenticationError,
+    AuthorizationError,
+    ConflictError,
+    NetworkError,
+    NotFoundError,
+    RateLimitError,
+    SDLCError,
+    ServerError,
+    TimeoutError,
+    ValidationError,
+)
+from .models.auth import AuthResponse, TokenInfo
+
+# Import main models
+from .models.base import BaseModel
+from .models.document import Document, DocumentProcessing, DocumentUpload
+from .models.monitoring import AuditLog, HealthCheck, Metrics
+from .models.policy import Policy, PolicyRule, PolicyTest
+from .models.rag import RAGQuery, RAGResponse, RAGSource
+from .models.tenant import Tenant, TenantCreate, TenantUpdate
+from .models.user import User, UserCreate, UserUpdate
+
+__all__ = [
+    # Version info
+    "__version__",
+    "__author__",
+    "__email__",
+    # Main clients
+    "SDLCClient",
+    "AsyncSDLCClient",
+    "Config",
+    # Exceptions
+    "SDLCError",
+    "AuthenticationError",
+    "AuthorizationError",
+    "ValidationError",
+    "RateLimitError",
+    "APIError",
+    "NetworkError",
+    "TimeoutError",
+    "NotFoundError",
+    "ConflictError",
+    "ServerError",
+    # Authentication
+    "BaseAuth",
+    "APIKeyAuth",
+    "OAuthAuth",
+    "MTLSAuth",
+    # Models
+    "BaseModel",
+    "AuthResponse",
+    "TokenInfo",
+    "User",
+    "UserCreate",
+    "UserUpdate",
+    "Tenant",
+    "TenantCreate",
+    "TenantUpdate",
+    "Document",
+    "DocumentUpload",
+    "DocumentProcessing",
+    "RAGQuery",
+    "RAGResponse",
+    "RAGSource",
+    "Policy",
+    "PolicyRule",
+    "PolicyTest",
+    "Metrics",
+    "HealthCheck",
+    "AuditLog",
+]
+
+# Configure logging
+import structlog
+
+logger = structlog.get_logger("sdlc_sdk")
+logger.info("SDLC.ai SDK initialized", version=__version__)

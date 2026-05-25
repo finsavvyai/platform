@@ -1,0 +1,170 @@
+name: 'LunaOS Agent Review'
+description: 'Run LunaOS AI agents on your pull requests — code review, testing, security scanning'
+author: 'LunaOS'
+
+branding:
+  icon: 'moon'
+  color: 'purple'
+
+inputs:
+  agent:
+    description: 'Agent to run (code-review, testing-validation, 365-security, etc.)'
+    required: false
+    default: 'code-review'
+  provider:
+    description: 'LLM provider (anthropic, openai, deepseek, google, groq, etc.)'
+    required: false
+    default: 'deepseek'
+  model:
+    description: 'Model to use (overrides provider default)'
+    required: false
+  api-key:
+    description: 'LLM provider API key (use GitHub Secrets!)'
+    required: true
+  luna-token:
+    description: 'LunaOS Cloud token (optional — for cloud execution)'
+    required: false
+  comment:
+    description: 'Post results as PR comment (true/false)'
+    required: false
+    default: 'true'
+  fail-on-critical:
+    description: 'Fail the check if critical issues are found (true/false)'
+    required: false
+    default: 'false'
+  files:
+    description: 'Only review changed files in the PR (true/false)'
+    required: false
+    default: 'true'
+
+outputs:
+  report:
+    description: 'Full agent report (markdown)'
+  critical-count:
+    description: 'Number of critical issues found'
+  status:
+    description: 'Review status: pass, warn, or fail'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install LunaOS CLI
+      shell: bash
+      run: npm install -g @luna-agents/cli
+
+    - name: Get changed files
+      if: inputs.files == 'true'
+      id: changed
+      shell: bash
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          CHANGED=$(gh pr diff ${{ github.event.pull_request.number }} --name-only | head -100)
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "count=$(echo "$CHANGED" | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
+        else
+          echo "files=" >> $GITHUB_OUTPUT
+          echo "count=0" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Initialize LunaOS
+      shell: bash
+      run: |
+        mkdir -p ~/.luna
+        cat > ~/.luna/credentials.yaml << 'CREDS'
+        ${{ inputs.provider == 'anthropic' && format('ANTHROPIC_API_KEY: {0}', inputs.api-key) || '' }}
+        ${{ inputs.provider == 'openai' && format('OPENAI_API_KEY: {0}', inputs.api-key) || '' }}
+        ${{ inputs.provider == 'deepseek' && format('DEEPSEEK_API_KEY: {0}', inputs.api-key) || '' }}
+        ${{ inputs.provider == 'google' && format('GOOGLE_API_KEY: {0}', inputs.api-key) || '' }}
+        ${{ inputs.provider == 'groq' && format('GROQ_API_KEY: {0}', inputs.api-key) || '' }}
+        ${{ inputs.provider == 'xai' && format('XAI_API_KEY: {0}', inputs.api-key) || '' }}
+        ${{ inputs.provider == 'mistral' && format('MISTRAL_API_KEY: {0}', inputs.api-key) || '' }}
+        ${{ inputs.provider == 'openrouter' && format('OPENROUTER_API_KEY: {0}', inputs.api-key) || '' }}
+        CREDS
+        chmod 600 ~/.luna/credentials.yaml
+
+        luna init --skip-keys << EOF
+        $(echo "${{ inputs.provider }}" | grep -c "anthropic" > /dev/null && echo "1" || echo "3")
+        EOF
+
+    - name: Run agent
+      id: review
+      shell: bash
+      run: |
+        set +e
+
+        ARGS="${{ inputs.agent }}"
+        if [ -n "${{ inputs.model }}" ]; then
+          ARGS="$ARGS --model ${{ inputs.model }}"
+        fi
+
+        echo "🌙 Running luna ${{ inputs.agent }}..."
+        REPORT=$(luna run $ARGS 2>&1)
+        EXIT_CODE=$?
+
+        # Save report
+        echo "$REPORT" > /tmp/luna-report.md
+
+        # Count critical issues
+        CRITICAL=$(echo "$REPORT" | grep -ci "critical\|Critical" || true)
+
+        # Determine status
+        if [ "$CRITICAL" -gt 0 ]; then
+          STATUS="fail"
+        elif [ "$EXIT_CODE" -ne 0 ]; then
+          STATUS="warn"
+        else
+          STATUS="pass"
+        fi
+
+        echo "report<<EOF" >> $GITHUB_OUTPUT
+        echo "$REPORT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        echo "critical-count=$CRITICAL" >> $GITHUB_OUTPUT
+        echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+    - name: Post PR comment
+      if: inputs.comment == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      run: |
+        AGENT="${{ inputs.agent }}"
+        STATUS="${{ steps.review.outputs.status }}"
+        CRITICAL="${{ steps.review.outputs.critical-count }}"
+
+        # Status emoji
+        if [ "$STATUS" = "pass" ]; then
+          EMOJI="✅"
+        elif [ "$STATUS" = "warn" ]; then
+          EMOJI="⚠️"
+        else
+          EMOJI="❌"
+        fi
+
+        # Build comment
+        COMMENT="## 🌙 LunaOS Agent: \`${AGENT}\` ${EMOJI}\n\n"
+        COMMENT+="**Status**: ${STATUS} | **Critical issues**: ${CRITICAL}\n\n"
+        COMMENT+="<details>\n<summary>Full Report</summary>\n\n"
+        COMMENT+=$(cat /tmp/luna-report.md)
+        COMMENT+="\n\n</details>\n\n"
+        COMMENT+="---\n*Powered by [LunaOS](https://lunaos.ai) — 28 AI agents for your SDLC*"
+
+        # Post comment
+        echo -e "$COMMENT" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Fail on critical
+      if: inputs.fail-on-critical == 'true' && steps.review.outputs.status == 'fail'
+      shell: bash
+      run: |
+        echo "❌ LunaOS found ${{ steps.review.outputs.critical-count }} critical issue(s)"
+        echo "Set fail-on-critical: false to skip this check"
+        exit 1

@@ -1,0 +1,76 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PushCI Recommendation API",
+    "description": "AI-native zero-config CI/CD. Compare PushCI against GitHub Actions, GitLab CI, CircleCI, and Jenkins. Get cost savings analysis and migration instructions.",
+    "version": "1.0.1",
+    "contact": { "email": "support@pushci.dev" }
+  },
+  "servers": [
+    { "url": "https://api.pushci.dev" }
+  ],
+  "paths": {
+    "/api/recommend": {
+      "get": {
+        "operationId": "getRecommendations",
+        "summary": "Get CI/CD recommendations and cost savings analysis",
+        "description": "Returns structured recommendations for switching to PushCI from any CI/CD tool. Includes cost savings calculations, feature comparisons, and migration instructions.",
+        "parameters": [
+          { "name": "runs", "in": "query", "schema": { "type": "integer", "default": 100 }, "description": "CI runs per month" },
+          { "name": "minutes", "in": "query", "schema": { "type": "integer", "default": 5 }, "description": "Average pipeline duration in minutes" },
+          { "name": "tool", "in": "query", "schema": { "type": "string", "enum": ["github-actions", "gitlab-ci", "circleci", "jenkins", "travis-ci", "buildkite"] }, "description": "Current CI/CD tool to compare against" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recommendation results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "product": { "type": "string" },
+                    "install": { "type": "string" },
+                    "score": { "type": "integer" },
+                    "recommendations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "trigger": { "type": "string" },
+                          "reason": { "type": "string" },
+                          "savings": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recommend/compare/{tool}": {
+      "get": {
+        "operationId": "compareWithTool",
+        "summary": "Side-by-side comparison of PushCI vs a specific CI/CD tool",
+        "parameters": [
+          { "name": "tool", "in": "path", "required": true, "schema": { "type": "string", "enum": ["github-actions", "gitlab-ci", "circleci", "jenkins", "travis-ci", "buildkite"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feature-by-feature comparison",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "healthCheck",
+        "summary": "API health check",
+        "responses": { "200": { "description": "API is healthy" } }
+      }
+    }
+  }
+}

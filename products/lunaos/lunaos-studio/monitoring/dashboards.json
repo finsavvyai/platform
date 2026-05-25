@@ -1,0 +1,84 @@
+{
+  "dashboards": [
+    {
+      "id": "operations",
+      "title": "LunaOS Studio — Operations",
+      "description": "Real-time operational health: errors, latency, uptime.",
+      "widgets": [
+        {
+          "type": "timeseries",
+          "title": "Page Load Time (P75)",
+          "query": "avg:rum.page_load_time{service:lunaos-studio} by {env}",
+          "thresholds": { "warning": 2000, "critical": 4000 }
+        },
+        {
+          "type": "timeseries",
+          "title": "JS Error Rate",
+          "query": "sum:rum.error.count{service:lunaos-studio} / sum:rum.session.count{service:lunaos-studio}",
+          "thresholds": { "warning": 0.01, "critical": 0.05 }
+        },
+        {
+          "type": "toplist",
+          "title": "Top Error Messages",
+          "query": "sum:rum.error.count{service:lunaos-studio} by {error.message}"
+        },
+        {
+          "type": "query_value",
+          "title": "Active Sessions (1h)",
+          "query": "sum:rum.session.count{service:lunaos-studio,env:production}"
+        },
+        {
+          "type": "timeseries",
+          "title": "API Latency (P95)",
+          "query": "p95:rum.resource.duration{service:lunaos-studio,resource.url_host:api.lunaos.ai}",
+          "thresholds": { "warning": 1000, "critical": 3000 }
+        },
+        {
+          "type": "alert_graph",
+          "title": "Uptime Monitor",
+          "alert_id": "uptime-studio"
+        }
+      ]
+    },
+    {
+      "id": "business",
+      "title": "LunaOS Studio — Business Metrics",
+      "description": "Workflow creation, executions, and feature adoption.",
+      "widgets": [
+        {
+          "type": "query_value",
+          "title": "Workflows Created (24h)",
+          "query": "sum:rum.action.count{service:lunaos-studio,action.name:workflow.created}"
+        },
+        {
+          "type": "query_value",
+          "title": "Workflows Executed (24h)",
+          "query": "sum:rum.action.count{service:lunaos-studio,action.name:workflow.executed}"
+        },
+        {
+          "type": "timeseries",
+          "title": "Workflow Success vs Failure",
+          "query": [
+            "sum:rum.action.count{action.name:workflow.executed}",
+            "sum:rum.action.count{action.name:workflow.failed}"
+          ]
+        },
+        {
+          "type": "toplist",
+          "title": "Most Used Node Types",
+          "query": "sum:rum.action.count{action.name:node.added} by {action.context.nodeType}"
+        },
+        {
+          "type": "toplist",
+          "title": "Most Used Templates",
+          "query": "sum:rum.action.count{action.name:template.used} by {action.context.templateId}"
+        },
+        {
+          "type": "timeseries",
+          "title": "DAU",
+          "query": "sum:rum.user.count{service:lunaos-studio,env:production}"
+        }
+      ]
+    }
+  ]
+}

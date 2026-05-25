@@ -1,0 +1,82 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: aegis_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      AEGIS_TEST_DATABASE_URL: "postgres://postgres:test@localhost:5432/aegis_ci?sslmode=disable"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: aegis
+
+      # sdlc-core is a private sibling Go module aegis depends on
+      # via 'replace ../sdlc-core' in go.mod. CI clones it via
+      # SDLC_CORE_TOKEN (fine-grained PAT, read-only on
+      # finsavvyai/sdlc-core). One-time setup: repo Settings →
+      # Secrets → Actions → New repository secret.
+      - name: Checkout sdlc-core (private sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: finsavvyai/sdlc-core
+          token: ${{ secrets.SDLC_CORE_TOKEN }}
+          path: sdlc-core
+          ref: main
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+          cache-dependency-path: aegis/go.sum
+      - name: build
+        working-directory: aegis
+        run: go build ./...
+      - name: vet
+        working-directory: aegis
+        run: go vet ./...
+      - name: unit + integration tests
+        working-directory: aegis
+        run: |
+          go test -count=1 -timeout 5m \
+            ./api/ \
+            ./internal/ai/ \
+            ./internal/auth/saml/ \
+            ./internal/security/ \
+            ./internal/domain/ \
+            ./internal/billing/ \
+            ./internal/screening/ \
+            ./internal/crypto/
+      - name: race detector (new packages)
+        working-directory: aegis
+        run: |
+          go test -race -count=1 -timeout 5m \
+            ./api/ \
+            ./internal/ai/ \
+            ./internal/auth/saml/ \
+            ./internal/security/ \
+            ./internal/domain/
+      - name: coverage gate
+        working-directory: aegis
+        run: |
+          go test -count=1 -cover -coverprofile=cov.out \
+            ./internal/security/ \
+            ./internal/auth/saml/ \
+            ./internal/ai/
+          go tool cover -func=cov.out | tail -1

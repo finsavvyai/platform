@@ -1,0 +1,742 @@
+---
+# Production Security Configuration
+
+---
+# Network Policies
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+# Allow only necessary traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: upm-plus-allow-internal
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-prod
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: upm-plus-prod
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+
+---
+# Pod Security Policies (if using older Kubernetes version)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: upm-plus-restricted
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+
+---
+# RBAC for Service Accounts
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: upm-plus-api-sa
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: api
+automountServiceAccountToken: false
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: upm-plus-api-role
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: api
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: upm-plus-api-rolebinding
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: api
+subjects:
+- kind: ServiceAccount
+  name: upm-plus-api-sa
+  namespace: upm-plus-prod
+roleRef:
+  kind: Role
+  name: upm-plus-api-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Secret Management
+apiVersion: v1
+kind: Secret
+metadata:
+  name: upm-plus-security-secrets
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+type: Opaque
+data:
+  # Base64 encoded secrets (to be populated during deployment)
+  # Generate with: openssl rand -base64 32
+  session-secret: ""
+  csrf-secret: ""
+  encryption-key: ""
+  api-signing-key: ""
+  webhook-signing-secret: ""
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: upm-plus-tls-secrets
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+type: kubernetes.io/tls
+data:
+  # tls.crt: Base64 encoded certificate
+  # tls.key: Base64 encoded private key
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: upm-plus-oauth-secrets
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+type: Opaque
+data:
+  # OAuth provider secrets
+  google-client-id: ""
+  google-client-secret: ""
+  microsoft-client-id: ""
+  microsoft-client-secret: ""
+  github-client-id: ""
+  github-client-secret: ""
+
+---
+# Security Context Constraints (OpenShift)
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: upm-plus-scc
+  labels:
+    app: upm-plus
+    component: security
+allowPrivilegedContainer: false
+allowHostDirVolumePlugin: false
+defaultAddCapabilities: []
+requiredDropCapabilities:
+- MKNOD
+- SYS_ADMIN
+- SYS_CHROOT
+- SYS_PTRACE
+allowedCapabilities: []
+allowHostNetwork: false
+allowHostPorts: false
+allowHostPID: false
+allowHostIPC: false
+readOnlyRootFilesystem: false
+runAsUser:
+  type: MustRunAsRange
+  uidRange:
+    min: 1000
+    max: 1000
+seLinuxContext:
+  type: MustRunAs
+  level: s0:c123,c456
+fsGroup:
+  type: MustRunAs
+  ranges:
+  - min: 1000
+    max: 1000
+volumes:
+- configMap
+- downwardAPI
+- emptyDir
+- persistentVolumeClaim
+- secret
+users: []
+groups: []
+
+---
+# Admission Controller Configuration
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: upm-plus-security-webhook
+  labels:
+    app: upm-plus
+    component: security
+webhooks:
+- name: security-validation.upm-plus.com
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods", "configmaps", "secrets"]
+  clientConfig:
+    service:
+      name: security-webhook
+      namespace: upm-plus-prod
+      path: "/validate"
+    caBundle: ""
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
+  failurePolicy: Fail
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: security-webhook
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: upm-plus
+      component: security
+  template:
+    metadata:
+      labels:
+        app: upm-plus
+        component: security
+    spec:
+      serviceAccountName: security-webhook-sa
+      containers:
+      - name: webhook
+        image: upm-plus/security-webhook:v1.0
+        ports:
+        - containerPort: 8443
+          name: webhook
+        volumeMounts:
+        - name: webhook-certs
+          mountPath: /etc/webhook/certs
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8443
+            scheme: HTTPS
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8443
+            scheme: HTTPS
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: webhook-certs
+        secret:
+          secretName: security-webhook-certs
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: security-webhook
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+spec:
+  type: ClusterIP
+  ports:
+  - name: webhook
+    port: 443
+    targetPort: 8443
+  selector:
+    app: upm-plus
+    component: security
+
+---
+# Certificate Management (cert-manager)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: upm-plus-api-tls
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+spec:
+  secretName: upm-plus-api-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - api.upm.plus
+  - "*.api.upm.plus"
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: upm-plus-webhook-tls
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+spec:
+  secretName: upm-plus-webhook-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - security-webhook.upm-plus-prod.svc.cluster.local
+
+---
+# Let's Encrypt ClusterIssuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  labels:
+    app: upm-plus
+    component: security
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@upm.plus
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+    - dns01:
+      providers:
+      - cloudflare:
+          apiTokenSecretRef:
+            name: cloudflare-api-token
+            key: api-token
+
+---
+# Rate Limiting Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-rate-limit
+  namespace: ingress-nginx
+  labels:
+    app: upm-plus
+    component: security
+data:
+  rate-limit: "100"
+  rate-limit-window: "1m"
+
+---
+# WAF Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-waf
+  namespace: ingress-nginx
+  labels:
+    app: upm-plus
+    component: security
+data:
+  modsecurity-conf: |
+    SecRuleEngine On
+    SecRequestBodyAccess On
+    SecResponseBodyAccess On
+    SecResponseBodyMimeType text/plain text/html
+    SecRequestBodyLimit 13107200
+    SecRequestBodyNoFilesLimit 131072
+
+    # OWASP CRS Rules
+    Include /etc/nginx/owasp-modsecurity-crs/crs-setup.conf
+    Include /etc/nginx/owasp-modsecurity-crs/rules/*.conf
+
+    # Custom Rules for UPM.Plus
+    SecRule REQUEST_HEADERS:User-Agent "@pmFromFile /etc/nginx/user-agents.data" \
+        "id:1000001,\
+        phase:1,\
+        deny,\
+        log,\
+        msg:'Known malicious user agent blocked'"
+
+    SecRule ARGS "@pmFromFile /etc/nginx/bad-words.data" \
+        "id:1000002,\
+        phase:2,\
+        deny,\
+        log,\
+        msg:'Inappropriate language detected'"
+
+    SecRule REQUEST_BODY "@pmFromFile /etc/nginx/sql-injection.data" \
+        "id:1000003,\
+        phase:2,\
+        deny,\
+        log,\
+        msg:'SQL injection attempt detected'"
+
+---
+# Security Monitoring
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-monitoring
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+data:
+  falco-rules.yaml: |
+    - rule: Suspicious container activity
+      desc: Detect suspicious activity in containers
+      condition: >
+        spawned_process and
+        container and
+        proc.name in (nc, ncat, wget, curl)
+      output: >
+        Suspicious activity detected (user=%user.name container=%container.name proc=%proc.name cmdline=%proc.cmdline)
+      priority: High
+      tags: [container, security]
+
+    - rule: Unauthorized API access attempt
+      desc: Detect unauthorized API access attempts
+      condition: >
+        http.request and
+        http.status_code >= 401 and
+        not (ka.source.namespace in upm-plus-prod or ka.source.namespace in ingress-nginx or ka.source.namespace in monitoring)
+      output: >
+        Unauthorized API access attempt (src.ip=%ka.source.ip src.namespace=%ka.source.namespace http.status_code=%http.status_code)
+      priority: High
+      tags: [api, security, unauthorized]
+
+    - rule: Privilege escalation attempt
+      desc: Detect privilege escalation attempts
+      condition: >
+        spawned_process and
+        proc.name in (sudo, su, pkexec) and
+        not user.name in (root, system)
+      output: >
+        Privilege escalation attempt detected (user=%user.name proc=%proc.name cmdline=%proc.cmdline)
+      priority: High
+      tags: [privilege_escalation, security]
+
+    - rule: File system anomaly
+      desc: Detect suspicious file system activity
+      condition: >
+        open_read and
+        container and
+        fd.name startswith (/etc/passwd, /etc/shadow, /etc/sudoers) and
+        not proc.name in (cat, grep, less, more, tail, head)
+      output: >
+        Sensitive file access detected (user=%user.name container=%container.name file=%fd.name proc=%proc.name)
+      priority: Medium
+      tags: [file_system, security]
+
+---
+# Falco DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: falco
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+spec:
+  selector:
+    matchLabels:
+      app: falco
+  template:
+    metadata:
+      labels:
+        app: falco
+    spec:
+      serviceAccount: falco
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+      containers:
+      - name: falco
+        image: falcosecurity/falco:latest
+        args:
+        - /usr/bin/falco
+        - --crio
+        - /etc/falco/falco_rules.yaml
+        volumeMounts:
+        - name: falco-rules
+          mountPath: /etc/falco
+          readOnly: true
+        - name: device
+          mountPath: /host/dev
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: var-run
+          mountPath: /var/run
+        - name: var-lib
+          mountPath: /var/lib
+          readOnly: true
+        securityContext:
+          privileged: true
+        resources:
+          requests:
+            memory: "200Mi"
+            cpu: "100m"
+          limits:
+            memory: "500Mi"
+            cpu: "200m"
+      volumes:
+      - name: falco-rules
+        configMap:
+          name: security-monitoring
+      - name: device
+        hostPath:
+          path: /dev
+      - name: proc
+        hostPath:
+          path: /proc
+      - name: var-run
+        hostPath:
+          path: /var/run
+      - name: var-lib
+        hostPath:
+          path: /var/lib
+
+---
+# Falco Service Account and RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: falco
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: falco-cluster-role
+  labels:
+    app: upm-plus
+    component: security
+rules:
+- apiGroups: [""]
+  resources: ["pods", "replicationcontrollers", "services", "endpoints"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions", "apps"]
+  resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: falco-cluster-rolebinding
+  labels:
+    app: upm-plus
+    component: security
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: falco-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: falco
+  namespace: upm-plus-prod
+
+---
+# Pod Security Admission Controller
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingAdmissionWebhook
+metadata:
+  name: pod-security-policy
+  labels:
+    app: upm-plus
+    component: security
+webhooks:
+- name: pod-security-policy.admission.k8s.io
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    operations: ["CREATE", "UPDATE"]
+    resources: ["pods"]
+  failurePolicy: Ignore
+  clientConfig:
+    service:
+      namespace: pod-security-policy
+      name: pod-security-policy-webhook
+    caBundle: ""
+
+---
+# Secret scanning
+apiVersion: v1
+kind: CronJob
+metadata:
+  name: secret-scanner
+  namespace: upm-plus-prod
+  labels:
+    app: upm-plus
+    component: security
+spec:
+  schedule: "0 4 * * *"  # Daily at 4 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: secret-scanner
+            image: trufflesecurity/trufflehog:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              DATE=$(date +%Y%m%d)
+              REPORT_FILE="/reports/secret-scan-${DATE}.json"
+
+              echo "Starting secret scan..."
+
+              # Scan Git repositories
+              find /app -name ".git" -type d | while read gitdir; do
+                cd "$(dirname "$gitdir")"
+                echo "Scanning repository: $(pwd)"
+                trufflehog --json --output /tmp/scan-$(basename $(pwd)).json .
+              done
+
+              # Combine reports
+              echo "[" > $REPORT_FILE
+              first=true
+              for report in /tmp/scan-*.json; do
+                if [ "$first" = true ]; then
+                  first=false
+                else
+                  echo "," >> $REPORT_FILE
+                fi
+                cat $report >> $REPORT_FILE
+              done
+              echo "]" >> $REPORT_FILE
+
+              # Find high-severity issues
+              HIGH_ISSUES=$(cat $REPORT_FILE | jq '[.[] | select(.severity == "HIGH") | .reason] | length')
+              if [ "$HIGH_ISSUES" -gt 0 ]; then
+                echo "Found $HIGH_ISSUES high-severity issues!"
+                exit 1
+              fi
+
+              echo "Secret scan completed successfully"
+            volumeMounts:
+            - name: reports
+              mountPath: /reports
+            - name: app-code
+              mountPath: /app
+              readOnly: true
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "200m"
+          restartPolicy: OnFailure
+          volumes:
+          - name: reports
+            persistentVolumeClaim:
+              claimName: security-reports-pvc
+          - name: app-code
+            hostPath:
+              path: /app

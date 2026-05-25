@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawPipe Cost Calculator — See Your LLM Savings in 30 Seconds</title>
+  <meta name="description" content="Calculate how much you'd save on LLM costs with ClawPipe's intelligent pipeline. Booster, Packer, Cache, and Router — see your savings in 30 seconds.">
+  <meta property="og:title" content="ClawPipe Cost Calculator — Save 30-50% on LLM Costs">
+  <meta property="og:description" content="Paste your monthly LLM spend, see how much ClawPipe would save. 30 seconds. No signup.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://calculator.clawpipe.ai">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ClawPipe Cost Calculator">
+  <meta name="twitter:description" content="See how much you'd save on LLM costs in 30 seconds.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="canonical" href="https://calculator.clawpipe.ai/">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg-primary: #0d0d0d;
+      --bg-secondary: #141414;
+      --bg-tertiary: #1a1a1a;
+      --fill-primary: rgba(120, 120, 128, 0.24);
+      --fill-secondary: rgba(120, 120, 128, 0.18);
+      --fill-tertiary: rgba(120, 120, 128, 0.12);
+      --separator: #2a2a2a;
+      --label-primary: #f0f0f0;
+      --label-secondary: #a0a0a0;
+      --label-tertiary: #666666;
+      --accent: #8b5cf6;
+      --accent-hover: #7c3aed;
+      --accent-2: #c084fc;
+      --green: #22c55e;
+      --red: #ef4444;
+      --tint: rgba(139, 92, 246, 0.15);
+      --space-xs: 4px; --space-sm: 8px; --space-md: 16px;
+      --space-lg: 24px; --space-xl: 32px; --space-2xl: 48px;
+      --space-3xl: 64px; --space-4xl: 80px;
+      --font-caption2: 11px; --font-caption1: 12px; --font-footnote: 13px;
+      --font-subhead: 15px; --font-body: 17px; --font-title3: 20px;
+      --font-title2: 22px; --font-title1: 28px; --font-large-title: 34px;
+      --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-xl: 20px;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg-primary: #f5f5f7;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #f0f0f2;
+        --fill-primary: rgba(120, 120, 128, 0.16);
+        --fill-secondary: rgba(120, 120, 128, 0.12);
+        --fill-tertiary: rgba(120, 120, 128, 0.08);
+        --separator: #d4d4d8;
+        --label-primary: #1a1a1a;
+        --label-secondary: #6b6b6b;
+        --label-tertiary: #a0a0a0;
+        --accent: #7c3aed;
+        --accent-hover: #6d28d9;
+        --tint: rgba(124, 58, 237, 0.06);
+        --green: #22c55e;
+        --red: #ef4444;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+      background: var(--bg-primary);
+      color: var(--label-primary);
+      line-height: 1.47;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      min-height: 100vh;
+    }
+    .container { max-width: 880px; margin: 0 auto; padding: 0 var(--space-lg); }
+    header {
+      padding: var(--space-md) 0;
+      border-bottom: 0.5px solid var(--separator);
+      display: flex; align-items: center; justify-content: space-between;
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      backdrop-filter: saturate(180%) blur(20px);
+    }
+    .logo { font-size: var(--font-title3); font-weight: 700; color: var(--accent); letter-spacing: -0.3px; text-decoration: none; }
+    header nav a { color: var(--label-secondary); font-size: var(--font-subhead); font-weight: 500; text-decoration: none; transition: color .2s ease; }
+    header nav a:hover { color: var(--label-primary); }
+    .hero { text-align: center; padding: var(--space-3xl) 0 var(--space-xl); }
+    .hero h1 {
+      font-size: clamp(var(--font-title1), 5vw, 44px);
+      font-weight: 700; letter-spacing: -0.6px; line-height: 1.1;
+      margin-bottom: var(--space-md);
+    }
+    .hero h1 span {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero p { font-size: var(--font-body); color: var(--label-secondary); max-width: 540px; margin: 0 auto; }
+    .section {
+      background: var(--bg-secondary); border: 0.5px solid var(--separator);
+      border-radius: var(--radius-lg); padding: var(--space-xl);
+      margin-bottom: var(--space-lg);
+    }
+    .section.hidden { display: none; }
+    .step-label {
+      font-size: var(--font-caption1); text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--accent); font-weight: 700; margin-bottom: var(--space-sm);
+    }
+    .section h2 { font-size: var(--font-title2); font-weight: 700; margin-bottom: var(--space-lg); letter-spacing: -0.3px; }
+    .field { margin-bottom: var(--space-lg); }
+    .field:last-child { margin-bottom: 0; }
+    .field label {
+      display: block; font-size: var(--font-footnote); font-weight: 600;
+      color: var(--label-secondary); margin-bottom: var(--space-sm);
+    }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
+    @media (max-width: 640px) { .field-row { grid-template-columns: 1fr; } }
+    .input-money {
+      position: relative; display: flex; align-items: center;
+      background: var(--bg-tertiary); border: 0.5px solid var(--separator);
+      border-radius: var(--radius-md); padding: var(--space-md) var(--space-lg);
+      transition: border-color .2s ease, background .2s ease;
+    }
+    .input-money:focus-within { border-color: var(--accent); background: var(--tint); }
+    .input-money .prefix { font-size: var(--font-large-title); font-weight: 700; color: var(--label-tertiary); margin-right: var(--space-sm); }
+    .input-money input {
+      flex: 1; background: transparent; border: none; outline: none;
+      font-size: var(--font-large-title); font-weight: 700; color: var(--label-primary);
+      font-family: inherit; min-width: 0; letter-spacing: -0.5px;
+    }
+    .input-money .suffix { font-size: var(--font-subhead); color: var(--label-tertiary); font-weight: 500; }
+    select {
+      width: 100%; background: var(--bg-tertiary); border: 0.5px solid var(--separator);
+      border-radius: var(--radius-md); padding: var(--space-md);
+      font-size: var(--font-subhead); color: var(--label-primary); font-family: inherit;
+      cursor: pointer; appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238e8e93' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right var(--space-md) center;
+      padding-right: var(--space-2xl); transition: border-color .2s ease;
+    }
+    select:focus { outline: none; border-color: var(--accent); }
+    .slider-wrap { padding: var(--space-sm) 0; }
+    .slider-value { font-size: var(--font-title3); font-weight: 700; color: var(--accent); margin-bottom: var(--space-sm); }
+    input[type=range] {
+      width: 100%; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 4px; background: var(--fill-primary); border-radius: 2px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; height: 22px; width: 22px;
+      border-radius: 50%; background: var(--accent); margin-top: -9px;
+      box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4); transition: transform .15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+    input[type=range]::-moz-range-track { height: 4px; background: var(--fill-primary); border-radius: 2px; }
+    input[type=range]::-moz-range-thumb { height: 22px; width: 22px; border-radius: 50%; background: var(--accent); border: none; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4); }
+    .divider-or {
+      text-align: center; color: var(--label-tertiary); font-size: var(--font-caption1);
+      text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
+      margin: var(--space-md) 0; position: relative;
+    }
+    .divider-or::before, .divider-or::after {
+      content: ''; position: absolute; top: 50%; width: 40%; height: 0.5px; background: var(--separator);
+    }
+    .divider-or::before { left: 0; }
+    .divider-or::after { right: 0; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: var(--space-md) var(--space-lg); min-height: 48px;
+      border-radius: var(--radius-md); font-weight: 600;
+      font-size: var(--font-subhead); cursor: pointer; border: none;
+      transition: all .2s ease; font-family: inherit; text-decoration: none;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); transform: scale(1.02); }
+    .btn-primary:active { transform: scale(.98); }
+    .btn-secondary { background: var(--fill-tertiary); color: var(--label-primary); border: 0.5px solid var(--separator); }
+    .btn-secondary:hover { background: var(--fill-secondary); }
+    .btn-full { width: 100%; }
+    .btn-row { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+    .btn-row .btn { flex: 1; min-width: 140px; }
+    .bars { display: flex; flex-direction: column; gap: var(--space-md); }
+    .bar {
+      display: grid; grid-template-columns: 120px 1fr auto; align-items: center;
+      gap: var(--space-md); font-size: var(--font-footnote);
+    }
+    .bar-name { font-weight: 600; color: var(--label-primary); }
+    .bar-track { height: 12px; background: var(--fill-tertiary); border-radius: 6px; overflow: hidden; position: relative; }
+    .bar-fill {
+      position: absolute; left: 0; top: 0; height: 100%; width: 0;
+      border-radius: 6px; transition: width .9s cubic-bezier(.22,1,.36,1);
+    }
+    .bar-fill.booster { background: linear-gradient(90deg, #8b5cf6, #c084fc); }
+    .bar-fill.packer { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+    .bar-fill.cache { background: linear-gradient(90deg, #10b981, #34d399); }
+    .bar-fill.router { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .bar-amount { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--label-primary); min-width: 72px; text-align: right; }
+    .result-hero {
+      text-align: center; padding: var(--space-xl) 0;
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(192, 132, 252, 0.08));
+      border-radius: var(--radius-lg); margin-bottom: var(--space-lg);
+    }
+    .result-big {
+      font-size: clamp(56px, 12vw, 96px); font-weight: 800; letter-spacing: -2px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      line-height: 1; font-variant-numeric: tabular-nums;
+    }
+    .result-big-label { font-size: var(--font-body); color: var(--label-secondary); margin-top: var(--space-sm); }
+    .result-meta { display: flex; justify-content: center; gap: var(--space-2xl); margin-top: var(--space-lg); flex-wrap: wrap; }
+    .result-meta-item { text-align: center; }
+    .result-meta-item .num { font-size: var(--font-title1); font-weight: 700; color: var(--label-primary); font-variant-numeric: tabular-nums; }
+    .result-meta-item .lbl { font-size: var(--font-caption1); color: var(--label-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: var(--space-xs); }
+    .roi-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-md); margin: var(--space-lg) 0; }
+    @media (max-width: 640px) { .roi-grid { grid-template-columns: 1fr; } }
+    .roi-card { background: var(--bg-tertiary); border: 0.5px solid var(--separator); border-radius: var(--radius-md); padding: var(--space-md); text-align: center; }
+    .roi-card .lbl { font-size: var(--font-caption1); color: var(--label-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: var(--space-xs); }
+    .roi-card .val { font-size: var(--font-title3); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .roi-card .val.green { color: var(--green); }
+    .roi-card .val.red { color: var(--red); }
+    .install {
+      background: var(--bg-tertiary); padding: var(--space-md) var(--space-lg);
+      border-radius: var(--radius-sm); font-size: var(--font-footnote);
+      color: var(--green); border: 0.5px solid var(--separator);
+      display: block; font-family: 'SF Mono', SFMono-Regular, Menlo, monospace;
+      text-align: center; margin: var(--space-md) 0; cursor: pointer;
+      transition: background .2s ease;
+    }
+    .install:hover { background: var(--fill-tertiary); }
+    footer { padding: var(--space-xl) 0; text-align: center; color: var(--label-tertiary); font-size: var(--font-caption1); border-top: 0.5px solid var(--separator); margin-top: var(--space-2xl); }
+    footer a { color: var(--label-secondary); text-decoration: none; }
+    footer a:hover { color: var(--accent); }
+    .fade-in { animation: fadeIn .5s cubic-bezier(.22,1,.36,1); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    *:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+      .bar-fill { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header role="banner">
+    <a class="logo" href="https://clawpipe.ai">ClawPipe</a>
+    <nav aria-label="Main"><a href="https://clawpipe.ai">Home</a> <a href="https://play.clawpipe.ai" style="margin-left:24px">Playground</a> <a href="https://docs.clawpipe.ai" style="margin-left:24px">Docs</a></nav>
+  </header>
+  <main>
+    <section class="hero">
+      <h1>How much would you <span>save</span>?</h1>
+      <p>Paste your monthly LLM spend. See your savings from every pipeline stage in 30 seconds. No signup.</p>
+    </section>
+
+    <section class="section" aria-labelledby="input-heading">
+      <div class="step-label">Step 1</div>
+      <h2 id="input-heading">Tell us about your usage</h2>
+      <div class="field">
+        <label for="spend">Monthly LLM spend</label>
+        <div class="input-money">
+          <span class="prefix">$</span>
+          <input id="spend" type="number" min="0" step="100" value="10000" inputmode="numeric" aria-label="Monthly spend in dollars">
+          <span class="suffix">/ month</span>
+        </div>
+      </div>
+      <div class="divider-or">or estimate from volume</div>
+      <div class="field">
+        <label for="volume">Requests per day: <span id="volume-display" class="slider-value-inline"></span></label>
+        <div class="slider-wrap">
+          <input id="volume" type="range" min="100" max="10000000" step="100" value="100000" aria-label="Requests per day">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="provider">Primary provider</label>
+          <select id="provider">
+            <option value="openai">OpenAI (GPT-4, GPT-4o)</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="mixed" selected>Mixed providers</option>
+            <option value="other">Other / Open source</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="usecase">Primary use case</label>
+          <select id="usecase">
+            <option value="chatbot">Chatbot / Assistant</option>
+            <option value="rag">RAG / Search</option>
+            <option value="codegen">Code Generation</option>
+            <option value="agents">AI Agents</option>
+            <option value="summarization">Summarization</option>
+            <option value="mixed" selected>Mixed workload</option>
+          </select>
+        </div>
+      </div>
+      <button id="calc-btn" class="btn btn-primary btn-full" style="margin-top: var(--space-md);">Calculate my savings</button>
+    </section>
+
+    <section class="section hidden" id="analysis-section" aria-labelledby="analysis-heading">
+      <div class="step-label">Step 2</div>
+      <h2 id="analysis-heading">Where your money goes</h2>
+      <p style="color: var(--label-secondary); font-size: var(--font-footnote); margin-bottom: var(--space-lg);">Based on your use case, here's how ClawPipe's pipeline stages cut your costs:</p>
+      <div class="bars" id="bars"></div>
+    </section>
+
+    <section class="section hidden" id="results-section" aria-labelledby="results-heading">
+      <div class="step-label">Step 3</div>
+      <h2 id="results-heading">Your savings with ClawPipe</h2>
+      <div class="result-hero">
+        <div class="result-big" id="big-savings">$0</div>
+        <div class="result-big-label">saved per month</div>
+        <div class="result-meta">
+          <div class="result-meta-item"><div class="num" id="yearly-savings">$0</div><div class="lbl">Per year</div></div>
+          <div class="result-meta-item"><div class="num" id="percent-savings">0%</div><div class="lbl">Cost reduction</div></div>
+        </div>
+      </div>
+      <h3 style="font-size: var(--font-subhead); font-weight: 600; margin-bottom: var(--space-md); color: var(--label-secondary);">ROI with ClawPipe Pro</h3>
+      <div class="roi-grid">
+        <div class="roi-card"><div class="lbl">Pro plan</div><div class="val red" id="roi-cost">-$49</div></div>
+        <div class="roi-card"><div class="lbl">Your savings</div><div class="val green" id="roi-savings">+$0</div></div>
+        <div class="roi-card"><div class="lbl">Net / month</div><div class="val green" id="roi-net">+$0</div></div>
+      </div>
+      <p style="color: var(--label-secondary); font-size: var(--font-footnote); text-align: center; margin-bottom: var(--space-sm);">Payback period: <strong id="payback" style="color: var(--green);">immediate</strong></p>
+      <p style="color: var(--label-tertiary); font-size: var(--font-caption1); text-align: center; margin-bottom: var(--space-lg);">Estimates use stage-rate assumptions documented at <a href="https://github.com/finsavvyai/clawpipe/blob/main/docs/case-modeled.md" style="color: var(--accent);">docs/case-modeled.md</a> (modeled, not customer-measured). Public measured benchmark in progress at <a href="https://github.com/finsavvyai/clawpipe-booster-benchmark" style="color: var(--accent);">clawpipe-booster-benchmark</a>. Your actual savings depend on prompt mix.</p>
+      <code class="install" id="install-cmd" onclick="copyInstall()" title="Click to copy">npm install clawpipe-ai</code>
+      <div class="btn-row">
+        <a id="cta-start" href="https://app.clawpipe.ai/signup" class="btn btn-primary">Start saving now</a>
+        <button id="share-twitter" class="btn btn-secondary">Share on X</button>
+        <button id="share-linkedin" class="btn btn-secondary">Share on LinkedIn</button>
+        <button id="share-copy" class="btn btn-secondary">Copy link</button>
+      </div>
+    </section>
+  </main>
+  <footer role="contentinfo">
+    <p>ClawPipe &copy; 2026. <a href="https://clawpipe.ai">Home</a> · <a href="https://clawpipe.ai/privacy">Privacy</a> · <a href="https://clawpipe.ai/terms">Terms</a> · <a href="https://clawpipe.ai/security">Security</a></p>
+  </footer>
+</div>
+<script>
+(function() {
+  'use strict';
+  const BREAKDOWNS = {
+    chatbot:       { booster: 0.25, cache: 0.22, packer: 0.05, router: 0.12 },
+    rag:           { booster: 0.05, cache: 0.18, packer: 0.32, router: 0.08 },
+    codegen:       { booster: 0.15, cache: 0.10, packer: 0.08, router: 0.28 },
+    agents:        { booster: 0.22, cache: 0.18, packer: 0.10, router: 0.12 },
+    summarization: { booster: 0.03, cache: 0.25, packer: 0.38, router: 0.05 },
+    mixed:         { booster: 0.14, cache: 0.18, packer: 0.18, router: 0.13 },
+  };
+  const MAX_SAVINGS_RATE = 0.75;
+  const COST_PER_REQUEST = 0.003;
+
+  const $ = (id) => document.getElementById(id);
+  const spendInput = $('spend');
+  const volumeInput = $('volume');
+  const volumeDisplay = $('volume-display');
+  const providerInput = $('provider');
+  const usecaseInput = $('usecase');
+  const calcBtn = $('calc-btn');
+  const analysisSection = $('analysis-section');
+  const resultsSection = $('results-section');
+  const barsEl = $('bars');
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let syncing = false;
+  function spendToVolume(s) { return Math.max(100, Math.round(s / 30 / COST_PER_REQUEST)); }
+  function volumeToSpend(v) { return Math.round(v * 30 * COST_PER_REQUEST); }
+  function formatNumber(n) { return n.toLocaleString('en-US'); }
+  function formatMoney(n) {
+    const rounded = Math.round(n);
+    if (rounded >= 1000000) return '$' + (rounded / 1000000).toFixed(1) + 'M';
+    if (rounded >= 10000) return '$' + formatNumber(rounded);
+    return '$' + formatNumber(rounded);
+  }
+  function formatVolume(v) {
+    if (v >= 1000000) return (v / 1000000).toFixed(v >= 10000000 ? 0 : 1) + 'M';
+    if (v >= 1000) return (v / 1000).toFixed(v >= 10000 ? 0 : 1) + 'K';
+    return String(v);
+  }
+
+  function updateVolumeDisplay() { volumeDisplay.textContent = formatVolume(Number(volumeInput.value) || 0); }
+  spendInput.addEventListener('input', () => {
+    if (syncing) return; syncing = true;
+    volumeInput.value = spendToVolume(Number(spendInput.value) || 0);
+    updateVolumeDisplay();
+    syncing = false;
+  });
+  volumeInput.addEventListener('input', () => {
+    if (syncing) return; syncing = true;
+    spendInput.value = volumeToSpend(Number(volumeInput.value) || 0);
+    updateVolumeDisplay();
+    syncing = false;
+  });
+  updateVolumeDisplay();
+
+  function calculateSavings(monthlySpend, useCase) {
+    const b = BREAKDOWNS[useCase] || BREAKDOWNS.mixed;
+    const raw = {
+      booster: monthlySpend * b.booster,
+      cache:   monthlySpend * b.cache,
+      packer:  monthlySpend * b.packer,
+      router:  monthlySpend * b.router,
+    };
+    const total = raw.booster + raw.cache + raw.packer + raw.router;
+    const cap = monthlySpend * MAX_SAVINGS_RATE;
+    if (total > cap) {
+      const scale = cap / total;
+      Object.keys(raw).forEach(k => { raw[k] *= scale; });
+    }
+    const finalTotal = raw.booster + raw.cache + raw.packer + raw.router;
+    return { stages: raw, total: finalTotal, percent: (finalTotal / monthlySpend) * 100 };
+  }
+
+  function animateCount(el, from, to, duration, formatter) {
+    if (prefersReducedMotion) { el.textContent = formatter(to); return; }
+    const start = performance.now();
+    function frame(now) {
+      const p = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      const val = from + (to - from) * eased;
+      el.textContent = formatter(val);
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function renderBars(stages, spend) {
+    const defs = [
+      { key: 'booster', name: 'Booster',  cls: 'booster', desc: 'Skip LLM' },
+      { key: 'packer',  name: 'Packer',   cls: 'packer',  desc: 'Fewer tokens' },
+      { key: 'cache',   name: 'Cache',    cls: 'cache',   desc: 'Deduplicate' },
+      { key: 'router',  name: 'Router',   cls: 'router',  desc: 'Cheaper model' },
+    ];
+    barsEl.innerHTML = '';
+    const maxValue = Math.max(...Object.values(stages), 1);
+    defs.forEach((d, i) => {
+      const amount = stages[d.key];
+      const widthPct = (amount / Math.max(spend * 0.4, maxValue)) * 100;
+      const row = document.createElement('div');
+      row.className = 'bar';
+      row.innerHTML = `<div class="bar-name">${d.name} <span style="color:var(--label-tertiary);font-weight:500;">${d.desc}</span></div>
+        <div class="bar-track"><div class="bar-fill ${d.cls}" style="width:0"></div></div>
+        <div class="bar-amount">${formatMoney(amount)}/mo</div>`;
+      barsEl.appendChild(row);
+      const fill = row.querySelector('.bar-fill');
+      setTimeout(() => { fill.style.width = Math.min(100, widthPct) + '%'; }, prefersReducedMotion ? 0 : (150 + i * 180));
+    });
+  }
+
+  function run() {
+    const monthlySpend = Number(spendInput.value) || 0;
+    if (monthlySpend <= 0) { spendInput.focus(); return; }
+    const useCase = usecaseInput.value;
+    const result = calculateSavings(monthlySpend, useCase);
+
+    analysisSection.classList.remove('hidden');
+    analysisSection.classList.add('fade-in');
+    renderBars(result.stages, monthlySpend);
+
+    setTimeout(() => {
+      resultsSection.classList.remove('hidden');
+      resultsSection.classList.add('fade-in');
+      animateCount($('big-savings'), 0, result.total, 1000, v => formatMoney(v));
+      animateCount($('yearly-savings'), 0, result.total * 12, 1000, v => formatMoney(v));
+      animateCount($('percent-savings'), 0, result.percent, 1000, v => Math.round(v) + '%');
+      const net = result.total - 49;
+      $('roi-savings').textContent = '+' + formatMoney(result.total);
+      $('roi-net').textContent = (net >= 0 ? '+' : '') + formatMoney(net);
+      $('payback').textContent = net > 0 ? 'immediate' : 'N/A';
+      resultsSection.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+      updateShareLinks(monthlySpend, result.total, providerInput.value, useCase);
+    }, prefersReducedMotion ? 0 : 400);
+  }
+  calcBtn.addEventListener('click', run);
+
+  function updateShareLinks(spend, saved, provider, useCase) {
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.set('spend', String(spend));
+    url.searchParams.set('provider', provider);
+    url.searchParams.set('usecase', useCase);
+    const shareUrl = url.toString();
+    const savedFormatted = formatMoney(saved);
+    const tweetText = `I just found out I could save ${savedFormatted}/mo on LLM costs with @ClawPipeAI 🚀`;
+    $('share-twitter').onclick = () => {
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareUrl)}`, '_blank', 'noopener');
+    };
+    $('share-linkedin').onclick = () => {
+      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank', 'noopener');
+    };
+    $('share-copy').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        const btn = $('share-copy'); const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 1600);
+      } catch (e) { prompt('Copy this link:', shareUrl); }
+    };
+  }
+
+  window.copyInstall = async function() {
+    try {
+      await navigator.clipboard.writeText('npm install clawpipe-ai');
+      const el = $('install-cmd'); const orig = el.textContent;
+      el.textContent = 'Copied to clipboard ✓';
+      setTimeout(() => { el.textContent = orig; }, 1600);
+    } catch (e) {}
+  };
+
+  function loadFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const spend = params.get('spend');
+    const provider = params.get('provider');
+    const usecase = params.get('usecase');
+    if (spend) {
+      spendInput.value = spend;
+      volumeInput.value = spendToVolume(Number(spend));
+      updateVolumeDisplay();
+    }
+    if (provider && providerInput.querySelector(`option[value="${provider}"]`)) providerInput.value = provider;
+    if (usecase && usecaseInput.querySelector(`option[value="${usecase}"]`)) usecaseInput.value = usecase;
+    if (spend) setTimeout(run, 200);
+  }
+  loadFromUrl();
+})();
+</script>
+</body>
+</html>

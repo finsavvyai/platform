@@ -1,0 +1,50 @@
+# Local + smoke-test composition. Brings up Postgres, runs migrations,
+# starts the gateway. Use as a reference for production manifests
+# (Helm/k8s/ECS) — all knobs are env-driven, no hard-coded secrets.
+#
+#   cd .. && docker compose -f sdlc-cc/deploy/docker-compose.yml up
+#
+# Secrets here are demo values; never use these in any environment
+# you'd want auditors to look at.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sdlc
+      POSTGRES_PASSWORD: sdlc-dev-password
+      POSTGRES_DB: sdlc
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sdlc -d sdlc"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: sdlc-cc/deploy/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://sdlc:sdlc-dev-password@postgres:5432/sdlc?sslmode=disable
+    command: ["./migrate", "-dir", "./migrations"]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: sdlc-cc/deploy/Dockerfile
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PORT: "8080"
+      DATABASE_URL: postgres://sdlc:sdlc-dev-password@postgres:5432/sdlc?sslmode=disable
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      SDLC_ADMIN_BEARER: ${SDLC_ADMIN_BEARER:-dev-admin-bearer-rotate-me}
+      TRANSPARENT_PROXY_HOSTS: ${TRANSPARENT_PROXY_HOSTS:-}
+    ports:
+      - "8080:8080"

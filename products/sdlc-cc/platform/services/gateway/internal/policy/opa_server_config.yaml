@@ -1,0 +1,152 @@
+# OPA Server Configuration for SDLC.ai Platform
+# This configuration sets up OPA with high-performance evaluation and bundle management
+
+server:
+  # Server listening configuration
+  address: "0.0.0.0"
+  port: 8181
+
+  # TLS configuration for secure communication
+  tls:
+    enabled: true
+    cert_file: "/etc/opa/certs/server.crt"
+    key_file: "/etc/opa/certs/server.key"
+
+  # Authentication for OPA API
+  authentication:
+    enabled: true
+    scheme: "bearer"
+    token: "${OPA_API_TOKEN}"
+
+bundles:
+  # Bundle service configuration
+  service: "sdlc-bundles"
+
+  # Bundle polling configuration
+  polling:
+    min_delay_seconds: 5
+    max_delay_seconds: 30
+
+  # Bundle activation
+  activation:
+    status: "ok"
+    prefix: "bundles"
+
+  # Bundle signature verification
+  signature_verification:
+    enabled: true
+    keys: ["${OPA_SIGNING_KEY}"]
+    scope: "write"
+
+decision_logs:
+  # Enable comprehensive decision logging
+  console: true
+
+  # Remote decision logging
+  service: "sdlc-decision-logs"
+
+  # Log configuration
+  reporting:
+    min_delay_seconds: 5
+    max_delay_seconds: 30
+
+  # Log filtering
+  status: "ok"
+
+status:
+  # Enable status API
+  console: true
+
+  # Remote status reporting
+  service: "sdlc-status"
+
+nlog:
+  # Enable query logging for debugging
+  console: false
+
+  # Remote query logging
+  service: "sdlc-query-logs"
+
+  # Query log configuration
+  reporting:
+    min_delay_seconds: 10
+    max_delay_seconds: 60
+
+# Labels for OPA instance
+labels:
+  service: "sdlc-policy-engine"
+  environment: "${ENVIRONMENT}"
+  version: "${VERSION}"
+
+# Plugins configuration
+plugins:
+  # Enable bundled plugins
+  bundle:
+    enabled: true
+    config: "/etc/opa/bundle-config.json"
+
+  # Enable decision logging plugin
+  decision_logs:
+    enabled: true
+    config: "/etc/opa/decision-logs-config.json"
+
+# Performance tuning
+performance:
+  # Memory limits
+  memory_limit: "512MB"
+
+  # Evaluation timeout
+  decision_timeout: "20ms"
+
+  # Concurrency settings
+  eval_workers: 4
+
+  # Cache configuration
+  cache:
+    enabled: true
+    size: 10000
+    ttl: "5m"
+
+# Metrics configuration
+metrics:
+  # Enable Prometheus metrics
+  prometheus:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+
+  # Custom metrics
+  custom:
+    enabled: true
+    include_decision_ids: true
+    include_policy_names: true
+
+# Security configuration
+security:
+  # Input validation
+  input_validation:
+    enabled: true
+    max_input_size: "1MB"
+
+  # Resource limits
+  resource_limits:
+    max_rules: 1000
+    max_policies: 100
+    max_recursion_depth: 100
+
+  # Rate limiting
+  rate_limiting:
+    enabled: true
+    requests_per_second: 1000
+    burst: 100
+
+# Development and debugging
+debug:
+  # Enable debug mode in development
+  enabled: ${DEBUG:-false}
+
+  # Enable detailed logging
+  verbose_logging: ${VERBOSE:-false}
+
+  # Enable debug endpoints
+  debug_endpoints: ${DEBUG_ENDPOINTS:-false}

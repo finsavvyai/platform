@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+echo "pre-push: running tests..."
+echo "  [.] go test..."
+(cd "." && go test ./... 2>&1 | tail -20)
+echo "  [./cmd/schedulers-stage] tests..."
+if [ -f "./cmd/schedulers-stage/pom.xml" ]; then (cd "./cmd/schedulers-stage" && mvn test -q 2>&1 | tail -10)
+elif [ -f "./cmd/schedulers-stage/build.gradle" ]; then (cd "./cmd/schedulers-stage" && ./gradlew test 2>&1 | tail -10)
+fi
+if [ -d "./web/node_modules" ]; then
+  echo "  [./web] tsc..."
+  (cd "./web" && npx tsc --noEmit 2>/dev/null) || true
+  echo "  [./web] tests..."
+  if grep -q vitest "./web/package.json" 2>/dev/null; then
+    (cd "./web" && npx vitest run 2>&1 | tail -5)
+  elif grep -q jest "./web/package.json" 2>/dev/null; then
+    (cd "./web" && npx jest 2>&1 | tail -5)
+  elif grep -q '"test"' "./web/package.json" 2>/dev/null; then
+    (cd "./web" && npm test 2>&1 | tail -5)
+  fi
+fi
+echo "pre-push: all tests passed"

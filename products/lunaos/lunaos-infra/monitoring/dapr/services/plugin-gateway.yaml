@@ -1,0 +1,45 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: lunaos-plugin-gateway-config
+  namespace: default
+spec:
+  appId: lunaos-plugin-gateway
+  appPort: 8004
+  daprHttpPort: 3502
+  daprGrpcPort: 50003
+  config: lunaos-config
+  components:
+    - name: statestore
+      type: state.redis
+      version: v1
+    - name: pubsub
+      type: pubsub.redis
+      version: v1
+  subscriptions:
+    - pubsubname: pubsub
+      topic: plugin-events
+      route: /gateway/events/plugins
+    - pubsubname: pubsub
+      topic: system-events
+      route: /gateway/events/system
+  httpPipeline:
+    handlers:
+      - name: serviceinvocation
+        type: middleware.http.serviceinvocation
+      - name: observability
+        type: middleware.http.observability
+  accessControl:
+    defaultAction: allow
+    trustDomain: "public"
+    policies:
+      - appId: lunaos-plugin-gateway
+        defaultAction: allow
+        trustDomain: "public"
+        operations:
+          - name: /plugins/*
+            httpVerb: ["GET", "POST", "PUT", "DELETE"]
+            action: allow
+          - name: /registry/*
+            httpVerb: ["GET", "POST"]
+            action: allow

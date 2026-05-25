@@ -1,0 +1,131 @@
+# Prometheus Recording Rules for SDLC Platform Gateway
+# These rules pre-compute frequently used queries for better performance
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gateway-recording
+  namespace: sdlc-platform
+  labels:
+    app: gateway
+    prometheus: kube-prometheus
+    role: recording-rules
+spec:
+  groups:
+  - name: gateway_http_metrics
+    interval: 30s
+    rules:
+    # Request rate by endpoint
+    - record: sdlc_gateway:request_rate:5m
+      expr: |
+        sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform"}[5m])) by (endpoint, tenant_id)
+
+    # Error rate by endpoint
+    - record: sdlc_gateway:error_rate:5m
+      expr: |
+        sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform",status_code=~"5.."}[5m])) by (endpoint, tenant_id)
+
+    # Error percentage
+    - record: sdlc_gateway:error_percentage:5m
+      expr: |
+        (
+          sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform",status_code=~"5.."}[5m])) by (tenant_id)
+          /
+          sum(rate(sdlc_gateway_http_requests_total{namespace="sdlc-platform"}[5m])) by (tenant_id)
+        ) * 100
+
+    # P95 latency by endpoint
+    - record: sdlc_gateway:latency:p95:5m
+      expr: |
+        histogram_quantile(0.95,
+          sum(rate(sdlc_gateway_http_request_duration_seconds_bucket{namespace="sdlc-platform"}[5m])) by (le, endpoint, tenant_id)
+        )
+
+    # P99 latency by endpoint
+    - record: sdlc_gateway:latency:p99:5m
+      expr: |
+        histogram_quantile(0.99,
+          sum(rate(sdlc_gateway_http_request_duration_seconds_bucket{namespace="sdlc-platform"}[5m])) by (le, endpoint, tenant_id)
+        )
+
+    # Average request size
+    - record: sdlc_gateway:request_size:avg:5m
+      expr: |
+        sum(rate(sdlc_gateway_http_request_size_bytes_sum{namespace="sdlc-platform"}[5m])) by (endpoint)
+        /
+        sum(rate(sdlc_gateway_http_request_size_bytes_count{namespace="sdlc-platform"}[5m])) by (endpoint)
+
+    # Average response size
+    - record: sdlc_gateway:response_size:avg:5m
+      expr: |
+        sum(rate(sdlc_gateway_http_response_size_bytes_sum{namespace="sdlc-platform"}[5m])) by (endpoint)
+        /
+        sum(rate(sdlc_gateway_http_response_size_bytes_count{namespace="sdlc-platform"}[5m])) by (endpoint)
+
+  - name: gateway_security_metrics
+    interval: 30s
+    rules:
+    # Authentication success rate
+    - record: sdlc_gateway:auth_success_rate:5m
+      expr: |
+        (
+          sum(rate(sdlc_gateway_authentication_attempts_total{namespace="sdlc-platform",status="success"}[5m])) by (tenant_id)
+          /
+          sum(rate(sdlc_gateway_authentication_attempts_total{namespace="sdlc-platform"}[5m])) by (tenant_id)
+        ) * 100
+
+    # Failed authentication attempts per minute
+    - record: sdlc_gateway:auth_failures:1m
+      expr: |
+        sum(rate(sdlc_gateway_authentication_attempts_total{namespace="sdlc-platform",status="failed"}[1m])) by (tenant_id)
+
+    # Authorization failures by reason
+    - record: sdlc_gateway:authz_failures:5m
+      expr: |
+        sum(rate(sdlc_gateway_authorization_failures_total{namespace="sdlc-platform"}[5m])) by (reason, tenant_id)
+
+    # Security violations by severity
+    - record: sdlc_gateway:security_violations:5m
+      expr: |
+        sum(rate(sdlc_gateway_security_violations_total{namespace="sdlc-platform"}[5m])) by (violation_type, severity)
+
+  - name: gateway_business_metrics
+    interval: 1m
+    rules:
+    # Documents processed per minute
+    - record: sdlc_gateway:documents_processed:1m
+      expr: |
+        sum(rate(sdlc_gateway_documents_processed_total{namespace="sdlc-platform"}[1m]))
+
+    # Queries performed per minute
+    - record: sdlc_gateway:queries_performed:1m
+      expr: |
+        sum(rate(sdlc_gateway_queries_performed_total{namespace="sdlc-platform"}[1m]))
+
+    # Tokens generated per minute
+    - record: sdlc_gateway:tokens_generated:1m
+      expr: |
+        sum(rate(sdlc_gateway_tokens_generated_total{namespace="sdlc-platform"}[1m]))
+
+  - name: gateway_infrastructure_metrics
+    interval: 30s
+    rules:
+    # Database connection pool utilization
+    - record: sdlc_gateway:db_pool_utilization
+      expr: |
+        (
+          sdlc_gateway_database_connections_active{namespace="sdlc-platform"} / 20
+        ) * 100
+
+    # Rate limit hit rate per tenant
+    - record: sdlc_gateway:rate_limit_hit_rate:5m
+      expr: |
+        sum(rate(sdlc_gateway_rate_limit_hits_total{namespace="sdlc-platform"}[5m])) by (tenant_id)
+
+    # DLP violation rate
+    - record: sdlc_gateway:dlp_violation_rate:5m
+      expr: |
+        (
+          sum(rate(sdlc_gateway_dlp_violations_total{namespace="sdlc-platform"}[5m]))
+          /
+          sum(rate(sdlc_gateway_dlp_scans_total{namespace="sdlc-platform"}[5m]))
+        ) * 100

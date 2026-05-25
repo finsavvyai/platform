@@ -1,0 +1,23 @@
+# ---- Base Node Builder ----
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY packages ./packages
+COPY workers ./workers
+COPY scripts ./scripts
+
+RUN npm install
+RUN npm run build
+
+# ---- Runtime ----
+FROM node:20-slim
+
+WORKDIR /app
+
+COPY --from=builder /app /app
+
+ENV NODE_ENV=production
+
+CMD ["npm", "start"]

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Integrations - ClawPipe Docs</title>
+  <meta name="description" content="Integrate ClawPipe with LangChain, LlamaIndex, Vercel AI SDK, and as an OpenAI drop-in replacement.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="docs-layout">
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Documentation">
+    <a href="/" class="logo">ClawPipe</a>
+    <nav>
+      <a href="index.html">Getting Started</a>
+      <a href="concepts.html">How It Works</a>
+      <div class="sep"></div>
+      <a href="typescript.html">TypeScript SDK</a>
+      <a href="python.html">Python SDK</a>
+      <a href="go.html">Go SDK</a>
+      <div class="sep"></div>
+      <a href="integrations.html" class="active">Integrations</a>
+      <a href="api.html">Gateway API</a>
+      <a href="oauth-setup.html">OAuth Setup</a>
+      <a href="migration.html">Migration</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="doc-header">
+      <div>
+        <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Toggle menu">&#9776;</button>
+        <span class="breadcrumb">Docs / Integrations</span>
+      </div>
+      <div class="links">
+        <a href="https://github.com/finsavvyai/clawpipe">GitHub</a>
+        <a href="https://clawpipe.ai">Home</a>
+      </div>
+    </header>
+    <main id="main-content" class="content">
+      <h1>Framework <span>Integrations</span></h1>
+      <p>ClawPipe integrates with popular AI frameworks. Use it as a drop-in replacement for OpenAI or plug it into LangChain, LlamaIndex, and the Vercel AI SDK.</p>
+
+      <h2>OpenAI Drop-in Replacement</h2>
+      <p>The <code>OpenAICompat</code> export provides an OpenAI-compatible interface. Replace your OpenAI client with ClawPipe and get all pipeline optimizations automatically.</p>
+<pre><code><span class="code-accent">import</span> { OpenAICompat } <span class="code-accent">from</span> <span class="code-green">'clawpipe-ai'</span>;
+
+<span class="code-dim">// Drop-in replacement for OpenAI client</span>
+<span class="code-accent">const</span> openai = <span class="code-accent">new</span> OpenAICompat({
+  apiKey: <span class="code-green">'cp_xxx'</span>,
+  projectId: <span class="code-green">'my-app'</span>,
+});
+
+<span class="code-dim">// Same API as OpenAI SDK</span>
+<span class="code-accent">const</span> completion = <span class="code-accent">await</span> openai.chat.completions.create({
+  model: <span class="code-green">'gpt-4o'</span>,
+  messages: [
+    { role: <span class="code-green">'system'</span>, content: <span class="code-green">'You are helpful.'</span> },
+    { role: <span class="code-green">'user'</span>, content: <span class="code-green">'Explain recursion'</span> },
+  ],
+  max_tokens: 2000,
+});
+
+console.log(completion.choices[0].message.content);</code></pre>
+
+      <h2>LangChain</h2>
+      <p>Use ClawPipe as a custom LLM provider in LangChain. Point LangChain's OpenAI integration at the ClawPipe gateway.</p>
+<pre><code><span class="code-accent">from</span> langchain_openai <span class="code-accent">import</span> ChatOpenAI
+
+<span class="code-dim"># Point LangChain at ClawPipe gateway</span>
+llm = ChatOpenAI(
+    base_url=<span class="code-green">"https://api.clawpipe.ai/v1"</span>,
+    api_key=<span class="code-green">"cp_xxx"</span>,
+    model=<span class="code-green">"gpt-4o"</span>,
+    default_headers={<span class="code-green">"X-Project-Id"</span>: <span class="code-green">"my-app"</span>},
+)
+
+<span class="code-dim"># Use exactly like normal LangChain</span>
+response = llm.invoke(<span class="code-green">"Explain recursion"</span>)
+print(response.content)
+
+<span class="code-dim"># Works with chains, agents, RAG, etc.</span>
+<span class="code-accent">from</span> langchain_core.prompts <span class="code-accent">import</span> ChatPromptTemplate
+
+prompt = ChatPromptTemplate.from_messages([
+    (<span class="code-green">"system"</span>, <span class="code-green">"You are a {role}."</span>),
+    (<span class="code-green">"human"</span>, <span class="code-green">"{input}"</span>),
+])
+chain = prompt | llm
+result = chain.invoke({<span class="code-green">"role"</span>: <span class="code-green">"tutor"</span>, <span class="code-green">"input"</span>: <span class="code-green">"What is a monad?"</span>})</code></pre>
+
+      <h2>LlamaIndex</h2>
+      <p>Configure LlamaIndex to use the ClawPipe gateway as its OpenAI-compatible backend.</p>
+<pre><code><span class="code-accent">from</span> llama_index.llms.openai <span class="code-accent">import</span> OpenAI
+
+<span class="code-dim"># Use ClawPipe as the LLM backend</span>
+llm = OpenAI(
+    api_base=<span class="code-green">"https://api.clawpipe.ai/v1"</span>,
+    api_key=<span class="code-green">"cp_xxx"</span>,
+    model=<span class="code-green">"gpt-4o"</span>,
+    additional_kwargs={<span class="code-green">"headers"</span>: {<span class="code-green">"X-Project-Id"</span>: <span class="code-green">"my-app"</span>}},
+)
+
+<span class="code-dim"># Use with any LlamaIndex component</span>
+<span class="code-accent">from</span> llama_index.core <span class="code-accent">import</span> VectorStoreIndex, SimpleDirectoryReader
+
+documents = SimpleDirectoryReader(<span class="code-green">"data"</span>).load_data()
+index = VectorStoreIndex.from_documents(documents, llm=llm)
+query_engine = index.as_query_engine()
+response = query_engine.query(<span class="code-green">"What does this codebase do?"</span>)</code></pre>
+
+      <h2>Vercel AI SDK</h2>
+      <p>Use ClawPipe with the Vercel AI SDK by configuring the OpenAI provider with the ClawPipe gateway URL.</p>
+<pre><code><span class="code-accent">import</span> { createOpenAI } <span class="code-accent">from</span> <span class="code-green">'@ai-sdk/openai'</span>;
+<span class="code-accent">import</span> { generateText, streamText } <span class="code-accent">from</span> <span class="code-green">'ai'</span>;
+
+<span class="code-accent">const</span> clawpipe = createOpenAI({
+  baseURL: <span class="code-green">'https://api.clawpipe.ai/v1'</span>,
+  apiKey: <span class="code-green">'cp_xxx'</span>,
+  headers: { <span class="code-green">'X-Project-Id'</span>: <span class="code-green">'my-app'</span> },
+});
+
+<span class="code-dim">// Generate text</span>
+<span class="code-accent">const</span> { text } = <span class="code-accent">await</span> generateText({
+  model: clawpipe(<span class="code-green">'gpt-4o'</span>),
+  prompt: <span class="code-green">'Explain recursion'</span>,
+});
+
+<span class="code-dim">// Stream text</span>
+<span class="code-accent">const</span> result = <span class="code-accent">await</span> streamText({
+  model: clawpipe(<span class="code-green">'gpt-4o'</span>),
+  prompt: <span class="code-green">'Write a haiku about code'</span>,
+});
+
+<span class="code-accent">for await</span> (<span class="code-accent">const</span> chunk <span class="code-accent">of</span> result.textStream) {
+  process.stdout.write(chunk);
+}</code></pre>
+
+      <h2>Gateway as Proxy</h2>
+      <p>Any OpenAI-compatible client can use ClawPipe by setting the base URL. This works with any language or framework that supports custom OpenAI endpoints.</p>
+<pre><code><span class="code-dim"># cURL example</span>
+curl -X POST https://api.clawpipe.ai/v1/prompt \
+  -H <span class="code-green">"Authorization: Bearer cp_xxx"</span> \
+  -H <span class="code-green">"X-Project-Id: my-app"</span> \
+  -H <span class="code-green">"Content-Type: application/json"</span> \
+  -d <span class="code-green">'{
+    "prompt": "Explain recursion",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "maxTokens": 2000
+  }'</span></code></pre>
+    </main>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,81 @@
+plugins {
+    id 'org.springframework.boot' version '2.5.3'
+    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+    id 'java'
+    id 'signing'
+    id 'war'
+}
+apply plugin: 'java-library'
+apply plugin: 'signing'
+group = 'com.bsl.service'
+version = '1.0.0-SNAPSHOT'
+sourceCompatibility = '1.8'
+ext['log4j2.version'] = '2.16.0'
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.security:spring-security-oauth2-resource-server'
+    implementation 'org.springframework.security:spring-security-oauth2-jose'
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:2.2.0'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.session:spring-session-core'
+    compileOnly 'org.projectlombok:lombok'
+    runtimeOnly 'com.oracle.database.jdbc:ojdbc8'
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'com.zaxxer:HikariCP:4.0.3'
+    annotationProcessor 'org.projectlombok:lombok'
+    providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.projectreactor:reactor-test'
+    implementation group: 'org.apache.commons', name: 'commons-email', version: '1.5'
+    implementation("com.slack.api:slack-api-client:1.10.0")
+    implementation group: 'com.squareup.okhttp3', name: 'okhttp', version: '4.1.0'
+    implementation group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.13'
+    implementation group: "com.twilio.sdk", name: "twilio", version: "8.19.0"
+
+}
+
+
+bootJar {
+    layered {
+        application {
+            intoLayer("spring-boot-loader") {
+                include "org/springframework/boot/loader/**"
+            }
+            intoLayer("application")
+        }
+        dependencies {
+            intoLayer("application") {
+                includeProjectDependencies()
+            }
+            intoLayer("snapshot-dependencies") {
+                include "*:*:*SNAPSHOT"
+            }
+            intoLayer("dependencies")
+        }
+        layerOrder = ["dependencies", "spring-boot-loader", "snapshot-dependencies", "application"]
+    }
+}
+
+bootRun {
+    systemProperty 'spring.profiles.active', 'local'
+    jvmArgs = ['-Dspring.profiles.active=local']
+}
+
+
+test {
+    useJUnitPlatform()
+}

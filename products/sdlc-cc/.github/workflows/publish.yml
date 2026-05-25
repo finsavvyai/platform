@@ -1,0 +1,88 @@
+# Publishes the sdlc-cc multi-arch container image to GitHub Container
+# Registry on every push to main and on git tags. Image is consumed by
+# the Fly.io deploy and (eventually) by any other downstream that wants
+# the latest gateway build.
+#
+# Tags published:
+#   ghcr.io/finsavvyai/sdlc-cc:main          (HEAD of main)
+#   ghcr.io/finsavvyai/sdlc-cc:<sha>         (immutable per-commit)
+#   ghcr.io/finsavvyai/sdlc-cc:<tag>         (when a git tag is pushed)
+#
+# The Dockerfile expects the parent dir to contain BOTH sdlc-cc/ and
+# sdlc-core/, mirroring the test workflow's sibling-clone pattern.
+
+name: publish-image
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sdlc-cc
+        uses: actions/checkout@v4
+        with:
+          path: sdlc-cc
+
+      - name: Checkout sdlc-core (private sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: finsavvyai/sdlc-core
+          token: ${{ secrets.SDLC_CORE_TOKEN }}
+          path: sdlc-core
+          ref: main
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Stable tags for the moving target ("main") + immutable per-sha
+      # so deploy rollouts can pin a specific build and roll back fast.
+      - name: Compute tags
+        id: tags
+        run: |
+          set -euxo pipefail
+          IMG=ghcr.io/${{ github.repository_owner }}/sdlc-cc
+          tags="$IMG:${GITHUB_SHA::12}"
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            tags="$tags,$IMG:main"
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+            tags="$tags,$IMG:$tag"
+          fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+      - name: Build + push
+        uses: docker/build-push-action@v6
+        with:
+          # Build context is the parent of sdlc-cc/ + sdlc-core/ so the
+          # go.mod replace directive resolves at COPY time (matches the
+          # test workflow's sibling-checkout layout).
+          context: .
+          file: sdlc-cc/deploy/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          # Cache layers in the registry so repeat builds (no Dockerfile
+          # change) take ~30s instead of ~5min.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/sdlc-cc:buildcache
+          cache-to:   type=registry,ref=ghcr.io/${{ github.repository_owner }}/sdlc-cc:buildcache,mode=max
+
+      - name: Image digest
+        run: |
+          echo "Pushed: ${{ steps.tags.outputs.tags }}"

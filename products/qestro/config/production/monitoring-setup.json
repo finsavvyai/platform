@@ -1,0 +1,72 @@
+{
+  "production_monitoring": {
+    "version": "1.0.0",
+    "status": "operational",
+    "configuration": {
+      "health_checks": {
+        "frontend": {
+          "url": "https://qestro.app",
+          "interval": 60,
+          "timeout": 10000,
+          "expected_status": 200,
+          "success_threshold": 3
+        },
+        "api": {
+          "url": "https://qestro.broad-dew-49ad.workers.dev/health",
+          "interval": 30,
+          "timeout": 5000,
+          "expected_status": 200,
+          "success_threshold": 5
+        },
+        "database": {
+          "connection_check": true,
+          "query": "SELECT COUNT(*) as users FROM users",
+          "interval": 300,
+          "timeout": 10000
+        }
+      },
+      "performance_monitoring": {
+        "response_time_thresholds": {
+          "api_p50": 50,
+          "api_p95": 100,
+          "api_p99": 200,
+          "frontend_load_time": 2000
+        },
+        "error_rate_thresholds": {
+          "critical": 0.01,
+          "warning": 0.05
+        },
+        "uptime_thresholds": {
+          "critical": 0.99,
+          "warning": 0.995
+        }
+      },
+      "alerting": {
+        "channels": [
+          {
+            "type": "email",
+            "recipients": ["admin@qestro.app"],
+            "severity_levels": ["critical", "warning"]
+          },
+          {
+            "type": "slack",
+            "webhook_url": "${SLACK_WEBHOOK_URL}",
+            "severity_levels": ["critical", "warning", "info"]
+          }
+        ],
+        "escalation_rules": {
+          "critical": {
+            "immediate": true,
+            "escalation_minutes": 5,
+            "max_escalations": 3
+          },
+          "warning": {
+            "immediate": false,
+            "escalation_minutes": 15,
+            "max_escalations": 2
+          }
+        }
+      }
+    }
+  }
+}

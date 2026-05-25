@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenSyber — Brand Identity System v1.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* ── Core palette ── */
+  --void:    #080B0F;   /* page background — near-black with blue bias */
+  --panel:   #0D1117;   /* card backgrounds */
+  --surface: #141B24;   /* elevated surfaces */
+  --border:  #1E2A38;   /* subtle borders */
+  --wire:    #243344;   /* visible grid lines */
+
+  /* ── Signal colours ── */
+  --signal:  #00E5C3;   /* primary accent — electric teal */
+  --signal2: #00B89A;   /* signal muted */
+  --signal3: #007A67;   /* signal dim */
+  --alert:   #FF4D4D;   /* critical */
+  --warn:    #FFB347;   /* warning */
+  --ok:      #2ECC7B;   /* safe/ok */
+  --info:    #4D9EFF;   /* informational */
+
+  /* ── Text ── */
+  --text-primary:   #E8F0F8;
+  --text-secondary: #7A96B2;
+  --text-muted:     #3D5470;
+  --text-signal:    #00E5C3;
+
+  /* ── Type ── */
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-mono:    'Space Mono', monospace;
+  --font-body:    'DM Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--void);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ── Scanline overlay ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,229,195,0.012) 2px,
+    rgba(0,229,195,0.012) 4px
+  );
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* ── Grid background ── */
+.page-grid {
+  background-image:
+    linear-gradient(var(--wire) 1px, transparent 1px),
+    linear-gradient(90deg, var(--wire) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: -1px -1px;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.container { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+.section { padding: 80px 0; border-top: 1px solid var(--border); }
+
+/* ── Nav ── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: rgba(8,11,15,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  z-index: 900;
+  padding: 0 32px;
+}
+.nav-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  height: 56px;
+}
+.nav-logo {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--signal);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.nav-logo span { color: var(--text-muted); }
+.nav-links {
+  display: flex;
+  gap: 28px;
+  list-style: none;
+  margin-left: auto;
+}
+.nav-links a {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--signal); }
+.nav-version {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 3px 10px;
+  border-radius: 2px;
+}
+
+/* ── Hero ── */
+.hero {
+  padding: 160px 0 100px;
+  position: relative;
+  overflow: hidden;
+}
+.hero-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--signal);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.hero-eyebrow::before {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 1px;
+  background: var(--signal);
+}
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(72px, 10vw, 140px);
+  line-height: 0.92;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.hero-title .signal { color: var(--signal); }
+.hero-sub {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 4vw, 52px);
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 40px;
+}
+.hero-desc {
+  max-width: 560px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.7;
+  margin-bottom: 48px;
+}
+.hero-meta {
+  display: flex;
+  gap: 40px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+.hero-meta span { color: var(--signal); }
+
+/* Decorative corner element */
+.corner-mark {
+  position: absolute;
+  right: 0;
+  top: 100px;
+  width: 420px;
+  height: 420px;
+  opacity: 0.06;
+  background: radial-gradient(circle at center, var(--signal) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── Section labels ── */
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--signal);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  max-width: 200px;
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(36px, 5vw, 60px);
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  line-height: 1;
+}
+.section-desc {
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin-bottom: 56px;
+  font-size: 15px;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 28px;
+  position: relative;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 32px; height: 2px;
+  background: var(--signal);
+  border-radius: 0 0 2px 0;
+}
+
+/* ── Grid systems ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; }
+
+/* ── Colour palette ── */
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 40px;
+}
+.swatch {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 12px;
+  position: relative;
+  cursor: default;
+  transition: transform 0.2s;
+}
+.swatch:hover { transform: scale(1.04); z-index: 2; }
+.swatch-name {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.swatch-hex {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  opacity: 0.6;
+}
+.swatch-role {
+  font-family: var(--font-body);
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+/* Signal swatches row */
+.signal-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.sig-swatch {
+  border-radius: 3px;
+  padding: 16px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.sig-swatch .name { font-weight: 700; letter-spacing: 0.06em; }
+.sig-swatch .hex  { opacity: 0.65; font-size: 10px; }
+.sig-swatch .use  { opacity: 0.75; font-size: 10px; margin-top: 4px; font-family: var(--font-body); }
+
+/* ── Typography specimens ── */
+.type-specimen {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.type-label {
+  background: var(--surface);
+  padding: 10px 20px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.type-body { padding: 28px; }
+.display-specimen {
+  font-family: var(--font-display);
+  font-size: 80px;
+  line-height: 0.9;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+}
+.display-specimen .accent { color: var(--signal); }
+.mono-specimen {
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+.mono-specimen .keyword { color: var(--signal); }
+.mono-specimen .string  { color: var(--warn); }
+.mono-specimen .comment { color: var(--text-muted); font-style: italic; }
+.mono-specimen .num     { color: var(--info); }
+.body-specimen {
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+  max-width: 520px;
+  line-height: 1.7;
+}
+.body-specimen strong { color: var(--text-primary); font-weight: 600; }
+
+/* Type scale table */
+.type-scale {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-top: 24px;
+}
+.type-scale th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.type-scale td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+.type-scale td:first-child { color: var(--text-primary); }
+.type-scale tr:last-child td { border-bottom: none; }
+
+/* ── Logo mark concepts ── */
+.logo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 40px;
+}
+.logo-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 40px 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.logo-card:hover { border-color: var(--signal3); }
+.logo-card.primary { border-color: var(--signal); }
+.logo-card.primary::before {
+  content: 'RECOMMENDED';
+  position: absolute;
+  top: -1px; left: 50%; transform: translateX(-50%);
+  background: var(--signal);
+  color: var(--void);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 3px 12px;
+  border-radius: 0 0 3px 3px;
+}
+.logo-card { position: relative; }
+.logo-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.logo-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* SVG logo marks */
+svg.mark { display: block; }
+
+/* ── Component showcase ── */
+.component-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+
+/* Buttons */
+.btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 11px 24px;
+  border-radius: 3px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-primary {
+  background: var(--signal);
+  color: var(--void);
+}
+.btn-primary:hover { background: #00ffda; box-shadow: 0 0 20px rgba(0,229,195,0.3); }
+.btn-secondary {
+  background: transparent;
+  color: var(--signal);
+  border: 1px solid var(--signal);
+}
+.btn-secondary:hover { background: rgba(0,229,195,0.08); }
+.btn-ghost {
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { color: var(--text-primary); border-color: var(--text-muted); }
+.btn-danger {
+  background: transparent;
+  color: var(--alert);
+  border: 1px solid var(--alert);
+}
+.btn-danger:hover { background: rgba(255,77,77,0.1); }
+
+/* Badges */
+.badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.badge::before { content: '●'; font-size: 7px; }
+.badge-critical { background: rgba(255,77,77,0.12);  color: var(--alert); }
+.badge-warning  { background: rgba(255,179,71,0.12); color: var(--warn);  }
+.badge-ok       { background: rgba(46,204,123,0.12); color: var(--ok);    }
+.badge-info     { background: rgba(77,158,255,0.12); color: var(--info);  }
+.badge-active   { background: rgba(0,229,195,0.12);  color: var(--signal);}
+
+/* Status line */
+.status-line {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--signal);
+  border-radius: 0 3px 3px 0;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.status-line .ts { color: var(--text-muted); font-size: 10px; white-space: nowrap; }
+.status-line .event { color: var(--text-primary); flex: 1; }
+.status-line .level { color: var(--signal); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; }
+
+/* Terminal block */
+.terminal {
+  background: #05080C;
+  border: 1px solid var(--wire);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.terminal-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--wire);
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.terminal-bar .dot { width: 10px; height: 10px; border-radius: 50%; }
+.terminal-bar .dot-r { background: #FF5F57; }
+.terminal-bar .dot-y { background: #FEBC2E; }
+.terminal-bar .dot-g { background: #28C840; }
+.terminal-bar .title { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-left: 8px; }
+.terminal-body { padding: 20px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.8; }
+.terminal-body .prompt { color: var(--signal); }
+.terminal-body .cmd    { color: var(--text-primary); }
+.terminal-body .out    { color: var(--text-muted); }
+.terminal-body .val    { color: var(--ok); }
+.terminal-body .err    { color: var(--alert); }
+.terminal-body .hi     { color: var(--warn); }
+
+/* ── Voice & tone ── */
+.tone-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tone-hdr {
+  background: var(--surface);
+  padding: 12px 20px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tone-hdr .dot { width: 6px; height: 6px; border-radius: 50%; }
+.tone-body { padding: 20px; }
+.tone-example {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border-radius: 3px;
+}
+.tone-yes { border-left: 3px solid var(--ok); background: rgba(46,204,123,0.05); }
+.tone-no  { border-left: 3px solid var(--alert); background: rgba(255,77,77,0.05); }
+.tone-label { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 8px; }
+.tone-label.yes { color: var(--ok); }
+.tone-label.no  { color: var(--alert); }
+
+/* ── Motion principles ── */
+.motion-example {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+}
+.pulse-dot {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 0 0 rgba(0,229,195,0.4);
+  animation: pulse-ring 2s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(0,229,195,0.5); }
+  70%  { box-shadow: 0 0 0 20px rgba(0,229,195,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,229,195,0); }
+}
+.scan-bar {
+  width: 100%;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+.scan-bar::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -30%;
+  width: 30%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--signal), transparent);
+  animation: scan 1.8s ease-in-out infinite;
+}
+@keyframes scan {
+  from { left: -30%; }
+  to   { left: 100%; }
+}
+.blink-cursor::after {
+  content: '█';
+  color: var(--signal);
+  animation: blink 1.2s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.motion-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+
+/* ── Misuse rules ── */
+.rule-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.rule-panel {
+  padding: 20px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.rule-do   { background: rgba(46,204,123,0.06); border: 1px solid rgba(46,204,123,0.2); }
+.rule-dont { background: rgba(255,77,77,0.06);  border: 1px solid rgba(255,77,77,0.2); }
+.rule-tag  { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 8px; }
+.rule-tag.do   { color: var(--ok); }
+.rule-tag.dont { color: var(--alert); }
+
+/* ── Footer ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 40px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ── Utility ── */
+.label-sm {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.gap-top-sm { margin-top: 24px; }
+.gap-top-md { margin-top: 40px; }
+.gap-top-lg { margin-top: 56px; }
+</style>
+</head>
+<body>
+<div class="page-grid">
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <div class="nav-logo">OPEN<span>//</span>SYBER &nbsp;·&nbsp; BRAND SYSTEM</div>
+    <ul class="nav-links">
+      <li><a href="#identity">Identity</a></li>
+      <li><a href="#palette">Palette</a></li>
+      <li><a href="#type">Typography</a></li>
+      <li><a href="#logo">Logo</a></li>
+      <li><a href="#components">Components</a></li>
+      <li><a href="#voice">Voice</a></li>
+      <li><a href="#motion">Motion</a></li>
+      <li><a href="#rules">Rules</a></li>
+    </ul>
+    <div class="nav-version">v1.0 — March 2026</div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero" id="identity">
+  <div class="corner-mark"></div>
+  <div class="container">
+    <div class="hero-eyebrow">Brand Identity System</div>
+    <div class="hero-title">OPEN<span class="signal">SYBER</span></div>
+    <div class="hero-sub">THE CONTROL ROOM</div>
+    <p class="hero-desc">
+      OpenSyber is the security operations layer for AI agents. The brand personality is
+      <strong>the operator who sees everything</strong> — a real-time control room for the
+      invisible infrastructure running your organisation. Dense with data. Quiet in confidence.
+      Sharp when it matters.
+    </p>
+    <div class="hero-meta">
+      Identity: <span>Control Room</span> &nbsp;·&nbsp;
+      Primary accent: <span>#00E5C3</span> &nbsp;·&nbsp;
+      Typefaces: <span>Bebas Neue / Space Mono / DM Sans</span>
+    </div>
+  </div>
+</div>
+
+<!-- PERSONALITY -->
+<section class="section" id="identity-detail">
+  <div class="container">
+    <div class="section-label">Brand Personality</div>
+    <div class="section-title">THE OPERATOR IDENTITY</div>
+    <p class="section-desc">
+      Every design decision should make the user feel like they are in command of something real. 
+      This is not a polished SaaS product. This is mission-critical infrastructure.
+    </p>
+
+    <div class="grid-4">
+      <div class="card">
+        <div class="label-sm">Archetype</div>
+        <div style="font-family:var(--font-display);font-size:32px;color:var(--signal);margin:12px 0 8px">THE SENTINEL</div>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.6">Watchful. Present. Never alarmist — but when it speaks, you listen immediately.</div>
+      </div>
+      <div class="card">
+        <div class="label-sm">Analogues</div>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.8;margin-top:12px">
+          Bloomberg Terminal<br>
+          Air traffic control<br>
+          NASA Mission Control<br>
+          NORAD operations
+        </div>
+      </div>
+      <div class="card">
+        <div class="label-sm">Not</div>
+        <div style="font-size:13px;color:var(--text-muted);line-height:1.8;margin-top:12px;text-decoration:line-through">
+          Friendly SaaS purple<br>
+          Corporate shield logos<br>
+          Stock photo hands<br>
+          Friendly chatbot tone
+        </div>
+      </div>
+      <div class="card">
+        <div class="label-sm">Core feeling</div>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.8;margin-top:12px">
+          I have <span style="color:var(--signal)">total visibility</span>.<br>
+          Nothing moves without me knowing.<br>
+          My agents are <span style="color:var(--ok)">under control</span>.
+        </div>
+      </div>
+    </div>
+
+    <div class="gap-top-md"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="label-sm">What the brand communicates</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:flex-start;gap:12px;font-size:13px;color:var(--text-secondary)">
+            <span style="color:var(--signal);font-family:var(--font-mono);font-size:11px;white-space:nowrap;margin-top:2px">01</span>
+            <span><strong style="color:var(--text-primary)">Depth over breadth.</strong> OpenSyber shows you the signal inside the noise. The brand is dense, precise, and purposeful — never decorative.</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:12px;font-size:13px;color:var(--text-secondary)">
+            <span style="color:var(--signal);font-family:var(--font-mono);font-size:11px;white-space:nowrap;margin-top:2px">02</span>
+            <span><strong style="color:var(--text-primary)">Technical authenticity.</strong> The product is built by engineers for engineers. The brand speaks their language — real terminal output, real data, no stock imagery.</span>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:12px;font-size:13px;color:var(--text-secondary)">
+            <span style="color:var(--signal);font-family:var(--font-mono);font-size:11px;white-space:nowrap;margin-top:2px">03</span>
+            <span><strong style="color:var(--text-primary)">Calm under pressure.</strong> The brand never panics. It uses colour sparingly — green means safe, red means act now. Signal has meaning.</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="border-color:var(--signal)">
+        <div class="label-sm" style="color:var(--signal)">Why "Control Room" — not the others</div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:13px;color:var(--text-muted);display:flex;gap:8px;align-items:flex-start">
+            <span style="color:var(--alert);font-size:11px;margin-top:3px">✗</span>
+            <span><span style="color:var(--text-secondary)">"Guardian" —</span> too warm, too passive. Wiz already owns the approachable-protector space.</span>
+          </div>
+          <div style="font-size:13px;color:var(--text-muted);display:flex;gap:8px;align-items:flex-start">
+            <span style="color:var(--alert);font-size:11px;margin-top:3px">✗</span>
+            <span><span style="color:var(--text-secondary)">"Hacker's Ally" —</span> too adversarial, signals ambiguity about whose side you're on.</span>
+          </div>
+          <div style="font-size:13px;color:var(--text-muted);display:flex;gap:8px;align-items:flex-start">
+            <span style="color:var(--alert);font-size:11px;margin-top:3px">✗</span>
+            <span><span style="color:var(--text-secondary)">"Enterprise Shield" —</span> indistinguishable from 200 competitors. Kills developer love.</span>
+          </div>
+          <div style="font-size:13px;color:var(--ok);display:flex;gap:8px;align-items:flex-start;margin-top:4px">
+            <span style="color:var(--ok);font-size:11px;margin-top:3px">✓</span>
+            <span><span style="color:var(--text-primary)">"Control Room" —</span> plays to the dashboard's genuine strengths. Appeals to technical builders. Differentiates from everyone moving corporate.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COLOUR PALETTE -->
+<section class="section" id="palette">
+  <div class="container">
+    <div class="section-label">Colour System</div>
+    <div class="section-title">PALETTE</div>
+    <p class="section-desc">
+      Five dark surfaces. Six semantic signal colours. Colour earns meaning — it is never decorative. 
+      Use signal colours only when the data warrants them.
+    </p>
+
+    <!-- Background swatches -->
+    <div class="label-sm gap-top-sm">Background Surfaces</div>
+    <div class="palette-grid" style="margin-top:12px">
+      <div class="swatch" style="background:#080B0F;color:#3D5470">
+        <div class="swatch-name">Void</div>
+        <div class="swatch-hex">#080B0F</div>
+        <div class="swatch-role">Page background</div>
+      </div>
+      <div class="swatch" style="background:#0D1117;color:#3D5470">
+        <div class="swatch-name">Panel</div>
+        <div class="swatch-hex">#0D1117</div>
+        <div class="swatch-role">Card backgrounds</div>
+      </div>
+      <div class="swatch" style="background:#141B24;color:#4A6480">
+        <div class="swatch-name">Surface</div>
+        <div class="swatch-hex">#141B24</div>
+        <div class="swatch-role">Elevated UI</div>
+      </div>
+      <div class="swatch" style="background:#1E2A38;color:#4A6480">
+        <div class="swatch-name">Border</div>
+        <div class="swatch-hex">#1E2A38</div>
+        <div class="swatch-role">Subtle borders</div>
+      </div>
+      <div class="swatch" style="background:#243344;color:#5A7A96">
+        <div class="swatch-name">Wire</div>
+        <div class="swatch-hex">#243344</div>
+        <div class="swatch-role">Grid / active borders</div>
+      </div>
+    </div>
+
+    <!-- Text swatches -->
+    <div class="label-sm" style="margin-top:32px">Text Hierarchy</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:16px">
+        <div style="font-family:var(--font-mono);font-size:24px;color:#E8F0F8;font-weight:700">Aa</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:8px">PRIMARY<br>#E8F0F8</div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:16px">
+        <div style="font-family:var(--font-mono);font-size:24px;color:#7A96B2;font-weight:700">Aa</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:8px">SECONDARY<br>#7A96B2</div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:16px">
+        <div style="font-family:var(--font-mono);font-size:24px;color:#3D5470;font-weight:700">Aa</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:8px">MUTED<br>#3D5470</div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:3px;padding:16px">
+        <div style="font-family:var(--font-mono);font-size:24px;color:#00E5C3;font-weight:700">Aa</div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);margin-top:8px">SIGNAL<br>#00E5C3</div>
+      </div>
+    </div>
+
+    <!-- Signal swatches -->
+    <div class="label-sm" style="margin-top:32px">Signal Colours — Semantic Use Only</div>
+    <div class="signal-swatches" style="margin-top:12px">
+      <div class="sig-swatch" style="background:rgba(0,229,195,0.1);border:1px solid rgba(0,229,195,0.25);color:#00E5C3">
+        <div class="name">SIGNAL</div>
+        <div class="hex">#00E5C3</div>
+        <div class="use">Primary accent, active state, brand mark</div>
+      </div>
+      <div class="sig-swatch" style="background:rgba(0,184,154,0.1);border:1px solid rgba(0,184,154,0.25);color:#00B89A">
+        <div class="name">SIGNAL–2</div>
+        <div class="hex">#00B89A</div>
+        <div class="use">Hover states, secondary emphasis</div>
+      </div>
+      <div class="sig-swatch" style="background:rgba(255,77,77,0.1);border:1px solid rgba(255,77,77,0.25);color:#FF4D4D">
+        <div class="name">ALERT</div>
+        <div class="hex">#FF4D4D</div>
+        <div class="use">Critical severity, errors, must-act</div>
+      </div>
+      <div class="sig-swatch" style="background:rgba(255,179,71,0.1);border:1px solid rgba(255,179,71,0.25);color:#FFB347">
+        <div class="name">WARN</div>
+        <div class="hex">#FFB347</div>
+        <div class="use">High severity, degraded state</div>
+      </div>
+      <div class="sig-swatch" style="background:rgba(46,204,123,0.1);border:1px solid rgba(46,204,123,0.25);color:#2ECC7B">
+        <div class="name">OK</div>
+        <div class="hex">#2ECC7B</div>
+        <div class="use">Safe, nominal, passing checks</div>
+      </div>
+      <div class="sig-swatch" style="background:rgba(77,158,255,0.1);border:1px solid rgba(77,158,255,0.25);color:#4D9EFF">
+        <div class="name">INFO</div>
+        <div class="hex">#4D9EFF</div>
+        <div class="use">Informational, low severity</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TYPOGRAPHY -->
+<section class="section" id="type">
+  <div class="container">
+    <div class="section-label">Typography</div>
+    <div class="section-title">TYPE SYSTEM</div>
+    <p class="section-desc">
+      Three typefaces. Each has a role. They never cross.
+      Bebas Neue commands. Space Mono operates. DM Sans explains.
+    </p>
+
+    <!-- Display -->
+    <div class="type-specimen">
+      <div class="type-label">
+        <span>BEBAS NEUE — Display / Headlines / Brand</span>
+        <span style="color:var(--signal)">Google Fonts · Free</span>
+      </div>
+      <div class="type-body">
+        <div class="display-specimen">AGENT <span class="accent">SECURITY</span><br>CONTROL ROOM</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-top:20px;letter-spacing:0.1em">
+          USE FOR: page titles · hero headlines · section headings · dashboard panel labels · numeric callouts
+        </div>
+      </div>
+    </div>
+
+    <!-- Mono -->
+    <div class="type-specimen">
+      <div class="type-label">
+        <span>SPACE MONO — Code / Data / Labels / UI</span>
+        <span style="color:var(--signal)">Google Fonts · Free</span>
+      </div>
+      <div class="type-body">
+        <div class="mono-specimen" style="font-size:13px">
+          <span class="keyword">opensyber</span>.<span class="keyword">monitor</span>(<span class="string">'claude-code'</span>, {<br>
+          &nbsp;&nbsp;gateway: <span class="string">'token_7f3a...c291'</span>,<br>
+          &nbsp;&nbsp;riskLevel: <span class="keyword">RiskLevel</span>.<span class="num">CRITICAL</span>,<br>
+          &nbsp;&nbsp;<span class="comment">// terminal command detected: curl | bash</span><br>
+          &nbsp;&nbsp;alert: <span class="keyword">true</span><br>
+          });
+        </div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-top:20px;letter-spacing:0.1em">
+          USE FOR: code blocks · terminal output · nav links · badges · timestamps · hex values · metadata
+        </div>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="type-specimen">
+      <div class="type-label">
+        <span>DM SANS — Body / Prose / Descriptions</span>
+        <span style="color:var(--signal)">Google Fonts · Free</span>
+      </div>
+      <div class="type-body">
+        <div class="body-specimen">
+          OpenSyber monitors <strong>39 external platforms</strong> through a unified normalisation pipeline. 
+          Every event — from a GuardDuty finding to an npm install command inside your developer's VS Code — 
+          passes through the same severity mapping, the same deduplication layer, and surfaces in one timeline. 
+          <strong>Nothing moves without you knowing.</strong>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-top:20px;letter-spacing:0.1em">
+          USE FOR: body copy · descriptions · documentation · blog posts · marketing text
+        </div>
+      </div>
+    </div>
+
+    <!-- Scale table -->
+    <div class="gap-top-md"></div>
+    <div class="label-sm">Type Scale</div>
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-top:12px">
+      <table class="type-scale">
+        <thead>
+          <tr><th>Role</th><th>Font</th><th>Size</th><th>Weight</th><th>Usage</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Display XL</td><td>Bebas Neue</td><td>120–80px</td><td>400</td>
+            <td style="color:var(--text-muted)">Hero headlines, campaign titles</td>
+          </tr>
+          <tr>
+            <td>Display L</td><td>Bebas Neue</td><td>60–40px</td><td>400</td>
+            <td style="color:var(--text-muted)">Section titles, feature headlines</td>
+          </tr>
+          <tr>
+            <td>Display M</td><td>Bebas Neue</td><td>32–24px</td><td>400</td>
+            <td style="color:var(--text-muted)">Card titles, dashboard panel headers</td>
+          </tr>
+          <tr>
+            <td>UI Label</td><td>Space Mono</td><td>12–11px</td><td>700</td>
+            <td style="color:var(--text-muted)">Nav items, badges, timestamps, metadata</td>
+          </tr>
+          <tr>
+            <td>Code</td><td>Space Mono</td><td>13–12px</td><td>400</td>
+            <td style="color:var(--text-muted)">Terminal output, code blocks, hex values</td>
+          </tr>
+          <tr>
+            <td>Body</td><td>DM Sans</td><td>16–15px</td><td>400</td>
+            <td style="color:var(--text-muted)">Paragraphs, descriptions, documentation</td>
+          </tr>
+          <tr>
+            <td>Body S</td><td>DM Sans</td><td>13–12px</td><td>400</td>
+            <td style="color:var(--text-muted)">Supporting text, captions, footnotes</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- LOGO -->
+<section class="section" id="logo">
+  <div class="container">
+    <div class="section-label">Logo System</div>
+    <div class="section-title">MARK & WORDMARK</div>
+    <p class="section-desc">
+      Three logo mark concepts — all based on the "pulse / signal" metaphor. 
+      The recommended mark (Crosshair) directly communicates precision targeting and real-time monitoring.
+    </p>
+
+    <div class="logo-grid">
+      <!-- Crosshair -->
+      <div class="logo-card primary">
+        <svg class="mark" width="72" height="72" viewBox="0 0 72 72" fill="none">
+          <circle cx="36" cy="36" r="34" stroke="#00E5C3" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <circle cx="36" cy="36" r="20" stroke="#00E5C3" stroke-width="1.5"/>
+          <circle cx="36" cy="36" r="5" fill="#00E5C3"/>
+          <line x1="36" y1="0" x2="36" y2="14" stroke="#00E5C3" stroke-width="1.5"/>
+          <line x1="36" y1="58" x2="36" y2="72" stroke="#00E5C3" stroke-width="1.5"/>
+          <line x1="0" y1="36" x2="14" y2="36" stroke="#00E5C3" stroke-width="1.5"/>
+          <line x1="58" y1="36" x2="72" y2="36" stroke="#00E5C3" stroke-width="1.5"/>
+          <circle cx="36" cy="36" r="28" stroke="#00E5C3" stroke-width="0.5" opacity="0.3"/>
+        </svg>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:var(--font-display);font-size:28px;letter-spacing:0.06em;color:var(--text-primary)">OPENSYBER</span>
+        </div>
+        <div class="logo-name">Crosshair</div>
+        <div class="logo-desc">Precision. Targeting. Constant vigilance. The crosshair communicates "we see everything" without aggression.</div>
+      </div>
+
+      <!-- Waveform -->
+      <div class="logo-card">
+        <svg class="mark" width="72" height="72" viewBox="0 0 72 72" fill="none">
+          <rect x="1" y="1" width="70" height="70" rx="6" stroke="#00E5C3" stroke-width="1.5"/>
+          <polyline points="8,36 16,20 22,48 28,28 34,44 40,16 46,52 52,30 58,36 64,36" stroke="#00E5C3" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="58" cy="36" r="3" fill="#00E5C3"/>
+        </svg>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:var(--font-display);font-size:28px;letter-spacing:0.06em;color:var(--text-primary)">OPENSYBER</span>
+        </div>
+        <div class="logo-name">Waveform</div>
+        <div class="logo-desc">Pulse monitoring. Activity stream. Works well for developer and security monitoring contexts.</div>
+      </div>
+
+      <!-- Hex Grid -->
+      <div class="logo-card">
+        <svg class="mark" width="72" height="72" viewBox="0 0 72 72" fill="none">
+          <polygon points="36,4 63,20 63,52 36,68 9,52 9,20" stroke="#00E5C3" stroke-width="1.5" fill="none"/>
+          <polygon points="36,16 54,27 54,45 36,56 18,45 18,27" stroke="#00E5C3" stroke-width="1" fill="none" opacity="0.5"/>
+          <polygon points="36,26 46,32 46,44 36,50 26,44 26,32" fill="rgba(0,229,195,0.15)" stroke="#00E5C3" stroke-width="1.5"/>
+          <line x1="36" y1="4" x2="36" y2="16" stroke="#00E5C3" stroke-width="1" opacity="0.4"/>
+          <line x1="36" y1="56" x2="36" y2="68" stroke="#00E5C3" stroke-width="1" opacity="0.4"/>
+        </svg>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-family:var(--font-display);font-size:28px;letter-spacing:0.06em;color:var(--text-primary)">OPENSYBER</span>
+        </div>
+        <div class="logo-name">Hex Grid</div>
+        <div class="logo-desc">Network topology. Defensive layers. Resonates with cybersecurity audience but risks being generic.</div>
+      </div>
+    </div>
+
+    <!-- Logo on different backgrounds -->
+    <div class="label-sm">Logo Backgrounds — Approved Usage</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px">
+      <div style="background:#080B0F;border:1px solid var(--border);padding:24px;border-radius:4px;display:flex;align-items:center;gap:10px">
+        <svg width="28" height="28" viewBox="0 0 72 72" fill="none">
+          <circle cx="36" cy="36" r="34" stroke="#00E5C3" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <circle cx="36" cy="36" r="20" stroke="#00E5C3" stroke-width="1.5"/>
+          <circle cx="36" cy="36" r="5" fill="#00E5C3"/>
+          <line x1="36" y1="0" x2="36" y2="14" stroke="#00E5C3" stroke-width="1.5"/>
+          <line x1="36" y1="58" x2="36" y2="72" stroke="#00E5C3" stroke-width="1.5"/>
+          <line x1="0" y1="36" x2="14" y2="36" stroke="#00E5C3" stroke-width="1.5"/>
+          <line x1="58" y1="36" x2="72" y2="36" stroke="#00E5C3" stroke-width="1.5"/>
+        </svg>
+        <span style="font-family:var(--font-display);font-size:18px;color:#E8F0F8;letter-spacing:0.06em">OPENSYBER</span>
+      </div>
+      <div style="background:#0D1117;border:1px solid var(--border);padding:24px;border-radius:4px;display:flex;align-items:center;gap:10px">
+        <svg width="28" height="28" viewBox="0 0 72 72" fill="none">
+          <circle cx="36" cy="36" r="34" stroke="#00E5C3" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <circle cx="36" cy="36" r="20" stroke="#00E5C3" stroke-width="1.5"/>
+          <circle cx="36" cy="36" r="5" fill="#00E5C3"/>
+          <line x1="36" y1="0" x2="36" y2="14" stroke="#00E5C3" stroke-width="1.5"/>
+          <line x1="36" y1="58" x2="36" y2="72" stroke="#00E5C3" stroke-width="1.5"/>
+          <line x1="0" y1="36" x2="14" y2="36" stroke="#00E5C3" stroke-width="1.5"/>
+          <line x1="58" y1="36" x2="72" y2="36" stroke="#00E5C3" stroke-width="1.5"/>
+        </svg>
+        <span style="font-family:var(--font-display);font-size:18px;color:#E8F0F8;letter-spacing:0.06em">OPENSYBER</span>
+      </div>
+      <div style="background:#00E5C3;padding:24px;border-radius:4px;display:flex;align-items:center;gap:10px">
+        <svg width="28" height="28" viewBox="0 0 72 72" fill="none">
+          <circle cx="36" cy="36" r="34" stroke="#080B0F" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <circle cx="36" cy="36" r="20" stroke="#080B0F" stroke-width="1.5"/>
+          <circle cx="36" cy="36" r="5" fill="#080B0F"/>
+          <line x1="36" y1="0" x2="36" y2="14" stroke="#080B0F" stroke-width="1.5"/>
+          <line x1="36" y1="58" x2="36" y2="72" stroke="#080B0F" stroke-width="1.5"/>
+          <line x1="0" y1="36" x2="14" y2="36" stroke="#080B0F" stroke-width="1.5"/>
+          <line x1="58" y1="36" x2="72" y2="36" stroke="#080B0F" stroke-width="1.5"/>
+        </svg>
+        <span style="font-family:var(--font-display);font-size:18px;color:#080B0F;letter-spacing:0.06em">OPENSYBER</span>
+      </div>
+      <div style="background:#F0F4F8;padding:24px;border-radius:4px;display:flex;align-items:center;gap:10px">
+        <svg width="28" height="28" viewBox="0 0 72 72" fill="none">
+          <circle cx="36" cy="36" r="34" stroke="#080B0F" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <circle cx="36" cy="36" r="20" stroke="#080B0F" stroke-width="1.5"/>
+          <circle cx="36" cy="36" r="5" fill="#080B0F"/>
+          <line x1="36" y1="0" x2="36" y2="14" stroke="#080B0F" stroke-width="1.5"/>
+          <line x1="36" y1="58" x2="36" y2="72" stroke="#080B0F" stroke-width="1.5"/>
+          <line x1="0" y1="36" x2="14" y2="36" stroke="#080B0F" stroke-width="1.5"/>
+          <line x1="58" y1="36" x2="72" y2="36" stroke="#080B0F" stroke-width="1.5"/>
+        </svg>
+        <span style="font-family:var(--font-display);font-size:18px;color:#080B0F;letter-spacing:0.06em">OPENSYBER</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPONENTS -->
+<section class="section" id="components">
+  <div class="container">
+    <div class="section-label">UI Components</div>
+    <div class="section-title">COMPONENT LIBRARY</div>
+    <p class="section-desc">
+      Every component reflects operator density. Information is surfaced, not hidden. 
+      Colour is earned — only signal severity states may use non-neutral colours.
+    </p>
+
+    <!-- Buttons -->
+    <div class="label-sm">Buttons</div>
+    <div class="component-row" style="margin-top:12px">
+      <button class="btn btn-primary">Connect Integration</button>
+      <button class="btn btn-secondary">View Events</button>
+      <button class="btn btn-ghost">Configure</button>
+      <button class="btn btn-danger">Revoke Access</button>
+    </div>
+
+    <!-- Badges -->
+    <div class="label-sm gap-top-md">Severity Badges</div>
+    <div class="component-row" style="margin-top:12px">
+      <span class="badge badge-critical">Critical</span>
+      <span class="badge badge-warning">High</span>
+      <span class="badge badge-info">Medium</span>
+      <span class="badge badge-ok">Nominal</span>
+      <span class="badge badge-active">Active</span>
+    </div>
+
+    <!-- Status lines -->
+    <div class="label-sm gap-top-md">Event Feed — Live</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">
+      <div class="status-line" style="border-left-color:var(--alert)">
+        <span class="ts">14:23:07.331</span>
+        <span class="level" style="color:var(--alert)">CRITICAL</span>
+        <span class="event">claude-code · filesystem enumeration prompt intercepted · path=/home/dev/.env → /tmp/inventory.txt</span>
+        <span class="badge badge-critical">IDE AGENT</span>
+      </div>
+      <div class="status-line" style="border-left-color:var(--warn)">
+        <span class="ts">14:22:51.108</span>
+        <span class="level" style="color:var(--warn)">HIGH</span>
+        <span class="event">npm install phantomjs-node · package name matches slopsquatting pattern · Socket.dev threat score 94/100</span>
+        <span class="badge badge-warning">SUPPLY CHAIN</span>
+      </div>
+      <div class="status-line" style="border-left-color:var(--info)">
+        <span class="ts">14:22:44.002</span>
+        <span class="level" style="color:var(--info)">MEDIUM</span>
+        <span class="event">guardduty · Recon:EC2/PortProbeUnprotectedPort · instance i-0a3f7c2b1d · us-east-1</span>
+        <span class="badge badge-info">GUARDDUTY</span>
+      </div>
+      <div class="status-line" style="border-left-color:var(--ok)">
+        <span class="ts">14:22:38.774</span>
+        <span class="level" style="color:var(--ok)">OK</span>
+        <span class="event">entra-id · risky sign-in resolved · user shachar@globalremit.com · risk state remediated</span>
+        <span class="badge badge-ok">IDENTITY</span>
+      </div>
+    </div>
+
+    <!-- Terminal -->
+    <div class="label-sm gap-top-md">Terminal Component</div>
+    <div class="terminal" style="margin-top:12px">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div>
+        <div class="dot dot-y"></div>
+        <div class="dot dot-g"></div>
+        <div class="title">opensyber — agent monitor</div>
+      </div>
+      <div class="terminal-body">
+        <div><span class="prompt">$ </span><span class="cmd">opensyber hook install claude-code --token=gw_7f3a...c291</span></div>
+        <div class="out">  ✓ Hook installed at /usr/local/bin/claude-code</div>
+        <div class="out">  ✓ Gateway token validated</div>
+        <div class="out">  ✓ Syncing to opensyber.cloud every 60s</div>
+        <div style="margin-top:12px"><span class="prompt">$ </span><span class="cmd">opensyber agents status</span></div>
+        <div class="out">  <span class="val">ACTIVE</span>   claude-code@3.1.2   session:abc123   risk:low   last:4s ago</div>
+        <div class="out">  <span class="val">ACTIVE</span>   cursor@0.43.1       session:def456   risk:low   last:12s ago</div>
+        <div class="out">  <span class="hi">WATCH</span>    copilot@1.258.0     session:ghi789   risk:med   last:3s ago</div>
+        <div style="margin-top:12px"><span class="prompt">$ </span><span class="cmd blink-cursor"></span></div>
+      </div>
+    </div>
+
+    <!-- Cards -->
+    <div class="label-sm gap-top-md">Metric Cards</div>
+    <div class="grid-4" style="margin-top:12px">
+      <div class="card">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">ACTIVE AGENTS</div>
+        <div style="font-family:var(--font-display);font-size:48px;color:var(--signal);line-height:1;margin-bottom:4px">24</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--ok)">↑ 3 since yesterday</div>
+      </div>
+      <div class="card">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">CRITICAL EVENTS</div>
+        <div style="font-family:var(--font-display);font-size:48px;color:var(--alert);line-height:1;margin-bottom:4px">3</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)">Last 24 hours</div>
+      </div>
+      <div class="card">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">INTEGRATIONS</div>
+        <div style="font-family:var(--font-display);font-size:48px;color:var(--text-primary);line-height:1;margin-bottom:4px">39</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--ok)">All nominal</div>
+      </div>
+      <div class="card">
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">SECURITY SCORE</div>
+        <div style="font-family:var(--font-display);font-size:48px;color:var(--warn);line-height:1;margin-bottom:4px">78</div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--warn)">↓ MCP gap open</div>
+      </div>
+    </div>
+
+    <!-- Scan bar progress -->
+    <div class="label-sm gap-top-md">Loading / Scan States</div>
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:16px">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-bottom:6px">SCANNING GUARDDUTY · us-east-1</div>
+        <div class="scan-bar"></div>
+      </div>
+      <div>
+        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);margin-bottom:6px">SYNCING CLAUDE CODE SESSIONS · 14 events pending</div>
+        <div class="scan-bar" style="animation-delay:0.6s"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VOICE & TONE -->
+<section class="section" id="voice">
+  <div class="container">
+    <div class="section-label">Voice & Tone</div>
+    <div class="section-title">HOW OPENSYBER SPEAKS</div>
+    <p class="section-desc">
+      The operator doesn't explain. The operator reports. Messages are exact, terse, and 
+      consequential. No marketing fluff penetrates the control room.
+    </p>
+
+    <div class="grid-2">
+      <!-- Error messages -->
+      <div class="tone-card">
+        <div class="tone-hdr">
+          <div class="dot" style="background:var(--alert)"></div>
+          Error Messages
+        </div>
+        <div class="tone-body">
+          <div class="tone-label no">WRONG</div>
+          <div class="tone-example tone-no">Oops! Something went wrong with your GuardDuty connection. Please try again later or contact our support team if this keeps happening!</div>
+          <div class="tone-label yes">RIGHT</div>
+          <div class="tone-example tone-yes" style="font-family:var(--font-mono);font-size:13px">GuardDuty · us-east-1 · ERR_AUTH_FAILED<br><span style="color:var(--text-muted)">SigV4 signature mismatch. Check access key rotation.<br>Last success: 4h ago</span></div>
+        </div>
+      </div>
+
+      <!-- Onboarding -->
+      <div class="tone-card">
+        <div class="tone-hdr">
+          <div class="dot" style="background:var(--signal)"></div>
+          Onboarding Copy
+        </div>
+        <div class="tone-body">
+          <div class="tone-label no">WRONG</div>
+          <div class="tone-example tone-no">Welcome to OpenSyber! We're so excited to have you here. Let's get started on your amazing security journey together!</div>
+          <div class="tone-label yes">RIGHT</div>
+          <div class="tone-example tone-yes">Your agents are running. You are not watching them.<br><br>Connect your first integration to change that.</div>
+        </div>
+      </div>
+
+      <!-- Empty states -->
+      <div class="tone-card">
+        <div class="tone-hdr">
+          <div class="dot" style="background:var(--info)"></div>
+          Empty States
+        </div>
+        <div class="tone-body">
+          <div class="tone-label no">WRONG</div>
+          <div class="tone-example tone-no">No events yet! Once you set up your integrations, your security events will appear here. Get started by connecting your first platform!</div>
+          <div class="tone-label yes">RIGHT</div>
+          <div class="tone-example tone-yes" style="font-family:var(--font-mono);font-size:13px">NO EVENTS IN RANGE<br><span style="color:var(--text-muted);font-size:12px">Last sync: 2 min ago · 0 matching events</span></div>
+        </div>
+      </div>
+
+      <!-- Success states -->
+      <div class="tone-card">
+        <div class="tone-hdr">
+          <div class="dot" style="background:var(--ok)"></div>
+          Success / Confirmation
+        </div>
+        <div class="tone-body">
+          <div class="tone-label no">WRONG</div>
+          <div class="tone-example tone-no">Awesome! Your GitHub integration is all set up and ready to go! You'll start receiving security alerts in just a few moments. Great job!</div>
+          <div class="tone-label yes">RIGHT</div>
+          <div class="tone-example tone-yes" style="font-family:var(--font-mono);font-size:13px">GitHub · connected<br><span style="color:var(--text-muted);font-size:12px">Watching: 3 repos · First sync in ~60s</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gap-top-md"></div>
+    <div class="card">
+      <div class="label-sm">The Five Voice Rules</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+        <div style="display:flex;gap:12px;font-size:13px;color:var(--text-secondary)">
+          <span style="color:var(--signal);font-family:var(--font-mono);font-size:11px;margin-top:2px;flex-shrink:0">01</span>
+          <span><strong style="color:var(--text-primary)">Be precise, not polite.</strong> "Connection failed: 403" is better than "We couldn't connect right now." Operators need the exact failure mode, not comfort.</span>
+        </div>
+        <div style="display:flex;gap:12px;font-size:13px;color:var(--text-secondary)">
+          <span style="color:var(--signal);font-family:var(--font-mono);font-size:11px;margin-top:2px;flex-shrink:0">02</span>
+          <span><strong style="color:var(--text-primary)">Name the thing.</strong> Always name the specific integration, agent, file, command, or user involved. "An agent" is useless. "claude-code · session abc123" is actionable.</span>
+        </div>
+        <div style="display:flex;gap:12px;font-size:13px;color:var(--text-secondary)">
+          <span style="color:var(--signal);font-family:var(--font-mono);font-size:11px;margin-top:2px;flex-shrink:0">03</span>
+          <span><strong style="color:var(--text-primary)">Timestamps are not optional.</strong> Every event, every status, every sync has a timestamp. "Last checked" without a time is theatre.</span>
+        </div>
+        <div style="display:flex;gap:12px;font-size:13px;color:var(--text-secondary)">
+          <span style="color:var(--signal);font-family:var(--font-mono);font-size:11px;margin-top:2px;flex-shrink:0">04</span>
+          <span><strong style="color:var(--text-primary)">Exclamation marks are banned.</strong> An exclamation mark is noise. A critical alert is colour and an immediate action. Urgency comes from design, not punctuation.</span>
+        </div>
+        <div style="display:flex;gap:12px;font-size:13px;color:var(--text-secondary)">
+          <span style="color:var(--signal);font-family:var(--font-mono);font-size:11px;margin-top:2px;flex-shrink:0">05</span>
+          <span><strong style="color:var(--text-primary)">Marketing copy stays outside the product.</strong> Inside the dashboard, there are no upsells, no "unlock this feature", no growth hooks in the data stream. The operator's workspace is sacred.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MOTION -->
+<section class="section" id="motion">
+  <div class="container">
+    <div class="section-label">Motion & Animation</div>
+    <div class="section-title">MOTION SYSTEM</div>
+    <p class="section-desc">
+      Motion communicates system state. Pulse means live. Scan means working. Static means done. 
+      Never animate for decoration — only for information.
+    </p>
+
+    <div class="grid-3">
+      <div class="motion-example">
+        <div class="pulse-dot"></div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-primary);margin-bottom:4px">LIVE PULSE</div>
+          <div class="motion-label">Agent is connected and transmitting. Stops when disconnected.</div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">2s · ease-out · infinite</div>
+      </div>
+
+      <div class="motion-example">
+        <div style="width:100%">
+          <div class="scan-bar"></div>
+        </div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-primary);margin-bottom:4px">SCAN SWEEP</div>
+          <div class="motion-label">Integration is syncing or health check is running.</div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">1.8s · ease-in-out · infinite</div>
+      </div>
+
+      <div class="motion-example">
+        <div style="font-family:var(--font-mono);font-size:28px;color:var(--text-primary)" class="blink-cursor">READY</div>
+        <div>
+          <div style="font-family:var(--font-mono);font-size:12px;color:var(--text-primary);margin-bottom:4px">CURSOR BLINK</div>
+          <div class="motion-label">Terminal input awaiting command. Signals interactivity.</div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--text-muted)">1.2s · step-end · infinite</div>
+      </div>
+    </div>
+
+    <div class="gap-top-md"></div>
+    <div class="card">
+      <div class="label-sm">Motion Principles</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:16px">
+        <div style="font-size:13px;color:var(--text-secondary)"><strong style="color:var(--text-primary);display:block;margin-bottom:4px">Duration</strong>100–200ms for micro-interactions. 300ms for state transitions. Never exceed 600ms for a state change. The operator doesn't wait.</div>
+        <div style="font-size:13px;color:var(--text-secondary)"><strong style="color:var(--text-primary);display:block;margin-bottom:4px">Easing</strong>ease-out for elements entering. ease-in for elements leaving. Linear for continuous system state (scan, pulse). No bounce, no spring, no elastic.</div>
+        <div style="font-size:13px;color:var(--text-secondary)"><strong style="color:var(--text-primary);display:block;margin-bottom:4px">Meaning</strong>Pulse = live. Scan = working. Blink = waiting. Fade-in = new data arrived. Flash-red = critical event. Every animation must mean exactly one thing.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RULES -->
+<section class="section" id="rules">
+  <div class="container">
+    <div class="section-label">Usage Rules</div>
+    <div class="section-title">WHAT INFECTS EVERYTHING</div>
+    <p class="section-desc">
+      The control room identity must be consistent across every surface the brand touches.
+      These are the non-negotiable rules.
+    </p>
+
+    <div class="rule-row">
+      <div class="rule-panel rule-do">
+        <div class="rule-tag do">✓ DO</div>
+        Use dark backgrounds (#080B0F or #0D1117) as the default surface across all product screens
+      </div>
+      <div class="rule-panel rule-dont">
+        <div class="rule-tag dont">✗ DON'T</div>
+        Ship a "light mode" until v2.0. The control room is dark. Light mode is a different brand.
+      </div>
+    </div>
+    <div class="rule-row">
+      <div class="rule-panel rule-do">
+        <div class="rule-tag do">✓ DO</div>
+        Show real data in marketing — actual terminal output, real event format, actual severity mapping. The sophistication is the demo.
+      </div>
+      <div class="rule-panel rule-dont">
+        <div class="rule-tag dont">✗ DON'T</div>
+        Use stock photography, generic dashboard screenshots, or illustrated characters. The brand communicates via real system output, not illustrations.
+      </div>
+    </div>
+    <div class="rule-row">
+      <div class="rule-panel rule-do">
+        <div class="rule-tag do">✓ DO</div>
+        Use Space Mono for all navigation, badges, labels, timestamps, and UI chrome. The product UI should feel like a terminal that got a design system.
+      </div>
+      <div class="rule-panel rule-dont">
+        <div class="rule-tag dont">✗ DON'T</div>
+        Mix DM Sans into UI labels. Body copy is for explanatory prose — documentation, marketing, blog posts. UI components speak Space Mono.
+      </div>
+    </div>
+    <div class="rule-row">
+      <div class="rule-panel rule-do">
+        <div class="rule-tag do">✓ DO</div>
+        Use signal colour (#00E5C3) sparingly — for the active/live state, primary CTAs, and the logo mark only. Its rarity is what makes it mean something.
+      </div>
+      <div class="rule-panel rule-dont">
+        <div class="rule-tag dont">✗ DON'T</div>
+        Use signal colour as a decorative accent, section highlight, or background colour. The moment it appears everywhere, critical states lose their urgency.
+      </div>
+    </div>
+    <div class="rule-row">
+      <div class="rule-panel rule-do">
+        <div class="rule-tag do">✓ DO</div>
+        Let the scanline overlay, grid background, and screen glow effects bleed across all product screens and marketing pages.
+      </div>
+      <div class="rule-panel rule-dont">
+        <div class="rule-tag dont">✗ DON'T</div>
+        Use gradients on text, drop shadows on cards, rounded corners larger than 4px, or any ornamental element that doesn't communicate system state.
+      </div>
+    </div>
+    <div class="rule-row">
+      <div class="rule-panel rule-do">
+        <div class="rule-tag do">✓ DO</div>
+        Bebas Neue for all display text — landing page hero, email headers, social graphics, press kit. The typeface IS the brand voice at scale.
+      </div>
+      <div class="rule-panel rule-dont">
+        <div class="rule-tag dont">✗ DON'T</div>
+        Use Inter, Roboto, or system fonts anywhere in brand-facing material. They communicate "we didn't think about this." OpenSyber thought about this.
+      </div>
+    </div>
+
+    <!-- Apply everywhere -->
+    <div class="gap-top-md"></div>
+    <div class="card" style="border-color:var(--signal)">
+      <div class="label-sm" style="color:var(--signal)">Apply this identity to every surface</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px">
+        <div style="font-size:12px;color:var(--text-secondary);font-family:var(--font-mono)">
+          <div style="color:var(--text-primary);margin-bottom:8px;letter-spacing:0.06em">PRODUCT</div>
+          Dashboard<br>Onboarding<br>Error pages<br>Empty states<br>Email alerts
+        </div>
+        <div style="font-size:12px;color:var(--text-secondary);font-family:var(--font-mono)">
+          <div style="color:var(--text-primary);margin-bottom:8px;letter-spacing:0.06em">MARKETING</div>
+          Landing page<br>Blog<br>Social media<br>Press kit<br>Conference slides
+        </div>
+        <div style="font-size:12px;color:var(--text-secondary);font-family:var(--font-mono)">
+          <div style="color:var(--text-primary);margin-bottom:8px;letter-spacing:0.06em">DOCS</div>
+          Documentation<br>API reference<br>Changelogs<br>README<br>CLI help text
+        </div>
+        <div style="font-size:12px;color:var(--text-secondary);font-family:var(--font-mono)">
+          <div style="color:var(--text-primary);margin-bottom:8px;letter-spacing:0.06em">COMMS</div>
+          Email templates<br>Slack alerts<br>PagerDuty format<br>GitHub issues<br>Job listings
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <span>OPENSYBER BRAND IDENTITY SYSTEM · v1.0 · MARCH 2026 · CONFIDENTIAL</span>
+    <span style="color:var(--signal)">THE CONTROL ROOM</span>
+  </div>
+</footer>
+
+</div>
+</body>
+</html>

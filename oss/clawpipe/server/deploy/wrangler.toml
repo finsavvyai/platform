@@ -1,0 +1,50 @@
+name = "finsavvyai-gateway"
+type = "javascript"
+main = "src/index.js"
+account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+workers_dev = true
+route = "api.finsavvyai.com/*"
+zone_id = "YOUR_CLOUDFLARE_ZONE_ID"
+
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+[env.staging]
+vars = { ENVIRONMENT = "staging" }
+
+[env.development]
+vars = { ENVIRONMENT = "development" }
+
+[build]
+command = "npm install && npm run build"
+cwd = "./cloudflare-workers"
+
+[[triggers.crons]]
+crons = ["0 */6 * * *"]
+
+[compatibility_date]
+date = "2024-12-01"
+
+[compatibility_flags]
+nodejs_compat = true
+
+[limits]
+cpu_ms = 50000
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "YOUR_KV_NAMESPACE_ID"
+preview_id = "YOUR_PREVIEW_KV_NAMESPACE_ID"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "YOUR_RATE_LIMIT_KV_ID"
+preview_id = "YOUR_PREVIEW_RATE_LIMIT_KV_ID"
+
+[env.production.kv_namespaces]
+binding = "CACHE"
+id = "prod-cache-kv"
+
+[env.production.kv_namespaces]
+binding = "RATE_LIMIT"
+id = "prod-rate-limit-kv"

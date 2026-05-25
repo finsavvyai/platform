@@ -1,0 +1,97 @@
+---
+import LexiconEntry from "../LexiconEntry.astro";
+
+interface Entry {
+  word: string;
+  display: string;
+  gloss: string;
+  category: string;
+  shortcutFor: string | null;
+  status?: "stable" | "beta" | "planned" | "stub" | "aux" | "unknown";
+  caps?: { reads: string[]; writes: string[]; network: boolean; secrets: string[] };
+  call: string;
+}
+
+interface Props { category: string; entries: Entry[]; }
+const { category, entries } = Astro.props;
+
+function posFor(e: Entry): "verb" | "operator" | "aux" | "primitive" {
+  if (e.shortcutFor) return "aux";
+  if (/^ll-/.test(e.word)) return "verb";
+  return "verb";
+}
+
+function etymFor(e: Entry): string | undefined {
+  if (e.shortcutFor) return `aux. shortcut for /${e.shortcutFor}.`;
+  return undefined;
+}
+
+function relatedFor(e: Entry, all: Entry[]): string[] {
+  const out = new Set<string>();
+  if (e.shortcutFor) out.add(e.shortcutFor);
+  // siblings: same category, neighbors alphabetically
+  const sib = all.filter((x) => x.category === e.category && x.word !== e.word).slice(0, 2);
+  for (const s of sib) out.add(s.word);
+  return [...out].slice(0, 3);
+}
+---
+
+<section class="cat" id={`cat-${category}`}>
+  <header class="cat-head">
+    <span class="cat-num" aria-hidden="true">§</span>
+    <h3 class="cat-title">{category}</h3>
+    <span class="cat-count" aria-label={`${entries.length} entries`}>{entries.length}</span>
+  </header>
+  <div class="cat-body">
+    {entries.map((e) => (
+      <LexiconEntry
+        word={e.word}
+        pos={posFor(e)}
+        glyph={`/${e.call.replace(/^\//, "")}/`}
+        gloss={e.gloss}
+        call={e.call}
+        etym={etymFor(e)}
+        related={relatedFor(e, entries)}
+        status={e.status}
+        caps={e.caps}
+      />
+    ))}
+  </div>
+</section>
+
+<style>
+  .cat {
+    padding-top: var(--t-8);
+    padding-bottom: var(--t-6);
+    scroll-margin-top: 2rem;
+  }
+  .cat-head {
+    display: flex;
+    align-items: baseline;
+    gap: 1ch;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: var(--t-1);
+    margin-bottom: var(--t-3);
+  }
+  .cat-num {
+    font-family: var(--font-mono);
+    color: var(--saffron-deep);
+    font-size: var(--step-2);
+  }
+  .cat-title {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: var(--step-3);
+    margin: 0;
+    text-transform: capitalize;
+    letter-spacing: -0.01em;
+  }
+  .cat-count {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    font-size: var(--step--1);
+    font-feature-settings: "tnum";
+  }
+  .cat-body { display: grid; gap: 0; }
+</style>

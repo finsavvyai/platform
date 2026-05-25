@@ -1,0 +1,100 @@
+[project]
+name = "sdlc-rag"
+version = "1.0.0"
+description = "RAG service: pgvector retrieval + embedding pipeline for sdlc.cc"
+requires-python = ">=3.11"
+license = { text = "BUSL-1.1" }
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+# 27 files have pre-existing invalid Python syntax (never compiled, mostly
+# pseudocode from early scaffolding). Excluded so ruff gates the healthy
+# modules; listed files need rewrite before they can lint.
+exclude = [
+    "app/api/endpoints/context.py",
+    "app/config/app_config.py",
+    "app/database/migrations/migrator.py",
+    "app/middleware/performance_optimization.py",
+    "app/schemas/search.py",
+    "app/services/billing/billing_integration.py",
+    "app/services/chunking.py",
+    "app/services/citation/formatting.py",
+    "app/services/citation/service.py",
+    "app/services/context_assembly/service.py",
+    "app/services/context_quality_monitor/calculators_advanced.py",
+    "app/services/context_quality_monitor/calculators_core.py",
+    "app/services/context_quality_monitor/calculators_extended.py",
+    "app/services/context_retrieval/service.py",
+    "app/services/document_processor.py",
+    "app/services/embedding_metadata_service.py",
+    "app/services/extractors/office_extractors.py",
+    "app/services/extractors/web_extractors.py",
+    "app/services/metadata_extractor.py",
+    "app/services/office_extractors.py",
+    "app/services/query_understanding/classification.py",
+    "app/services/query_understanding/extraction.py",
+    "app/services/text_processor.py",
+    "tests/integration_test_document_processing.py",
+    "tests/integration_validation.py",
+    "tests/test_embedding_service.py",
+    "tests/test_token_management_integration.py",
+]
+
+[tool.ruff.lint]
+# Minimal baseline that the healthy modules pass today. Widen to I/B/C4/UP
+# once a cleanup pass lands — tracking issue in the CI gate commit body.
+select = ["E", "W", "F"]
+ignore = [
+    "E501", # line length — handled by black/formatter
+    "E722", # bare except — legacy patterns; tackle in dedicated cleanup
+    "E701", # multiple statements on one line — codegen output
+    "E721", # type comparison — rare intentional isinstance shim
+    "E741", # ambiguous var names — rare
+    "F811", # redefined-while-unused — overloaded stubs
+    "F402", # import shadowed by loop var — legacy
+    "F821", # undefined-name — some late-bound refs; tracked separately
+    "F823", # undefined-local — legacy dead branches
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["B011"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+asyncio_mode = "auto"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-report=xml:coverage.xml",
+    "--cov-fail-under=90",
+]
+markers = [
+    "integration: requires external services (Postgres, Redis); skipped in unit-only runs",
+    "slow: takes >1s; opt in with -m slow",
+]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+omit = [
+    "app/**/__init__.py",
+    "app/**/migrations/**",
+    "tests/**",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+fail_under = 90
+show_missing = true
+skip_covered = false

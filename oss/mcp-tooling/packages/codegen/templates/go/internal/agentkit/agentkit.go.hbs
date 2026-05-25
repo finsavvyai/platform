@@ -1,0 +1,364 @@
+package agentkit
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"time"
+
+	"go.uber.org/zap"
+)
+
+// Agent represents an OpenAI AgentKit agent
+type Agent struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Runtime     string            `json:"runtime"`
+	Version     string            `json:"version"`
+	ManifestURL string            `json:"manifest_url"`
+	Permissions []string          `json:"permissions"`
+	Status      string            `json:"status"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+	Metadata    map[string]string `json:"metadata"`
+}
+
+// Manifest represents the agent manifest for AgentKit
+type Manifest struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Version     string                 `json:"version"`
+	Runtime     string                 `json:"runtime"`
+	Permissions []Permission           `json:"permissions"`
+	Tools       []Tool                 `json:"tools"`
+	Metadata    map[string]interface{} `json:"metadata"`
+}
+
+// Permission represents a permission in the manifest
+type Permission struct {
+	Type        string      `json:"type"`        // "api", "filesystem", "network", etc.
+	Scope       string      `json:"scope"`       // Specific scope like "read", "write", "execute"
+	Description string      `json:"description"`
+	Constraints interface{} `json:"constraints,omitempty"`
+}
+
+// Tool represents a tool in the manifest
+type Tool struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	InputSchema map[string]interface{} `json:"input_schema"`
+}
+
+// Client represents the AgentKit client
+type Client struct {
+	baseURL    string
+	apiKey     string
+	httpClient *http.Client
+	logger     *zap.Logger
+}
+
+// NewClient creates a new AgentKit client
+func NewClient(baseURL, apiKey string, logger *zap.Logger) *Client {
+	return &Client{
+		baseURL: baseURL,
+		apiKey:  apiKey,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+		logger: logger,
+	}
+}
+
+// RegisterAgent registers an agent with AgentKit
+func (c *Client) RegisterAgent(ctx context.Context, manifest *Manifest) (*Agent, error) {
+	c.logger.Info("Registering agent with AgentKit",
+		zap.String("name", manifest.Name),
+		zap.String("version", manifest.Version),
+		zap.String("runtime", manifest.Runtime),
+	)
+
+	reqBody, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/agents", bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register agent: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("agent registration failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var agent Agent
+	if err := json.NewDecoder(resp.Body).Decode(&agent); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	c.logger.Info("Successfully registered agent",
+		zap.String("id", agent.ID),
+		zap.String("name", agent.Name),
+	)
+
+	return &agent, nil
+}
+
+// UnregisterAgent unregisters an agent from AgentKit
+func (c *Client) UnregisterAgent(ctx context.Context, agentID string) error {
+	c.logger.Info("Unregistering agent from AgentKit",
+		zap.String("id", agentID),
+	)
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", c.baseURL+"/agents/"+agentID, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to unregister agent: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("agent unregistration failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	c.logger.Info("Successfully unregistered agent",
+		zap.String("id", agentID),
+	)
+
+	return nil
+}
+
+// GetAgent retrieves an agent from AgentKit
+func (c *Client) GetAgent(ctx context.Context, agentID string) (*Agent, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/agents/"+agentID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get agent: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("get agent failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var agent Agent
+	if err := json.NewDecoder(resp.Body).Decode(&agent); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &agent, nil
+}
+
+// UpdateAgent updates an agent in AgentKit
+func (c *Client) UpdateAgent(ctx context.Context, agentID string, manifest *Manifest) (*Agent, error) {
+	c.logger.Info("Updating agent in AgentKit",
+		zap.String("id", agentID),
+		zap.String("name", manifest.Name),
+		zap.String("version", manifest.Version),
+	)
+
+	reqBody, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "PUT", c.baseURL+"/agents/"+agentID, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update agent: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("agent update failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var agent Agent
+	if err := json.NewDecoder(resp.Body).Decode(&agent); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	c.logger.Info("Successfully updated agent",
+		zap.String("id", agent.ID),
+		zap.String("name", agent.Name),
+	)
+
+	return &agent, nil
+}
+
+// Manager manages agent lifecycle for the MCP server
+type Manager struct {
+	client     *Client
+	agent      *Agent
+	manifest   *Manifest
+	logger     *zap.Logger
+}
+
+// NewManager creates a new agent manager
+func NewManager(baseURL, apiKey string, manifest *Manifest, logger *zap.Logger) *Manager {
+	return &Manager{
+		client:   NewClient(baseURL, apiKey, logger),
+		manifest: manifest,
+		logger:   logger,
+	}
+}
+
+// Register registers the agent with AgentKit
+func (m *Manager) Register(ctx context.Context) error {
+	agent, err := m.client.RegisterAgent(ctx, m.manifest)
+	if err != nil {
+		return fmt.Errorf("failed to register agent: %w", err)
+	}
+	m.agent = agent
+
+	// Store agent ID for future reference
+	if err := m.storeAgentID(agent.ID); err != nil {
+		m.logger.Warn("Failed to store agent ID", zap.Error(err))
+	}
+
+	return nil
+}
+
+// Unregister unregisters the agent from AgentKit
+func (m *Manager) Unregister(ctx context.Context) error {
+	if m.agent == nil {
+		m.logger.Info("No agent registered, skipping unregistration")
+		return nil
+	}
+
+	if err := m.client.UnregisterAgent(ctx, m.agent.ID); err != nil {
+		return fmt.Errorf("failed to unregister agent: %w", err)
+	}
+
+	// Clear stored agent ID
+	m.clearAgentID()
+	m.agent = nil
+
+	return nil
+}
+
+// GetStatus returns the current agent status
+func (m *Manager) GetStatus() string {
+	if m.agent == nil {
+		return "not_registered"
+	}
+	return m.agent.Status
+}
+
+// GetAgentID returns the current agent ID
+func (m *Manager) GetAgentID() string {
+	if m.agent == nil {
+		return ""
+	}
+	return m.agent.ID
+}
+
+// Sync synchronizes the agent with AgentKit
+func (m *Manager) Sync(ctx context.Context) error {
+	if m.agent == nil {
+		// Try to register
+		return m.Register(ctx)
+	}
+
+	// Check if agent exists and update if needed
+	currentAgent, err := m.client.GetAgent(ctx, m.agent.ID)
+	if err != nil {
+		m.logger.Warn("Failed to get current agent, attempting to re-register", zap.Error(err))
+		return m.Register(ctx)
+	}
+
+	// Update if version changed
+	if currentAgent.Version != m.manifest.Version {
+		updatedAgent, err := m.client.UpdateAgent(ctx, currentAgent.ID, m.manifest)
+		if err != nil {
+			return fmt.Errorf("failed to update agent: %w", err)
+		}
+		m.agent = updatedAgent
+	} else {
+		m.agent = currentAgent
+	}
+
+	return nil
+}
+
+// storeAgentID stores the agent ID to a file for persistence
+func (m *Manager) storeAgentID(agentID string) error {
+	return os.WriteFile(".agentkit_id", []byte(agentID), 0644)
+}
+
+// clearAgentID removes the stored agent ID
+func (m *Manager) clearAgentID() {
+	os.Remove(".agentkit_id")
+}
+
+// loadAgentID loads the agent ID from file
+func (m *Manager) loadAgentID() (string, error) {
+	data, err := os.ReadFile(".agentkit_id")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// RestoreFromStorage attempts to restore agent registration from stored ID
+func (m *Manager) RestoreFromStorage(ctx context.Context) error {
+	agentID, err := m.loadAgentID()
+	if err != nil {
+		// No stored ID, that's fine
+		return nil
+	}
+
+	m.logger.Info("Attempting to restore agent from storage", zap.String("id", agentID))
+
+	agent, err := m.client.GetAgent(ctx, agentID)
+	if err != nil {
+		m.logger.Warn("Failed to restore agent from storage, will re-register", zap.Error(err))
+		m.clearAgentID()
+		return nil
+	}
+
+	m.agent = agent
+	m.logger.Info("Successfully restored agent from storage",
+		zap.String("id", agent.ID),
+		zap.String("name", agent.Name),
+	)
+
+	return nil
+}

@@ -1,0 +1,109 @@
+# ConfigMap for Gateway Service Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: sdlc-platform
+  labels:
+    app: gateway
+    component: api-gateway
+data:
+  # Base64 encoded or plain text configuration
+  config.yaml: |
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      read_timeout: "30s"
+      write_timeout: "30s"
+      idle_timeout: "60s"
+      graceful_shutdown_timeout: "30s"
+      request_timeout: "30s"
+
+    database:
+      host: "${DB_HOST}"
+      port: 5432
+      user: "${DB_USER}"
+      password: "${DB_PASSWORD}"
+      database: "sdlc_platform"
+      ssl_mode: "require"
+      max_connections: 20
+      min_connections: 5
+      max_conn_lifetime: "1h"
+      max_conn_idle_time: "30m"
+      health_check_period: "1m"
+      connect_timeout: "10s"
+      retry_attempts: 3
+      retry_delay: "2s"
+
+    redis:
+      host: "${REDIS_HOST}"
+      port: 6379
+      password: "${REDIS_PASSWORD}"
+      database: 0
+      pool_size: 10
+      min_idle_conns: 3
+      max_retries: 3
+      dial_timeout: "5s"
+      read_timeout: "3s"
+      write_timeout: "3s"
+      idle_timeout: "5m"
+
+    jwt:
+      secret: "${JWT_SECRET}"
+      access_token_ttl: "15m"
+      refresh_token_ttl: "168h"
+      issuer: "sdlc-platform"
+      signing_algorithm: "HS256"
+
+    logging:
+      level: "info"
+      format: "json"
+      output: "stdout"
+
+    monitoring:
+      enabled: true
+      port: 9090
+      path: "/metrics"
+      namespace: "sdlc_platform"
+      subsystem: "gateway"
+      sample_rate: 0.1
+
+    security:
+      rate_limiting:
+        enabled: true
+        default_rate_limit: 1000
+        default_window: "1h"
+        burst_limit: 100
+        redis_key_prefix: "rate_limit:"
+        cleanup_interval: "5m"
+
+      cors:
+        enabled: true
+        allowed_origins: ["https://sdlc.finsavvyai.com", "https://www.sdlc.finsavvyai.com"]
+        allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        allowed_headers: ["Authorization", "Content-Type", "X-API-Key"]
+        exposed_headers: ["X-Total-Count", "X-RateLimit-Remaining"]
+        allow_credentials: true
+        max_age: 86400
+
+      mtls:
+        enabled: false
+
+      dlp:
+        enabled: true
+        engines: ["regex", "ner"]
+        confidence_threshold: 0.8
+        timeout: "5s"
+
+    tracing:
+      exporter: "otlp"
+      otlp_endpoint: "${OTEL_ENDPOINT}"
+      sample_rate: 0.1
+      service_name: "gateway"
+
+    circuit_breaker:
+      max_failures: 5
+      reset_timeout: "30s"
+
+    version: "${VERSION}"
+    environment: "production"

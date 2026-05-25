@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # Development-only services
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: mcpoverflow_node_exporter
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    restart: unless-stopped
+
+  # Development database admin tools
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: mcpoverflow_pgadmin
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@mcpoverflow.local
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+
+volumes:
+  pgadmin_data:
+
+networks:
+  default:
+    external:
+      name: mcpoverflow_network

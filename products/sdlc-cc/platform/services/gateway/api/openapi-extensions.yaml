@@ -1,0 +1,1938 @@
+openapi: 3.0.3
+info:
+  title: SDLC.ai - Extension Endpoints
+  description: |
+    ## Extension Endpoints
+
+    This specification extends the core SDLC.ai API with tenant management,
+    user administration, file operations, policy management, API keys,
+    usage tracking, DLP scanning, and vector search capabilities.
+
+    All endpoints require authentication via Bearer token or API key.
+    Multi-tenant isolation is enforced at the database level via Row-Level Security (RLS).
+
+  version: 1.0.0
+  termsOfService: https://sdlc.cc/terms
+  contact:
+    name: SDLC.ai Support
+    email: support@sdlc.cc
+  license:
+    name: Commercial License
+    url: https://sdlc.cc/license
+
+servers:
+  - url: https://api.sdlc.cc/v1
+    description: Production Server
+  - url: https://staging-api.sdlc.cc/v1
+    description: Staging Server
+  - url: http://localhost:8080/v1
+    description: Local Development
+
+paths:
+  # Tenant Management Endpoints
+  /tenants:
+    get:
+      tags:
+        - Tenant Management
+      summary: List tenants
+      description: Retrieve a paginated list of tenants accessible to the current user
+      operationId: listTenants
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Search'
+        - name: status
+          in: query
+          description: Filter by tenant status
+          schema:
+            type: string
+            enum: [active, inactive, suspended]
+        - name: sort
+          in: query
+          description: Sort field and direction (name:asc, created_at:desc)
+          schema:
+            type: string
+            default: name:asc
+      responses:
+        '200':
+          description: Tenants retrieved successfully
+          headers:
+            X-Total-Count:
+              schema:
+                type: integer
+              description: Total number of tenants
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Tenant Management
+      summary: Create tenant
+      description: Create a new tenant with optional admin user and subscription info
+      operationId: createTenant
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTenantRequest'
+      responses:
+        '201':
+          description: Tenant created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /tenants/{id}:
+    get:
+      tags:
+        - Tenant Management
+      summary: Get tenant
+      description: Retrieve detailed information about a specific tenant
+      operationId: getTenant
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TenantID'
+      responses:
+        '200':
+          description: Tenant retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - Tenant Management
+      summary: Update tenant
+      description: Update tenant configuration, settings, or status
+      operationId: updateTenant
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TenantID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTenantRequest'
+      responses:
+        '200':
+          description: Tenant updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tenant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Tenant Management
+      summary: Delete tenant
+      description: Permanently delete a tenant and all associated data
+      operationId: deleteTenant
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TenantID'
+      responses:
+        '204':
+          description: Tenant deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # User Management Endpoints
+  /users:
+    get:
+      tags:
+        - User Management
+      summary: List users
+      description: Retrieve a paginated list of users in the current tenant
+      operationId: listUsers
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Search'
+        - name: role
+          in: query
+          description: Filter by user role
+          schema:
+            type: string
+            enum: [admin, member, viewer]
+        - name: status
+          in: query
+          description: Filter by user status
+          schema:
+            type: string
+            enum: [active, inactive, suspended]
+      responses:
+        '200':
+          description: Users retrieved successfully
+          headers:
+            X-Total-Count:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - User Management
+      summary: Create user
+      description: Create a new user in the current tenant
+      operationId: createUser
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /users/{id}:
+    get:
+      tags:
+        - User Management
+      summary: Get user
+      description: Retrieve detailed information about a specific user
+      operationId: getUser
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+      responses:
+        '200':
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - User Management
+      summary: Update user
+      description: Update user profile, permissions, or settings
+      operationId: updateUser
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - User Management
+      summary: Delete user
+      description: Deactivate or permanently delete a user
+      operationId: deleteUser
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserID'
+      responses:
+        '204':
+          description: User deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # File Management Endpoints
+  /files:
+    get:
+      tags:
+        - File Management
+      summary: List files
+      description: Retrieve a paginated list of files in the current tenant
+      operationId: listFiles
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - $ref: '#/components/parameters/Search'
+        - name: format
+          in: query
+          description: Filter by file format (pdf, docx, txt, etc.)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Files retrieved successfully
+          headers:
+            X-Total-Count:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - File Management
+      summary: Upload file
+      description: Upload a new file to the platform
+      operationId: uploadFile
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FileUploadRequest'
+      responses:
+        '201':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/File'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /files/{id}:
+    get:
+      tags:
+        - File Management
+      summary: Get file metadata
+      description: Retrieve metadata for a specific file
+      operationId: getFileMetadata
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FileID'
+      responses:
+        '200':
+          description: File metadata retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/File'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - File Management
+      summary: Delete file
+      description: Delete a file and all associated metadata
+      operationId: deleteFile
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FileID'
+      responses:
+        '204':
+          description: File deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /files/{id}/download:
+    get:
+      tags:
+        - File Management
+      summary: Download file
+      description: Download the original file content
+      operationId: downloadFile
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FileID'
+      responses:
+        '200':
+          description: File content retrieved successfully
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /files/{id}/exists:
+    get:
+      tags:
+        - File Management
+      summary: Check file existence
+      description: Check if a file exists and is accessible
+      operationId: fileExists
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FileID'
+      responses:
+        '200':
+          description: File exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExistenceCheckResponse'
+        '404':
+          description: File does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExistenceCheckResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /files/formats:
+    get:
+      tags:
+        - File Management
+      summary: Get supported formats
+      description: Retrieve list of supported file formats
+      operationId: getSupportedFormats
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Supported formats retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportedFormatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # Policy Management Endpoints
+  /policies:
+    get:
+      tags:
+        - Policy Management
+      summary: List policies
+      description: Retrieve a paginated list of policies in the current tenant
+      operationId: listPolicies
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+        - name: status
+          in: query
+          description: Filter by policy status
+          schema:
+            type: string
+            enum: [draft, active, archived]
+      responses:
+        '200':
+          description: Policies retrieved successfully
+          headers:
+            X-Total-Count:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Policy Management
+      summary: Create policy
+      description: Create a new policy rule
+      operationId: createPolicy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePolicyRequest'
+      responses:
+        '201':
+          description: Policy created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /policies/{id}:
+    get:
+      tags:
+        - Policy Management
+      summary: Get policy
+      description: Retrieve detailed information about a specific policy
+      operationId: getPolicy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PolicyID'
+      responses:
+        '200':
+          description: Policy retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - Policy Management
+      summary: Update policy
+      description: Update an existing policy
+      operationId: updatePolicy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PolicyID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePolicyRequest'
+      responses:
+        '200':
+          description: Policy updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Policy Management
+      summary: Delete policy
+      description: Delete a policy rule
+      operationId: deletePolicy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PolicyID'
+      responses:
+        '204':
+          description: Policy deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /policies/{id}/test:
+    post:
+      tags:
+        - Policy Management
+      summary: Test policy
+      description: Test a policy against sample data
+      operationId: testPolicy
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PolicyID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyTestRequest'
+      responses:
+        '200':
+          description: Policy test executed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyTestResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # API Key Management Endpoints
+  /api-keys:
+    get:
+      tags:
+        - API Key Management
+      summary: List API keys
+      description: Retrieve a list of API keys for the current user
+      operationId: listApiKeys
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: API keys retrieved successfully
+          headers:
+            X-Total-Count:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - API Key Management
+      summary: Create API key
+      description: Generate a new API key for the current user
+      operationId: createApiKey
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApiKeyRequest'
+      responses:
+        '201':
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyWithSecret'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api-keys/{id}:
+    get:
+      tags:
+        - API Key Management
+      summary: Get API key
+      description: Retrieve information about a specific API key (secret not included)
+      operationId: getApiKey
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiKeyID'
+      responses:
+        '200':
+          description: API key retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKey'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    patch:
+      tags:
+        - API Key Management
+      summary: Update API key
+      description: Update API key metadata (name, permissions, expiration)
+      operationId: updateApiKey
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiKeyID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateApiKeyRequest'
+      responses:
+        '200':
+          description: API key updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKey'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - API Key Management
+      summary: Revoke API key
+      description: Revoke and delete an API key
+      operationId: revokeApiKey
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ApiKeyID'
+      responses:
+        '204':
+          description: API key revoked successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # Usage & Metrics Endpoints
+  /usage/tokens:
+    get:
+      tags:
+        - Usage & Metrics
+      summary: Get token usage
+      description: Retrieve token usage statistics for the current tenant
+      operationId: getTokenUsage
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: period
+          in: query
+          description: Time period for usage (day, week, month, year)
+          schema:
+            type: string
+            enum: [day, week, month, year]
+            default: month
+        - name: start_date
+          in: query
+          description: Start date for usage period (ISO 8601)
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          description: End date for usage period (ISO 8601)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Token usage retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenUsageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /usage/documents:
+    get:
+      tags:
+        - Usage & Metrics
+      summary: Get document usage
+      description: Retrieve document count and storage usage statistics
+      operationId: getDocumentUsage
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Document usage retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentUsageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /usage/costs:
+    get:
+      tags:
+        - Usage & Metrics
+      summary: Get cost breakdown
+      description: Retrieve estimated costs based on usage
+      operationId: getCostBreakdown
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - name: period
+          in: query
+          description: Time period (day, week, month, year)
+          schema:
+            type: string
+            enum: [day, week, month, year]
+            default: month
+      responses:
+        '200':
+          description: Cost breakdown retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostBreakdownResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # DLP Scanning Endpoints
+  /dlp/scan:
+    post:
+      tags:
+        - Data Loss Prevention
+      summary: Scan content
+      description: Scan content for sensitive data patterns (PII, secrets, etc.)
+      operationId: dlpScan
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DLPScanRequest'
+      responses:
+        '200':
+          description: DLP scan completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DLPScanResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /dlp/rules:
+    get:
+      tags:
+        - Data Loss Prevention
+      summary: List DLP rules
+      description: Retrieve active DLP rules and patterns
+      operationId: listDLPRules
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: DLP rules retrieved
+          headers:
+            X-Total-Count:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DLPRuleListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # Vector Search Endpoints
+  /vector/search:
+    post:
+      tags:
+        - Vector Search
+      summary: Search vectors
+      description: Perform semantic search across embeddings
+      operationId: vectorSearch
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VectorSearchRequest'
+      responses:
+        '200':
+          description: Search results retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VectorSearchResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /vector/embeddings:
+    post:
+      tags:
+        - Vector Search
+      summary: Create embeddings
+      description: Generate embeddings for text content
+      operationId: createEmbeddings
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingRequest'
+      responses:
+        '200':
+          description: Embeddings created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /vector/indices:
+    get:
+      tags:
+        - Vector Search
+      summary: List indices
+      description: Retrieve list of vector indices
+      operationId: listVectorIndices
+      security:
+        - BearerAuth: []
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Vector indices retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VectorIndexListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  parameters:
+    TenantID:
+      name: id
+      in: path
+      required: true
+      description: Tenant ID (UUID)
+      schema:
+        type: string
+        format: uuid
+
+    UserID:
+      name: id
+      in: path
+      required: true
+      description: User ID (UUID)
+      schema:
+        type: string
+        format: uuid
+
+    FileID:
+      name: id
+      in: path
+      required: true
+      description: File ID (UUID)
+      schema:
+        type: string
+        format: uuid
+
+    PolicyID:
+      name: id
+      in: path
+      required: true
+      description: Policy ID (UUID)
+      schema:
+        type: string
+        format: uuid
+
+    ApiKeyID:
+      name: id
+      in: path
+      required: true
+      description: API Key ID (UUID)
+      schema:
+        type: string
+        format: uuid
+
+    Limit:
+      name: limit
+      in: query
+      description: Maximum number of results to return
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    Offset:
+      name: offset
+      in: query
+      description: Number of results to skip
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+    Search:
+      name: search
+      in: query
+      description: Search query string
+      schema:
+        type: string
+
+  schemas:
+    # Common Schemas
+    Tenant:
+      type: object
+      required:
+        - id
+        - name
+        - domain
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique tenant identifier
+        name:
+          type: string
+          description: Tenant display name
+        domain:
+          type: string
+          description: Tenant domain
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+        config:
+          type: object
+          description: Tenant configuration (JSON)
+        settings:
+          type: object
+          description: Tenant settings (JSON)
+        subscription:
+          type: object
+          properties:
+            plan:
+              type: string
+            expires_at:
+              type: string
+              format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateTenantRequest:
+      type: object
+      required:
+        - name
+        - domain
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        domain:
+          type: string
+          format: hostname
+        config:
+          type: object
+          description: Optional configuration settings
+        settings:
+          type: object
+          description: Optional tenant settings
+        subscription:
+          type: object
+          properties:
+            plan:
+              type: string
+              enum: [free, pro, enterprise]
+            expires_at:
+              type: string
+              format: date-time
+        admin_user:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+            password:
+              type: string
+              minLength: 8
+            first_name:
+              type: string
+            last_name:
+              type: string
+
+    UpdateTenantRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        config:
+          type: object
+        settings:
+          type: object
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+
+    TenantListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tenant'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - role
+        - is_active
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, member, viewer]
+        is_active:
+          type: boolean
+        mfa_enabled:
+          type: boolean
+        email_verified:
+          type: boolean
+        phone_number:
+          type: string
+        phone_verified:
+          type: boolean
+        permissions:
+          type: object
+        metadata:
+          type: object
+        profile:
+          type: object
+        preferences:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateUserRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        role:
+          type: string
+          enum: [admin, member, viewer]
+          default: member
+        permissions:
+          type: object
+        metadata:
+          type: object
+        profile:
+          type: object
+        preferences:
+          type: object
+        phone_number:
+          type: string
+        send_invitation:
+          type: boolean
+          default: false
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, member, viewer]
+        permissions:
+          type: object
+        metadata:
+          type: object
+        is_active:
+          type: boolean
+        mfa_enabled:
+          type: boolean
+        profile:
+          type: object
+        preferences:
+          type: object
+        phone_number:
+          type: string
+        phone_verified:
+          type: boolean
+        email_verified:
+          type: boolean
+
+    UserListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+
+    File:
+      type: object
+      required:
+        - id
+        - name
+        - format
+        - size
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        format:
+          type: string
+        size:
+          type: integer
+          description: File size in bytes
+        mime_type:
+          type: string
+        checksum:
+          type: string
+          description: SHA256 checksum
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    FileUploadRequest:
+      type: object
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+          description: File content
+        metadata:
+          type: object
+          description: Optional file metadata
+
+    FileListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/File'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+
+    ExistenceCheckResponse:
+      type: object
+      properties:
+        exists:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+
+    SupportedFormatsResponse:
+      type: object
+      properties:
+        formats:
+          type: array
+          items:
+            type: object
+            properties:
+              format:
+                type: string
+              mime_type:
+                type: string
+              max_size:
+                type: integer
+                description: Max file size in bytes
+
+    Policy:
+      type: object
+      required:
+        - id
+        - name
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, archived]
+        rules:
+          type: array
+          items:
+            type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreatePolicyRequest:
+      type: object
+      required:
+        - name
+        - rules
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        rules:
+          type: array
+          items:
+            type: object
+        status:
+          type: string
+          enum: [draft, active]
+          default: draft
+
+    UpdatePolicyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        rules:
+          type: array
+        status:
+          type: string
+          enum: [draft, active, archived]
+
+    PolicyTestRequest:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          description: Sample data to test policy against
+
+    PolicyTestResponse:
+      type: object
+      properties:
+        passed:
+          type: boolean
+        results:
+          type: array
+          items:
+            type: object
+        errors:
+          type: array
+          items:
+            type: string
+
+    PolicyListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Policy'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+
+    ApiKey:
+      type: object
+      required:
+        - id
+        - name
+        - prefix
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        prefix:
+          type: string
+          description: First 8 characters of key for identification
+        last_used:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        permissions:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ApiKeyWithSecret:
+      allOf:
+        - $ref: '#/components/schemas/ApiKey'
+        - type: object
+          properties:
+            secret:
+              type: string
+              description: Full API key secret (only shown once)
+
+    CreateApiKeyRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        permissions:
+          type: array
+          items:
+            type: string
+
+    UpdateApiKeyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        permissions:
+          type: array
+          items:
+            type: string
+
+    ApiKeyListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApiKey'
+        meta:
+          $ref: '#/components/schemas/ListMeta'
+
+    TokenUsageResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        total_tokens:
+          type: integer
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        usage_by_model:
+          type: object
+          additionalProperties:
+            type: integer
+
+    DocumentUsageResponse:
+      type: object
+      properties:
+        total_documents:
+          type: integer
+        total_size_bytes:
+          type: integer
+        documents_limit:
+          type: integer
+        storage_limit_bytes:
+          type: integer
+
+    CostBreakdownResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        estimated_cost:
+          type: number
+          format: float
+        cost_by_service:
+          type: object
+          additionalProperties:
+            type: number
+
+    DLPScanRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+        file_id:
+          type: string
+          format: uuid
+        scan_type:
+          type: string
+          enum: [pii, secrets, custom]
+
+    DLPScanResponse:
+      type: object
+      properties:
+        scan_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [completed, in_progress, failed]
+        findings:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              severity:
+                type: string
+                enum: [low, medium, high, critical]
+              location:
+                type: object
+              redacted_content:
+                type: string
+
+    DLPRuleListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              pattern:
+                type: string
+              enabled:
+                type: boolean
+
+    VectorSearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+        embedding:
+          type: array
+          items:
+            type: number
+          description: Optional pre-computed embedding
+        limit:
+          type: integer
+          default: 10
+        threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.5
+          description: Similarity threshold
+
+    VectorSearchResult:
+      type: object
+      properties:
+        query:
+          type: string
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              content:
+                type: string
+              similarity:
+                type: number
+              metadata:
+                type: object
+
+    EmbeddingRequest:
+      type: object
+      required:
+        - input
+      properties:
+        input:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        model:
+          type: string
+          default: default
+
+    EmbeddingResponse:
+      type: object
+      properties:
+        embeddings:
+          type: array
+          items:
+            type: object
+            properties:
+              embedding:
+                type: array
+                items:
+                  type: number
+              index:
+                type: integer
+
+    VectorIndexListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              dimension:
+                type: integer
+              document_count:
+                type: integer
+
+    # Shared response structures
+    ListMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized - missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Not found - resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Conflict:
+      description: Conflict - resource already exists
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    PayloadTooLarge:
+      description: Payload too large - request body exceeds maximum size
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token in Authorization header
+
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for service-to-service communication
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []

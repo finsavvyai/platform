@@ -1,0 +1,188 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sdlc-sdk"
+version = "3.0.0"
+description = "Python SDK for SDLC.ai Secure Data Learning Platform v3"
+authors = [
+    {name = "SDLC.ai Team", email = "sdk@sdlc.cc"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Security",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["sdlc", "ai", "security", "rag", "vector-search", "llm", "data-platform"]
+
+dependencies = [
+    "httpx>=0.25.0",
+    "pydantic>=2.4.0",
+    "pydantic-settings>=2.0.0",
+    "tenacity>=8.2.0",
+    "structlog>=23.1.0",
+    "cryptography>=41.0.0",
+    "python-jose[cryptography]>=3.3.0",
+    "typing-extensions>=4.7.0",
+    "aiolimiter>=1.1.0",
+    "orjson>=3.9.0",
+    "python-dateutil>=2.8.2",
+    "pytz>=2023.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+    "pytest-xdist>=3.3.0",
+    "httpx-mock>=0.10.0",
+    "black>=23.7.0",
+    "ruff>=0.0.280",
+    "mypy>=1.5.0",
+    "pre-commit>=3.3.0",
+    "pytest-benchmark>=4.0.0",
+    "types-python-dateutil>=2.8.19",
+]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.1.0",
+    "mkdocstrings[python]>=0.22.0",
+    "mkdocs-gen-files>=0.5.0",
+    "mkdocs-literate-nav>=0.6.0",
+]
+benchmark = [
+    "pytest-benchmark>=4.0.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+]
+
+[project.urls]
+Homepage = "https://sdlc.cc"
+Documentation = "https://sdk.sdlc.cc"
+Repository = "https://github.com/sdlc-ai/sdlc-sdk-python"
+Issues = "https://github.com/sdlc-ai/sdlc-sdk-python/issues"
+Changelog = "https://github.com/sdlc-ai/sdlc-sdk-python/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sdlc_sdk*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+exclude = [
+    # Legacy pseudocode — has invalid Python syntax and references
+    # removed pydantic v1 APIs (regex= kwarg → pattern=). Tracked for
+    # rewrite alongside the pkg/sdln services rewrite.
+    "tests/test_models.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "W", "F"]
+ignore = [
+    "E501", # line-length — handled by black
+    "E722", # bare except — tackle in focused cleanup
+    "F821", # undefined-name — late-bound refs in SDK surface
+    "F811", # redefined-while-unused — overloaded stubs
+]
+unfixable = [
+    "B004",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**" = ["B011"]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+warn_unreachable = true
+pretty = true
+show_column_numbers = true
+show_error_codes = true
+show_error_context = true
+incremental = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "tenacity.*",
+    "structlog.*",
+    "orjson.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+# Coverage disabled until the sdlc_sdk package's BaseSchema MRO drift is
+# resolved — test_models + test_client can't currently import the package.
+# Restore `--cov=sdlc_sdk --cov-fail-under=95` as part of that cleanup.
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "benchmark: marks tests as benchmarks",
+    "security: marks tests as security-focused",
+]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["sdlc_sdk"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

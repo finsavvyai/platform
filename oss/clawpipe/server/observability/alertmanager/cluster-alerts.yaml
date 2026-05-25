@@ -1,0 +1,114 @@
+groups:
+  - name: finsavvyai-lmstudio-cluster
+    interval: 30s
+    rules:
+      # Cluster health alerts
+      - alert: ClusterDegraded
+        expr: finsavvyai_cluster_nodes_online < finsavvyai_cluster_nodes_total
+        for: 2m
+        labels:
+          severity: warning
+          service: cluster
+        annotations:
+          summary: "FinSavvyAI cluster is degraded"
+          description: "Only {{ $value }} of {{ $finsavvyai_cluster_nodes_total }} nodes are online."
+
+      - alert: ClusterDown
+        expr: finsavvyai_cluster_nodes_online == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: cluster
+        annotations:
+          summary: "FinSavvyAI cluster is down"
+          description: "No nodes are online. All requests are failing."
+
+      # Node health alerts
+      - alert: NodeOffline
+        expr: finsavvyai_cluster_node_up == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: node
+        annotations:
+          summary: "Node {{ $node_id }} is offline"
+          description: "Node {{ $node_id }} has been unreachable for 2 minutes."
+
+      - alert: NodeHighErrorRate
+        expr: |
+          rate(finsavvyai_cluster_errors_total{node_id=~".+"}[5m])
+          / rate(finsavvyai_cluster_requests_total{node_id=~".+"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: node
+        annotations:
+          summary: "Node {{ $node_id }} has high error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      # Performance alerts
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95, rate(finsavvyai_cluster_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: performance
+        annotations:
+          summary: "Cluster response time is high"
+          description: "P95 response time is {{ $value }}s (target: < 5s)."
+
+      - alert: CriticalResponseTime
+        expr: |
+          histogram_quantile(0.95, rate(finsavvyai_cluster_request_duration_seconds_bucket[5m])) > 15
+        for: 2m
+        labels:
+          severity: critical
+          service: performance
+        annotations:
+          summary: "Critical response time"
+          description: "P95 response time is {{ $value }}s. Cluster is severely degraded."
+
+      # Load balancing alerts
+      - alert: UnevenLoadDistribution
+        expr: |
+          stddev(rate(finsavvyai_cluster_requests_total{node_id=~".+"}[5m]))
+          / avg(rate(finsavvyai_cluster_requests_total{node_id=~".+"}[5m])) > 0.5
+        for: 10m
+        labels:
+          severity: info
+          service: loadbalancer
+        annotations:
+          summary: "Uneven load distribution across nodes"
+          description: "Request distribution standard deviation is {{ $value }}. Consider adjusting load balancer."
+
+      # Discovery alerts
+      - alert: DiscoveryFailed
+        expr: increase(finsavvyai_discovery_errors_total[10m]) > 0
+        labels:
+          severity: warning
+          service: discovery
+        annotations:
+          summary: "LM Studio discovery failed"
+          description: "Failed to discover new LM Studio instances in the last 10 minutes."
+
+      # Model availability alerts
+      - alert: ModelUnavailable
+        expr: finsavvyai_cluster_models_available < 1
+        for: 5m
+        labels:
+          severity: critical
+          service: model
+        annotations:
+          summary: "No models available"
+          description: "Cluster has no available models. Check that LM Studio instances have models loaded."
+
+      - alert: LowModelCount
+        expr: finsavvyai_cluster_models_available < 3
+        for: 15m
+        labels:
+          severity: info
+          service: model
+        annotations:
+          summary: "Low model count"
+          description: "Only {{ $value }} models available across the cluster. Consider loading more models."

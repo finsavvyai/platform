@@ -1,0 +1,75 @@
+name: Load test baseline
+
+on:
+  pull_request:
+    paths:
+      - "services/gateway/**"
+      - "services/rag/**"
+      - "services/document-processor/**"
+      - "tests/load/**"
+      - ".github/workflows/load-test-baseline.yml"
+  schedule:
+    - cron: "0 4 * * *" # 04:00 UTC nightly full sweep
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: Smoke (VUS=100, 2m)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install k6
+        run: |
+          curl -sLO https://github.com/grafana/k6/releases/download/v0.55.2/k6-v0.55.2-linux-amd64.tar.gz
+          tar -xzf k6-v0.55.2-linux-amd64.tar.gz
+          sudo mv k6-v0.55.2-linux-amd64/k6 /usr/local/bin/k6
+      - name: Run RAG query smoke test
+        env:
+          GATEWAY_URL: ${{ vars.STAGING_GATEWAY_URL }}
+          API_KEY: ${{ secrets.STAGING_LOAD_TEST_API_KEY }}
+        run: |
+          k6 run tests/load/rag-query.js \
+            -e GATEWAY_URL=$GATEWAY_URL \
+            -e API_KEY=$API_KEY \
+            -e VUS=100 \
+            -e DURATION=2m
+
+  nightly:
+    name: Nightly full sweep
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      matrix:
+        scenario:
+          - { name: rag-100,  script: rag-query.js,       vus: 100,   duration: 5m }
+          - { name: rag-1k,   script: rag-query.js,       vus: 1000,  duration: 5m }
+          - { name: rag-10k,  script: rag-query.js,       vus: 10000, duration: 5m }
+          - { name: up-1mb,   script: document-upload.js, vus: 50,    duration: 5m }
+          - { name: up-50mb,  script: document-upload.js, vus: 25,    duration: 5m }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install k6
+        run: |
+          curl -sLO https://github.com/grafana/k6/releases/download/v0.55.2/k6-v0.55.2-linux-amd64.tar.gz
+          tar -xzf k6-v0.55.2-linux-amd64.tar.gz
+          sudo mv k6-v0.55.2-linux-amd64/k6 /usr/local/bin/k6
+      - name: Run ${{ matrix.scenario.name }}
+        env:
+          GATEWAY_URL: ${{ vars.STAGING_GATEWAY_URL }}
+          API_KEY: ${{ secrets.STAGING_LOAD_TEST_API_KEY }}
+          DOC_SIZE_MB: ${{ matrix.scenario.name == 'up-50mb' && '50' || '1' }}
+        run: |
+          k6 run tests/load/${{ matrix.scenario.script }} \
+            -e GATEWAY_URL=$GATEWAY_URL \
+            -e API_KEY=$API_KEY \
+            -e VUS=${{ matrix.scenario.vus }} \
+            -e DURATION=${{ matrix.scenario.duration }}
+      - name: Upload k6 summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-${{ matrix.scenario.name }}
+          path: ./*-summary.json

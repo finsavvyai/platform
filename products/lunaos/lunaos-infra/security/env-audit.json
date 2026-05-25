@@ -1,0 +1,85 @@
+{
+  "name": "LunaOS Secrets & Environment Audit",
+  "lastAudit": "2026-02-27",
+  "nextAudit": "2026-03-27",
+  "rotationPolicy": "90 days for all secrets; 30 days for API keys",
+  "repos": [
+    {
+      "repo": "lunaos-engine",
+      "envFile": "wrangler.toml + CF Dashboard Secrets",
+      "secrets": [
+        { "name": "JWT_SECRET", "rotation": "90d", "storage": "Cloudflare Secrets", "lastRotated": "2026-02-10" },
+        { "name": "ANTHROPIC_API_KEY", "rotation": "90d", "storage": "Cloudflare Secrets", "lastRotated": "2026-02-10" },
+        { "name": "OPENAI_API_KEY", "rotation": "90d", "storage": "Cloudflare Secrets", "lastRotated": "2026-02-10" },
+        { "name": "DEEPSEEK_API_KEY", "rotation": "90d", "storage": "Cloudflare Secrets", "lastRotated": "2026-02-10" },
+        { "name": "GITHUB_CLIENT_ID", "rotation": "90d", "storage": "Cloudflare Secrets", "lastRotated": "2026-02-10" },
+        { "name": "GITHUB_CLIENT_SECRET", "rotation": "90d", "storage": "Cloudflare Secrets", "lastRotated": "2026-02-10" },
+        { "name": "STRIPE_SECRET_KEY", "rotation": "90d", "storage": "Cloudflare Secrets", "lastRotated": "2026-02-10" },
+        { "name": "STRIPE_WEBHOOK_SECRET", "rotation": "90d", "storage": "Cloudflare Secrets", "lastRotated": "2026-02-10" },
+        { "name": "RESEND_API_KEY", "rotation": "90d", "storage": "Cloudflare Secrets", "lastRotated": "2026-02-10" },
+        { "name": "SENTRY_DSN", "rotation": "never", "storage": "Cloudflare Secrets", "lastRotated": "N/A" }
+      ],
+      "status": "compliant"
+    },
+    {
+      "repo": "lunaos-dashboard",
+      "envFile": ".env.local",
+      "secrets": [
+        { "name": "NEXT_PUBLIC_API_URL", "rotation": "never", "storage": "Vercel/CF Pages env", "lastRotated": "N/A" },
+        { "name": "NEXT_PUBLIC_ANALYTICS_ENABLED", "rotation": "never", "storage": "Vercel/CF Pages env", "lastRotated": "N/A" }
+      ],
+      "status": "compliant",
+      "note": "No secrets in client-side env (NEXT_PUBLIC_ only)"
+    },
+    {
+      "repo": "lunaos-studio",
+      "envFile": ".env",
+      "secrets": [
+        { "name": "VITE_API_URL", "rotation": "never", "storage": "CF Pages env", "lastRotated": "N/A" }
+      ],
+      "status": "compliant"
+    },
+    {
+      "repo": "lunaos-mobile",
+      "envFile": ".env",
+      "secrets": [
+        { "name": "EXPO_PUBLIC_API_URL", "rotation": "never", "storage": "EAS env", "lastRotated": "N/A" }
+      ],
+      "status": "compliant"
+    },
+    {
+      "repo": "luna-agents",
+      "envFile": ".env",
+      "secrets": [
+        { "name": "LUNAOS_API_KEY", "rotation": "user-managed", "storage": "user local", "lastRotated": "N/A" }
+      ],
+      "status": "compliant"
+    }
+  ],
+  "checks": {
+    "noSecretsInCode": {
+      "status": "pass",
+      "command": "grep -r 'sk-' --include='*.ts' --include='*.tsx' --include='*.js' | grep -v node_modules | grep -v .env",
+      "description": "No hardcoded API keys in source code"
+    },
+    "envExampleExists": {
+      "status": "pass",
+      "repos": ["lunaos-engine", "lunaos-dashboard", "lunaos-studio"],
+      "description": "All repos with secrets have .env.example files"
+    },
+    "gitignoreCoversEnv": {
+      "status": "pass",
+      "description": ".env files are in .gitignore for all repos"
+    },
+    "noSecretsInLogs": {
+      "status": "pass",
+      "description": "Error handlers redact sensitive data in production"
+    }
+  },
+  "recommendations": [
+    "Rotate JWT_SECRET before launch (last rotated Feb 10)",
+    "Rotate all API keys after launch (fresh keys for production)",
+    "Enable Cloudflare Access for staging environments",
+    "Set up secret scanning alerts in GitHub (GitHub Advanced Security)"
+  ]
+}

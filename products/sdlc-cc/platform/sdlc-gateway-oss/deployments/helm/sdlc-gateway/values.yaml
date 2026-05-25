@@ -1,0 +1,47 @@
+image:
+  repository: ghcr.io/finsavvyai/sdlc-gateway
+  tag: ""  # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    cpu: 500m
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Bitnami Redis sub-chart. Disable to use external Redis.
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+
+# When redis.enabled=false, point at external instance.
+externalRedis:
+  host: ""
+  port: 6379
+
+env: {}
+  # LISTEN_ADDR: ":8080"
+
+networkPolicy:
+  enabled: false
+  ingressNamespace: ingress-nginx

@@ -1,0 +1,43 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod-quantombean
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@quantombean.io
+    privateKeySecretRef:
+      name: letsencrypt-prod-quantombean-private-key
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+          podTemplate:
+            spec:
+              nodeSelector:
+                "kubernetes.io/os": linux
+              tolerations:
+              - key: "node-role.kubernetes.io/master"
+                operator: "Exists"
+                effect: "NoSchedule"
+              - key: "node-role.kubernetes.io/control-plane"
+                operator: "Exists"
+                effect: "NoSchedule"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: upm-plus-production-wildcard
+  namespace: upm-plus
+spec:
+  secretName: upm-plus-production-tls
+  issuerRef:
+    name: letsencrypt-prod-quantombean
+    kind: ClusterIssuer
+  dnsNames:
+  - quantombean.io
+  - www.quantombean.io
+  - api.quantombean.io
+  - app.quantombean.io
+  - dashboard.quantombean.io
+  - "*.quantombean.io"

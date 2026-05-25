@@ -1,0 +1,84 @@
+# OpenSyber Agent - Production Dockerfile
+# Agent daemon that runs in user containers
+
+# Stage 1: Dependencies
+FROM node:22-alpine AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/agent/package.json ./apps/agent/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Stage 2: Build
+FROM node:22-alpine AS builder
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
+
+# Copy dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Build packages and app
+RUN pnpm build --filter=@opensyber/shared...
+RUN pnpm build --filter=@opensyber/agent
+
+# Stage 3: Production
+FROM node:22-alpine AS runner
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
+
+# Install system dependencies for agent operations
+RUN apk add --no-cache \
+    docker-cli \
+    curl \
+    bash \
+    procps
+
+# Create non-root user with docker group access
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 opensyber
+RUN addgroup docker
+RUN addgroup opensyber docker
+
+# Set environment
+ENV NODE_ENV=production
+ENV AGENT_MODE=production
+
+# Copy necessary files
+COPY --from=builder /app/apps/agent/package.json ./apps/agent/
+COPY --from=builder /app/apps/agent/dist ./apps/agent/dist
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+
+# Install production dependencies only
+COPY package.json pnpm-lock.yaml ./
+COPY packages/shared/package.json ./packages/shared/
+COPY apps/agent/package.json ./apps/agent/
+
+RUN pnpm install --frozen-lockfile --prod
+
+# Set permissions
+RUN chown -R opensyber:nodejs /app
+USER opensyber
+
+# Expose metrics port
+EXPOSE 9090
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:9090/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Run the agent daemon
+CMD ["node", "apps/agent/dist/index.js"]

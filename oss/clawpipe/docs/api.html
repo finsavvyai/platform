@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gateway API Reference - ClawPipe Docs</title>
+  <meta name="description" content="ClawPipe Gateway API reference: endpoints, request/response schemas, and authentication.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<div class="docs-layout">
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Documentation">
+    <a href="/" class="logo">ClawPipe</a>
+    <nav>
+      <a href="index.html">Getting Started</a>
+      <a href="concepts.html">How It Works</a>
+      <div class="sep"></div>
+      <a href="typescript.html">TypeScript SDK</a>
+      <a href="python.html">Python SDK</a>
+      <a href="go.html">Go SDK</a>
+      <div class="sep"></div>
+      <a href="integrations.html">Integrations</a>
+      <a href="api.html" class="active">Gateway API</a>
+      <a href="oauth-setup.html">OAuth Setup</a>
+      <a href="migration.html">Migration</a>
+      <a href="pricing.html">Pricing</a>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="doc-header">
+      <div>
+        <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Toggle menu">&#9776;</button>
+        <span class="breadcrumb">Docs / Gateway API</span>
+      </div>
+      <div class="links">
+        <a href="https://github.com/finsavvyai/clawpipe">GitHub</a>
+        <a href="https://clawpipe.ai">Home</a>
+      </div>
+    </header>
+    <main id="main-content" class="content">
+      <h1>Gateway <span>API Reference</span></h1>
+      <p>Base URL: <code>https://api.clawpipe.ai</code>. The gateway is an OpenAPI 3.1 compliant service running on Cloudflare Workers.</p>
+
+      <h2>Authentication</h2>
+      <p>The API supports two authentication methods:</p>
+      <ul>
+        <li><strong>API Key (Bearer)</strong> — for SDK and programmatic access. Pass as <code>Authorization: Bearer cp_xxx</code> with <code>X-Project-Id</code> header.</li>
+        <li><strong>JWT Cookie</strong> — for dashboard and browser access. Set via <code>clawpipe_session</code> HttpOnly Secure cookie after login.</li>
+      </ul>
+      <p>API keys are hashed with SHA-256 and never stored in plaintext. Provider keys are encrypted at rest in KV.</p>
+
+      <h2>Prompt Endpoints</h2>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-post">POST</span> /v1/prompt</div>
+        <p>Send a prompt through the pipeline and receive a complete response.</p>
+        <h3>Request Body</h3>
+<pre><code>{
+  <span class="code-green">"prompt"</span>: <span class="code-green">"Explain recursion in simple terms"</span>,
+  <span class="code-green">"provider"</span>: <span class="code-green">"openai"</span>,
+  <span class="code-green">"model"</span>: <span class="code-green">"gpt-4o-mini"</span>,
+  <span class="code-green">"system"</span>: <span class="code-green">"You are a helpful tutor"</span>,
+  <span class="code-green">"maxTokens"</span>: 4096,
+  <span class="code-green">"temperature"</span>: 0.7
+}</code></pre>
+        <h3>Response (200)</h3>
+<pre><code>{
+  <span class="code-green">"text"</span>: <span class="code-green">"Recursion is when a function calls itself..."</span>,
+  <span class="code-green">"tokensIn"</span>: 24,
+  <span class="code-green">"tokensOut"</span>: 156,
+  <span class="code-green">"latencyMs"</span>: 412
+}</code></pre>
+        <p>Errors: <code>400</code> invalid request, <code>401</code> auth failed, <code>502</code> provider error, <code>503</code> provider not configured.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-post">POST</span> /v1/stream</div>
+        <p>Stream a prompt response via Server-Sent Events. Same request body as <code>/v1/prompt</code>.</p>
+        <h3>Response (200)</h3>
+<pre><code>Content-Type: text/event-stream
+
+data: Recursion
+data:  is when
+data:  a function
+data:  calls itself...
+data: [DONE]</code></pre>
+      </div>
+
+      <h2>Auth Endpoints</h2>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-post">POST</span> /auth/register</div>
+        <p>Create a new account. Sets a session cookie on success.</p>
+<pre><code>{ <span class="code-green">"email"</span>: <span class="code-green">"dev@example.com"</span>, <span class="code-green">"password"</span>: <span class="code-green">"min8chars"</span>, <span class="code-green">"name"</span>: <span class="code-green">"Dev"</span> }</code></pre>
+        <p>Returns: <code>201</code> created, <code>400</code> validation error, <code>409</code> email taken.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-post">POST</span> /auth/login</div>
+        <p>Sign in with email and password. Sets a session cookie.</p>
+<pre><code>{ <span class="code-green">"email"</span>: <span class="code-green">"dev@example.com"</span>, <span class="code-green">"password"</span>: <span class="code-green">"min8chars"</span> }</code></pre>
+        <p>Returns: <code>200</code> authenticated, <code>401</code> invalid credentials.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-get">GET</span> /auth/me</div>
+        <p>Get the current authenticated user profile. Requires session cookie.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-post">POST</span> /auth/logout</div>
+        <p>Sign out and clear the session cookie.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-get">GET</span> /auth/google</div>
+        <p>Redirect to Google OAuth 2.0 flow. Returns <code>302</code>.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-get">GET</span> /auth/github</div>
+        <p>Redirect to GitHub OAuth flow. Returns <code>302</code>.</p>
+      </div>
+
+      <h2>Project Endpoints</h2>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-get">GET</span> /v1/projects</div>
+        <p>List all projects for the authenticated user with their roles.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-post">POST</span> /v1/projects</div>
+        <p>Create a new project. Returns the project with an initial API key.</p>
+<pre><code>{ <span class="code-green">"name"</span>: <span class="code-green">"my-new-project"</span> }</code></pre>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-post">POST</span> /v1/projects/:projectId/keys</div>
+        <p>Create a new API key for a project. Requires admin+ role. The key is shown once.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-delete">DELETE</span> /v1/projects/:projectId/keys</div>
+        <p>Revoke an API key. Requires owner role.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-post">POST</span> /v1/projects/:projectId/keys/rotate</div>
+        <p>Rotate an API key. Issues a new key and invalidates the old one. Requires owner role.</p>
+      </div>
+
+      <h2>Analytics Endpoints</h2>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-get">GET</span> /v1/analytics/overview</div>
+        <p>Aggregate statistics for the project: total requests, tokens, cost, cache hit rate.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-get">GET</span> /v1/analytics/providers</div>
+        <p>Per-provider and per-model request counts and cost breakdown.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-get">GET</span> /v1/analytics/cache</div>
+        <p>Daily cache hit rates and savings data.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-get">GET</span> /v1/analytics/routes</div>
+        <p>Daily routing decisions by model, showing how the self-learning router is distributing traffic.</p>
+      </div>
+
+      <h2>Weights Endpoints</h2>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-get">GET</span> /v1/weights</div>
+        <p>Get the learned router weights for the project.</p>
+      </div>
+
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-put">PUT</span> /v1/weights</div>
+        <p>Save updated router weights.</p>
+<pre><code>{ <span class="code-green">"weights"</span>: [{ <span class="code-green">"provider"</span>: <span class="code-green">"openai"</span>, <span class="code-green">"model"</span>: <span class="code-green">"gpt-4o"</span>, <span class="code-green">"score"</span>: 0.85 }] }</code></pre>
+      </div>
+
+      <h2>Health Check</h2>
+      <div class="endpoint">
+        <div class="method-path"><span class="method method-get">GET</span> /health</div>
+        <p>No authentication required. Returns gateway status.</p>
+<pre><code>{ <span class="code-green">"status"</span>: <span class="code-green">"ok"</span>, <span class="code-green">"service"</span>: <span class="code-green">"clawpipe-gateway"</span> }</code></pre>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

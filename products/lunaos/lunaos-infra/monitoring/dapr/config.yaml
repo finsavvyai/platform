@@ -1,0 +1,84 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: lunaos-config
+  namespace: default
+spec:
+  tracing:
+    samplingRate: "1"
+    zipkin:
+      endpointAddress: "http://localhost:9411/api/v2/spans"
+  metric:
+    enabled: true
+    rules:
+      - name: app_http_server_request_count
+        labels:
+          - name: method
+            regex: "(GET|POST|PUT|DELETE|PATCH)"
+          - name: status
+            regex: "([0-9]{3})"
+      - name: app_http_server_request_latency
+        labels:
+          - name: method
+            regex: "(GET|POST|PUT|DELETE|PATCH)"
+          - name: status
+            regex: "([0-9]{3})"
+  accessControl:
+    defaultAction: allow
+    trustDomain: "public"
+    policies:
+      - appId: lunaos-api
+        defaultAction: allow
+        trustDomain: "public"
+        operations:
+          - name: /health
+            httpVerb: ["GET"]
+            action: allow
+          - name: /api/*
+            httpVerb: ["GET", "POST", "PUT", "DELETE"]
+            action: allow
+      - appId: lunaos-agent-runtime
+        defaultAction: allow
+        trustDomain: "public"
+        operations:
+          - name: /agents/*
+            httpVerb: ["GET", "POST", "PUT", "DELETE"]
+            action: allow
+          - name: /runtime/*
+            httpVerb: ["GET", "POST"]
+            action: allow
+      - appId: lunaos-plugin-gateway
+        defaultAction: allow
+        trustDomain: "public"
+        operations:
+          - name: /plugins/*
+            httpVerb: ["GET", "POST", "PUT", "DELETE"]
+            action: allow
+          - name: /registry/*
+            httpVerb: ["GET", "POST"]
+            action: allow
+  features:
+    - name: proxy.grpc
+      enabled: true
+    - name: proxy.http
+      enabled: true
+    - name: workflow
+      enabled: false
+    - name: actor
+      enabled: false
+  httpPipeline:
+    handlers:
+      - name: oauth2
+        type: middleware.http.oauth2
+      - name: ratelimit
+        type: middleware.http.ratelimit
+        spec:
+          storeName: "statestore"
+          maxRequestsPerSecond: 100
+  mqtt:
+    enabled: false
+  nameResolution:
+    component: "mdns"
+    configuration:
+      mDNSInstanceName: "lunaos"
+      mDNSPort: 5353

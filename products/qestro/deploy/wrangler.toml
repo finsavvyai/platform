@@ -1,0 +1,196 @@
+# Qestro - Cloudflare Workers Deployment Configuration
+# Comprehensive setup for AI-powered testing automation platform
+# Supports dev, staging, and production environments with full CI/CD integration
+
+name = "qestro-workers"
+main = "src/index.ts"
+compatibility_date = "2024-10-26"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "npm run build"
+cwd = ".."
+watch_paths = ["../src/**/*.ts"]
+
+# D1 Database - Application data, test results, user projects
+[[d1_databases]]
+binding = "DB"
+database_name = "qestro-production"
+database_id = "8da4925d-405b-4e78-ac0c-d1c7ba22adad"
+migrations_dir = "../drizzle/migrations"
+
+# KV Namespaces - Session storage, caching, rate limiting
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "aa2db9182fc343d7a8993ea371b7e722"
+preview_id = "aa2db9182fc343d7a8993ea371b7e722"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "693c6c0110614bc1b4e316982c7d93f9"
+preview_id = "693c6c0110614bc1b4e316982c7d93f9"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "0b96001752234d4f85d84fa4f8a9228e"
+preview_id = "abb362aaf51c4c85ac932d65c28d2280"
+
+# R2 Buckets - Screenshots, recordings, test artifacts
+[[r2_buckets]]
+binding = "SCREENSHOTS"
+bucket_name = "qestro-screenshots"
+preview_bucket_name = "qestro-screenshots-preview"
+
+[[r2_buckets]]
+binding = "RECORDINGS"
+bucket_name = "qestro-recordings"
+preview_bucket_name = "qestro-recordings-preview"
+
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "qestro-artifacts"
+preview_bucket_name = "qestro-artifacts-preview"
+
+# Durable Objects - Real-time collaboration, test execution state
+[[durable_objects.bindings]]
+name = "COLLABORATION_DO"
+class_name = "CollaborationDO"
+
+[[durable_objects.bindings]]
+name = "TEST_EXECUTION_DO"
+class_name = "TestExecutionDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CollaborationDO", "TestExecutionDO"]
+
+# Global environment variables (shared across all environments)
+[vars]
+APP_NAME = "Qestro"
+APP_VERSION = "1.0.0"
+CORS_ALLOWED_ORIGINS = "https://qestro.app,https://preview.qestro.app,http://localhost:5173"
+LOG_LEVEL = "warn"
+
+# Development environment
+[env.dev]
+name = "qestro-workers-dev"
+vars = { ENVIRONMENT = "development", API_URL = "http://localhost:8787", LOG_LEVEL = "debug" }
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "qestro-dev"
+
+[[env.dev.kv_namespaces]]
+binding = "SESSIONS"
+id = "dev-sessions-id"
+
+[[env.dev.kv_namespaces]]
+binding = "CACHE"
+id = "dev-cache-id"
+
+[[env.dev.kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "dev-ratelimit-id"
+
+[[env.dev.r2_buckets]]
+binding = "SCREENSHOTS"
+bucket_name = "qestro-screenshots-dev"
+
+[[env.dev.r2_buckets]]
+binding = "RECORDINGS"
+bucket_name = "qestro-recordings-dev"
+
+[[env.dev.r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "qestro-artifacts-dev"
+
+# Staging environment
+[env.staging]
+name = "qestro-workers-staging"
+vars = { ENVIRONMENT = "staging", API_URL = "https://staging-api.qestro.app", LOG_LEVEL = "info" }
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "qestro-staging"
+database_id = "dc52cafe-9c98-463a-bf03-a28d26bd643b"
+
+[[env.staging.kv_namespaces]]
+binding = "SESSIONS"
+id = "61f04de853474e1f8b543ee25f7ddd22"
+
+[[env.staging.kv_namespaces]]
+binding = "CACHE"
+id = "371889de975042ecb39474ab8655e529"
+
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "327901e2cd0c4c629eb855a2a1ea7000"
+
+[[env.staging.r2_buckets]]
+binding = "SCREENSHOTS"
+bucket_name = "qestro-screenshots-staging"
+
+[[env.staging.r2_buckets]]
+binding = "RECORDINGS"
+bucket_name = "qestro-recordings-staging"
+
+[[env.staging.r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "qestro-artifacts-staging"
+
+# Production environment
+[env.production]
+name = "qestro-workers-production"
+vars = { ENVIRONMENT = "production", API_URL = "https://api.qestro.app", LOG_LEVEL = "warn" }
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "qestro-production"
+database_id = "5660da07-b2dd-40ff-ab9e-d747fa19727b"
+
+[[env.production.kv_namespaces]]
+binding = "SESSIONS"
+id = "8c6001d69c3e4f058999c392c59a7d53"
+
+[[env.production.kv_namespaces]]
+binding = "CACHE"
+id = "4ef4e42f887540b2922d48cc12bddfb4"
+
+[[env.production.kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "a0e054707fc149a0ae2fa97b283a095a"
+
+[[env.production.r2_buckets]]
+binding = "SCREENSHOTS"
+bucket_name = "qestro-screenshots"
+
+[[env.production.r2_buckets]]
+binding = "RECORDINGS"
+bucket_name = "qestro-recordings"
+
+[[env.production.r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "qestro-artifacts"
+
+# Observability - Error tracking and performance monitoring
+[observability]
+enabled = true
+
+# Secrets (set via wrangler secret put <NAME> --env <ENV>)
+# Required secrets for all environments:
+#   JWT_SECRET: Secret for JWT token signing and verification
+#   OPENAI_API_KEY: OpenAI API key for AI test generation
+#   LEMONSQUEEZY_API_KEY: LemonSqueezy API key for subscription billing
+#   LEMONSQUEEZY_WEBHOOK_SECRET: Webhook verification secret
+#
+# Optional secrets for OAuth providers:
+#   GITHUB_OAUTH_CLIENT_ID, GITHUB_OAUTH_CLIENT_SECRET
+#   AZURE_OAUTH_CLIENT_ID, AZURE_OAUTH_CLIENT_SECRET
+#   GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET
+#
+# Email service:
+#   RESEND_API_KEY: Resend.com API key for transactional email
+#
+# Set secrets with:
+#   wrangler secret put JWT_SECRET --env production
+#   wrangler secret put OPENAI_API_KEY --env production

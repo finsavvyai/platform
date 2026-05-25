@@ -1,0 +1,130 @@
+name: Migrations
+
+on:
+  pull_request:
+    paths:
+      - "database/migrations/**"
+      - "services/gateway/internal/infrastructure/migrations/migrations/**"
+      - "make-it-run.sh"
+      - ".github/workflows/migrations.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  apply:
+    name: Apply migrations against fresh Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sdlc_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            if pg_isready -h localhost -p 5432 -U postgres; then
+              echo "postgres up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "postgres never came up"; exit 1
+
+      - name: Bootstrap roles + extensions
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d sdlc_platform <<'SQL'
+            -- The migrations expect an `app_user` role for RLS GRANTs.
+            CREATE ROLE app_user NOLOGIN;
+            -- pgvector / pgcrypto are loaded by the 000_extensions
+            -- migration; nothing else needs pre-creating here.
+          SQL
+
+      - name: Build ordered migration list
+        id: order
+        run: |
+          set -euo pipefail
+          # Canonical dir is database/migrations/. The gateway-internal
+          # 011/012/013 are pulled in inline (matching make-it-run.sh)
+          # because the canonical 014/015 reference spend_events from 012.
+          {
+            ls database/migrations/*.sql 2>/dev/null
+            for v in 011_ip_allowlist 012_spend_events 013_retention_policies; do
+              f="services/gateway/internal/infrastructure/migrations/migrations/${v}.sql"
+              [ -f "$f" ] && echo "$f"
+            done
+          } | sort -t/ -k4 > /tmp/migrations.lst
+          echo "Files to apply ($(wc -l < /tmp/migrations.lst)):"
+          cat /tmp/migrations.lst
+
+      - name: Apply each migration
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          while IFS= read -r m; do
+            base="$(basename "$m")"
+            # Skip Day-1 leftovers that target a different DB flavor;
+            # mirrors the same skip in make-it-run.sh.
+            if [ "$base" = "001_initial_schema.sql" ]; then
+              echo "  [skip] $m (D1 leftover)"; continue
+            fi
+            echo "::group::Applying $m"
+            psql -h localhost -U postgres -d sdlc_platform \
+                 -v ON_ERROR_STOP=1 -f "$m"
+            echo "::endgroup::"
+          done < /tmp/migrations.lst
+
+      - name: Verify required tables exist
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d sdlc_platform -tAc "
+            SELECT tablename FROM pg_tables
+            WHERE schemaname='public'
+              AND tablename IN (
+                'tenants','users','audit_logs','rate_limits',
+                'roles','role_permissions','user_roles',
+                'tenant_dlp_policy','ip_allowlists',
+                'webhook_endpoints','retention_policies'
+              )
+            ORDER BY tablename;
+          " | tee /tmp/tables.txt
+          # 11 tables expected; fail loud if any missing.
+          n=$(wc -l < /tmp/tables.txt | tr -d ' ')
+          if [ "$n" -lt 11 ]; then
+            echo "::error::Expected 11 core tables, got $n"; exit 1
+          fi
+
+      - name: Re-apply once more (idempotency check)
+        env:
+          PGPASSWORD: postgres
+        run: |
+          # Re-running every migration must be a no-op. The 001/002/007/
+          # 008 idempotency fixes (commit 2d90250) were precisely about
+          # this; this step is the regression guard.
+          set -euo pipefail
+          while IFS= read -r m; do
+            base="$(basename "$m")"
+            if [ "$base" = "001_initial_schema.sql" ]; then continue; fi
+            psql -h localhost -U postgres -d sdlc_platform \
+                 -v ON_ERROR_STOP=1 -f "$m" > /dev/null
+          done < /tmp/migrations.lst
+          echo "second pass succeeded — migrations are idempotent"

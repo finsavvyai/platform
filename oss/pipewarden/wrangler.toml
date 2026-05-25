@@ -1,0 +1,65 @@
+# PipeWarden — Cloudflare Containers config
+# Docs: https://developers.cloudflare.com/containers/
+# Plan: Workers Paid Plan required (Containers in open beta as of 2026-04)
+#
+# Deploy:
+#   docker build --platform linux/amd64 -t ghcr.io/finsavvyai/pipewarden:0.1.0 .
+#   docker push ghcr.io/finsavvyai/pipewarden:0.1.0
+#   wrangler containers push ghcr.io/finsavvyai/pipewarden:0.1.0
+#   wrangler deploy
+#
+# Required secrets (boot fails without these; set via wrangler secret put):
+#   PIPEWARDEN_VAULT_KEY              — 32+ byte AES-256-GCM key
+#   PIPEWARDEN_SESSION_SECRET         — 32+ byte cookie-signing secret
+#   PIPEWARDEN_DATABASE_URL           — postgres URL with sslmode=require
+#   PIPEWARDEN_SMTP_HOST              — verify+reset email relay
+#   PIPEWARDEN_SMTP_USER, PIPEWARDEN_SMTP_PASSWORD, PIPEWARDEN_SMTP_FROM
+#   PIPEWARDEN_WEBAUTHN_RPID          — apex domain (pipewarden.io)
+#   PIPEWARDEN_WEBAUTHN_ORIGINS       — comma-separated https origins
+#   CLAUDE_API_KEY                    — Claude analyzer
+# When auth.githubApp.enabled=true:
+#   GITHUB_APP_ID, GITHUB_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET
+#   GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_APP_SLUG
+# When features.billing=true:
+#   LEMONSQUEEZY_API_KEY, LEMONSQUEEZY_STORE_ID, LEMONSQUEEZY_WEBHOOK_SECRET
+
+name                = "pipewarden"
+main                = "worker/proxy.js"
+compatibility_date  = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev         = true
+
+[vars]
+PIPEWARDEN_ENVIRONMENT     = "production"
+PIPEWARDEN_SERVER_PORT     = "8080"
+PIPEWARDEN_DATABASE_DRIVER = "sqlite"
+PIPEWARDEN_DATABASE_PATH   = "/data/pipewarden.db"
+PIPEWARDEN_LOGGING_LEVEL   = "info"
+PIPEWARDEN_HOSTED_MODE     = "false"
+PIPEWARDEN_COOKIE_DOMAIN   = ".pipewarden.io"
+PIPEWARDEN_WEBAUTHN_NAME   = "PipeWarden"
+
+# Route to apex domain is claimed by the existing pipewarden-prod worker.
+# Re-enable once we cut over from the legacy deploy.
+# [[routes]]
+# pattern    = "api.pipewarden.io/*"
+# zone_name  = "pipewarden.io"
+
+[[durable_objects.bindings]]
+name       = "PIPEWARDEN_CONTAINER"
+class_name = "PipeWardenContainer"
+
+[[migrations]]
+tag                = "v1"
+new_sqlite_classes = ["PipeWardenContainer"]
+
+[[containers]]
+class_name    = "PipeWardenContainer"
+# CF-managed registry. deploy.sh pushes :latest alongside :<sha> so this
+# stays valid commit-to-commit.
+image         = "registry.cloudflare.com/d2fe608a92dc9faa2ce5b0fd2cad5eb7/pipewarden/pipewarden:latest"
+max_instances = 3
+instance_type = "lite"
+
+[observability]
+enabled = true

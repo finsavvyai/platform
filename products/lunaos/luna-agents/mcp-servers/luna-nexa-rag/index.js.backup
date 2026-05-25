@@ -1,0 +1,399 @@
+#!/usr/bin/env node
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { ChromaClient } from 'chromadb';
+import { readdir, readFile } from 'fs/promises';
+import { join, extname, relative } from 'path';
+
+const COLLECTION_NAME = process.env.COLLECTION_NAME || 'luna-codebase';
+const PROJECT_PATH = process.env.PROJECT_PATH || process.cwd();
+const CHROMA_HOST = process.env.CHROMA_HOST || 'localhost';
+const CHROMA_PORT = process.env.CHROMA_PORT || '8000';
+
+class NexaRAGServer {
+  constructor() {
+    this.server = new Server(
+      { name: 'nexa-rag', version: '1.0.0' },
+      { capabilities: { tools: {} } }
+    );
+    this.chromaClient = null;
+    this.collection = null;
+    this.setupHandlers();
+  }
+
+  async initialize() {
+    try {
+      this.chromaClient = new ChromaClient({
+        path: `http://${CHROMA_HOST}:${CHROMA_PORT}`
+      });
+      this.collection = await this.chromaClient.getOrCreateCollection({
+        name: COLLECTION_NAME,
+        metadata: { 'hnsw:space': 'cosine' }
+      });
+      console.error(`✓ Connected to ChromaDB at ${CHROMA_HOST}:${CHROMA_PORT}`);
+      console.error(`✓ Using collection: ${COLLECTION_NAME}`);
+    } catch (error) {
+      console.error('❌ Failed to initialize ChromaDB:', error.message);
+      console.error('\n💡 Make sure ChromaDB is running:');
+      console.error('   docker run -d -p 8000:8000 chromadb/chroma\n');
+    }
+  }
+
+  setupHandlers() {
+    // List available tools
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: [
+        {
+          name: 'index_codebase',
+          description: 'Index project codebase for semantic search. Scans and embeds all code files.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              projectPath: {
+                type: 'string',
+                description: 'Path to project directory (default: PROJECT_PATH env var)'
+              },
+              fileTypes: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'File extensions to index',
+                default: ['.js', '.ts', '.py', '.md', '.tsx', '.jsx', '.json']
+              }
+            }
+          }
+        },
+        {
+          name: 'search_context',
+          description: 'Search codebase semantically for relevant context, code snippets, or implementations',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: 'Natural language search query'
+              },
+              limit: {
+                type: 'number',
+                description: 'Maximum number of results',
+                default: 5
+              }
+            },
+            required: ['query']
+          }
+        },
+        {
+          name: 'get_similar_implementations',
+          description: 'Find similar feature implementations or code patterns in the codebase',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              feature: {
+                type: 'string',
+                description: 'Feature or pattern description'
+              },
+              limit: {
+                type: 'number',
+                description: 'Maximum number of results',
+                default: 3
+              }
+            },
+            required: ['feature']
+          }
+        },
+        {
+          name: 'get_coding_patterns',
+          description: 'Extract coding patterns and standards from existing codebase',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              patternType: {
+                type: 'string',
+                description: 'Type of pattern (e.g., "error-handling", "api-design", "testing")'
+              }
+            },
+            required: ['patternType']
+          }
+        }
+      ]
+    }));
+
+    // Handle tool calls
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+
+      try {
+        switch (name) {
+          case 'index_codebase':
+            return await this.indexCodebase(
+              args.projectPath || PROJECT_PATH,
+              args.fileTypes || ['.js', '.ts', '.py', '.md', '.tsx', '.jsx', '.json']
+            );
+
+          case 'search_context':
+            return await this.searchContext(args.query, args.limit || 5);
+
+          case 'get_similar_implementations':
+            return await this.getSimilarImplementations(args.feature, args.limit || 3);
+
+          case 'get_coding_patterns':
+            return await this.getCodingPatterns(args.patternType);
+
+          default:
+            throw new Error(`Unknown tool: ${name}`);
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Error: ${error.message}`
+            }
+          ],
+          isError: true
+        };
+      }
+    });
+  }
+
+  async walkDirectory(dir, fileTypes, files = []) {
+    try {
+      const entries = await readdir(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        
+        if (entry.isDirectory()) {
+          // Skip common directories
+          if (!['node_modules', '.git', 'dist', 'build', '.next', 'coverage', '__pycache__'].includes(entry.name)) {
+            await this.walkDirectory(fullPath, fileTypes, files);
+          }
+        } else if (entry.isFile() && fileTypes.includes(extname(entry.name))) {
+          files.push(fullPath);
+        }
+      }
+    } catch (error) {
+      console.error(`Error reading ${dir}:`, error.message);
+    }
+
+    return files;
+  }
+
+  async indexCodebase(projectPath, fileTypes) {
+    if (!this.collection) {
+      await this.initialize();
+    }
+
+    console.error(`\n📂 Indexing ${projectPath}...`);
+    const files = await this.walkDirectory(projectPath, fileTypes);
+    const documents = [];
+    const metadatas = [];
+    const ids = [];
+
+    for (const file of files) {
+      try {
+        const content = await readFile(file, 'utf-8');
+        const relativePath = relative(projectPath, file);
+        
+        // Skip very large files
+        if (content.length > 100000) {
+          console.error(`⚠️  Skipping large file: ${relativePath}`);
+          continue;
+        }
+        
+        documents.push(content);
+        metadatas.push({
+          file: relativePath,
+          type: extname(file),
+          size: content.length,
+          timestamp: new Date().toISOString()
+        });
+        ids.push(relativePath);
+      } catch (error) {
+        console.error(`Failed to read ${file}:`, error.message);
+      }
+    }
+
+    if (documents.length > 0) {
+      console.error(`💾 Adding ${documents.length} documents to ChromaDB...`);
+      await this.collection.add({
+        documents,
+        metadatas,
+        ids
+      });
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ Successfully indexed ${documents.length} files from ${projectPath}\n\n📁 File types: ${fileTypes.join(', ')}\n🗄️  Collection: ${COLLECTION_NAME}`
+        }
+      ]
+    };
+  }
+
+  async searchContext(query, limit) {
+    if (!this.collection) {
+      await this.initialize();
+    }
+
+    console.error(`🔍 Searching for: "${query}"`);
+    
+    const results = await this.collection.query({
+      queryTexts: [query],
+      nResults: limit
+    });
+
+    if (!results.documents[0] || results.documents[0].length === 0) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: 'No results found. Make sure the codebase is indexed first.'
+          }
+        ]
+      };
+    }
+
+    const formattedResults = results.documents[0].map((doc, idx) => ({
+      file: results.metadatas[0][idx].file,
+      relevance: (1 - results.distances[0][idx]).toFixed(3),
+      snippet: doc.substring(0, 300) + (doc.length > 300 ? '...' : ''),
+      type: results.metadatas[0][idx].type
+    }));
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Found ${formattedResults.length} relevant contexts:\n\n${JSON.stringify(formattedResults, null, 2)}`
+        }
+      ]
+    };
+  }
+
+  async getSimilarImplementations(feature, limit) {
+    if (!this.collection) {
+      await this.initialize();
+    }
+
+    console.error(`🔎 Finding similar implementations for: "${feature}"`);
+
+    // Try multiple query strategies
+    const queries = [
+      `${feature} implementation`,
+      `${feature} example code`,
+      `how to implement ${feature}`
+    ];
+
+    const allResults = [];
+    
+    for (const query of queries) {
+      const results = await this.collection.query({
+        queryTexts: [query],
+        nResults: limit
+      });
+
+      if (results.documents[0]) {
+        results.documents[0].forEach((doc, idx) => {
+          allResults.push({
+            file: results.metadatas[0][idx].file,
+            relevance: (1 - results.distances[0][idx]).toFixed(3),
+            code: doc,
+            type: results.metadatas[0][idx].type
+          });
+        });
+      }
+    }
+
+    // Remove duplicates and sort by relevance
+    const uniqueResults = Array.from(
+      new Map(allResults.map(item => [item.file, item])).values()
+    )
+      .sort((a, b) => b.relevance - a.relevance)
+      .slice(0, limit);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Found ${uniqueResults.length} similar implementations for "${feature}":\n\n${JSON.stringify(uniqueResults, null, 2)}`
+        }
+      ]
+    };
+  }
+
+  async getCodingPatterns(patternType) {
+    if (!this.collection) {
+      await this.initialize();
+    }
+
+    console.error(`📋 Extracting coding patterns for: "${patternType}"`);
+
+    const results = await this.collection.query({
+      queryTexts: [`${patternType} pattern best practices coding standard`],
+      nResults: 10
+    });
+
+    if (!results.documents[0] || results.documents[0].length === 0) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `No coding patterns found for "${patternType}". Make sure the codebase is indexed.`
+          }
+        ]
+      };
+    }
+
+    const patterns = results.documents[0].map((doc, idx) => ({
+      file: results.metadatas[0][idx].file,
+      pattern: this.extractPattern(doc, patternType),
+      relevance: (1 - results.distances[0][idx]).toFixed(3)
+    }));
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Coding patterns for "${patternType}":\n\n${JSON.stringify(patterns, null, 2)}`
+        }
+      ]
+    };
+  }
+
+  extractPattern(code, patternType) {
+    // Extract relevant code patterns
+    const lines = code.split('\n');
+    const relevantLines = lines.filter(line => 
+      line.includes('function') || 
+      line.includes('class') || 
+      line.includes('const') ||
+      line.includes('async') ||
+      line.includes('try') ||
+      line.includes('catch') ||
+      line.includes('import') ||
+      line.includes('export')
+    ).slice(0, 15);
+
+    return relevantLines.join('\n');
+  }
+
+  async run() {
+    await this.initialize();
+    const transport = new StdioServerTransport();
+    await this.server.connect(transport);
+    
+    console.error('\n🌙 Nexa RAG MCP Server Running');
+    console.error('================================');
+    console.error(`📁 Project Path: ${PROJECT_PATH}`);
+    console.error(`🗄️  Collection: ${COLLECTION_NAME}`);
+    console.error(`🔗 ChromaDB: ${CHROMA_HOST}:${CHROMA_PORT}`);
+    console.error('================================\n');
+  }
+}
+
+// Start the server
+const server = new NexaRAGServer();
+server.run().catch(console.error);

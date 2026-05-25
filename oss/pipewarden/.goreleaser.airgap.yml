@@ -1,0 +1,70 @@
+version: 2
+
+project_name: pipewarden-airgap
+
+# Air-gap variant config. Run after `make airgap-stage` so that
+# dist/airgap/llamafile-{amd64,arm64} exist and are SHA256-verified
+# against scripts/airgap/llamafile-pins.txt. The default goreleaser
+# config (.goreleaser.yml) does not pull in this variant; it is shipped
+# only when explicitly requested with --config .goreleaser.airgap.yml.
+
+before:
+  hooks:
+    - go mod tidy
+    - bash scripts/airgap/stage-llamafile.sh dist/airgap
+
+builds:
+  - id: pipewarden-linux-amd64
+    main: ./cmd/pipewarden
+    binary: pipewarden
+    goos: [linux]
+    goarch: [amd64]
+    env:
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.variant=airgap
+
+  - id: pipewarden-linux-arm64
+    main: ./cmd/pipewarden
+    binary: pipewarden
+    goos: [linux]
+    goarch: [arm64]
+    env:
+      - CGO_ENABLED=1
+      - CC=aarch64-linux-gnu-gcc
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.variant=airgap
+
+archives:
+  - id: airgap
+    name_template: >-
+      pipewarden-airgap-
+      {{- .Version }}-
+      {{- .Os }}-
+      {{- .Arch }}
+    builds:
+      - pipewarden-linux-amd64
+      - pipewarden-linux-arm64
+    files:
+      - README.md
+      - LICENSE
+      - configs/**/*
+      - docs/airgap-install.md
+      - docs/sre/trace-cookbook.md
+      - docs/enterprise/tailnet.md
+      - src: 'dist/airgap/llamafile-{{ .Arch }}'
+        dst: llamafile
+        info:
+          mode: 0o755
+
+checksum:
+  name_template: 'checksums-airgap.txt'
+  algorithm: sha256

@@ -1,0 +1,152 @@
+# Default values for finsavvyai.
+# Override with: helm install finsavvyai ./helm/finsavvyai -f my-values.yaml
+
+# -- Number of gateway replicas
+replicaCount: 1
+
+image:
+  repository: finsavvyai/finsavvyai
+  pullPolicy: IfNotPresent
+  # -- Overrides the image tag (defaults to chart appVersion)
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# ── Services ──────────────────────────────────────────────────────────────────
+
+gateway:
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    FINSAVVYAI_LOG_LEVEL: INFO
+    FINSAVVYAI_AUTH_ENABLED: "false"
+    FINSAVVYAI_RATE_LIMIT_REQUESTS: "100"
+
+master:
+  enabled: true
+  replicaCount: 1
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+worker:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: finsavvyai.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # tls:
+  #   - secretName: finsavvyai-tls
+  #     hosts:
+  #       - finsavvyai.example.com
+
+# ── Secrets (set via --set or sealed-secrets) ─────────────────────────────────
+
+secrets:
+  # -- OpenAI API key (required for OpenAI provider)
+  openaiApiKey: ""
+  # -- Anthropic API key
+  anthropicApiKey: ""
+  # -- FinSavvyAI gateway API key (when auth enabled)
+  finsavvyaiApiKey: ""
+
+# ── Config ────────────────────────────────────────────────────────────────────
+
+config:
+  ollamaBaseUrl: ""
+  masterHost: ""  # auto-set to service DNS when empty
+
+# ── Persistence ───────────────────────────────────────────────────────────────
+
+persistence:
+  logs:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+
+# ── Autoscaling ───────────────────────────────────────────────────────────────
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# ── Probes ────────────────────────────────────────────────────────────────────
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

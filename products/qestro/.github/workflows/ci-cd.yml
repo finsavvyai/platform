@@ -1,0 +1,557 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, production-deploy]
+  pull_request:
+    branches: [main, develop]
+  release:
+    types: [published]
+
+env:
+  NODE_VERSION: "20"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Code Quality and Security
+  code-quality:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Type checking
+        run: npm run type-check
+
+      - name: Security audit
+        run: npm run security:scan
+
+      - name: Code formatting check
+        run: npm run format:check
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # Testing
+  testing:
+    name: Testing
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+  # Integration Testing
+  integration-testing:
+    name: Integration Testing
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: qestro_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup test environment
+        run: |
+          cp backend/.env.test backend/.env
+          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/qestro_test" >> backend/.env
+          echo "REDIS_URL=redis://localhost:6379" >> backend/.env
+          echo "JWT_SECRET=test-jwt-secret" >> backend/.env
+          echo "NODE_ENV=test" >> backend/.env
+
+      - name: Run database migrations
+        run: |
+          cd backend
+          npm run db:migrate
+
+      - name: Run integration tests
+        run: npm run integration-test
+
+      - name: Run API integration tests
+        run: |
+          cd backend
+          npm run test:integration
+
+  # E2E Testing
+  e2e-testing:
+    name: E2E Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Build application
+        run: npm run build
+
+      - name: Start application
+        run: |
+          npm start &
+          sleep 10
+
+      - name: Run Playwright tests
+        run: npm run test:playwright
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+  # Build and Package
+  build:
+    name: Build & Package
+    runs-on: ubuntu-latest
+    needs: [code-quality, testing, integration-testing]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            COMMIT_SHA="${{ github.sha }}"
+            VERSION="1.0.0-${COMMIT_SHA:0:7}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+          tar -czf ../frontend-build.tar.gz dist/
+
+      - name: Build backend
+        run: |
+          cd backend
+          npm run build
+          tar -czf ../backend-build.tar.gz dist/
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            frontend-build.tar.gz
+            backend-build.tar.gz
+          retention-days: 7
+
+  # Docker Build
+  docker-build:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'push' || github.event_name == 'release'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ needs.build.outputs.version }}
+            NODE_ENV=production
+
+  # Security Scanning
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.event_name == 'push' || github.event_name == 'release'
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.docker-build.outputs.image-tag }}
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"
+
+  # Deploy to Staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, docker-build]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+
+      - name: Deploy to Render (Staging)
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: ${{ secrets.RENDER_STAGING_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}
+          wait-for-success: true
+
+      - name: Run smoke tests
+        run: |
+          sleep 30
+          curl -f https://staging.qestro.io/api/health || exit 1
+          curl -f https://staging.qestro.io || exit 1
+
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: "#deployments"
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          message: |
+            🚀 Staging deployment completed successfully!
+            Commit: ${{ github.sha }}
+            Version: ${{ needs.build.outputs.version }}
+
+  # Deploy to Production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, docker-build, e2e-testing]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+    environment: production
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+
+      - name: Create backup
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.BACKUP_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"environment": "production"}' \
+            https://backup.qestro.io/api/create-backup
+
+      - name: Deploy to Render (Production)
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: ${{ secrets.RENDER_PRODUCTION_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}
+          wait-for-success: true
+
+      - name: Run health checks
+        run: |
+          sleep 60
+          # API health check
+          curl -f https://api.qestro.io/api/health || exit 1
+          # Frontend health check
+          curl -f https://qestro.io || exit 1
+          # Database connectivity check
+          curl -f https://api.qestro.io/api/health/database || exit 1
+
+      - name: Run post-deployment tests
+        run: |
+          npm run test:smoke -- --baseUrl=https://api.qestro.io
+
+      - name: Update deployment status
+        if: always()
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.DEPLOYMENT_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "version": "${{ needs.build.outputs.version }}",
+              "status": "${{ job.status }}",
+              "environment": "production",
+              "commit": "${{ github.sha }}"
+            }' \
+            https://deployments.qestro.io/api/status
+
+      - name: Notify Slack
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: "#deployments"
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          message: |
+            🚀 Production deployment ${{ job.status == 'success' && 'completed successfully! 🎉' || 'failed! ❌' }}
+            Commit: ${{ github.sha }}
+            Version: ${{ needs.build.outputs.version }}
+            ${{ job.status == 'failure' && 'Check the logs and investigate immediately!' }}
+
+  # Performance Testing
+  performance-testing:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install performance testing tools
+        run: npm install -g artillery k6
+
+      - name: Run load tests
+        run: |
+          artillery run tests/performance/load-test.yml -o artillery-results.json
+          k6 run tests/performance/stress-test.js -o json=k6-results.json
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: |
+            artillery-results.json
+            k6-results.json
+          retention-days: 30
+
+      - name: Compare with baseline
+        run: |
+          node scripts/performance/compare-results.js \
+            --current artillery-results.json \
+            --baseline baseline/performance-baseline.json \
+            --threshold 10
+
+  # Post-Deployment
+  post-deployment:
+    name: Post-Deployment Tasks
+    runs-on: ubuntu-latest
+    needs: [deploy-production, performance-testing]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+    steps:
+      - name: Update documentation
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.DOCUMENTATION_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "version": "${{ needs.build.outputs.version }}",
+              "releaseNotes": "See GitHub release for details"
+            }' \
+            https://docs.qestro.io/api/update-version
+
+      - name: Update feature flags
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.FEATURE_FLAG_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "environment": "production",
+              "features": {
+                "new_dashboard": true,
+                "ai_test_generation": true
+              }
+            }' \
+            https://flags.qestro.io/api/update
+
+      - name: Send deployment notification email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "🚀 Qestro v${{ needs.build.outputs.version }} Deployed to Production"
+          to: team@qestro.io
+          from: "Deployments <deployments@qestro.io>"
+          body: |
+            The new version has been successfully deployed to production!
+
+            Version: ${{ needs.build.outputs.version }}
+            Commit: ${{ github.sha }}
+            Deployed by: ${{ github.actor }}
+
+            Performance tests: ${{ needs.performance-testing.result }}
+
+            Check the live application at https://qestro.io
+
+  # Rollback (on failure)
+  rollback:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: failure() && (github.ref == 'refs/heads/main' || github.event_name == 'release')
+    environment: production
+    steps:
+      - name: Trigger rollback
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"service_id": "${{ secrets.RENDER_PRODUCTION_SERVICE_ID }}", "rollback": true}' \
+            https://api.render.com/v1/services/${{ secrets.RENDER_PRODUCTION_SERVICE_ID }}/deploy
+
+      - name: Notify rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: "failure"
+          channel: "#deployments"
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          message: |
+            🚨 PRODUCTION ROLLBACK INITIATED!
+            Deployment failed for version: ${{ needs.deploy-production.outputs.version }}
+            Previous version is being restored immediately.
+
+      - name: Create incident
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.INCIDENT_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "title": "Production Deployment Failure",
+              "severity": "high",
+              "description": "Deployment version ${{ needs.deploy-production.outputs.version }} failed and rollback was initiated",
+              "assignee": "on-call"
+            }' \
+            https://incidents.qestro.io/api/create

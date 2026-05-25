@@ -1,0 +1,297 @@
+package server
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
+
+	"{{config.packageName}}/internal/config"
+	"{{config.packageName}}/internal/models"
+	"{{config.packageName}}/internal/tools"
+)
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow all origins for development
+	},
+}
+
+type Server struct {
+	config       *config.Config
+	toolRegistry *tools.Registry
+	logger       *zap.Logger
+	httpServer   *http.Server
+}
+
+type MCPRequest struct {
+	JSONRPC string                 `json:"jsonrpc"`
+	ID      interface{}            `json:"id"`
+	Method  string                 `json:"method"`
+	Params  map[string]interface{} `json:"params,omitempty"`
+}
+
+type MCPResponse struct {
+	JSONRPC string      `json:"jsonrpc"`
+	ID      interface{} `json:"id,omitempty"`
+	Result  interface{} `json:"result,omitempty"`
+	Error   *MCPError   `json:"error,omitempty"`
+}
+
+type MCPError struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
+type MCPCapability struct {
+	Tools map[string]interface{} `json:"tools"`
+}
+
+type InitializeResult struct {
+	ProtocolVersion string       `json:"protocolVersion"`
+	Capabilities    MCPCapability `json:"capabilities"`
+	ServerInfo      models.ServerInfo `json:"serverInfo"`
+}
+
+func New(cfg *config.Config, toolRegistry *tools.Registry, logger *zap.Logger) *Server {
+	return &Server{
+		config:       cfg,
+		toolRegistry: toolRegistry,
+		logger:       logger,
+	}
+}
+
+func (s *Server) Start(ctx context.Context) error {
+	router := mux.NewRouter()
+
+	// Health check endpoint
+	router.HandleFunc("/health", s.handleHealth).Methods("GET")
+
+	// MCP WebSocket endpoint
+	router.HandleFunc("/mcp", s.handleWebSocket)
+
+	// MCP HTTP endpoint (for testing)
+	router.HandleFunc("/mcp", s.handleHTTP).Methods("POST")
+
+	s.httpServer = &http.Server{
+		Addr:         ":" + s.config.Server.Port,
+		Handler:      router,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+	}
+
+	go func() {
+		<-ctx.Done()
+		s.logger.Info("Shutting down server...")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		s.httpServer.Shutdown(shutdownCtx)
+	}()
+
+	s.logger.Info("Server starting", zap.String("port", s.config.Server.Port))
+	return s.httpServer.ListenAndServe()
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "healthy",
+		"service": "{{config.serviceName}}",
+		"version": "{{config.serviceVersion}}",
+	})
+}
+
+func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		s.logger.Error("Failed to upgrade to WebSocket", zap.Error(err))
+		return
+	}
+	defer conn.Close()
+
+	s.logger.Info("WebSocket connection established")
+
+	for {
+		var req MCPRequest
+		err := conn.ReadJSON(&req)
+		if err != nil {
+			if err == io.EOF {
+				s.logger.Info("WebSocket connection closed")
+				return
+			}
+			s.logger.Error("Failed to read WebSocket message", zap.Error(err))
+			return
+		}
+
+		resp := s.handleRequest(req)
+		if err := conn.WriteJSON(resp); err != nil {
+			s.logger.Error("Failed to write WebSocket response", zap.Error(err))
+			return
+		}
+	}
+}
+
+func (s *Server) handleHTTP(w http.ResponseWriter, r *http.Request) {
+	var req MCPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeHTTPError(w, -32700, "Parse error", nil)
+		return
+	}
+
+	resp := s.handleRequest(req)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleRequest(req MCPRequest) MCPResponse {
+	switch req.Method {
+	case "initialize":
+		return s.handleInitialize(req)
+	case "tools/list":
+		return s.handleToolsList(req)
+	case "tools/call":
+		return s.handleToolsCall(req)
+	default:
+		return MCPResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error: &MCPError{
+				Code:    -32601,
+				Message: "Method not found",
+			},
+		}
+	}
+}
+
+func (s *Server) handleInitialize(req MCPRequest) MCPResponse {
+	tools := s.toolRegistry.ListTools()
+	toolList := make([]map[string]interface{}, len(tools))
+
+	for i, tool := range tools {
+		toolList[i] = map[string]interface{}{
+			"name":        tool.Name(),
+			"description": tool.Description(),
+			"inputSchema": tool.InputSchema(),
+		}
+	}
+
+	result := InitializeResult{
+		ProtocolVersion: "2024-11-05",
+		Capabilities: MCPCapability{
+			Tools: map[string]interface{}{
+				"listChanged": false,
+			},
+		},
+		ServerInfo: models.ServerInfo{
+			Name:    "{{config.serviceName}}",
+			Version: "{{config.serviceVersion}}",
+			Author:  "{{config.author}}",
+		},
+	}
+
+	return MCPResponse{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  result,
+	}
+}
+
+func (s *Server) handleToolsList(req MCPRequest) MCPResponse {
+	tools := s.toolRegistry.ListTools()
+	toolList := make([]map[string]interface{}, len(tools))
+
+	for i, tool := range tools {
+		toolList[i] = map[string]interface{}{
+			"name":        tool.Name(),
+			"description": tool.Description(),
+			"inputSchema": tool.InputSchema(),
+		}
+	}
+
+	result := map[string]interface{}{
+		"tools": toolList,
+	}
+
+	return MCPResponse{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  result,
+	}
+}
+
+func (s *Server) handleToolsCall(req MCPRequest) MCPResponse {
+	params, ok := req.Params["name"].(string)
+	if !ok {
+		return MCPResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error: &MCPError{
+				Code:    -32602,
+				Message: "Invalid params: name is required",
+			},
+		}
+	}
+
+	tool := s.toolRegistry.GetTool(params)
+	if tool == nil {
+		return MCPResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error: &MCPError{
+				Code:    -32601,
+				Message: fmt.Sprintf("Tool '%s' not found", params),
+			},
+		}
+	}
+
+	arguments, _ := req.Params["arguments"].(map[string]interface{})
+	result, err := tool.Execute(arguments)
+	if err != nil {
+		return MCPResponse{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error: &MCPError{
+				Code:    -32603,
+				Message: fmt.Sprintf("Tool execution failed: %v", err),
+			},
+		}
+	}
+
+	response := map[string]interface{}{
+		"content": []map[string]interface{}{
+			{
+				"type": "text",
+				"text": fmt.Sprintf("%v", result),
+			},
+		},
+		"isError": false,
+	}
+
+	return MCPResponse{
+		JSONRPC: "2.0",
+		ID:      req.ID,
+		Result:  response,
+	}
+}
+
+func (s *Server) writeHTTPError(w http.ResponseWriter, code int, message string, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	resp := MCPResponse{
+		JSONRPC: "2.0",
+		Error: &MCPError{
+			Code:    code,
+			Message: message,
+			Data:    data,
+		},
+	}
+	json.NewEncoder(w).Encode(resp)
+}

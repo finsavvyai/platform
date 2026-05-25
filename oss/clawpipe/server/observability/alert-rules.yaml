@@ -1,0 +1,135 @@
+groups:
+  - name: finsavvyai-availability
+    rules:
+      # Service down alerts
+      - alert: GatewayDown
+        expr: up{job="finsavvyai-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: gateway
+        annotations:
+          summary: "API Gateway is down"
+          description: "The FinSavvyAI API Gateway has been unreachable for more than 1 minute."
+
+      - alert: MasterDown
+        expr: up{job="finsavvyai-master"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: master
+        annotations:
+          summary: "Master server is down"
+          description: "The FinSavvyAI Master server has been unreachable for more than 1 minute."
+
+      - alert: AllWorkersDown
+        expr: finsavvyai_cluster_nodes_online == 0 and finsavvyai_cluster_nodes_total > 0
+        for: 2m
+        labels:
+          severity: critical
+          service: cluster
+        annotations:
+          summary: "All worker nodes are offline"
+          description: "No worker nodes are online but {{ $value }} are registered. Inference is unavailable."
+
+      - alert: WorkerDown
+        expr: up{job="finsavvyai-workers"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: worker
+        annotations:
+          summary: "Worker node {{ $labels.worker_id }} is down"
+          description: "Worker {{ $labels.worker_id }} has been unreachable for more than 2 minutes."
+
+  - name: finsavvyai-error-rates
+    rules:
+      # High error rate
+      - alert: HighErrorRate
+        expr: >
+          rate(finsavvyai_errors_total[5m])
+          / (rate(finsavvyai_requests_total[5m]) > 0)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Error rate above 5%"
+          description: "The error rate has been above 5% for the last 5 minutes (current: {{ $value | humanizePercentage }})."
+
+      - alert: CriticalErrorRate
+        expr: >
+          rate(finsavvyai_errors_total[5m])
+          / (rate(finsavvyai_requests_total[5m]) > 0)
+          > 0.20
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Error rate above 20%"
+          description: "The error rate has been above 20% for the last 2 minutes (current: {{ $value | humanizePercentage }})."
+
+      # Circuit breaker trips
+      - alert: CircuitBreakerTripping
+        expr: rate(finsavvyai_circuit_breaker_trips_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit breaker is tripping"
+          description: "Circuit breakers are being triggered, indicating worker failures."
+
+  - name: finsavvyai-latency
+    rules:
+      # High latency
+      - alert: HighRequestLatency
+        expr: >
+          histogram_quantile(0.95, rate(finsavvyai_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 request latency above 2s"
+          description: "The 95th percentile request latency is {{ $value }}s (target: <2s)."
+
+      - alert: CriticalRequestLatency
+        expr: >
+          histogram_quantile(0.95, rate(finsavvyai_request_duration_seconds_bucket[5m])) > 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "P95 request latency above 10s"
+          description: "The 95th percentile request latency is {{ $value }}s, indicating severe performance degradation."
+
+      - alert: HighInferenceLatency
+        expr: >
+          histogram_quantile(0.95, rate(finsavvyai_inference_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 inference latency above 30s"
+          description: "Model inference is taking {{ $value }}s at p95."
+
+  - name: finsavvyai-resources
+    rules:
+      # Rate limiting
+      - alert: HighRateLimiting
+        expr: rate(finsavvyai_rate_limit_hits_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Excessive rate limiting"
+          description: "More than 1 request per second is being rate-limited. Consider increasing limits."
+
+      # Memory usage (alert if any service exceeds 2GB)
+      - alert: HighMemoryUsage
+        expr: finsavvyai_memory_usage_bytes > 2147483648
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.service }}"
+          description: "Service {{ $labels.service }} is using {{ $value | humanize1024 }}B of memory."

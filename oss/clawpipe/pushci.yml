@@ -1,0 +1,59 @@
+"on":
+    - push
+    - pull_request
+stages:
+    - name: install
+      dir: sdk
+      checks:
+        - name: npm-install
+          run: npm install
+    - name: build
+      dir: sdk
+      checks:
+        - name: build
+          run: npm run build
+      depends_on:
+        - install
+    - name: test
+      dir: sdk
+      checks:
+        - name: test
+          run: npm test
+      depends_on:
+        - install
+      parallel: true
+    - name: lint
+      dir: sdk
+      checks:
+        - name: lint
+          run: npm run lint
+      depends_on:
+        - install
+      parallel: true
+    - name: line-cap
+      checks:
+        - name: 200-line-cap
+          run: bash scripts/check-line-cap.sh
+      parallel: true
+    - name: prompt-storage
+      checks:
+        - name: no-raw-prompt-column
+          run: node tools/lint-prompt-storage.mjs
+      parallel: true
+    - name: audit
+      checks:
+        - name: sdk-audit
+          run: cd sdk && npm audit --audit-level=high --omit=dev
+        - name: gateway-audit
+          run: cd gateway && npm install --no-audit --no-fund && npm audit --audit-level=high
+      parallel: true
+    - name: smoke
+      checks:
+        - name: reachability
+          run: ./scripts/smoke-reachability.sh
+        - name: live-call
+          run: node scripts/smoke-live-call.js
+        - name: endpoints
+          run: node scripts/smoke-endpoints.js
+      depends_on:
+        - build

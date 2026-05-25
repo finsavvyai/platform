@@ -1,0 +1,185 @@
+services:
+  # ── OpenCLaw Local AI ──────────────────────────────────────────
+  openclaw:
+    image: ${OPENCLAW_IMAGE:-openclaw/openclaw:latest}
+    container_name: openclaw
+    ports:
+      - "11434:${OPENCLAW_CONTAINER_PORT:-11434}"
+    volumes:
+      - openclaw_data:/root/.openclaw
+    environment:
+      - OPENCLAW_HOST=0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:${OPENCLAW_CONTAINER_PORT:-11434}/health || curl -fsS http://localhost:${OPENCLAW_CONTAINER_PORT:-11434}/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── FinSavvyAI Master Server ───────────────────────────────────
+  master:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: finsavvyai-master
+    command: ["-m", "src.core.start_master"]
+    ports:
+      - "8000:8000"
+    environment:
+      - FINSAVVY_ROLE=master
+      - OPENCLAW_URL=http://openclaw:${OPENCLAW_CONTAINER_PORT:-11434}
+      - OPENCLAW_ENABLED=true
+      - API_KEY=${API_KEY:-changeme}
+      - RATE_LIMIT_ENABLED=true
+      - LOG_LEVEL=info
+    depends_on:
+      openclaw:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── FinSavvyAI Worker Node ─────────────────────────────────────
+  worker:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: finsavvyai-worker
+    command: ["-m", "src.workers.worker_node", "--master", "master"]
+    ports:
+      - "8001:8001"
+    environment:
+      - FINSAVVY_ROLE=worker
+      - MASTER_URL=http://master:8000
+      - OPENCLAW_URL=http://openclaw:${OPENCLAW_CONTAINER_PORT:-11434}
+      - OPENCLAW_ENABLED=true
+      - CHANNELS_ENABLED=${CHANNELS_ENABLED:-false}
+      - CHANNELS_WEBHOOK_SECRET=${CHANNELS_WEBHOOK_SECRET:-}
+      - LOG_LEVEL=info
+    depends_on:
+      master:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── API Gateway ────────────────────────────────────────────────
+  gateway:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: finsavvyai-gateway
+    command: ["-m", "src.api.gateway", "--master-host", "master"]
+    ports:
+      - "8080:8080"
+    environment:
+      - FINSAVVY_ROLE=gateway
+      - MASTER_URL=http://master:8000
+      - API_KEY=${API_KEY:-changeme}
+      - RATE_LIMIT_ENABLED=true
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - LOG_LEVEL=info
+    depends_on:
+      master:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Control Hub Facade ────────────────────────────────────────
+  control-hub:
+    build:
+      context: ..
+      dockerfile: packages/control-hub-node/Dockerfile
+    container_name: control-hub
+    env_file:
+      - path: ./control-hub.env
+        required: false
+    ports:
+      - "127.0.0.1:${CONTROL_HUB_PORT:-9091}:9090"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=9090
+      - OPENCLAW_BASE_URL=${CONTROL_HUB_OPENCLAW_BASE_URL:-http://openclaw:11434}
+      - FINSAVVY_GATEWAY_URL=${CONTROL_HUB_GATEWAY_URL:-http://gateway:8080}
+      - FINSAVVY_MASTER_URL=${CONTROL_HUB_MASTER_URL:-http://master:8000}
+      - CONTROL_HUB_FETCH_TIMEOUT_MS=${CONTROL_HUB_FETCH_TIMEOUT_MS:-15000}
+      - CONTROL_HUB_ENABLE_DOCKER_HELPERS=${CONTROL_HUB_ENABLE_DOCKER_HELPERS:-false}
+      - CONTROL_HUB_PROXY_ALLOWLIST=${CONTROL_HUB_PROXY_ALLOWLIST:-openclaw,gateway,master,worker,localhost,127.0.0.1}
+      - CONTROL_HUB_TRUST_PROXY=${CONTROL_HUB_TRUST_PROXY:-false}
+      - CONTROL_HUB_RATE_LIMIT_ENABLED=${CONTROL_HUB_RATE_LIMIT_ENABLED:-true}
+      - CONTROL_HUB_RATE_LIMIT_WINDOW_MS=${CONTROL_HUB_RATE_LIMIT_WINDOW_MS:-60000}
+      - CONTROL_HUB_RATE_LIMIT_MAX=${CONTROL_HUB_RATE_LIMIT_MAX:-120}
+      - CONTROL_HUB_AUDIT_LOG_ENABLED=${CONTROL_HUB_AUDIT_LOG_ENABLED:-true}
+      - CONTROL_HUB_AUDIT_LOG_HEALTHZ=${CONTROL_HUB_AUDIT_LOG_HEALTHZ:-false}
+      - CONTROL_HUB_AUDIT_LOG_FILE=/app/.control-hub/control-hub-audit.log
+      - CONTROL_HUB_STATE_FILE=/app/.control-hub/control-hub-state.json
+    volumes:
+      - control_hub_state:/app/.control-hub
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:9090/api/healthz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Control Hub TLS Reverse Proxy (optional) ──────────────────
+  control-hub-proxy:
+    image: caddy:2-alpine
+    container_name: control-hub-proxy
+    profiles: ["edge"]
+    depends_on:
+      control-hub:
+        condition: service_healthy
+    ports:
+      - "${CONTROL_HUB_PROXY_HTTPS_PORT:-9443}:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - control_hub_caddy_data:/data
+      - control_hub_caddy_config:/config
+    restart: unless-stopped
+
+  # ── Prometheus Metrics ─────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+
+  # ── Grafana Dashboard ──────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/openclaw_metrics.json
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  openclaw_data:
+  prometheus_data:
+  grafana_data:
+  control_hub_state:
+  control_hub_caddy_data:
+  control_hub_caddy_config:

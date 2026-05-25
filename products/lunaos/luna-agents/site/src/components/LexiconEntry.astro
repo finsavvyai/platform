@@ -1,0 +1,175 @@
+---
+interface Props {
+  /** the headword, e.g. "persona", "ghost", "pipe" */
+  word: string;
+  /** part of speech in the language, verb, operator, aux, primitive */
+  pos: "verb" | "operator" | "aux" | "primitive";
+  /** pronunciation/glyph guide, mono, e.g. "/per·so·na/", "/>>/" */
+  glyph?: string;
+  /** one-line definition */
+  gloss: string;
+  /** primary call signature, mono, e.g. /persona generate */
+  call?: string;
+  /** etymology, when added, by whom or what category */
+  etym?: string;
+  /** see-also list of other headwords */
+  related?: string[];
+  /** implementation status from build-lexicon.mjs */
+  status?: "stable" | "beta" | "planned" | "stub" | "aux" | "unknown";
+  /** derived capability manifest */
+  caps?: {
+    reads: string[];
+    writes: string[];
+    network: boolean;
+    secrets: string[];
+  };
+}
+const { word, pos, glyph, gloss, call, etym, related = [], status, caps } = Astro.props;
+const capTokens: string[] = [];
+if (caps) {
+  if (caps.reads.length) capTokens.push(`reads ${caps.reads.join(",")}`);
+  if (caps.writes.length) capTokens.push(`writes ${caps.writes.join(",")}`);
+  if (caps.network && !caps.reads.includes("network")) capTokens.push("net");
+  if (caps.secrets.length) capTokens.push(`secrets: ${caps.secrets.join(", ")}`);
+}
+const slug = word.replace(/\s+/g, "-");
+
+const STATUS_LABEL: Record<string, string> = {
+  stable: "stable",
+  beta: "beta",
+  planned: "planned",
+  stub: "stub",
+  aux: "alias",
+  unknown: "draft",
+};
+const statusLabel = status ? STATUS_LABEL[status] : null;
+---
+
+<article class="entry" id={`w-${slug}`} data-status={status ?? ""}>
+  <header class="head">
+    <h4 class="word">
+      <a href={`#w-${slug}`} aria-label={`Permalink to ${word}`}>{word}</a>
+    </h4>
+    {glyph && <span class="glyph">{glyph}</span>}
+    {statusLabel && (
+      <span class={`status status-${status}`} title={`Implementation status: ${statusLabel}`}>
+        {statusLabel}
+      </span>
+    )}
+    <span class="pos">{pos}</span>
+  </header>
+  <p class="gloss">{gloss}</p>
+  {call && (
+    <p class="call">
+      <span class="call-label" aria-hidden="true">call</span>
+      <code>{call}</code>
+    </p>
+  )}
+  {related.length > 0 && (
+    <p class="see">
+      <span class="see-label" aria-hidden="true">see also</span>
+      {related.map((r, i) => (
+        <>
+          <a href={`#w-${r}`}>{r}</a>{i < related.length - 1 ? ", " : ""}
+        </>
+      ))}
+    </p>
+  )}
+  {capTokens.length > 0 && (
+    <p class="caps">
+      <span class="caps-label" aria-hidden="true">caps</span>
+      {capTokens.map((t, i) => (
+        <>
+          <code class="cap-token">{t}</code>{i < capTokens.length - 1 ? " " : ""}
+        </>
+      ))}
+    </p>
+  )}
+  {etym && <p class="etym"><small>{etym}</small></p>}
+</article>
+
+<style>
+  .entry {
+    padding: var(--t-3) 0;
+    border-bottom: 1px solid var(--rule);
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--t-1);
+  }
+  .head {
+    display: flex;
+    align-items: baseline;
+    gap: 1ch;
+    flex-wrap: wrap;
+  }
+  .word {
+    font-family: var(--font-mono);
+    font-size: var(--step-1);
+    font-weight: 500;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .word a { text-decoration: none; border-bottom: 1px dashed transparent; }
+  .word a:hover { border-bottom-color: var(--ink); }
+  .glyph {
+    font-family: var(--font-mono);
+    color: var(--muted);
+    font-size: var(--step--1);
+  }
+  .pos {
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--saffron-deep);
+    font-size: var(--step--1);
+    margin-left: auto;
+  }
+  .status {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.45rem;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    line-height: 1.4;
+    opacity: 0.85;
+  }
+  .status-stable  { color: #0a7a3b; }
+  .status-beta    { color: #8a5a00; }
+  .status-planned { color: #888;    border-style: dashed; }
+  .status-stub    { color: #888;    border-style: dashed; }
+  .status-aux     { color: var(--muted); }
+  .status-unknown { color: #c14d4d; border-style: dashed; }
+  .gloss { margin: 0; max-width: 56ch; }
+  .call, .see, .etym { margin: 0; font-size: var(--step--1); }
+  .call-label, .see-label {
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--muted);
+    margin-right: 0.5ch;
+  }
+  .see a { color: var(--saffron-deep); text-decoration-color: currentColor; }
+  .caps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4ch;
+    align-items: baseline;
+    color: var(--muted);
+  }
+  .caps-label {
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--muted);
+    margin-right: 0.5ch;
+  }
+  .cap-token {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    background: rgba(0, 0, 0, 0.04);
+    padding: 0.05rem 0.4rem;
+    border-radius: 2px;
+    border: 0;
+  }
+  .etym { color: var(--muted); margin-top: var(--t-1); }
+</style>

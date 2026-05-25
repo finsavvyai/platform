@@ -1,0 +1,61 @@
+Title: Compliance middleware for enterprise AI: technical deep dive
+
+Body:
+
+Built compliance middleware that enables data scientists to use ChatGPT/Claude without exposing sensitive data.
+
+**Use Case:**
+You want to use GPT-4 for data analysis but your dataset has PII (names, SSNs, emails). Can't send it to OpenAI due to compliance.
+
+**Solution:**
+Automatic PII redaction proxy:
+
+```python
+# Standard OpenAI SDK
+import openai
+
+# Just change the base URL
+openai.api_base = "https://api.sdlc.cc/v1"
+
+# Your code works exactly the same
+response = openai.ChatCompletion.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": df.to_string()}]
+)
+
+# PII is automatically redacted before reaching OpenAI
+# You get complete audit trail of what was redacted
+```
+
+**Technical Details:**
+
+PII Detection Pipeline:
+1. Regex patterns for structured data (SSN, cards, phone)
+2. Luhn algorithm for credit card validation
+3. Format validation for phone/email
+4. Medical record number patterns
+5. Context-aware detection (reducing false positives)
+
+Supported PII Types:
+• SSN, credit cards, phone, email, IP
+• Medical IDs, insurance IDs, DEA numbers
+• Driver's licenses, passports
+• Bank accounts, tax IDs
+
+Performance:
+• <50ms detection + redaction latency
+• Deployed to 250+ edge locations (Cloudflare Workers)
+• Scales automatically
+• 100% test coverage
+
+Compliance:
+• HIPAA: Complete audit trails
+• GDPR: No data persistence
+• PCI-DSS: Card data detection
+• SOC2: In progress (Q2 2026)
+
+**Demo:** https://361e1652.sdlc-landing-page.pages.dev
+
+Alpha stage. Looking for data scientists to test it!
+
+What's your biggest AI compliance challenge?

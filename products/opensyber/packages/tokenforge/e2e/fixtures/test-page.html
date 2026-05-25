@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TokenForge cross-browser smoke fixture</title>
+</head>
+<body>
+  <h1>TokenForge SDK test fixture</h1>
+  <pre id="log"></pre>
+  <script type="module">
+    import { createTokenForge } from '/dist/client/index.js';
+
+    const log = (msg) => {
+      const el = document.getElementById('log');
+      el.textContent += msg + '\n';
+      // also push to console for Playwright trace
+      console.log('[fixture]', msg);
+    };
+
+    // Stable session id keyed in sessionStorage so each spec gets a fresh one
+    function getSessionId() {
+      let sid = sessionStorage.getItem('tf-test-sid');
+      if (!sid) {
+        sid = 'sess_' + Math.random().toString(36).slice(2);
+        sessionStorage.setItem('tf-test-sid', sid);
+      }
+      return sid;
+    }
+
+    const tf = createTokenForge({
+      apiBase: '',                  // same-origin (mock server)
+      getSessionId,
+    });
+
+    // Expose to test driver via window
+    window.tf = tf;
+    window.tfLog = log;
+    window.tfReady = true;
+    log('TokenForge fixture loaded; sid=' + getSessionId());
+  </script>
+</body>
+</html>

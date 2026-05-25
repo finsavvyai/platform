@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>TokenForge browser SDK demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    code, pre { background: #f4f4f6; padding: 0.5rem; border-radius: 6px; }
+    button { padding: 0.5rem 1rem; margin: 0.25rem 0.25rem 0.25rem 0; }
+    .log { white-space: pre-wrap; height: 12rem; overflow: auto; border: 1px solid #ddd; padding: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>TokenForge SDK demo</h1>
+  <p>
+    Customer's web app loads <code>@tokenforge/browser</code>, calls
+    <code>tf.bind({ subject })</code> after login, and lets the SDK
+    auto-refresh the bound cookie via the fetch interceptor.
+  </p>
+
+  <p>
+    <strong>Setup before opening:</strong>
+    serve this file on the same origin that exposes
+    <code>POST /__tokenforge/register</code> (Phase 5 middleware) and
+    a protected resource at <code>GET /__protected</code>.
+  </p>
+
+  <button id="bind">1. Bind session</button>
+  <button id="probe">2. Hit protected endpoint</button>
+  <button id="refresh">3. Force refresh</button>
+  <button id="unbind">4. Unbind</button>
+
+  <h3>Events</h3>
+  <div id="log" class="log"></div>
+
+  <script type="module">
+    import { TokenForge } from '/sdk/tokenforge-browser.js';
+
+    const log = (line) => {
+      const el = document.getElementById('log');
+      el.textContent += `[${new Date().toISOString()}] ${line}\n`;
+      el.scrollTop = el.scrollHeight;
+    };
+
+    const tf = new TokenForge({ registerUrl: '/__tokenforge/register' });
+    tf.on((e) => log(`event: ${JSON.stringify(e)}`));
+
+    document.getElementById('bind').onclick = async () => {
+      try {
+        const rec = await tf.bind({ subject: 'demo_user' });
+        log(`bound: ${rec.sessionId}`);
+      } catch (err) { log(`bind failed: ${err}`); }
+    };
+
+    document.getElementById('probe').onclick = async () => {
+      try {
+        const r = await fetch('/__protected', { credentials: 'include' });
+        log(`protected: ${r.status} ${r.statusText}`);
+      } catch (err) { log(`probe failed: ${err}`); }
+    };
+
+    document.getElementById('refresh').onclick = async () => {
+      const ok = await tf.refreshIfNeeded();
+      log(`refreshIfNeeded -> ${ok}`);
+    };
+
+    document.getElementById('unbind').onclick = async () => {
+      await tf.unbind();
+      log('unbound');
+    };
+  </script>
+</body>
+</html>

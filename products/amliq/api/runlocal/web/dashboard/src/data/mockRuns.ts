@@ -1,0 +1,65 @@
+import { CIRun } from './types';
+
+export const mockRuns: CIRun[] = [
+  {
+    id: 'run-001',
+    repo: 'acme/web-app',
+    branch: 'main',
+    commitSha: 'a3f7c21',
+    commitMsg: 'fix: resolve auth redirect loop',
+    status: 'passed',
+    duration: '2m 14s',
+    timestamp: '2026-04-02T10:32:00Z',
+    checks: [
+      { name: 'Lint', status: 'passed', duration: '12s', output: 'No issues found.' },
+      { name: 'Unit Tests', status: 'passed', duration: '48s', output: '142 tests passed.' },
+      { name: 'Build', status: 'passed', duration: '1m 14s', output: 'Build complete.' },
+    ],
+  },
+  {
+    id: 'run-002',
+    repo: 'acme/api-service',
+    branch: 'feat/payments',
+    commitSha: 'e9b4d08',
+    commitMsg: 'feat: add Stripe webhook handler',
+    status: 'failed',
+    duration: '1m 47s',
+    timestamp: '2026-04-02T09:15:00Z',
+    checks: [
+      { name: 'Lint', status: 'passed', duration: '8s', output: 'No issues found.' },
+      { name: 'Unit Tests', status: 'failed', duration: '1m 02s',
+        output: 'FAIL payments_test.go:42\nExpected status 200, got 500' },
+      { name: 'Build', status: 'passed', duration: '37s', output: 'Build complete.' },
+    ],
+  },
+  {
+    id: 'run-003',
+    repo: 'acme/web-app',
+    branch: 'feat/dashboard',
+    commitSha: '7cd2f19',
+    commitMsg: 'feat: add analytics dashboard page',
+    status: 'running',
+    duration: '0m 38s',
+    timestamp: '2026-04-02T11:01:00Z',
+    checks: [
+      { name: 'Lint', status: 'passed', duration: '10s', output: 'No issues found.' },
+      { name: 'Unit Tests', status: 'running', duration: '28s', output: 'Running...' },
+      { name: 'Build', status: 'running', duration: '-', output: 'Waiting...' },
+    ],
+  },
+  {
+    id: 'run-004',
+    repo: 'acme/infra',
+    branch: 'main',
+    commitSha: 'b1a9c33',
+    commitMsg: 'chore: upgrade Terraform to 1.8',
+    status: 'passed',
+    duration: '3m 52s',
+    timestamp: '2026-04-01T22:45:00Z',
+    checks: [
+      { name: 'Validate', status: 'passed', duration: '15s', output: 'Config valid.' },
+      { name: 'Plan', status: 'passed', duration: '2m 10s', output: 'No changes.' },
+      { name: 'Apply', status: 'passed', duration: '1m 27s', output: 'Applied.' },
+    ],
+  },
+];

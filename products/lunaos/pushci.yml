@@ -1,0 +1,36 @@
+"on":
+    - push
+    - pull_request
+stages:
+    - name: install
+      checks:
+        - name: npm-install
+          run: npm install
+        - name: pip-install
+          run: pip install -r requirements.txt
+    - name: build
+      checks:
+        - name: build
+          run: npm run build
+        - name: mvn-build
+          run: mvn compile -q
+      depends_on:
+        - install
+    - name: test
+      checks:
+        - name: test
+          run: npm test
+        - name: pytest
+          run: pytest
+        - name: mvn-test
+          run: mvn test -q
+      depends_on:
+        - install
+      parallel: true
+    - name: lint
+      checks:
+        - name: lint
+          run: npm run lint
+      depends_on:
+        - install
+      parallel: true

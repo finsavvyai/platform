@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scrub.sdlc.cc — paste-and-redact for AI workflows</title>
+<meta name="description" content="DLP scrub for any text. Redacts PII / credentials / IDs before you paste it into Claude, ChatGPT, Cowork, or anywhere else." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230066ff'%3E%3Cpath d='M12 2L4 6v6c0 5.6 3.6 10.5 8 12 4.4-1.5 8-6.4 8-12V6l-8-4z'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #0e0e10;
+    --panel: #17171b;
+    --panel-2: #1f1f24;
+    --line: #2a2a31;
+    --text: #ececef;
+    --muted: #8b8b94;
+    --accent: #6ea8ff;
+    --ok: #4ade80;
+    --warn: #facc15;
+    --danger: #f87171;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+  header { padding: 24px 28px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+  header h1 { margin: 0; font-size: 18px; letter-spacing: -0.02em; }
+  header h1 .domain { color: var(--accent); }
+  header .tagline { color: var(--muted); font-size: 13px; }
+  main { flex: 1; padding: 24px 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 1400px; width: 100%; margin: 0 auto; }
+  @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .panel h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  textarea { width: 100%; min-height: 280px; resize: vertical; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; color: var(--text); font-family: var(--mono); font-size: 13px; line-height: 1.5; }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+  .clean-out { white-space: pre-wrap; word-wrap: break-word; min-height: 280px; max-height: 480px; overflow: auto; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-family: var(--mono); font-size: 13px; color: var(--text); }
+  .clean-out .placeholder { color: var(--muted); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  button { background: var(--accent); color: #000; border: 0; padding: 9px 16px; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; transition: opacity 0.15s; }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+  input.key { flex: 1; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; color: var(--text); font-family: var(--mono); font-size: 12px; }
+  input.key:focus { outline: 2px solid var(--accent); }
+  .counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+  .count { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .count .n { font-size: 18px; font-weight: 600; }
+  .count .n.zero { color: var(--muted); }
+  .count .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .count.hit { border-color: var(--ok); }
+  .status { font-size: 12px; color: var(--muted); }
+  .status.error { color: var(--danger); }
+  .status.success { color: var(--ok); }
+  footer { padding: 16px 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .config { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px; max-width: 1400px; width: 100%; margin: 0 auto 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .config label { color: var(--muted); font-size: 12px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  details > div { margin-top: 8px; padding: 10px; background: var(--panel-2); border-radius: 6px; font-family: var(--mono); font-size: 11px; line-height: 1.6; max-height: 200px; overflow: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="domain">scrub.sdlc.cc</span> — paste-and-redact</h1>
+  <span class="tagline">PII · credentials · IDs · IPs — out before AI sees it</span>
+</header>
+
+<div class="config">
+  <label>API endpoint</label>
+  <input id="endpoint" class="key" type="url" placeholder="https://api.sdlc.cc" />
+  <label>Bearer key (sk_sdlc_*)</label>
+  <input id="apikey" class="key" type="password" placeholder="sk_sdlc_..." autocomplete="off" />
+  <button class="secondary" id="save-config">Save</button>
+  <span id="config-status" class="status"></span>
+</div>
+
+<main>
+  <section class="panel">
+    <h2>Input</h2>
+    <textarea id="input" placeholder="Paste any text here — emails, log snippets, customer records, anything you'd otherwise drop into an AI tool. Try a credit card, an SSN, an API key, a UK NI number, an email address, an IP. Then hit Scrub."></textarea>
+    <div class="row">
+      <button id="scrub-btn">Scrub</button>
+      <button class="secondary" id="paste-btn">Paste from clipboard</button>
+      <button class="secondary" id="clear-btn">Clear</button>
+      <span class="status" id="latency"></span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Output (safe to paste into AI)</h2>
+    <div class="clean-out" id="output"><span class="placeholder">Scrubbed text appears here…</span></div>
+    <div class="row">
+      <button class="secondary" id="copy-btn">Copy clean text</button>
+      <span class="status" id="copy-status"></span>
+    </div>
+    <h2 style="margin-top: 8px;">Redactions</h2>
+    <div class="counts" id="counts"></div>
+    <details>
+      <summary>What gets caught (current detector pack)</summary>
+      <div>
+        Email · phone · IPv4 · IPv6 ·
+        US SSN · UK NI · Israeli ID ·
+        PAN (Luhn) · IBAN (mod-97) · BIC ·
+        Anthropic/OpenAI/GitHub/AWS/Slack/Stripe/Google API keys ·
+        JWT · PEM private keys.
+      </div>
+    </details>
+  </section>
+</main>
+
+<footer>
+  <span>scrub.sdlc.cc — runs entirely client-side except for the scrub call. Your text is sent to your gateway only when you press Scrub. Nothing is logged here; the gateway logs counts (not text) per your audit policy.</span>
+  <span><a href="https://github.com/finsavvyai/sdlc-cc">source</a> · <a href="https://api.sdlc.cc/health">/health</a></span>
+</footer>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const KEYS = { endpoint: 'sdlc_endpoint', apikey: 'sdlc_apikey' };
+  const COUNT_LABELS = [
+    ['email', 'Email'], ['phone', 'Phone'],
+    ['pan', 'PAN'], ['iban', 'IBAN'], ['bic', 'BIC'],
+    ['ssn', 'US SSN'], ['uk_ni', 'UK NI'], ['il_id', 'IL ID'],
+    ['nl_bsn', 'NL BSN'], ['de_steuer_id', 'DE Steuer-ID'],
+    ['ca_sin', 'CA SIN'], ['au_tfn', 'AU TFN'], ['us_npi', 'US NPI'],
+    ['ip', 'IP'], ['credentials', 'Credentials'],
+  ];
+  const DEFAULT_ENDPOINT = 'https://api.sdlc.cc';
+
+  // ─── persistence ────────────────────────────────────────────────
+  const load = () => {
+    $('endpoint').value = localStorage.getItem(KEYS.endpoint) || DEFAULT_ENDPOINT;
+    $('apikey').value   = localStorage.getItem(KEYS.apikey)   || '';
+  };
+  const save = () => {
+    localStorage.setItem(KEYS.endpoint, $('endpoint').value.trim() || DEFAULT_ENDPOINT);
+    localStorage.setItem(KEYS.apikey, $('apikey').value.trim());
+    setStatus('config-status', 'saved', 'success');
+  };
+
+  // ─── small UI helpers ──────────────────────────────────────────
+  const setStatus = (id, text, cls) => {
+    const el = $(id);
+    el.textContent = text;
+    el.className = 'status ' + (cls || '');
+    if (text) setTimeout(() => { el.textContent = ''; el.className = 'status'; }, 2500);
+  };
+
+  const renderCounts = (counts) => {
+    const c = $('counts');
+    c.innerHTML = '';
+    for (const [key, label] of COUNT_LABELS) {
+      const n = counts[key] ?? 0;
+      const div = document.createElement('div');
+      div.className = 'count' + (n > 0 ? ' hit' : '');
+      div.innerHTML = `<div class="n${n === 0 ? ' zero' : ''}">${n}</div><div class="label">${label}</div>`;
+      c.appendChild(div);
+    }
+  };
+
+  // ─── core action ───────────────────────────────────────────────
+  const scrub = async () => {
+    const endpoint = ($('endpoint').value.trim() || DEFAULT_ENDPOINT).replace(/\/+$/, '');
+    const key = $('apikey').value.trim();
+    const text = $('input').value;
+    if (!key) { setStatus('config-status', 'enter your sk_sdlc_* key first', 'error'); $('apikey').focus(); return; }
+    if (!text) { setStatus('latency', 'nothing to scrub', 'error'); return; }
+
+    $('scrub-btn').disabled = true;
+    const t0 = performance.now();
+    try {
+      const resp = await fetch(`${endpoint}/v1/dlp/scrub`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+        body: JSON.stringify({ text }),
+      });
+      const ms = Math.round(performance.now() - t0);
+      if (!resp.ok) {
+        const body = await resp.text();
+        throw new Error(`HTTP ${resp.status}: ${body.slice(0, 160)}`);
+      }
+      const data = await resp.json();
+      $('output').textContent = data.clean_text;
+      renderCounts(data.redactions || {});
+      setStatus('latency', `${ms} ms · ${data.bytes_in}B in · ${data.bytes_out}B out`, 'success');
+    } catch (e) {
+      $('output').innerHTML = `<span class="placeholder" style="color: var(--danger)">Error: ${e.message}</span>`;
+      setStatus('latency', 'failed', 'error');
+    } finally {
+      $('scrub-btn').disabled = false;
+    }
+  };
+
+  const pasteIn = async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t) { $('input').value = t; $('input').focus(); }
+    } catch {
+      setStatus('latency', 'clipboard unavailable — paste manually', 'error');
+    }
+  };
+
+  const copyOut = async () => {
+    const out = $('output').textContent;
+    if (!out || out.startsWith('Scrubbed')) return;
+    try { await navigator.clipboard.writeText(out); setStatus('copy-status', 'copied', 'success'); }
+    catch { setStatus('copy-status', 'copy failed', 'error'); }
+  };
+
+  // ─── wire ──────────────────────────────────────────────────────
+  load();
+  renderCounts({});
+  $('save-config').addEventListener('click', save);
+  $('scrub-btn').addEventListener('click', scrub);
+  $('paste-btn').addEventListener('click', pasteIn);
+  $('clear-btn').addEventListener('click', () => { $('input').value = ''; $('input').focus(); });
+  $('copy-btn').addEventListener('click', copyOut);
+  // Cmd/Ctrl-Enter triggers scrub
+  $('input').addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); scrub(); }
+  });
+})();
+</script>
+</body>
+</html>

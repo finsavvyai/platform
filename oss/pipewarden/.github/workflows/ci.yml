@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+          # cache: true is the v5 default but setting it explicitly here
+          # documents intent — without this the toolchain download is
+          # re-fetched on every cold runner, adding ~30s per job.
+          cache: true
+          cache-dependency-path: go.sum
+          check-latest: false
+
+      - name: Cache Go modules
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Run tests with coverage
+        run: |
+          make test
+          go test -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
+        with:
+          files: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Build
+        run: make build
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+          # cache: true is the v5 default but setting it explicitly here
+          # documents intent — without this the toolchain download is
+          # re-fetched on every cold runner, adding ~30s per job.
+          cache: true
+          cache-dependency-path: go.sum
+          check-latest: false
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8.0.0
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Upload golangci-lint SARIF
+        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998b57afb7ea4ef1bb5513d3 # v3.28.15
+        if: always()
+        with:
+          sarif_file: ./golangci-lint-report.sarif
+          wait-for-processing: true
+        continue-on-error: true
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+          # cache: true is the v5 default but setting it explicitly here
+          # documents intent — without this the toolchain download is
+          # re-fetched on every cold runner, adding ~30s per job.
+          cache: true
+          cache-dependency-path: go.sum
+          check-latest: false
+
+      - name: Run gosec security scanner
+        uses: securego/gosec@f2b9bb2c5c02b11de03a4db8c56e1875d6b30a50 # v2.22.1
+        with:
+          args: '-no-fail -fmt sarif -out gosec-report.sarif ./...'
+        continue-on-error: true
+
+      - name: Upload gosec SARIF
+        uses: github/codeql-action/upload-sarif@45775bd8235c68ba998b57afb7ea4ef1bb5513d3 # v3.28.15
+        if: always()
+        with:
+          sarif_file: ./gosec-report.sarif
+          category: gosec
+        continue-on-error: true
+
+      - name: Run gitleaks secret scanner
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run go-licenses compliance check
+        # Pre-vetted dependency licenses are documented in docs/licensing.md.
+        # Add new modules there before importing them so reviewers can see
+        # the category ahead of CI surfacing it.
+        run: |
+          go install github.com/google/go-licenses@latest
+          go-licenses check ./... \
+            --disallowed_types=forbidden,restricted,unknown

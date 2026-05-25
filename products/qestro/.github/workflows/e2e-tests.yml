@@ -1,0 +1,123 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop, production-deploy]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# Browser smoke + API health (full suite lives in workflow_dispatch extras or locally).
+jobs:
+  smoke:
+    name: Playwright smoke (Chromium)
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: qestro_test
+          POSTGRES_USER: qestro_test
+          POSTGRES_PASSWORD: qestro_test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Backend DB migrate (best effort)
+        env:
+          DATABASE_URL: postgresql://qestro_test:qestro_test_password@localhost:5432/qestro_test
+          NODE_ENV: test
+        run: cd backend && npm run db:migrate || true
+
+      - name: Build backend
+        env:
+          NODE_ENV: production
+        run: npm --prefix backend run build
+
+      - name: Build frontend
+        env:
+          NODE_ENV: production
+          VITE_API_URL: http://127.0.0.1:8000
+          VITE_WS_URL: ws://127.0.0.1:8000
+        run: npm --prefix frontend run build
+
+      - name: Start backend
+        env:
+          DATABASE_URL: postgresql://qestro_test:qestro_test_password@localhost:5432/qestro_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-jwt-secret-key-123456789
+          JWT_REFRESH_SECRET: test-refresh-secret-key-123456789
+          NODE_ENV: test
+          PORT: 8000
+        run: |
+          cd backend
+          node dist/index.minimal.js &
+          sleep 3
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/health >/dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:8000/health >/dev/null || (echo "Backend failed"; exit 1)
+
+      - name: Start frontend
+        env:
+          NODE_ENV: production
+        run: |
+          cd frontend
+          npm run start &
+          sleep 12
+
+      - name: Run smoke E2E
+        env:
+          CI: true
+          PLAYWRIGHT_TEST_BASE_URL: http://127.0.0.1:3000
+          BASE_URL: http://127.0.0.1:3000
+          PLAYWRIGHT_API_URL: http://127.0.0.1:8000
+          PLAYWRIGHT_WS_URL: ws://127.0.0.1:8000
+        run: npm run test:e2e:ci
+
+      - name: Run smoke API checks
+        env:
+          CI: true
+          PLAYWRIGHT_TEST_BASE_URL: http://127.0.0.1:3000
+          BASE_URL: http://127.0.0.1:3000
+          PLAYWRIGHT_API_URL: http://127.0.0.1:8000
+          PLAYWRIGHT_WS_URL: ws://127.0.0.1:8000
+        run: npm run test:e2e:smoke:api
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-smoke-report
+          path: playwright-report/
+          retention-days: 14

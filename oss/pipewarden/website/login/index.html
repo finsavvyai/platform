@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign in — PipeWarden</title>
+<meta name="description" content="Sign in to your PipeWarden account." />
+<link rel="stylesheet" href="/auth.css" />
+<link rel="icon" href="/favicon.svg" />
+</head>
+<body>
+<main class="auth-shell">
+  <section class="auth-card">
+    <a href="/" class="auth-brand"><span class="dot"></span>PipeWarden</a>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-sub">Sign in to your PipeWarden workspace.</p>
+
+    <div class="error" id="err"></div>
+
+    <button type="button" class="btn-secondary" id="passkey-btn" style="width:100%; margin-bottom: 12px;">🔑 Sign in with passkey</button>
+    <a class="btn-secondary" id="github-btn" href="/api/v1/auth/github/start" style="width:100%; margin-bottom: 16px; display: block; text-align: center; text-decoration: none;">Sign in with GitHub</a>
+
+    <div class="divider"><span>or with email</span></div>
+
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" autocomplete="email" required placeholder="you@company.com" />
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required placeholder="Your password" />
+      </div>
+      <button type="submit" class="btn-primary" id="submit-btn">Sign in</button>
+    </form>
+
+    <div class="auth-footer">
+      No account yet? <a href="/signup/">Create one</a> · <a href="/forgot-password/">Forgot password?</a>
+    </div>
+  </section>
+</main>
+
+<script>
+const API_BASE = window.location.hostname === 'pipewarden.com' || window.location.hostname === 'pipewarden.io'
+  ? 'https://api.pipewarden.io'
+  : '';
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  const err = document.getElementById('err');
+  err.classList.remove('visible');
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  try {
+    const res = await fetch(API_BASE + '/api/v1/auth/login', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        email: document.getElementById('email').value,
+        password: document.getElementById('password').value,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error((data && data.error) || 'Invalid email or password');
+    }
+    window.location.href = (data && data.next) || '/dashboard/';
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('visible');
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+  }
+});
+
+// Passkey login (discoverable credential — browser prompts user to pick)
+document.getElementById('passkey-btn').addEventListener('click', async () => {
+  const err = document.getElementById('err');
+  err.classList.remove('visible');
+  if (!window.PublicKeyCredential) {
+    err.textContent = 'Passkeys not supported in this browser.';
+    err.classList.add('visible');
+    return;
+  }
+  try {
+    const begin = await fetch(API_BASE + '/api/v1/auth/passkey/login/begin', {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({}),
+    });
+    const opts = (await begin.json()).publicKey;
+    opts.challenge = b64uToBuf(opts.challenge);
+    if (opts.allowCredentials) opts.allowCredentials.forEach(c => c.id = b64uToBuf(c.id));
+
+    const cred = await navigator.credentials.get({publicKey: opts});
+    const finishBody = credToJSON(cred);
+    const finish = await fetch(API_BASE + '/api/v1/auth/passkey/login/finish', {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(finishBody),
+    });
+    const data = await finish.json();
+    if (!finish.ok) throw new Error(data.error || 'Passkey login failed');
+    window.location.href = data.next || '/dashboard/';
+  } catch (e) {
+    err.textContent = e.message;
+    err.classList.add('visible');
+  }
+});
+
+function b64uToBuf(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = '='.repeat((4 - s.length % 4) % 4);
+  const bin = atob(s + pad);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+function bufToB64u(buf) {
+  const bin = String.fromCharCode(...new Uint8Array(buf));
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function credToJSON(cred) {
+  return {
+    id: cred.id,
+    rawId: bufToB64u(cred.rawId),
+    type: cred.type,
+    response: {
+      authenticatorData: bufToB64u(cred.response.authenticatorData),
+      clientDataJSON: bufToB64u(cred.response.clientDataJSON),
+      signature: bufToB64u(cred.response.signature),
+      userHandle: cred.response.userHandle ? bufToB64u(cred.response.userHandle) : null,
+    },
+  };
+}
+</script>
+</body>
+</html>

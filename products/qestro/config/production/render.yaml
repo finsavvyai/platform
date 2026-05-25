@@ -1,0 +1,338 @@
+# Questro AI-Powered Testing Automation Platform
+# Production Environment Configuration
+# Render.com Deployment Configuration
+
+services:
+  # Main API Service
+  - type: web
+    name: qestro-api
+    env: production
+    plan: starter
+    runtime: node
+    region: oregon
+    branch: main
+    healthCheckPath: /health
+    healthCheckTimeout: 30
+    healthCheckInterval: 30
+    healthCheckGracePeriod: 60
+
+    buildCommand: |
+      cd backend
+      npm ci
+      npm run build
+      npm run db:migrate
+
+    startCommand: |
+      cd backend
+      NODE_ENV=production npm start
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: qestro-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: qestro-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://app.qestro.ai
+      - key: CORS_ORIGIN
+        value: https://app.qestro.ai
+      - key: ENABLE_SSL
+        value: true
+      - key: SESSION_TIMEOUT_MS
+        value: 3600000
+      - key: ENABLE_RATE_LIMITING
+        value: true
+      - key: RATE_LIMIT_REQUESTS_PER_MINUTE
+        value: 1000
+      - key: ENABLE_ANALYTICS
+        value: true
+      - key: SENTRY_ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: ENABLE_PERFORMANCE_MONITORING
+        value: true
+      - key: AI_PROVIDER
+        value: openai
+      - key: ENABLE_AI_FEATURES
+        value: true
+      - key: ENABLE_COLLABORATION
+        value: true
+      - key: ENABLE_REAL_TIME_UPDATES
+        value: true
+      - key: ENABLE_ENTERPRISE_FEATURES
+        value: true
+      - key: ENABLE_SSO
+        value: true
+
+    # Add secrets for third-party integrations
+    - key: OPENAI_API_KEY
+      sync: false
+    - key: STRIPE_API_KEY
+      sync: false
+    - key: STRIPE_WEBHOOK_SECRET
+      sync: false
+    - key: SENTRY_DSN
+      sync: false
+    - key: SMTP_HOST
+      sync: false
+    - key: SMTP_USER
+      sync: false
+    - key: SMTP_PASS
+      sync: false
+    - key: GOOGLE_CLIENT_ID
+      sync: false
+    - key: GOOGLE_CLIENT_SECRET
+      sync: false
+
+    # Scaling configuration
+    scalingPolicy:
+      minInstances: 1
+      maxInstances: 10
+      targetCPUUtilization: 70
+      targetMemoryUtilization: 80
+
+    # Resource limits
+    resources:
+      cpu: 1
+      memory: 2Gi
+
+  # Frontend Application
+  - type: web
+    name: qestro-frontend
+    env: production
+    plan: starter
+    runtime: static
+    region: oregon
+    branch: main
+    rootDir: frontend
+
+    buildCommand: |
+      npm ci
+      npm run build
+      npm run test:coverage
+
+    staticPublishPath: ./dist
+
+    envVars:
+      - key: VITE_API_URL
+        value: https://api.qestro.ai
+      - key: VITE_WS_URL
+        value: wss://api.qestro.ai
+      - key: VITE_ENVIRONMENT
+        value: production
+      - key: VITE_VERSION
+        value: 1.0.0
+      - key: VITE_ENABLE_ANALYTICS
+        value: true
+      - key: VITE_SENTRY_DSN
+        sync: false
+
+    # Custom domain configuration
+    domains:
+      - app.qestro.ai
+      - qestro.ai
+
+  # PostgreSQL Database
+  - type: postgres
+    name: qestro-postgres
+    plan: starter
+    region: oregon
+    ipAllowList: []
+
+    # Database configuration
+    databaseName: qestro_production
+    user: qestro_user
+
+    # Backup configuration
+    backup:
+      - enabled: true
+        schedule: daily
+        retentionDays: 30
+
+    # High availability
+    highAvailability: true
+
+  # Redis Cache
+  - type: redis
+    name: qestro-redis
+    plan: starter
+    region: oregon
+    ipAllowList: []
+
+    # Redis configuration
+    maxMemoryPolicy: allkeys-lru
+    persistence: rdb
+
+    # Performance optimization
+    ioThreads: 4
+
+  # Background Worker Service
+  - type: worker
+    name: qestro-worker
+    env: production
+    plan: starter
+    runtime: node
+    region: oregon
+    branch: main
+
+    buildCommand: |
+      cd backend
+      npm ci
+      npm run build
+
+    startCommand: |
+      cd backend
+      NODE_ENV=production npm run worker:start
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: qestro-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: qestro-redis
+          property: connectionString
+      - key: QUEUE_CONCURRENCY
+        value: 5
+      - key: ENABLE_HEALTH_CHECKS
+        value: true
+      - key: LOG_LEVEL
+        value: info
+
+    # Inherit secrets from main service
+    - key: OPENAI_API_KEY
+      sync: false
+    - key: STRIPE_API_KEY
+      sync: false
+    - key: SENTRY_DSN
+      sync: false
+
+  # WebSocket Service (if separate)
+  - type: web
+    name: qestro-websocket
+    env: production
+    plan: starter
+    runtime: node
+    region: oregon
+    branch: main
+    healthCheckPath: /ws/health
+    healthCheckTimeout: 30
+
+    buildCommand: |
+      cd backend
+      npm ci
+      npm run build
+
+    startCommand: |
+      cd backend
+      NODE_ENV=production npm run websocket:start
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8001
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: qestro-redis
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: WS_HEARTBEAT_INTERVAL_MS
+        value: 30000
+      - key: WS_CONNECTION_TIMEOUT_MS
+        value: 120000
+      - key: WS_MAX_CONNECTIONS_PER_USER
+        value: 10
+
+    # Scaling for WebSocket connections
+    scalingPolicy:
+      minInstances: 1
+      maxInstances: 5
+      targetCPUUtilization: 60
+
+# Cron Jobs
+crons:
+  - name: daily-reports
+    schedule: "0 2 * * *"
+    service: qestro-worker
+    command: "npm run cron:daily-reports"
+
+  - name: cleanup-sessions
+    schedule: "0 */6 * * *"
+    service: qestro-worker
+    command: "npm run cron:cleanup-sessions"
+
+  - name: maintenance-tasks
+    schedule: "0 0 * * 0"
+    service: qestro-worker
+    command: "npm run cron:maintenance"
+
+  - name: health-checks
+    schedule: "*/5 * * * *"
+    service: qestro-worker
+    command: "npm run cron:health-checks"
+
+# Environment Groups
+environments:
+  production:
+    # Production-specific settings
+    autoDeploy: true
+    previews:
+      # Disable preview environments in production
+      generation: "PRs" # Only for PRs
+      expiration: "7d"
+
+  staging:
+    # Staging environment configuration
+    autoDeploy: true
+    previews:
+      generation: "PRs"
+      expiration: "7d"
+
+# Global settings
+version: "1.0.0"
+build:
+  # Global build settings
+  nodeVersion: "20.x"
+  npmVersion: "10.x"
+
+# Monitoring and Logging
+monitoring:
+  # Enable performance monitoring
+  performanceMonitoring: true
+
+  # Error tracking
+  errorTracking: true
+
+  # Custom metrics
+  customMetrics: true
+
+# Security
+security:
+  # Enable SSL/TLS
+  ssl: true
+
+  # Security headers
+  securityHeaders: true
+
+  # Rate limiting
+  rateLimiting: true

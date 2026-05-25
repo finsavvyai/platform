@@ -1,0 +1,458 @@
+name: Documentation Tests
+
+on:
+  push:
+    branches: [ main, production-deploy, develop ]
+    paths:
+      - 'docs/**'
+      - 'tests/documentation/**'
+      - '.github/workflows/documentation-tests.yml'
+  pull_request:
+    branches: [ main, production-deploy ]
+    paths:
+      - 'docs/**'
+      - 'tests/documentation/**'
+  schedule:
+    # Run documentation tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of documentation tests to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - accuracy
+          - usability
+          - completeness
+          - links
+          - performance
+          - security
+
+env:
+  NODE_VERSION: '18'
+  DOCUMENTATION_TEST_TIMEOUT: '30000'
+  SKIP_EXTERNAL_LINKS: 'false'
+  GENERATE_COVERAGE_REPORT: 'true'
+
+jobs:
+  documentation-test-matrix:
+    name: Documentation Tests (${{ matrix.test-suite }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test-suite:
+          - accuracy
+          - completeness
+          - links
+          - performance
+          - security
+        include:
+          - test-suite: accuracy
+            test-path: 'tests/documentation/accuracy'
+            timeout: 60000
+          - test-suite: completeness
+            test-path: 'tests/documentation/completeness'
+            timeout: 60000
+          - test-suite: links
+            test-path: 'tests/documentation/links'
+            timeout: 120000 # Links take longer
+          - test-suite: performance
+            test-path: 'tests/documentation/performance'
+            timeout: 90000
+          - test-suite: security
+            test-path: 'tests/documentation/security'
+            timeout: 60000
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm run setup:deps
+
+      - name: Create test results directory
+        run: mkdir -p test-results/documentation
+
+      - name: Run ${{ matrix.test-suite }} tests
+        run: |
+          echo "Running ${{ matrix.test-suite }} documentation tests..."
+          NODE_ENV=test npm test -- "${{ matrix.test-path }}" \
+            --timeout=${{ matrix.timeout }} \
+            --coverage \
+            --coverageReporters=text-lcov \
+            --coverageReporters=text-summary \
+            --coverageReporters=lcov \
+            --coverageDirectory=coverage/documentation-${{ matrix.test-suite }} \
+            2>&1 | tee "test-results/documentation/${{ matrix.test-suite }}-results.log"
+        env:
+          CI: true
+          DOCUMENTATION_TEST_TIMEOUT: ${{ env.DOCUMENTATION_TEST_TIMEOUT }}
+          SKIP_EXTERNAL_LINKS: ${{ env.SKIP_EXTERNAL_LINKS }}
+
+      - name: Generate test report
+        if: always()
+        run: |
+          cat > test-results/documentation/${{ matrix.test-suite }}-report.json << 'EOF'
+          {
+            "test_suite": "${{ matrix.test-suite }}",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)",
+            "run_id": "${{ github.run_id }}",
+            "branch": "${{ github.ref_name }}",
+            "commit": "${{ github.sha }}"
+          }
+          EOF
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-test-results-${{ matrix.test-suite }}
+          path: |
+            test-results/documentation/
+            coverage/documentation-${{ matrix.test-suite }}/
+          retention-days: 30
+
+      - name: Upload coverage to Codecov
+        if: matrix.test-suite == 'accuracy' # Only upload coverage once
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage/documentation-${{ matrix.test-suite }}/lcov.info
+          flags: documentation
+          name: documentation-coverage
+          fail_ci_if_error: false
+
+  link-validation:
+    name: External Link Validation
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || github.event.schedule == '0 2 * * *'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install additional tools
+        run: |
+          npm install -g markdown-link-check
+          pip install --user markdown-link-check
+
+      - name: Check internal links
+        run: |
+          find docs -name "*.md" -print0 | xargs -0 -n1 markdown-link-check \
+            --config .github/workflows/mlc-config.json \
+            --verbose \
+            --http-status-codes-for-retry 429,500,502,503,504 \
+            --timeout 30 \
+            --retry-on 429 \
+            --retries 2 || true
+
+      - name: Check external links (limited)
+        if: env.SKIP_EXTERNAL_LINKS == 'false'
+        run: |
+          # Limit to first 10 files to avoid timeouts
+          find docs -name "*.md" -print0 | head -z -n 10 | xargs -0 -n1 markdown-link-check \
+            --config .github/workflows/mlc-external-config.json \
+            --verbose \
+            --http-status-codes-for-retry 429,500,502,503,504 \
+            --timeout 45 \
+            --retry-on 429 \
+            --retries 3 || true
+
+  spell-check:
+    name: Documentation Spell Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install cspell
+        run: npm install -g cspell
+
+      - name: Run spell check
+        run: |
+          cspell lint docs/**/*.{md,txt} \
+            --config .github/workflows/cspell.json \
+            --words-only \
+            --unique \
+            --reporter summary \
+            2>&1 | tee test-results/spell-check.log || true
+
+      - name: Upload spell check results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spell-check-results
+          path: test-results/spell-check.log
+          retention-days: 7
+
+  lint-check:
+    name: Documentation Lint Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install markdownlint
+        run: npm install -g markdownlint-cli
+
+      - name: Run markdown lint
+        run: |
+          markdownlint docs/**/*.md \
+            --config .github/workflows/.markdownlint.json \
+            2>&1 | tee test-results/markdownlint.log || true
+
+      - name: Check for common documentation issues
+        run: |
+          # Check for very long lines
+          find docs -name "*.md" -exec awk 'length($0) > 200 {print FILENAME ":" NR ":" $0}' {} \; > test-results/long-lines.log || true
+
+          # Check for missing alt text
+          find docs -name "*.md" -exec grep -n "!\\[](\\*)" {} \; > test-results/missing-alt-text.log || true
+
+          # Check for broken section links
+          find docs -name "*.md" -exec grep -n "\\[.*\\](#.*)" {} \; > test-results/section-links.log || true
+
+      - name: Upload lint results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-lint-results
+          path: |
+            test-results/markdownlint.log
+            test-results/long-lines.log
+            test-results/missing-alt-text.log
+            test-results/section-links.log
+          retention-days: 7
+
+  build-documentation:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    needs: [documentation-test-matrix, link-validation, spell-check, lint-check]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm run setup:deps
+
+      - name: Build documentation (if applicable)
+        run: |
+          if [ -d "docs" ]; then
+            echo "Building documentation..."
+            # Add any documentation build commands here
+            # For example: npm run docs:build or mkdocs build
+            echo "Documentation build completed"
+          else
+            echo "No docs directory found, skipping build"
+          fi
+
+      - name: Generate documentation report
+        run: |
+          cat > test-results/documentation-build-report.json << 'EOF'
+          {
+            "build_status": "success",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)",
+            "run_id": "${{ github.run_id }}",
+            "files_processed": "$(find docs -name '*.md' | wc -l)"
+          }
+          EOF
+
+      - name: Upload build results
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-build-results
+          path: test-results/documentation-build-report.json
+          retention-days: 30
+
+  generate-summary:
+    name: Generate Test Summary
+    runs-on: ubuntu-latest
+    needs: [documentation-test-matrix, link-validation, spell-check, lint-check]
+    if: always()
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: test-results/artifacts
+
+      - name: Generate comprehensive report
+        run: |
+          cat > test-results/documentation-test-summary.md << 'EOF'
+          # Documentation Test Summary
+
+          ## Test Results Overview
+          - **Test Suite**: Documentation Quality Assurance
+          - **Timestamp**: $(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)
+          - **Run ID**: ${{ github.run_id }}
+          - **Branch**: ${{ github.ref_name }}
+          - **Commit**: ${{ github.sha }}
+
+          ## Test Suites Status
+
+          ### Accuracy Tests
+          ${{ contains(needs.documentation-test-matrix.result, 'success') && '✅ Passed' || '❌ Failed' }}
+
+          ### Completeness Tests
+          ${{ contains(needs.documentation-test-matrix.result, 'success') && '✅ Passed' || '❌ Failed' }}
+
+          ### Link Validation
+          ${{ contains(needs.link-validation.result, 'success') && '✅ Passed' || '❌ Failed' }}
+
+          ### Performance Tests
+          ${{ contains(needs.documentation-test-matrix.result, 'success') && '✅ Passed' || '❌ Failed' }}
+
+          ### Security Tests
+          ${{ contains(needs.documentation-test-matrix.result, 'success') && '✅ Passed' || '❌ Failed' }}
+
+          ### Spell Check
+          ${{ contains(needs.spell-check.result, 'success') && '✅ Passed' || '❌ Failed' }}
+
+          ### Lint Check
+          ${{ contains(needs.lint-check.result, 'success') && '✅ Passed' || '❌ Failed' }}
+
+          ## Detailed Results
+
+          Check the uploaded artifacts for detailed test results and coverage reports.
+
+          EOF
+
+      - name: Upload summary report
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-test-summary
+          path: test-results/documentation-test-summary.md
+          retention-days: 90
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summaryPath = 'test-results/documentation-test-summary.md';
+
+            if (fs.existsSync(summaryPath)) {
+              const summary = fs.readFileSync(summaryPath, 'utf8');
+
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+            }
+
+  security-scan:
+    name: Security Scan Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Check for secrets in documentation
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: docs/
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [documentation-test-matrix, link-validation, spell-check, lint-check, generate-summary]
+    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production-deploy')
+    steps:
+      - name: Notify on success
+        if: needs.documentation-test-matrix.result == 'success'
+        run: |
+          echo "✅ Documentation tests passed successfully!"
+          echo "All documentation quality checks completed successfully."
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Documentation tests failed!"
+          echo "Please review the test results and fix any issues."
+          exit 1
+
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [documentation-test-matrix, link-validation, spell-check, lint-check, build-documentation, generate-summary]
+    if: always()
+    steps:
+      - name: Cleanup old artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+
+            // Keep only the latest 5 artifacts per type
+            const artifactsToDelete = artifacts.data.artifacts
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+              .slice(5);
+
+            for (const artifact of artifactsToDelete) {
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+            }

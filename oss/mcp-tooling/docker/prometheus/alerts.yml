@@ -1,0 +1,164 @@
+groups:
+  - name: mcpoverflow-api
+    interval: 30s
+    rules:
+      # High Error Rate Alert
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job="mcpoverflow-api", status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="mcpoverflow-api"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: mcpoverflow-api
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # High Latency Alert
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket{job="mcpoverflow-api"}[5m])) by (le)
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: mcpoverflow-api
+        annotations:
+          summary: "High API latency detected"
+          description: "P95 latency is {{ $value | humanizeDuration }} (threshold: 1s)"
+
+      # API Down Alert
+      - alert: APIServiceDown
+        expr: up{job="mcpoverflow-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: mcpoverflow-api
+        annotations:
+          summary: "MCPOverflow API is down"
+          description: "The API service has been unreachable for more than 1 minute"
+
+      # High Request Rate (potential DDoS)
+      - alert: HighRequestRate
+        expr: |
+          sum(rate(http_requests_total{job="mcpoverflow-api"}[1m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: mcpoverflow-api
+        annotations:
+          summary: "Unusually high request rate"
+          description: "Request rate is {{ $value | humanize }} req/s (threshold: 1000)"
+
+  - name: mcpoverflow-infrastructure
+    interval: 60s
+    rules:
+      # Database Connection Pool Exhaustion
+      - alert: DatabaseConnectionPoolHigh
+        expr: |
+          pg_stat_activity_count{datname="mcpoverflow"} 
+          / 
+          pg_settings_max_connections > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          service: postgres
+        annotations:
+          summary: "Database connection pool usage high"
+          description: "Connection pool usage is {{ $value | humanizePercentage }} (threshold: 80%)"
+
+      # Redis Memory Usage
+      - alert: RedisMemoryHigh
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Memory usage is {{ $value | humanizePercentage }} (threshold: 85%)"
+
+      # Redis Down
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been unreachable for more than 1 minute"
+
+      # High Disk Usage
+      - alert: HighDiskUsage
+        expr: |
+          (node_filesystem_size_bytes - node_filesystem_free_bytes) 
+          / node_filesystem_size_bytes > 0.85
+        for: 15m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High disk usage detected"
+          description: "Disk usage is {{ $value | humanizePercentage }} (threshold: 85%)"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }} (threshold: 90%)"
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value | humanize }}% (threshold: 85%)"
+
+  - name: mcpoverflow-business
+    interval: 60s
+    rules:
+      # Low Deployment Success Rate
+      - alert: LowDeploymentSuccessRate
+        expr: |
+          (
+            sum(increase(deployments_total{status="success"}[1h]))
+            /
+            sum(increase(deployments_total[1h]))
+          ) < 0.8
+        for: 30m
+        labels:
+          severity: warning
+          service: mcpoverflow-api
+        annotations:
+          summary: "Deployment success rate is low"
+          description: "Deployment success rate is {{ $value | humanizePercentage }} (threshold: 80%)"
+
+      # High Job Queue Length
+      - alert: HighJobQueueLength
+        expr: |
+          generation_jobs_queued > 50
+        for: 15m
+        labels:
+          severity: warning
+          service: mcpoverflow-api
+        annotations:
+          summary: "Job queue is backing up"
+          description: "{{ $value }} jobs are queued (threshold: 50)"

@@ -1,0 +1,11 @@
+export { MatchDetailPanel } from './MatchDetailPanel';
+export type { MatchData } from './MatchDetailPanel';
+export { MatchDetailOverlay } from './MatchDetailOverlay';
+export { MatchDetailHeader } from './MatchDetailHeader';
+export { TypeBadge, ListBadge } from './MatchBadges';
+export { TimestampRow, BioSection } from './MatchBio';
+export { NamesSection, IdentifiersSection } from './MatchSections';
+export { SanctionsSection } from './MatchSanctions';
+export { ContactSection } from './MatchContact';
+export { LayersSection } from './MatchLayers';
+export { Section, Field } from './MatchSection';

@@ -1,0 +1,109 @@
+# LiteLLM Proxy Router Config
+# https://docs.litellm.ai/docs/proxy/configs
+#
+# This config is mounted into the sidecar container at /app/config.yaml.
+# It defines the unified model list, per-model fallbacks, and per-tenant
+# rate limits. All API keys are injected from environment variables so no
+# secrets are committed to the repo.
+
+model_list:
+  # ---- OpenAI ----
+  - model_name: gpt-4
+    litellm_params:
+      model: openai/gpt-4
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: gpt-4-turbo
+    litellm_params:
+      model: openai/gpt-4-turbo-preview
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: gpt-3.5-turbo
+    litellm_params:
+      model: openai/gpt-3.5-turbo
+      api_key: os.environ/OPENAI_API_KEY
+
+  # ---- Anthropic ----
+  - model_name: claude-3-opus
+    litellm_params:
+      model: anthropic/claude-3-opus-20240229
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: claude-3-sonnet
+    litellm_params:
+      model: anthropic/claude-3-sonnet-20240229
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: claude-3-haiku
+    litellm_params:
+      model: anthropic/claude-3-haiku-20240307
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # ---- AWS Bedrock ----
+  - model_name: bedrock-claude-3-sonnet
+    litellm_params:
+      model: bedrock/anthropic.claude-3-sonnet-20240229-v1:0
+      aws_access_key_id: os.environ/AWS_BEDROCK_ACCESS_KEY_ID
+      aws_secret_access_key: os.environ/AWS_BEDROCK_SECRET_ACCESS_KEY
+      aws_region_name: os.environ/AWS_BEDROCK_REGION
+
+  # ---- Azure OpenAI ----
+  - model_name: azure-gpt-4
+    litellm_params:
+      model: azure/gpt-4
+      api_key: os.environ/AZURE_API_KEY
+      api_base: os.environ/AZURE_API_BASE
+      api_version: os.environ/AZURE_API_VERSION
+
+  # ---- Cohere ----
+  - model_name: command-r-plus
+    litellm_params:
+      model: cohere/command-r-plus
+      api_key: os.environ/COHERE_API_KEY
+
+litellm_settings:
+  # Drop params the upstream provider does not support instead of erroring.
+  drop_params: true
+  # Emit cost/usage headers (x-litellm-response-cost, x-litellm-model-id).
+  return_response_headers: true
+  cache: true
+  cache_params:
+    type: redis
+    host: os.environ/REDIS_HOST
+    port: os.environ/REDIS_PORT
+    password: os.environ/REDIS_PASSWORD
+  # Route to next model in fallback list on 5xx / rate-limit.
+  num_retries: 2
+  request_timeout: 60
+  fallbacks:
+    - gpt-4: [claude-3-opus, azure-gpt-4]
+    - claude-3-opus: [gpt-4, bedrock-claude-3-sonnet]
+    - gpt-3.5-turbo: [claude-3-haiku]
+
+router_settings:
+  routing_strategy: simple-shuffle
+  redis_host: os.environ/REDIS_HOST
+  redis_port: os.environ/REDIS_PORT
+  redis_password: os.environ/REDIS_PASSWORD
+
+# Per-tenant rate limits. The Go gateway forwards the tenant id as
+# `user` on the OpenAI-compatible request; LiteLLM applies RPM/TPM caps
+# tracked in Redis.
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/LITELLM_DATABASE_URL
+  max_parallel_requests: 100
+  global_max_parallel_requests: 1000
+  enforce_user_param: true
+
+# Default quotas; enterprise tenants can be overridden via the
+# `/user/new` admin endpoint at runtime.
+default_team_settings:
+  - team_id: free-tier
+    rpm_limit: 20
+    tpm_limit: 40000
+    max_budget: 5.0
+  - team_id: pro-tier
+    rpm_limit: 200
+    tpm_limit: 400000
+    max_budget: 500.0
+  - team_id: enterprise-tier
+    rpm_limit: 2000
+    tpm_limit: 4000000
+    max_budget: 10000.0

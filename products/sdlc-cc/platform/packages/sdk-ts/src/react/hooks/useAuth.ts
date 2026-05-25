@@ -1,0 +1,97 @@
+// Authentication hook for React
+
+import * as React from 'react';
+import { useSDLC } from '../providers/SDLCProvider';
+import type { LoginCredentials } from '../../types';
+
+export function useAuth() {
+  const { client, user, tokens, isLoading, isAuthenticated, login, logout, refresh } = useSDLC();
+  const [isLoggingIn, setIsLoggingIn] = React.useState(false);
+  const [error, setError] = React.useState<Error | null>(null);
+
+  const handleLogin = React.useCallback(async (credentials: LoginCredentials) => {
+    setIsLoggingIn(true);
+    setError(null);
+
+    try {
+      await login(credentials);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setIsLoggingIn(false);
+    }
+  }, [login]);
+
+  const handleLogout = React.useCallback(async () => {
+    setError(null);
+    await logout();
+  }, [logout]);
+
+  const handleRefresh = React.useCallback(async () => {
+    setError(null);
+    await refresh();
+  }, [refresh]);
+
+  const updateProfile = React.useCallback(async (data: {
+    firstName?: string;
+    lastName?: string;
+    avatar?: string;
+  }) => {
+    if (!client) throw new Error('Client not initialized');
+
+    setError(null);
+    try {
+      const updatedUser = await client.auth.updateProfile(data);
+      return updatedUser;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [client]);
+
+  const changePassword = React.useCallback(async (currentPassword: string, newPassword: string) => {
+    if (!client) throw new Error('Client not initialized');
+
+    setError(null);
+    try {
+      await client.auth.changePassword(currentPassword, newPassword);
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [client]);
+
+  const enableMFA = React.useCallback(async () => {
+    if (!client) throw new Error('Client not initialized');
+
+    setError(null);
+    try {
+      const result = await client.auth.enableMFA();
+      return result;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [client]);
+
+  const clearError = React.useCallback(() => {
+    setError(null);
+  }, []);
+
+  return {
+    user,
+    tokens,
+    isLoading,
+    isLoggingIn,
+    isAuthenticated,
+    error,
+    login: handleLogin,
+    logout: handleLogout,
+    refresh: handleRefresh,
+    updateProfile,
+    changePassword,
+    enableMFA,
+    clearError
+  };
+}

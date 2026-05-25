@@ -1,0 +1,64 @@
+# Cloudflare Tunnel Configuration for FinSavvyAI
+#
+# Setup:
+#   1. Install cloudflared: brew install cloudflared (macOS) or apt install cloudflared (Linux)
+#   2. Login: cloudflared tunnel login
+#   3. Create tunnel: cloudflared tunnel create finsavvyai
+#   4. Copy credentials JSON to ./credentials/<TUNNEL_ID>.json
+#   5. Create DNS record:
+#      cloudflared tunnel route dns finsavvyai llm.finsavvyai.com
+#   6. Start: cloudflared tunnel --config config.yml run
+#
+# For Docker, this file is mounted at /etc/cloudflared/config.yml
+#
+# Architecture:
+#   llm.finsavvyai.com (CF Worker at edge)
+#     /hub/*        → Control Hub (Node.js :9090) via tunnel
+#     /api/v1/*     → API Gateway (Python :8080) via tunnel
+#     /dashboard/*  → Gateway dashboard (Python :8080) via tunnel
+#     /             → Landing page (served by CF Worker directly)
+#     /chat         → Chat UI (served by CF Worker directly)
+#     /login        → Login page (served by CF Worker directly)
+
+tunnel: TUNNEL_ID_HERE  # Replace with your tunnel UUID
+credentials-file: /etc/cloudflared/credentials/TUNNEL_ID_HERE.json
+
+ingress:
+  # Control Hub — proxied at /hub/*
+  - hostname: llm.finsavvyai.com
+    path: /hub/*
+    service: http://control-hub:9090
+    originRequest:
+      connectTimeout: 10s
+      noTLSVerify: true
+
+  # API Gateway — proxied at /api/* and /dashboard/*
+  - hostname: llm.finsavvyai.com
+    path: /api/*
+    service: http://gateway:8080
+    originRequest:
+      connectTimeout: 10s
+      noTLSVerify: true
+
+  - hostname: llm.finsavvyai.com
+    path: /dashboard/*
+    service: http://gateway:8080
+    originRequest:
+      connectTimeout: 10s
+      noTLSVerify: true
+
+  # Master Server — cluster management
+  - hostname: master.llm.finsavvyai.com
+    service: http://master:8000
+    originRequest:
+      connectTimeout: 10s
+      noTLSVerify: true
+
+  # Grafana dashboards (monitoring)
+  - hostname: monitor.llm.finsavvyai.com
+    service: http://grafana:3000
+    originRequest:
+      connectTimeout: 10s
+
+  # Catch-all: return 404
+  - service: http_status:404

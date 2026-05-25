@@ -1,0 +1,294 @@
+# Claude Agent Platform - Alert Rules
+# Development environment alerts
+
+groups:
+  - name: platform.rules
+    rules:
+      # API Gateway Alerts
+      - alert: APIGatewayDown
+        expr: up{job="api-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: api-gateway
+        annotations:
+          summary: "API Gateway is down"
+          description: "API Gateway has been down for more than 1 minute"
+
+      - alert: APIGatewayHighErrorRate
+        expr: rate(http_requests_total{job="api-gateway",status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: "API Gateway high error rate"
+          description: "API Gateway error rate is {{ $value }} errors per second"
+
+      - alert: APIGatewayHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="api-gateway"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: api-gateway
+        annotations:
+          summary: "API Gateway high latency"
+          description: "API Gateway 95th percentile latency is {{ $value }} seconds"
+
+      # Luna Agents Alerts
+      - alert: LunaAgentsDown
+        expr: up{job="luna-agents"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: luna-agents
+        annotations:
+          summary: "Luna Agents service is down"
+          description: "Luna Agents service has been down for more than 1 minute"
+
+      - alert: LunaAgentsHighQueueSize
+        expr: agent_queue_size > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: luna-agents
+        annotations:
+          summary: "Luna Agents high queue size"
+          description: "Agent queue size is {{ $value }} tasks"
+
+      - alert: LunaAgentsLongExecutionTime
+        expr: agent_execution_duration_seconds > 300
+        for: 2m
+        labels:
+          severity: warning
+          service: luna-agents
+        annotations:
+          summary: "Luna Agents long execution time"
+          description: "Agent execution time is {{ $value }} seconds"
+
+      # Database Alerts
+      - alert: PostgreSQLDown
+        expr: up{job="postgres-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database has been down for more than 1 minute"
+
+      - alert: PostgreSQLHighConnections
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL high connection count"
+          description: "PostgreSQL has {{ $value }} active connections"
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_statements_calls_total{datname="claude_agent"}[5m]) > 10
+        for: 3m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL slow queries detected"
+          description: "PostgreSQL slow query rate is {{ $value }} calls per second"
+
+      # Redis Alerts
+      - alert: RedisDown
+        expr: up{job="redis-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache has been down for more than 1 minute"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: RedisHighConnectionCount
+        expr: redis_connected_clients > 50
+        for: 3m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis high connection count"
+          description: "Redis has {{ $value }} connected clients"
+
+      # RabbitMQ Alerts
+      - alert: RabbitMQDown
+        expr: up{job="rabbitmq-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: rabbitmq
+        annotations:
+          summary: "RabbitMQ is down"
+          description: "RabbitMQ message queue has been down for more than 1 minute"
+
+      - alert: RabbitMQQueueBacklog
+        expr: rabbitmq_queue_messages > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: "RabbitMQ queue backlog"
+          description: "Queue {{ $labels.queue }} has {{ $value }} messages"
+
+      - alert: RabbitMQUnroutableMessages
+        expr: rate(rabbitmq_channel_messages_unroutable_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: rabbitmq
+        annotations:
+          summary: "RabbitMQ unroutable messages"
+          description: "RabbitMQ has {{ $value }} unroutable messages per second"
+
+      # Elasticsearch Alerts
+      - alert: ElasticsearchDown
+        expr: up{job="elasticsearch-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: elasticsearch
+        annotations:
+          summary: "Elasticsearch is down"
+          description: "Elasticsearch has been down for more than 1 minute"
+
+      - alert: ElasticsearchHighDiskUsage
+        expr: elasticsearch_filesystem_data_available_bytes / elasticsearch_filesystem_data_size_bytes < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: elasticsearch
+        annotations:
+          summary: "Elasticsearch high disk usage"
+          description: "Elasticsearch disk usage is {{ $value | humanizePercentage }}"
+
+      - alert: ElasticsearchHighJVMHeap
+        expr: elasticsearch_jvm_memory_used_bytes{area="heap"} / elasticsearch_jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 3m
+        labels:
+          severity: warning
+          service: elasticsearch
+        annotations:
+          summary: "Elasticsearch high JVM heap usage"
+          description: "Elasticsearch JVM heap usage is {{ $value | humanizePercentage }}"
+
+      # Qdrant Alerts
+      - alert: QdrantDown
+        expr: up{job="qdrant-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: qdrant
+        annotations:
+          summary: "Qdrant is down"
+          description: "Qdrant vector database has been down for more than 1 minute"
+
+      - alert: QdrantHighMemoryUsage
+        expr: qdrant_app_memory_usage_bytes / qdrant_app_total_memory_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: qdrant
+        annotations:
+          summary: "Qdrant high memory usage"
+          description: "Qdrant memory usage is {{ $value | humanizePercentage }}"
+
+      # MinIO Alerts
+      - alert: MinIODown
+        expr: up{job="minio-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "MinIO is down"
+          description: "MinIO storage has been down for more than 1 minute"
+
+      - alert: MinIOHighDiskUsage
+        expr: minio_s3_disk_usage_free_bytes / minio_s3_disk_usage_total_bytes < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: minio
+        annotations:
+          summary: "MinIO high disk usage"
+          description: "MinIO disk usage is {{ $value | humanizePercentage }}"
+
+      # System Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value }}% on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+
+  - name: platform.health.rules
+    rules:
+      # Overall Platform Health
+      - alert: PlatformServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Platform service is down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} has been down for more than 2 minutes"
+
+      - alert: PlatformHighErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Platform high error rate"
+          description: "Overall platform error rate is {{ $value | humanizePercentage }}"
+
+      - alert: PlatformSlowResponse
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Platform slow response time"
+          description: "Platform 95th percentile response time is {{ $value }} seconds"

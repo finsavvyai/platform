@@ -1,0 +1,270 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ClawPipe Gateway API",
+    "version": "1.0.0",
+    "summary": "Public gateway for the ClawPipe AI optimization pipeline.",
+    "description": "ClawPipe is an SDK-local + edge gateway pipeline (Booster -> Pack -> Cache -> Route -> Call -> Learn) across 21 providers. Public measured benchmark in progress at https://github.com/finsavvyai/clawpipe-booster-benchmark; methodology v1.0 locked 2026-05-18.",
+    "contact": {
+      "name": "ClawPipe Support",
+      "email": "support@clawpipe.ai",
+      "url": "https://clawpipe.ai"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/finsavvyai/clawpipe-sdk/blob/main/LICENSE"
+    }
+  },
+  "servers": [
+    { "url": "https://api.clawpipe.ai", "description": "Production" }
+  ],
+  "security": [{ "bearerAuth": [] }],
+  "tags": [
+    { "name": "Pipeline", "description": "Send prompts through the optimization pipeline." },
+    { "name": "Router", "description": "Persistent router weights." },
+    { "name": "Analytics", "description": "Aggregated request and savings metrics." },
+    { "name": "Billing", "description": "Subscription checkout + customer portal." }
+  ],
+  "paths": {
+    "/v1/prompt": {
+      "post": {
+        "tags": ["Pipeline"],
+        "summary": "Send a prompt through the ClawPipe pipeline.",
+        "description": "Routes through Booster, Cache, Router, then Provider. Returns response text plus token + latency metadata. Cache hits return immediately with x-clawpipe-cache: SEMANTIC_HIT header.",
+        "operationId": "sendPrompt",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PromptRequest" },
+              "examples": {
+                "openai-gpt4o-mini": {
+                  "summary": "Simple OpenAI prompt",
+                  "value": { "prompt": "Summarize the Cloudflare Workers docs.", "provider": "openai", "model": "gpt-4o-mini" }
+                },
+                "anthropic-haiku": {
+                  "summary": "Anthropic Claude Haiku",
+                  "value": { "prompt": "What is 17 * 23?", "provider": "anthropic", "model": "claude-3-haiku-20240307", "maxTokens": 256 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prompt completed (or served from semantic cache).",
+            "headers": {
+              "x-clawpipe-cache": {
+                "description": "Cache status: SEMANTIC_HIT, MISS, REFRESH, or DISABLED",
+                "schema": { "type": "string", "enum": ["SEMANTIC_HIT", "MISS", "REFRESH", "DISABLED"] }
+              }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/PromptResponse" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "402": { "description": "Monthly budget exceeded for this project or team." },
+          "413": { "description": "Prompt or system message exceeds size limit (100k / 50k chars)." },
+          "429": { "description": "Daily quota exceeded for project or team." },
+          "502": { "description": "Upstream provider error." },
+          "503": { "description": "Provider not configured for this gateway instance." }
+        }
+      }
+    },
+    "/v1/stream": {
+      "post": {
+        "tags": ["Pipeline"],
+        "summary": "Streaming variant of /v1/prompt (Server-Sent Events).",
+        "description": "Currently supported for openai, anthropic, deepseek, groq, mistral. Returns text/event-stream relayed from upstream provider.",
+        "operationId": "streamPrompt",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PromptRequest" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Server-Sent Events stream.",
+            "content": { "text/event-stream": { "schema": { "type": "string" } } }
+          },
+          "400": { "description": "Invalid JSON body or streaming not supported for this provider." },
+          "503": { "description": "Provider not configured." },
+          "502": { "description": "Stream failed upstream." }
+        }
+      }
+    },
+    "/v1/weights": {
+      "get": {
+        "tags": ["Router"],
+        "summary": "Load router weights for the authenticated project.",
+        "operationId": "getWeights",
+        "responses": {
+          "200": {
+            "description": "Router weights array.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "weights": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Weight" }
+                    }
+                  },
+                  "required": ["weights"]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/v1/analytics/overview": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Aggregate request counts, total cost, and savings for the authenticated project.",
+        "operationId": "analyticsOverview",
+        "responses": {
+          "200": {
+            "description": "Overview JSON.",
+            "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/v1/billing/checkout": {
+      "post": {
+        "tags": ["Billing"],
+        "summary": "Create a LemonSqueezy checkout URL for the requested tier.",
+        "operationId": "billingCheckout",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["variant"],
+                "properties": {
+                  "variant": { "type": "string", "enum": ["dev", "growth", "scale"] },
+                  "email": { "type": "string", "format": "email" },
+                  "redirectUrl": { "type": "string", "format": "uri" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Checkout URL ready.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": { "type": "string", "format": "uri" },
+                    "expiresAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": ["url"]
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid variant or JSON body." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "502": { "description": "LemonSqueezy unavailable." },
+          "503": { "description": "Billing not configured for this variant." }
+        }
+      }
+    },
+    "/v1/billing/portal": {
+      "get": {
+        "tags": ["Billing"],
+        "summary": "Get a signed LemonSqueezy customer portal URL for the project's subscription.",
+        "operationId": "billingPortal",
+        "responses": {
+          "200": {
+            "description": "Portal URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "url": { "type": "string", "format": "uri" } },
+                  "required": ["url"]
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "description": "No active subscription for this project." },
+          "502": { "description": "LemonSqueezy unavailable." }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "ClawPipe API key (cp_live_... or cp_test_...)"
+      }
+    },
+    "schemas": {
+      "PromptRequest": {
+        "type": "object",
+        "required": ["prompt", "provider", "model"],
+        "properties": {
+          "prompt": { "type": "string", "maxLength": 100000, "description": "User prompt to optimize and send." },
+          "provider": { "type": "string", "description": "Provider id, e.g. openai, anthropic, groq, deepseek." },
+          "model": { "type": "string", "description": "Model id, e.g. gpt-4o-mini, claude-3-haiku-20240307." },
+          "system": { "type": "string", "maxLength": 50000, "description": "Optional system prompt." },
+          "maxTokens": { "type": "integer", "minimum": 1, "maximum": 32768, "default": 4096 },
+          "temperature": { "type": "number", "minimum": 0, "maximum": 2, "default": 0.7 }
+        }
+      },
+      "PromptResponse": {
+        "type": "object",
+        "required": ["text", "tokensIn", "tokensOut", "latencyMs"],
+        "properties": {
+          "text": { "type": "string" },
+          "tokensIn": { "type": "integer", "minimum": 0 },
+          "tokensOut": { "type": "integer", "minimum": 0 },
+          "latencyMs": { "type": "integer", "minimum": 0 },
+          "request_id": { "type": "string", "format": "uuid" }
+        }
+      },
+      "Weight": {
+        "type": "object",
+        "properties": {
+          "provider": { "type": "string" },
+          "model": { "type": "string" },
+          "totalCalls": { "type": "integer", "minimum": 0 },
+          "avgLatencyMs": { "type": "number", "minimum": 0 },
+          "avgTokensOut": { "type": "number", "minimum": 0 },
+          "score": { "type": "number" }
+        },
+        "required": ["provider", "model", "totalCalls", "score"]
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string" } }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request body or parameters.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid bearer token.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  }
+}

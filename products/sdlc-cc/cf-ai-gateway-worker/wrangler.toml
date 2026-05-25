@@ -1,0 +1,24 @@
+# Cloudflare Worker that sits in front of Cloudflare's AI Gateway,
+# scrubs request bodies via sdlc.cc, then forwards to the AI Gateway
+# URL the customer already uses. Drop-in replacement for the AI
+# Gateway endpoint:
+#
+#   was: https://gateway.ai.cloudflare.com/v1/<acct>/<gw>/anthropic/v1/messages
+#   now: https://sdlc-cc-cf-gw.<your-account>.workers.dev/<same-path>
+#
+# Deploy: wrangler deploy
+# Secrets (set via `wrangler secret put`):
+#   SDLC_API_KEY        — your sk_sdlc_*
+#   CF_AI_GATEWAY_URL   — the AI Gateway URL prefix to forward to
+#                         (e.g. https://gateway.ai.cloudflare.com/v1/ACCT/GW)
+
+name = "sdlc-cc-cf-gw"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Default vars — non-secret. The SDLC scrub endpoint to call.
+# Customers normally don't change this; pointing at a self-hosted
+# gateway is the only reason to override.
+[vars]
+SDLC_SCRUB_URL = "https://api.sdlc.cc/v1/dlp/scrub"

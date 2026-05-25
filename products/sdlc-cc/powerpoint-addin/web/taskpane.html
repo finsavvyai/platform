@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sdlc.cc — PowerPoint taskpane</title>
+<script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+<style>
+  :root { --bg: #fff; --panel: #f3f3f5; --text: #1c1c1f; --muted: #6c6c75; --line: #e1e1e4; --accent: #b7472a; --ok: #16a34a; --danger: #dc2626; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1f1f24; --panel: #17171b; --text: #ececef; --muted: #8b8b94; --line: #2a2a31; --accent: #e08068; } }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 13px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif; }
+  .pane { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; min-height: 100vh; }
+  h1 { margin: 0; font-size: 14px; font-weight: 600; }
+  h1 .domain { color: var(--accent); }
+  .lead { font-size: 12px; color: var(--muted); margin: -4px 0 8px; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0; }
+  legend { padding: 0 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  label { display: block; font-size: 11px; color: var(--muted); margin: 6px 0 2px; }
+  input, select { width: 100%; padding: 7px 9px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 12px; }
+  input:focus, select:focus { outline: 2px solid var(--accent); }
+  button { background: var(--accent); color: #fff; border: 0; padding: 9px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .status { font-size: 12px; color: var(--muted); }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--danger); }
+  .counts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px; }
+  .count { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  .count .n { font-size: 15px; font-weight: 600; }
+  .count .n.zero { color: var(--muted); }
+  .count .label { font-size: 10px; color: var(--muted); text-transform: uppercase; }
+  .count.hit { border-color: var(--ok); }
+  .hint { font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="pane">
+
+<h1><span class="domain">sdlc.cc</span> — Sanitize for AI</h1>
+<p class="lead">Scrubs slide text — speaker notes too — before you share the deck with Copilot or any AI tool.</p>
+
+<fieldset>
+  <legend>Gateway</legend>
+  <label>Endpoint</label>
+  <input id="endpoint" type="url" placeholder="https://api.sdlc.cc" />
+  <label>API key (sk_sdlc_*)</label>
+  <input id="apiKey" type="password" placeholder="sk_sdlc_..." autocomplete="off" />
+  <div class="row" style="margin-top: 8px;">
+    <button id="save">Save</button>
+    <button id="test" class="secondary">Test</button>
+    <span id="cfg-status" class="status"></span>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>Scrub deck</legend>
+  <label>Scope</label>
+  <select id="scope">
+    <option value="selected">Selected slide(s)</option>
+    <option value="all">All slides</option>
+  </select>
+  <label>Include speaker notes</label>
+  <select id="notes">
+    <option value="yes">Yes — scrub notes too</option>
+    <option value="no">No — slide text only</option>
+  </select>
+  <div class="row" style="margin-top: 8px;">
+    <button id="scrub">Scrub</button>
+  </div>
+  <div id="counts" class="counts"></div>
+  <p class="hint" id="op-status"></p>
+</fieldset>
+
+<fieldset>
+  <legend>What gets caught</legend>
+  <p class="hint">
+    Email · phone · IPv4/IPv6 · US SSN · UK NI · Israeli ID · PAN (Luhn) · IBAN (mod-97) · BIC ·
+    Anthropic / OpenAI / GitHub / AWS / Slack / Stripe / Google API keys · JWT · PEM private keys.
+  </p>
+</fieldset>
+
+</div>
+
+<script src="taskpane.js"></script>
+</body>
+</html>

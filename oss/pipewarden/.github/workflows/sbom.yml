@@ -1,0 +1,85 @@
+name: sbom-and-sign
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+
+jobs:
+  sbom:
+    name: Generate SBOM + sign release artifacts
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install Syft (SPDX + CycloneDX SBOM)
+        uses: anchore/sbom-action/download-syft@7ccf588e3cf3cc2611714c2eeae48550fbc17552 # v0.15.11
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@4959ce089c160fddf62f7b42464195ba1a56d382 # v3.6.0
+
+      - name: Generate SPDX SBOM for source
+        run: |
+          syft dir:. -o spdx-json=sbom.spdx.json -o cyclonedx-json=sbom.cyclonedx.json
+
+      - name: Generate SBOM for Go binaries (if any)
+        run: |
+          if ls ./bin/pipewarden* 2>/dev/null; then
+            for b in ./bin/pipewarden*; do
+              syft "$b" -o spdx-json="$b.spdx.json"
+            done
+          fi
+
+      - name: Sign SBOM with cosign (keyless OIDC)
+        env:
+          COSIGN_YES: "true"
+        run: |
+          cosign sign-blob --bundle sbom.spdx.json.sig sbom.spdx.json
+          cosign sign-blob --bundle sbom.cyclonedx.json.sig sbom.cyclonedx.json
+
+      - name: Attach SBOM + signatures to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
+        with:
+          files: |
+            sbom.spdx.json
+            sbom.spdx.json.sig
+            sbom.cyclonedx.json
+            sbom.cyclonedx.json.sig
+
+      - name: Upload SBOM as workflow artifact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: sbom
+          path: sbom.*.json*
+          if-no-files-found: error
+
+  sign-image:
+    name: Sign container image (keyless)
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'release'
+    needs: sbom
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@4959ce089c160fddf62f7b42464195ba1a56d382 # v3.6.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign container image by tag
+        env:
+          COSIGN_YES: "true"
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}"
+          DIGEST=$(docker buildx imagetools inspect "$IMAGE" --format '{{ json .Manifest.Digest }}' | tr -d '"')
+          cosign sign "ghcr.io/${{ github.repository }}@${DIGEST}"

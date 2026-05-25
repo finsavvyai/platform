@@ -1,0 +1,231 @@
+version: '3.8'
+
+# Production-ready Docker Compose for Qestro
+# Configure all secrets via .env.production before deploying
+#
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d
+#
+# Requirements:
+#   - .env.production file with all required variables
+#   - Production build of frontend (dist/ directory)
+#   - SSL certificates for HTTPS
+
+services:
+  # ============================================
+  # PostgreSQL 16 (Production Database)
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: qestro-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-qestro_production}
+      POSTGRES_USER: ${DB_USER:-qestro_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-qestro_db_dev}
+      POSTGRES_INITDB_ARGS: -c max_connections=200 -c shared_buffers=256MB -c work_mem=16MB
+    ports:
+      # Bind to localhost only for security
+      - 127.0.0.1:5432:5432
+    volumes:
+      # Named volume for data persistence across container restarts
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${DB_USER:-qestro_user} -d ${DB_NAME:-qestro_production}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - qestro-network
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  # ============================================
+  # Redis 7 (Cache & Job Queue)
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: qestro-redis
+    restart: always
+    command:
+      - redis-server
+      - --maxmemory
+      - '256mb'
+      - --maxmemory-policy
+      - allkeys-lru
+      - --requirepass
+      - ${REDIS_PASSWORD:-qestro_redis_dev}
+      - --appendonly
+      - 'yes'
+    ports:
+      # Bind to localhost only for security
+      - 127.0.0.1:6379:6379
+    volumes:
+      # Named volume for persistence
+      - redis_data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - -a
+        - ${REDIS_PASSWORD:-qestro_redis_dev}
+        - ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - qestro-network
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  # ============================================
+  # Qestro Backend API
+  # ============================================
+  backend:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+      args:
+        NODE_ENV: production
+    container_name: qestro-backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Core
+      NODE_ENV: production
+      PORT: 8000
+      HOST: 0.0.0.0
+
+      # Database
+      DATABASE_URL: postgresql://${DB_USER:-qestro_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-qestro_production}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-qestro_production}
+      DB_USER: ${DB_USER:-qestro_user}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_POOL_MIN: '5'
+      DB_POOL_MAX: '20'
+
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-jwt-refresh-secret-change-in-production}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+
+      # CORS & Frontend
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://qestro.app,https://qestro.io}
+      FRONTEND_URL: ${FRONTEND_URL:-https://qestro.app}
+
+      # Email (optional)
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-sendgrid}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@qestro.app}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Qestro}
+
+      # AI Services (optional)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: gpt-4
+      OPENAI_MAX_TOKENS: '4000'
+
+      # Stripe/Payment (optional)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+
+      # File Storage (optional)
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      AWS_REGION: ${AWS_REGION:-us-west-2}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+
+      # Features
+      ENABLE_RECORDING: 'true'
+      ENABLE_MOBILE_TESTING: 'true'
+      ENABLE_AI_GENERATION: 'true'
+      ENABLE_METRICS: 'true'
+
+      # Logging
+      LOG_LEVEL: info
+
+    ports:
+      # Expose on localhost for reverse proxy to access
+      - 127.0.0.1:8000:8000
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - qestro-network
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: '5'
+
+  # ============================================
+  # Qestro Frontend (Next.js)
+  # ============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${FRONTEND_URL:-https://qestro.app}
+    container_name: qestro-frontend
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${FRONTEND_URL:-https://qestro.app}
+    ports:
+      # Expose on localhost for reverse proxy
+      - 127.0.0.1:3000:3000
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000']
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - qestro-network
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  # Internal Docker network for inter-service communication
+  qestro-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

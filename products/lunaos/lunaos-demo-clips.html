@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LunaOS | Live Command Demos</title>
+<style>
+  :root {
+    --bg: #0a0a12;
+    --card: #12121e;
+    --border: rgba(255,255,255,0.06);
+    --term-bg: #0c0c16;
+    --green: #34d399;
+    --blue: #4a9eff;
+    --purple: #a78bfa;
+    --pink: #f472b6;
+    --yellow: #fbbf24;
+    --dim: rgba(255,255,255,0.35);
+    --text: rgba(255,255,255,0.8);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+    padding: 40px 20px;
+  }
+  h1 {
+    text-align: center; font-size: 32px; font-weight: 700;
+    color: #fff; margin-bottom: 8px; letter-spacing: -0.5px;
+  }
+  .subtitle {
+    text-align: center; font-size: 15px; color: var(--dim);
+    margin-bottom: 48px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 24px; max-width: 1200px; margin: 0 auto;
+  }
+  .clip {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .clip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(74,158,255,0.08);
+  }
+  .clip-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid var(--border);
+  }
+  .dots { display: flex; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #febc2e; }
+  .dot-g { background: #28c840; }
+  .clip-title {
+    font-size: 12px; color: var(--dim);
+    margin-left: auto; font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .clip-badge {
+    font-size: 10px; padding: 2px 8px;
+    border-radius: 6px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .badge-cli { background: rgba(52,211,153,0.15); color: var(--green); }
+  .badge-ide { background: rgba(74,158,255,0.15); color: var(--blue); }
+  .badge-ai { background: rgba(167,139,250,0.15); color: var(--purple); }
+  .badge-test { background: rgba(244,114,182,0.15); color: var(--pink); }
+  .badge-deploy { background: rgba(251,191,36,0.15); color: var(--yellow); }
+
+  .terminal {
+    padding: 16px; min-height: 260px;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 12.5px; line-height: 1.7;
+    background: var(--term-bg); position: relative;
+    overflow: hidden;
+  }
+  .line { opacity: 0; white-space: pre-wrap; word-break: break-all; }
+  .line.visible { opacity: 1; }
+  .prompt { color: var(--green); }
+  .cmd { color: #fff; font-weight: 600; }
+  .out { color: rgba(255,255,255,0.55); }
+  .success { color: var(--green); }
+  .warn { color: var(--yellow); }
+  .info { color: var(--blue); }
+  .accent { color: var(--purple); }
+  .pink { color: var(--pink); }
+  .dim { color: rgba(255,255,255,0.25); }
+  .cursor {
+    display: inline-block; width: 7px; height: 15px;
+    background: var(--green); vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .progress-bar {
+    display: inline-block; min-width: 200px;
+  }
+  .replay-btn {
+    position: absolute; bottom: 12px; right: 12px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    color: var(--dim); border-radius: 8px; padding: 4px 10px;
+    font-size: 11px; cursor: pointer; font-family: inherit;
+    transition: all 0.15s;
+  }
+  .replay-btn:hover {
+    background: rgba(255,255,255,0.1); color: #fff;
+  }
+
+  .clip-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--dim);
+    display: flex; justify-content: space-between;
+  }
+
+  @media (max-width: 500px) {
+    .grid { grid-template-columns: 1fr; }
+    .terminal { font-size: 11px; min-height: 220px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>See Luna in Action</h1>
+<p class="subtitle">Every command. Real output. Watch it run.</p>
+
+<div class="grid" id="clips-grid"></div>
+
+<script>
+const CLIPS = [
+  {
+    id: 'install',
+    title: 'luna-agents',
+    badge: 'CLI', badgeClass: 'badge-cli',
+    footer: { left: 'npm install', right: '~4s' },
+    lines: [
+      { type: 'prompt', text: '$ npm i -g @luna-agents/cli', typeSpeed: 40 },
+      { delay: 600 },
+      { type: 'out', text: '' },
+      { type: 'dim', text: 'added 143 packages in 3.8s' },
+      { type: 'out', text: '' },
+      { type: 'success', text: '  \u2713 @luna-agents/cli@2.1.0 installed' },
+      { type: 'success', text: '  \u2713 55 agents registered' },
+      { type: 'success', text: '  \u2713 143 skills available' },
+      { type: 'out', text: '' },
+      { type: 'info', text: '  \ud83c\udf19 Luna Agents ready. Run: luna --help' },
+      { type: 'out', text: '' },
+      { type: 'prompt', text: '$ luna doctor', typeSpeed: 50 },
+      { delay: 400 },
+      { type: 'success', text: '  \u2713 Node.js v22.4.0' },
+      { type: 'success', text: '  \u2713 Claude Code connected' },
+      { type: 'success', text: '  \u2713 MCP servers: 3 active' },
+      { type: 'success', text: '  \u2713 All systems operational' },
+    ]
+  },
+  {
+    id: 'review',
+    title: 'Code Review',
+    badge: 'AI', badgeClass: 'badge-ai',
+    footer: { left: '/luna-agents:rev', right: '~12s' },
+    lines: [
+      { type: 'prompt', text: '$ /rev', typeSpeed: 60 },
+      { delay: 300 },
+      { type: 'accent', text: '  \ud83d\udd0d Luna Code Review Agent starting...' },
+      { type: 'out', text: '' },
+      { type: 'info', text: '  Scanning 47 changed files...' },
+      { delay: 200 },
+      { type: 'out', text: '  \u251c\u2500 src/routes/billing.ts' },
+      { type: 'out', text: '  \u251c\u2500 src/services/stripe.ts' },
+      { type: 'out', text: '  \u251c\u2500 src/middleware/auth.ts' },
+      { type: 'out', text: '  \u2514\u2500 +44 more files' },
+      { type: 'out', text: '' },
+      { delay: 400 },
+      { type: 'warn', text: '  \u26a0  3 issues found:' },
+      { type: 'out', text: '' },
+      { type: 'pink', text: '  [HIGH] billing.ts:42 \u2014 Missing null check on subscription.plan' },
+      { type: 'warn', text: '  [MED]  auth.ts:87 \u2014 JWT expiry window too long (24h \u2192 suggest 1h)' },
+      { type: 'dim', text: '  [LOW]  stripe.ts:15 \u2014 Unused import: StripeEvent' },
+      { type: 'out', text: '' },
+      { type: 'success', text: '  \u2713 Auto-fix applied for 2/3 issues' },
+      { type: 'success', text: '  \u2713 Review complete. PR comment drafted.' },
+    ]
+  },
+  {
+    id: 'test',
+    title: 'Test Suite',
+    badge: 'TEST', badgeClass: 'badge-test',
+    footer: { left: '/luna-agents:test', right: '~18s' },
+    lines: [
+      { type: 'prompt', text: '$ /test', typeSpeed: 60 },
+      { delay: 300 },
+      { type: 'accent', text: '  \ud83e\uddea Luna Testing Agent starting...' },
+      { type: 'out', text: '' },
+      { type: 'info', text: '  Analyzing codebase for test targets...' },
+      { delay: 300 },
+      { type: 'out', text: '  Generated 24 unit tests, 8 integration tests' },
+      { type: 'out', text: '' },
+      { type: 'out', text: '  Running tests...' },
+      { delay: 200 },
+      { type: 'success', text: '  \u2713 auth.test.ts           12/12 passed  (0.4s)' },
+      { type: 'success', text: '  \u2713 billing.test.ts         8/8 passed   (0.3s)' },
+      { type: 'success', text: '  \u2713 workflows.test.ts      18/18 passed  (0.7s)' },
+      { type: 'warn',    text: '  \u2717 teams.test.ts           6/7 failed   (0.2s)' },
+      { type: 'success', text: '  \u2713 api-keys.test.ts        9/9 passed   (0.3s)' },
+      { type: 'out', text: '' },
+      { delay: 300 },
+      { type: 'pink', text: '  \u2717 teams.test.ts:45 \u2014 Expected 403, got 200 (missing RBAC check)' },
+      { type: 'success', text: '  \u2713 Auto-fix: added role guard to DELETE /teams/:id' },
+      { type: 'success', text: '  \u2713 Re-run: 7/7 passed' },
+      { type: 'out', text: '' },
+      { type: 'success', text: '  \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 53/53 tests passing \u2014 Coverage: 94.2%' },
+    ]
+  },
+  {
+    id: 'deploy',
+    title: 'Deploy',
+    badge: 'DEPLOY', badgeClass: 'badge-deploy',
+    footer: { left: '/luna-agents:ship', right: '~30s' },
+    lines: [
+      { type: 'prompt', text: '$ /ship', typeSpeed: 60 },
+      { delay: 300 },
+      { type: 'accent', text: '  \ud83d\ude80 Luna Deployment Agent starting...' },
+      { type: 'out', text: '' },
+      { type: 'info', text: '  Pre-flight checks...' },
+      { type: 'success', text: '    \u2713 Tests passing (194/194)' },
+      { type: 'success', text: '    \u2713 Coverage 94.2% (threshold: 90%)' },
+      { type: 'success', text: '    \u2713 No security vulnerabilities' },
+      { type: 'success', text: '    \u2713 Build successful (2.1s)' },
+      { type: 'out', text: '' },
+      { delay: 300 },
+      { type: 'info', text: '  Deploying to Cloudflare Workers...' },
+      { delay: 200 },
+      { type: 'out', text: '    \u251c\u2500 lunaos-engine    \u2192 api.lunaos.ai' },
+      { type: 'out', text: '    \u251c\u2500 lunaos-dashboard \u2192 agents.lunaos.ai' },
+      { type: 'out', text: '    \u251c\u2500 lunaos-studio    \u2192 studio.lunaos.ai' },
+      { type: 'out', text: '    \u2514\u2500 lunaos-docs      \u2192 docs.lunaos.ai' },
+      { type: 'out', text: '' },
+      { delay: 400 },
+      { type: 'success', text: '  \u2713 All 4 services deployed in 8.3s' },
+      { type: 'success', text: '  \u2713 Health checks passing' },
+      { type: 'success', text: '  \u2713 Rollback point saved: v2.0.47' },
+      { type: 'info', text: '  \ud83c\udf0d Live at https://lunaos.ai' },
+    ]
+  },
+  {
+    id: 'rag',
+    title: 'RAG Search',
+    badge: 'AI', badgeClass: 'badge-ai',
+    footer: { left: '/luna-agents:q', right: '~3s' },
+    lines: [
+      { type: 'prompt', text: '$ /q "how does billing webhook work?"', typeSpeed: 35 },
+      { delay: 400 },
+      { type: 'accent', text: '  \ud83d\udd0e Searching across 10 repos...' },
+      { delay: 300 },
+      { type: 'out', text: '' },
+      { type: 'info', text: '  Top 3 results (relevance > 0.85):' },
+      { type: 'out', text: '' },
+      { type: 'success', text: '  1. lunaos-engine/src/services/billing-webhook-handlers.ts' },
+      { type: 'out', text: '     LemonSqueezy webhook handler. Processes subscription_created,' },
+      { type: 'out', text: '     subscription_updated, payment events. Verifies HMAC signature.' },
+      { type: 'out', text: '' },
+      { type: 'success', text: '  2. lunaos-engine/src/routes/billing.ts' },
+      { type: 'out', text: '     POST /billing/webhook endpoint. Validates X-Signature header,' },
+      { type: 'out', text: '     dispatches to handler by event type.' },
+      { type: 'out', text: '' },
+      { type: 'success', text: '  3. lunaos-dashboard/src/lib/billing-client.ts' },
+      { type: 'out', text: '     Frontend billing API. Fetches subscription status, redirects' },
+      { type: 'out', text: '     to LemonSqueezy portal for management.' },
+      { type: 'out', text: '' },
+      { type: 'dim', text: '  Indexed: 2,847 files \u2022 Last sync: 4m ago' },
+    ]
+  },
+  {
+    id: 'heal',
+    title: 'Auto-Heal',
+    badge: 'CLI', badgeClass: 'badge-cli',
+    footer: { left: '/luna-agents:heal', right: '~45s' },
+    lines: [
+      { type: 'prompt', text: '$ /heal', typeSpeed: 60 },
+      { delay: 300 },
+      { type: 'accent', text: '  \ud83e\ude7a Luna Heal Agent starting...' },
+      { type: 'info', text: '  Loop 1/5 \u2014 Scanning for issues...' },
+      { type: 'out', text: '' },
+      { delay: 300 },
+      { type: 'warn', text: '  Found 4 issues:' },
+      { type: 'pink', text: '    \u2717 TypeScript: 2 type errors in runs.ts' },
+      { type: 'pink', text: '    \u2717 Test: teams.integration.test.ts failing' },
+      { type: 'warn', text: '    \u26a0 Lint: 3 warnings (unused imports)' },
+      { type: 'warn', text: '    \u26a0 File size: Canvas.tsx at 214 lines (max 200)' },
+      { type: 'out', text: '' },
+      { delay: 300 },
+      { type: 'info', text: '  Fixing...' },
+      { type: 'success', text: '    \u2713 Fixed type errors (added null guards)' },
+      { type: 'success', text: '    \u2713 Fixed test (updated mock data)' },
+      { type: 'success', text: '    \u2713 Removed 3 unused imports' },
+      { type: 'success', text: '    \u2713 Split Canvas.tsx \u2192 Canvas.tsx + CanvasToolbar.tsx' },
+      { type: 'out', text: '' },
+      { delay: 200 },
+      { type: 'info', text: '  Loop 2/5 \u2014 Verifying...' },
+      { type: 'success', text: '    \u2713 0 issues found. Project healthy.' },
+      { type: 'out', text: '' },
+      { type: 'success', text: '  \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588 All clear \u2014 4 fixes applied in 38s' },
+    ]
+  },
+];
+
+function createClipHTML(clip) {
+  return `
+    <div class="clip" id="clip-${clip.id}">
+      <div class="clip-header">
+        <div class="dots">
+          <div class="dot dot-r"></div>
+          <div class="dot dot-y"></div>
+          <div class="dot dot-g"></div>
+        </div>
+        <span class="clip-badge ${clip.badgeClass}">${clip.badge}</span>
+        <span class="clip-title">${clip.title}</span>
+      </div>
+      <div class="terminal" id="term-${clip.id}"></div>
+      <div class="clip-footer">
+        <span>${clip.footer.left}</span>
+        <span>${clip.footer.right}</span>
+      </div>
+    </div>
+  `;
+}
+
+const grid = document.getElementById('clips-grid');
+CLIPS.forEach(clip => { grid.insertAdjacentHTML('beforeend', createClipHTML(clip)); });
+
+// --- Typing animation engine ---
+class TerminalAnimator {
+  constructor(clipData) {
+    this.clip = clipData;
+    this.el = document.getElementById(`term-${clipData.id}`);
+    this.lineIndex = 0;
+    this.started = false;
+    this.observer = null;
+    this.setupObserver();
+  }
+
+  setupObserver() {
+    this.observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && !this.started) {
+          this.started = true;
+          this.play();
+        }
+      });
+    }, { threshold: 0.3 });
+    this.observer.observe(this.el);
+  }
+
+  async play() {
+    this.el.innerHTML = '';
+    for (let i = 0; i < this.clip.lines.length; i++) {
+      const lineData = this.clip.lines[i];
+      if (lineData.delay) {
+        await this.wait(lineData.delay);
+        continue;
+      }
+      await this.renderLine(lineData);
+    }
+    // Add replay button
+    const btn = document.createElement('button');
+    btn.className = 'replay-btn';
+    btn.textContent = '\u21bb Replay';
+    btn.onclick = () => { this.started = false; this.started = true; this.play(); };
+    this.el.appendChild(btn);
+  }
+
+  async renderLine(lineData) {
+    const div = document.createElement('div');
+    div.className = 'line';
+    this.el.appendChild(div);
+
+    if (lineData.type === 'prompt') {
+      // Type out character by character
+      const speed = lineData.typeSpeed || 40;
+      const parts = lineData.text.split(' ');
+      const promptPart = parts[0]; // $
+      const cmdPart = parts.slice(1).join(' ');
+
+      div.innerHTML = `<span class="prompt">${promptPart}</span> `;
+      div.classList.add('visible');
+
+      const cmdSpan = document.createElement('span');
+      cmdSpan.className = 'cmd';
+      div.appendChild(cmdSpan);
+
+      const cursorSpan = document.createElement('span');
+      cursorSpan.className = 'cursor';
+      div.appendChild(cursorSpan);
+
+      for (let c = 0; c < cmdPart.length; c++) {
+        cmdSpan.textContent += cmdPart[c];
+        await this.wait(speed + Math.random() * 30);
+      }
+      cursorSpan.remove();
+      await this.wait(200);
+    } else {
+      div.innerHTML = `<span class="${lineData.type}">${this.escapeHtml(lineData.text)}</span>`;
+      div.classList.add('visible');
+      await this.wait(80 + Math.random() * 40);
+    }
+
+    // Auto-scroll terminal
+    this.el.scrollTop = this.el.scrollHeight;
+  }
+
+  escapeHtml(text) {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// Initialize all animators
+const animators = CLIPS.map(clip => new TerminalAnimator(clip));
+</script>
+</body>
+</html>

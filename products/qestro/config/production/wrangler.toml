@@ -1,0 +1,198 @@
+# Questro AI-Powered Testing Automation Platform
+# Production Environment Configuration
+# Cloudflare Workers/Pages Deployment Configuration
+
+name = "qestro-ai-platform"
+main = "src/index.ts"
+compatibility_date = "2025-11-02"
+compatibility_flags = ["nodejs_compat"]
+
+# Production Environment
+[env.production]
+name = "qestro-ai-platform-prod"
+routes = [
+  { pattern = "qestro.ai/*", zone_name = "qestro.ai" },
+  { pattern = "api.qestro.ai/*", zone_name = "qestro.ai" },
+  { pattern = "app.qestro.ai/*", zone_name = "qestro.ai" }
+]
+
+# Staging Environment
+[env.staging]
+name = "qestro-ai-platform-staging"
+routes = [
+  { pattern = "staging.qestro.ai/*", zone_name = "qestro.ai" },
+  { pattern = "api-staging.qestro.ai/*", zone_name = "qestro.ai" }
+]
+
+# KV Namespaces for Production
+[[kv_namespaces]]
+binding = "QUESTRO_KV"
+id = "production-kv-namespace-id"
+preview_id = "preview-kv-namespace-id"
+
+[[kv_namespaces]]
+binding = "QUESTRO_CACHE"
+id = "cache-kv-namespace-id"
+preview_id = "cache-preview-namespace-id"
+
+[[kv_namespaces]]
+binding = "QUESTRO_SESSIONS"
+id = "sessions-kv-namespace-id"
+preview_id = "sessions-preview-namespace-id"
+
+# D1 Database Configuration
+[[d1_databases]]
+binding = "QUESTRO_DB"
+database_name = "qestro-production"
+database_id = "production-database-id"
+migrations_dir = "migrations"
+
+# Durable Objects for Real-time Features
+[[durable_objects.bindings]]
+name = "WEBSOCKET_MANAGER"
+class_name = "WebSocketManager"
+
+[[durable_objects.bindings]]
+name = "TEST_EXECUTION_ENGINE"
+class_name = "TestExecutionEngine"
+
+[[durable_objects.bindings]]
+name = "COLLABORATION_MANAGER"
+class_name = "CollaborationManager"
+
+# R2 Storage Configuration
+[[r2_buckets]]
+binding = "QUESTRO_STORAGE"
+bucket_name = "qestro-production-storage"
+
+# Environment Variables
+[vars]
+ENVIRONMENT = "production"
+PLATFORM_VERSION = "1.0.0"
+API_VERSION = "v1"
+ENABLE_DEBUG_LOGGING = "false"
+ENABLE_PERFORMANCE_MONITORING = "true"
+ENABLE_SECURITY_HEADERS = "true"
+ENABLE_RATE_LIMITING = "true"
+
+# CORS Configuration
+CORS_ORIGIN = "https://app.qestro.ai"
+CORS_ALLOWED_METHODS = "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+CORS_ALLOWED_HEADERS = "Content-Type,Authorization,X-Requested-With,X-API-Version"
+CORS_CREDENTIALS = "true"
+
+# Security Configuration
+ENABLE_HELMET = "true"
+ENABLE_CSP = "true"
+ENABLE_HSTS = "true"
+JWT_ALGORITHM = "RS256"
+SESSION_SECRET = "" # To be set via secrets
+
+# Performance Configuration
+ENABLE_COMPRESSION = "true"
+COMPRESSION_THRESHOLD = "1024"
+ENABLE_CACHING = "true"
+CACHE_TTL_DEFAULT = "3600"
+CACHE_TTL_API = "300"
+
+# Feature Flags
+ENABLE_AI_FEATURES = "true"
+ENABLE_COLLABORATION = "true"
+ENABLE_REAL_TIME_UPDATES = "true"
+ENABLE_ENTERPRISE_FEATURES = "true"
+ENABLE_SSO = "true"
+
+# AI Service Configuration
+AI_PROVIDER = "openai"
+AI_MODEL = "gpt-4-turbo"
+AI_MAX_TOKENS = "4096"
+AI_TEMPERATURE = "0.7"
+AI_TIMEOUT_MS = "30000"
+
+# Database Configuration
+DB_CONNECTION_POOL_SIZE = "20"
+DB_QUERY_TIMEOUT_MS = "10000"
+DB_ENABLE_QUERY_LOGGING = "false"
+
+# Rate Limiting Configuration
+RATE_LIMIT_REQUESTS_PER_MINUTE = "1000"
+RATE_LIMIT_BURST_SIZE = "100"
+RATE_LIMIT_GLOBAL = "true"
+
+# WebSocket Configuration
+WS_HEARTBEAT_INTERVAL_MS = "30000"
+WS_CONNECTION_TIMEOUT_MS = "120000"
+WS_MAX_CONNECTIONS_PER_USER = "10"
+WS_MESSAGE_RATE_LIMIT = "100"
+
+# Production Secrets (to be set via wrangler secret put)
+# JWT_SECRET, JWT_REFRESH_SECRET, DATABASE_URL, REDIS_URL
+# OPENAI_API_KEY, STRIPE_API_KEY, SENTRY_DSN, etc.
+
+# Production-specific Environment Variables
+[env.production.vars]
+ENVIRONMENT = "production"
+ENABLE_DEBUG_LOGGING = "false"
+ENABLE_PERFORMANCE_MONITORING = "true"
+ENABLE_SECURITY_HEADERS = "true"
+ENABLE_RATE_LIMITING = "true"
+CORS_ORIGIN = "https://app.qestro.ai"
+SESSION_TIMEOUT_MS = "3600000"  # 1 hour
+ENABLE_ANALYTICS = "true"
+SENTRY_ENVIRONMENT = "production"
+
+# Staging-specific Environment Variables
+[env.staging.vars]
+ENVIRONMENT = "staging"
+ENABLE_DEBUG_LOGGING = "true"
+ENABLE_PERFORMANCE_MONITORING = "true"
+ENABLE_SECURITY_HEADERS = "true"
+ENABLE_RATE_LIMITING = "true"
+CORS_ORIGIN = "https://staging.qestro.ai"
+SESSION_TIMEOUT_MS = "1800000"  # 30 minutes
+ENABLE_ANALYTICS = "true"
+SENTRY_ENVIRONMENT = "staging"
+
+# Limits and Quotas
+[limits]
+cpu_ms = 50000
+memory_mb = 128
+max_concurrent_requests = 1000
+max_requests_per_second = 10000
+
+# Build Configuration
+[build]
+command = "npm run build:production"
+watch_dir = "src"
+upload = [
+  { format = "modules", dir = "dist" }
+]
+
+# Assets Configuration
+[assets]
+directory = "./public"
+binding = "ASSETS"
+html_handling = "single-page-application"
+cache_control = "public, max-age=31536000, immutable"
+
+# Analytics and Monitoring
+[analytics]
+enabled = true
+dataset = "qestro_production"
+
+# Scheduled Events (Cron Jobs)
+[[triggers]]
+crons = ["0 */6 * * *"]  # Every 6 hours
+schedule = "cleanup-sessions"
+
+[[triggers]]
+crons = ["0 2 * * *"]    # Daily at 2 AM
+schedule = "generate-reports"
+
+[[triggers]]
+crons = ["0 0 * * 0"]    # Weekly on Sunday
+schedule = "maintenance-tasks"
+
+[[triggers]]
+crons = ["*/5 * * * *"]  # Every 5 minutes
+schedule = "health-checks"

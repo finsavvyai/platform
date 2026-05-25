@@ -1,0 +1,64 @@
+name: E2E
+
+on:
+  pull_request:
+    paths:
+      - "services/gateway/**"
+      - "services/rag/**"
+      - "services/document-processor/**"
+      - "deployments/docker-compose.e2e.yml"
+      - ".github/workflows/e2e.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  rag-roundtrip:
+    name: Gateway↔RAG roundtrip
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.24", cache: true }
+
+      - name: Bring up E2E stack
+        run: |
+          docker compose -f deployments/docker-compose.e2e.yml up -d --wait \
+            || (docker compose -f deployments/docker-compose.e2e.yml logs && exit 1)
+
+      - name: Wait for gateway healthcheck
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://localhost:8080/health; then
+              echo; echo "gateway up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "gateway never came up"
+          docker compose -f deployments/docker-compose.e2e.yml logs gateway
+          exit 1
+
+      - name: Run E2E tests
+        env:
+          E2E_GATEWAY_URL: http://localhost:8080
+          E2E_API_KEY: ${{ secrets.E2E_API_KEY }}
+        run: |
+          cd services/gateway
+          go test -tags=e2e -timeout=15m ./tests/e2e/...
+
+      - name: Capture stack logs on failure
+        if: failure()
+        run: |
+          docker compose -f deployments/docker-compose.e2e.yml logs --no-color > /tmp/e2e-logs.txt || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-logs
+          path: /tmp/e2e-logs.txt
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f deployments/docker-compose.e2e.yml down -v

@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
+    <title>PipeWarden Findings Embed</title>
+    <style>
+        :root {
+            --bg: #1c1c1e;
+            --surface: #2c2c2e;
+            --surface-hover: #3a3a3c;
+            --text-1: rgba(255,255,255,0.96);
+            --text-2: rgba(235,235,245,0.60);
+            --separator: rgba(84,84,88,0.60);
+            --accent: #8b5cf6;
+            --critical: #FF453A;
+            --high: #FF9F0A;
+            --medium: #64D2FF;
+            --low: rgba(235,235,245,0.60);
+            --container-radius: 16px;
+            --row-radius: 10px;
+            --motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #ffffff;
+                --surface: #f2f2f7;
+                --surface-hover: #e5e5ea;
+                --text-1: #1c1c1e;
+                --text-2: rgba(60,60,67,0.60);
+                --separator: rgba(60,60,67,0.18);
+                --accent: #7c3aed;
+                --low: rgba(60,60,67,0.60);
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text-1);
+            font-size: 15px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            padding: 16px;
+        }
+
+        .embed-container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: var(--surface);
+            border-radius: var(--container-radius);
+            padding: 16px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        h2 {
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--text-1);
+        }
+
+        .last-updated {
+            font-size: 13px;
+            color: var(--text-2);
+            font-weight: 400;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .summary-card {
+            background: var(--bg);
+            border-radius: var(--row-radius);
+            padding: 12px 16px;
+            transition: background 150ms var(--motion-ease);
+        }
+
+        .summary-card:hover {
+            background: var(--surface-hover);
+        }
+
+        .summary-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-2);
+            margin-bottom: 4px;
+        }
+
+        .summary-value {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--text-1);
+        }
+
+        .summary-card.severity-critical .summary-value { color: var(--critical); }
+        .summary-card.severity-high .summary-value { color: var(--high); }
+        .summary-card.severity-medium .summary-value { color: var(--medium); }
+        .summary-card.severity-low .summary-value { color: var(--low); }
+
+        .risk-card {
+            grid-column: 1 / -1;
+        }
+
+        .risk-gauge {
+            width: 100%;
+            height: 4px;
+            background: var(--separator);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .risk-bar {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 300ms var(--motion-ease), background-color 300ms var(--motion-ease);
+            background: var(--accent);
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-2);
+        }
+
+        select {
+            background: var(--bg);
+            border: 0.5px solid var(--separator);
+            color: var(--text-1);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 15px;
+            font-family: inherit;
+            cursor: pointer;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3e%3cpath fill='none' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M3 4.5l3 3 3-3'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 28px;
+            transition: background-color 150ms var(--motion-ease);
+        }
+
+        select:hover {
+            background-color: var(--surface-hover);
+        }
+
+        select:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .findings-list {
+            list-style: none;
+            background: var(--bg);
+            border-radius: var(--row-radius);
+            overflow: hidden;
+        }
+
+        .finding-row {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 12px;
+            align-items: center;
+            padding: 12px 16px;
+            position: relative;
+            transition: background 150ms var(--motion-ease);
+            cursor: pointer;
+        }
+
+        .finding-row:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 0;
+            height: 0.5px;
+            background: var(--separator);
+        }
+
+        .finding-row:hover {
+            background: var(--surface-hover);
+        }
+
+        .finding-row:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-radius: var(--row-radius);
+        }
+
+        .finding-body {
+            min-width: 0;
+        }
+
+        .finding-title {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-1);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 4px;
+        }
+
+        .finding-meta {
+            font-size: 13px;
+            color: var(--text-2);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .finding-meta-dot {
+            margin: 0 8px;
+            opacity: 0.5;
+        }
+
+        .finding-date {
+            font-size: 13px;
+            color: var(--text-2);
+            white-space: nowrap;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            white-space: nowrap;
+        }
+
+        .badge-critical {
+            background: rgba(255, 69, 58, 0.16);
+            color: var(--critical);
+        }
+
+        .badge-high {
+            background: rgba(255, 159, 10, 0.16);
+            color: var(--high);
+        }
+
+        .badge-medium {
+            background: rgba(100, 210, 255, 0.16);
+            color: var(--medium);
+        }
+
+        .badge-low {
+            background: rgba(142, 142, 147, 0.16);
+            color: var(--low);
+        }
+
+        .badge-info {
+            background: rgba(100, 210, 255, 0.16);
+            color: var(--medium);
+        }
+
+        .status-text {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .status-open { color: var(--text-1); }
+        .status-acknowledged { color: var(--high); }
+        .status-resolved { color: var(--medium); }
+        .status-false_positive { color: var(--text-2); }
+
+        .state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 240px;
+            padding: 32px 16px;
+            text-align: center;
+            color: var(--text-2);
+            background: var(--bg);
+            border-radius: var(--row-radius);
+        }
+
+        .state-icon {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+            color: var(--text-2);
+            opacity: 0.6;
+        }
+
+        .state-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text-1);
+            margin-bottom: 4px;
+            letter-spacing: -0.01em;
+        }
+
+        .state-message {
+            font-size: 13px;
+            color: var(--text-2);
+            max-width: 280px;
+        }
+
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--separator);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            color: var(--text-2);
+            font-size: 13px;
+            margin-top: 16px;
+            padding-top: 12px;
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="embed-container" aria-labelledby="widget-title">
+        <div class="header">
+            <h2 id="widget-title">Security Findings</h2>
+            <div id="lastUpdated" class="last-updated" aria-live="polite"></div>
+        </div>
+
+        <div class="summary-grid" role="group" aria-label="Findings summary">
+            <div class="summary-card severity-critical">
+                <div class="summary-label">Critical</div>
+                <div class="summary-value" id="countCritical" aria-label="Critical findings count">0</div>
+            </div>
+            <div class="summary-card severity-high">
+                <div class="summary-label">High</div>
+                <div class="summary-value" id="countHigh" aria-label="High severity findings count">0</div>
+            </div>
+            <div class="summary-card severity-medium">
+                <div class="summary-label">Medium</div>
+                <div class="summary-value" id="countMedium" aria-label="Medium severity findings count">0</div>
+            </div>
+            <div class="summary-card severity-low">
+                <div class="summary-label">Low</div>
+                <div class="summary-value" id="countLow" aria-label="Low severity findings count">0</div>
+            </div>
+            <div class="summary-card risk-card">
+                <div class="summary-label">Overall Risk Score</div>
+                <div class="summary-value" id="riskScore" aria-label="Overall risk score">0</div>
+                <div class="risk-gauge" role="progressbar" aria-labelledby="riskScore" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="riskGauge">
+                    <div class="risk-bar" id="riskBar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls" role="group" aria-label="Filter findings">
+            <div class="filter-group">
+                <label for="filterSeverity">Severity</label>
+                <select id="filterSeverity">
+                    <option value="">All</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="filterPlatform">Platform</label>
+                <select id="filterPlatform">
+                    <option value="">All</option>
+                    <option value="github">GitHub</option>
+                    <option value="gitlab">GitLab</option>
+                    <option value="bitbucket">Bitbucket</option>
+                    <option value="jenkins">Jenkins</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="filterStatus">Status</label>
+                <select id="filterStatus">
+                    <option value="">All</option>
+                    <option value="open">Open</option>
+                    <option value="acknowledged">Acknowledged</option>
+                    <option value="resolved">Resolved</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="content" aria-live="polite"></div>
+
+        <div class="footer">
+            <p>PipeWarden &middot; DevSecOps Pipeline Security Monitoring</p>
+        </div>
+    </main>
+
+    <script>
+        const API_BASE = window.parent.location.origin || 'http://localhost:8080';
+        let allFindings = [];
+        let summaryData = {};
+
+        const SEVERITY_LABELS = {
+            critical: 'Critical severity',
+            high: 'High severity',
+            medium: 'Medium severity',
+            low: 'Low severity',
+            info: 'Informational'
+        };
+
+        async function loadFindings() {
+            try {
+                const contentDiv = document.getElementById('content');
+                contentDiv.innerHTML = `
+                    <div class="state" role="status" aria-live="polite">
+                        <div class="loading-spinner" aria-hidden="true"></div>
+                        <div class="state-title">Loading findings</div>
+                    </div>
+                `;
+
+                // Load summary
+                const summaryRes = await fetch(`${API_BASE}/api/v1/embed/summary`);
+                if (summaryRes.ok) {
+                    summaryData = await summaryRes.json();
+                    updateSummary();
+                }
+
+                // Load findings
+                const params = new URLSearchParams({
+                    severity: document.getElementById('filterSeverity').value,
+                    platform: document.getElementById('filterPlatform').value,
+                    status: document.getElementById('filterStatus').value,
+                });
+
+                const findingsRes = await fetch(`${API_BASE}/api/v1/embed/findings?${params}`);
+                if (!findingsRes.ok) throw new Error('Failed to load findings');
+
+                const data = await findingsRes.json();
+                allFindings = data.findings || [];
+                renderFindings();
+                updateLastUpdated();
+            } catch (err) {
+                const contentDiv = document.getElementById('content');
+                contentDiv.innerHTML = `
+                    <div class="state" role="alert">
+                        <svg class="state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <div class="state-title">Unable to load findings</div>
+                        <div class="state-message">${escapeHtml(err.message)}</div>
+                    </div>
+                `;
+            }
+        }
+
+        function updateSummary() {
+            document.getElementById('countCritical').textContent = summaryData.critical || 0;
+            document.getElementById('countHigh').textContent = summaryData.high || 0;
+            document.getElementById('countMedium').textContent = summaryData.medium || 0;
+            document.getElementById('countLow').textContent = summaryData.low || 0;
+
+            const riskScore = summaryData.risk_score || 0;
+            document.getElementById('riskScore').textContent = riskScore;
+            const riskBar = document.getElementById('riskBar');
+            const riskGauge = document.getElementById('riskGauge');
+            riskBar.style.width = riskScore + '%';
+            riskGauge.setAttribute('aria-valuenow', String(riskScore));
+
+            riskBar.classList.remove('risk-bar-critical', 'risk-bar-high', 'risk-bar-medium', 'risk-bar-low');
+            let riskLevel;
+            if (riskScore > 75) riskLevel = 'critical';
+            else if (riskScore > 50) riskLevel = 'high';
+            else if (riskScore > 25) riskLevel = 'medium';
+            else riskLevel = 'low';
+
+            const colorMap = {
+                critical: 'var(--critical)',
+                high: 'var(--high)',
+                medium: 'var(--medium)',
+                low: 'var(--accent)'
+            };
+            riskBar.style.background = colorMap[riskLevel];
+        }
+
+        function renderFindings() {
+            const contentDiv = document.getElementById('content');
+
+            if (allFindings.length === 0) {
+                contentDiv.innerHTML = `
+                    <div class="state" role="status">
+                        <svg class="state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 2L4 7v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V7l-8-5z"></path>
+                            <polyline points="9 12 11 14 15 10"></polyline>
+                        </svg>
+                        <div class="state-title">All clear</div>
+                        <div class="state-message">No findings match the current filters.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<ul class="findings-list" role="list" aria-label="PipeWarden security findings">';
+
+            allFindings.forEach((finding, idx) => {
+                const date = new Date(finding.created_at).toLocaleDateString();
+                const severity = (finding.severity || 'low').toLowerCase();
+                const status = (finding.status || 'open').toLowerCase();
+                const severityLabel = SEVERITY_LABELS[severity] || severity;
+                html += `
+                    <li class="finding-row" role="listitem" tabindex="0" data-finding="${idx}">
+                        <span class="badge badge-${escapeHtml(severity)}" aria-label="${escapeHtml(severityLabel)}">${escapeHtml(finding.severity)}</span>
+                        <div class="finding-body">
+                            <div class="finding-title">${escapeHtml(finding.title)}</div>
+                            <div class="finding-meta">
+                                <span>${escapeHtml(finding.connection_name)}</span>
+                                <span class="finding-meta-dot" aria-hidden="true">&middot;</span>
+                                <span>${escapeHtml(finding.category)}</span>
+                                <span class="finding-meta-dot" aria-hidden="true">&middot;</span>
+                                <span class="status-text status-${escapeHtml(status)}">${escapeHtml(finding.status)}</span>
+                            </div>
+                        </div>
+                        <span class="finding-date">${escapeHtml(date)}</span>
+                    </li>
+                `;
+            });
+
+            html += '</ul>';
+            contentDiv.innerHTML = html;
+        }
+
+        function updateLastUpdated() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('lastUpdated').textContent = `Updated ${timeStr}`;
+        }
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Event listeners
+        document.getElementById('filterSeverity').addEventListener('change', loadFindings);
+        document.getElementById('filterPlatform').addEventListener('change', loadFindings);
+        document.getElementById('filterStatus').addEventListener('change', loadFindings);
+
+        // Post message support for cross-origin embedding
+        window.addEventListener('message', (event) => {
+            if (event.data.action === 'refresh') {
+                loadFindings();
+            }
+        });
+
+        // Load on startup
+        loadFindings();
+
+        // Auto-refresh every 60 seconds
+        setInterval(loadFindings, 60000);
+    </script>
+</body>
+</html>

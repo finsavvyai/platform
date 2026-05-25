@@ -1,0 +1,212 @@
+# ─────────────────────────────────────────────────────────
+# Chaos Engineering Experiments — SDLC.ai Platform
+# Uses Chaos Mesh (https://chaos-mesh.org) for Kubernetes
+# ─────────────────────────────────────────────────────────
+
+# ── 1. Pod Failure — Gateway ─────────────────────────────
+# Validates: Auto-restart, load balancer failover, zero-downtime
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: gateway-pod-failure
+  namespace: sdlc-platform
+  labels:
+    experiment: pod-failure
+    service: gateway
+spec:
+  action: pod-failure
+  mode: one
+  selector:
+    namespaces:
+      - sdlc-platform
+    labelSelectors:
+      app: gateway
+  duration: "60s"
+  scheduler:
+    cron: "@every 168h"  # Weekly
+
+---
+# ── 2. Network Latency — RAG to Vector Store ────────────
+# Validates: Timeout handling, circuit breaker activation, graceful degradation
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: rag-vector-latency
+  namespace: sdlc-platform
+  labels:
+    experiment: network-latency
+    service: rag-engine
+spec:
+  action: delay
+  mode: all
+  selector:
+    namespaces:
+      - sdlc-platform
+    labelSelectors:
+      app: rag-engine
+  delay:
+    latency: "500ms"
+    jitter: "100ms"
+    correlation: "50"
+  direction: to
+  target:
+    selector:
+      namespaces:
+        - sdlc-platform
+      labelSelectors:
+        app: vector-store
+    mode: all
+  duration: "300s"
+
+---
+# ── 3. Network Partition — Database ──────────────────────
+# Validates: Connection pool recovery, retry logic, read replica failover
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: db-network-partition
+  namespace: sdlc-platform
+  labels:
+    experiment: network-partition
+    service: postgresql
+spec:
+  action: partition
+  mode: all
+  selector:
+    namespaces:
+      - sdlc-platform
+    labelSelectors:
+      app: gateway
+  direction: to
+  target:
+    selector:
+      namespaces:
+        - sdlc-platform
+      labelSelectors:
+        app: postgresql
+    mode: all
+  duration: "30s"
+
+---
+# ── 4. CPU Stress — LLM Orchestrator ────────────────────
+# Validates: Auto-scaling trigger, request queuing, SLO adherence under load
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: llm-cpu-stress
+  namespace: sdlc-platform
+  labels:
+    experiment: cpu-stress
+    service: llm-orchestrator
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - sdlc-platform
+    labelSelectors:
+      app: llm-orchestrator
+  stressors:
+    cpu:
+      workers: 4
+      load: 80
+  duration: "180s"
+
+---
+# ── 5. Memory Stress — Gateway ───────────────────────────
+# Validates: OOMKill recovery, memory limit enforcement, pod restart behavior
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: gateway-memory-stress
+  namespace: sdlc-platform
+  labels:
+    experiment: memory-stress
+    service: gateway
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - sdlc-platform
+    labelSelectors:
+      app: gateway
+  stressors:
+    memory:
+      workers: 2
+      size: "512MB"
+  duration: "120s"
+
+---
+# ── 6. DNS Failure ───────────────────────────────────────
+# Validates: DNS cache, fallback resolution, service mesh resilience
+apiVersion: chaos-mesh.org/v1alpha1
+kind: DNSChaos
+metadata:
+  name: dns-failure
+  namespace: sdlc-platform
+  labels:
+    experiment: dns-failure
+spec:
+  action: error
+  mode: all
+  selector:
+    namespaces:
+      - sdlc-platform
+    labelSelectors:
+      app: gateway
+  patterns:
+    - "vector-store.sdlc-platform.svc.cluster.local"
+  duration: "60s"
+
+---
+# ── 7. Redis Connection Kill ─────────────────────────────
+# Validates: Rate limiter fallback, cache miss handling, session recovery
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: redis-connection-kill
+  namespace: sdlc-platform
+  labels:
+    experiment: redis-kill
+    service: redis
+spec:
+  action: partition
+  mode: all
+  selector:
+    namespaces:
+      - sdlc-platform
+    labelSelectors:
+      app: gateway
+  direction: to
+  target:
+    selector:
+      namespaces:
+        - sdlc-platform
+      labelSelectors:
+        app: redis-master
+    mode: all
+  duration: "45s"
+
+---
+# ── 8. HTTP Abort — External LLM API ────────────────────
+# Validates: LLM provider failover, retry with backoff, user-facing error handling
+apiVersion: chaos-mesh.org/v1alpha1
+kind: HTTPChaos
+metadata:
+  name: llm-api-abort
+  namespace: sdlc-platform
+  labels:
+    experiment: http-abort
+    service: llm-orchestrator
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - sdlc-platform
+    labelSelectors:
+      app: llm-orchestrator
+  target: Request
+  port: 443
+  method: POST
+  path: "/v1/chat/completions"
+  abort: true
+  duration: "120s"

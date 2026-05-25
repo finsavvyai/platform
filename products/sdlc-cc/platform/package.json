@@ -1,0 +1,130 @@
+{
+  "name": "sdlc-platform",
+  "version": "1.0.0",
+  "description": "SDLC.ai - Secure Data Learning Platform v3: Cloudflare-native, zero-trust middleware fabric for secure AI-data interactions",
+  "private": true,
+  "workspaces": [
+    "services/*",
+    "shared/libs/*",
+    "tools/*",
+    "examples/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:gateway\" \"npm run dev:rag\" \"npm run dev:vector\" \"npm run dev:admin\"",
+    "dev:root": "tsx watch src/server.ts",
+    "dev:gateway": "cd services/gateway && go run ./cmd/server",
+    "dev:rag": "cd services/rag && uvicorn app.main:app --reload --host 0.0.0.0 --port 8001",
+    "dev:vector": "cd services/vector-core && cargo run",
+    "dev:admin": "cd services/admin-ui && npm run dev",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:root": "vitest run --passWithNoTests",
+    "build": "npm run build:root",
+    "build:root": "tsc -p tsconfig.build.json --noEmit",
+    "build:all": "npm run build:gateway && npm run build:rag && npm run build:vector && npm run build:admin",
+    "build:gateway": "cd services/gateway && go build -o bin/gateway ./cmd/server",
+    "build:rag": "cd services/rag && pip install -r requirements.txt",
+    "build:vector": "cd services/vector-core && cargo build --release",
+    "build:admin": "cd services/admin-ui && npm run build",
+    "test": "npm run test:root",
+    "test:all": "npm run test:gateway && npm run test:rag && npm run test:vector && npm run test:admin",
+    "test:gateway": "cd services/gateway && go test ./...",
+    "test:rag": "cd services/rag && pytest",
+    "test:vector": "cd services/vector-core && cargo test",
+    "test:admin": "cd services/admin-ui && npm run test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:prod": "PLAYWRIGHT_TEST_BASE_URL=https://sdlc-landing-page.pages.dev playwright test",
+    "test:e2e:latest": "PLAYWRIGHT_TEST_BASE_URL=https://c8181f99.sdlc-landing-page.pages.dev playwright test",
+    "test:e2e:sdlc": "PLAYWRIGHT_TEST_BASE_URL=https://sdlc.cc playwright test tests/e2e",
+    "test:e2e:sdlc:ci": "PLAYWRIGHT_TEST_BASE_URL=https://sdlc.cc playwright test tests/e2e --forbid-only",
+    "lint": "npm run typecheck",
+    "lint:all": "npm run lint:gateway && npm run lint:rag && npm run lint:vector && npm run lint:admin",
+    "lint:gateway": "cd services/gateway && golangci-lint run",
+    "lint:rag": "cd services/rag && ruff check .",
+    "lint:vector": "cd services/vector-core && cargo clippy",
+    "lint:admin": "cd services/admin-ui && npm run lint",
+    "docker:dev": "docker-compose -f .config/docker/docker-compose.dev.yml up --build",
+    "docker:prod": "docker-compose -f .config/docker/docker-compose.prod.yml up -d --build",
+    "docker:staging": "docker-compose -f .config/docker/docker-compose.staging.yml up -d --build",
+    "docs:serve": "cd docs && python -m http.server 8080",
+    "security:scan": "npm run security:gateway && npm run security:rag && npm run security:vector && npm run security:admin",
+    "security:gateway": "cd services/gateway && gosec ./...",
+    "security:rag": "cd services/rag && bandit -r .",
+    "security:vector": "cd services/vector-core && cargo audit",
+    "security:admin": "cd services/admin-ui && npm audit",
+    "ci:local": "npm run lint && npm run test && npm run security:scan && npm run build",
+    "production:check": "npm run typecheck && npm run test:root && npm run build:root",
+    "start": "node dist/server.js",
+    "clean": "npm run clean:gateway && npm run clean:rag && npm run clean:vector && npm run clean:admin",
+    "clean:gateway": "cd services/gateway && rm -rf bin/",
+    "clean:rag": "cd services/rag && find . -type d -name '__pycache__' -exec rm -rf {} +",
+    "clean:vector": "cd services/vector-core && cargo clean",
+    "clean:admin": "cd services/admin-ui && rm -rf .next node_modules"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^18.4.4",
+    "@commitlint/config-conventional": "^18.4.4",
+    "@finsavvyai/test-config": "file:./packages/test-config",
+    "@playwright/test": "^1.40.0",
+    "@types/express": "^4.17.25",
+    "@types/node": "^25.2.3",
+    "@types/supertest": "^2.0.16",
+    "concurrently": "^8.2.2",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.1",
+    "supertest": "^6.3.4",
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0",
+    "go": ">=1.21.0",
+    "python": ">=3.11.0",
+    "rust": ">=1.75.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/finsavvyai/sdlc-platform.git"
+  },
+  "keywords": [
+    "ai",
+    "rag",
+    "security",
+    "privacy",
+    "compliance",
+    "gdpr",
+    "hipaa",
+    "dlp",
+    "zero-trust",
+    "cloudflare",
+    "enterprise",
+    "multi-tenant"
+  ],
+  "author": "SDLC.ai Team",
+  "license": "BUSL-1.1",
+  "bugs": {
+    "url": "https://github.com/finsavvyai/sdlc-platform/issues"
+  },
+  "homepage": "https://sdlc.cc",
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "dependencies": {
+    "@esbuild/darwin-arm64": "^0.21.5",
+    "express": "^4.22.1",
+    "express-validator": "^7.3.1",
+    "pino": "^9.14.0"
+  },
+  "overrides": {
+    "next": "15.5.15",
+    "minimatch": "10.2.5",
+    "@hono/vite-dev-server": "0.25.3"
+  }
+}

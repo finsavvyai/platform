@@ -1,0 +1,77 @@
+version: "3.9"
+
+# SDLC Platform — Audit Log Pipeline
+# Services:
+#   - loki   : short-term queryable log store (90d retention)
+#   - vector : collector + router → Loki (hot) + R2 (cold, 7y)
+#
+# Dev mode uses filesystem storage for Loki and a local volume
+# simulating R2 cold storage. In production, override via
+# docker-compose.prod.yml or Helm values (see README.md).
+
+services:
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: sdlc-audit-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - audit-net
+
+  vector:
+    image: timberio/vector:0.35.0-distroless-libc
+    container_name: sdlc-audit-vector
+    restart: unless-stopped
+    depends_on:
+      loki:
+        condition: service_healthy
+    environment:
+      VECTOR_LOG: info
+      # Production overrides (empty in dev — uses filesystem sink instead of R2)
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_BUCKET: ${R2_BUCKET:-sdlc-audit-logs}
+    volumes:
+      - ./vector-config.toml:/etc/vector/vector.toml:ro
+      - audit-logs:/var/log/sdlc:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - vector-data:/var/lib/vector
+    networks:
+      - audit-net
+
+  # Optional: Grafana for dev-time LogQL exploration
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: sdlc-audit-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - audit-net
+
+volumes:
+  loki-data:
+  vector-data:
+  grafana-data:
+  audit-logs:
+
+networks:
+  audit-net:
+    driver: bridge

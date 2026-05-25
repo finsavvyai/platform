@@ -1,0 +1,117 @@
+---
+import ChapterOpener from "../ChapterOpener.astro";
+
+interface Props {
+  count: number;
+  categories: string[];
+  statusCounts?: Record<string, number>;
+}
+const { count, categories, statusCounts = {} } = Astro.props;
+const sortedCats = [...categories].filter((c) => c !== "shortcut").sort();
+---
+
+<ChapterOpener
+  num="01"
+  word="Lexicon"
+  subtitle={`${count} entries. The standard library of Luna Pipes, sorted alphabetically within ${sortedCats.length} categories. Hover any headword for its call signature; follow "see also" for cross-references.`}
+/>
+
+<nav class="cat-rail wrap" aria-label="Jump to category">
+  <h3 class="rail-title">Categories.</h3>
+  <ol class="rail">
+    {sortedCats.map((cat) => (
+      <li>
+        <a href={`#cat-${cat}`}><span class="cat-name">{cat}</span></a>
+      </li>
+    ))}
+  </ol>
+</nav>
+
+<section class="legend wrap">
+  <h3 class="legend-title">Notation.</h3>
+  <dl class="legend-list">
+    <div><dt><em>verb</em></dt><dd>callable skill that produces output</dd></div>
+    <div><dt><em>operator</em></dt><dd>composes two stages of a pipe</dd></div>
+    <div><dt><em>aux</em></dt><dd>shortcut form of a verb</dd></div>
+    <div><dt><em>primitive</em></dt><dd>built into the runtime; not user-defined</dd></div>
+  </dl>
+</section>
+
+{Object.keys(statusCounts).length > 0 && (
+  <section class="legend wrap">
+    <h3 class="legend-title">Implementation status.</h3>
+    <dl class="legend-list">
+      <div><dt><span class="badge bg-stable">stable</span></dt><dd>agent wired, body fleshed out, runnable today, {statusCounts.stable ?? 0} verbs</dd></div>
+      <div><dt><span class="badge bg-beta">beta</span></dt><dd>agent wired, body still thin, expect rough edges, {statusCounts.beta ?? 0} verbs</dd></div>
+      <div><dt><span class="badge bg-aux">alias</span></dt><dd>shortcut for a canonical verb in another category, {statusCounts.aux ?? 0} aliases</dd></div>
+      <div><dt><span class="badge bg-planned">planned</span></dt><dd>spec exists, agent does not, not yet runnable, {(statusCounts.planned ?? 0) + (statusCounts.stub ?? 0) + (statusCounts.unknown ?? 0)} verbs</dd></div>
+    </dl>
+  </section>
+)}
+
+<style>
+  .cat-rail { padding-bottom: var(--t-6); }
+  .rail-title, .legend-title {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: var(--step-2);
+    margin: var(--t-6) 0 var(--t-3);
+  }
+  .rail {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .rail li {
+    margin: 0;
+    flex: 1 1 auto;
+    border-right: 1px solid var(--rule);
+  }
+  .rail li:last-child { border-right: 0; }
+  .rail a {
+    display: block;
+    padding: var(--t-2) var(--t-3);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: var(--step--1);
+    color: var(--ink);
+    transition: background-color 240ms var(--ease);
+  }
+  .rail a:hover { background: var(--saffron); color: var(--saffron-on); }
+  .cat-name { letter-spacing: -0.01em; }
+
+  .legend { padding-bottom: var(--t-8); }
+  .legend-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: var(--t-3);
+    margin: 0;
+    max-width: var(--measure-wide);
+  }
+  .legend-list dt {
+    font-family: var(--font-display);
+    font-style: italic;
+    color: var(--saffron-deep);
+    margin-bottom: var(--t-1);
+  }
+  .legend-list dd { margin: 0; font-size: var(--step--1); color: var(--muted); }
+
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.1rem 0.45rem;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+  }
+  .bg-stable  { color: #0a7a3b; }
+  .bg-beta    { color: #8a5a00; }
+  .bg-aux     { color: var(--muted); }
+  .bg-planned { color: #888; border-style: dashed; }
+</style>

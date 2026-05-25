@@ -1,0 +1,60 @@
+# Fly.io app config for the sdlc.cc gateway. Deployed image is pulled
+# from ghcr.io (built by .github/workflows/publish.yml on every main).
+#
+# Bootstrap (one-time, manual):
+#   flyctl auth login
+#   flyctl apps create sdlc-cc                       # picks the app name
+#   flyctl postgres create --name sdlc-cc-db         # provisions Postgres
+#   flyctl postgres attach sdlc-cc-db --app sdlc-cc  # writes DATABASE_URL
+#   flyctl secrets set --app sdlc-cc \
+#     ANTHROPIC_API_KEY=sk-ant-... \
+#     SDLC_ADMIN_BEARER=$(openssl rand -hex 32)
+#   flyctl deploy --app sdlc-cc -c sdlc-cc/deploy/fly.toml
+#
+# DNS (after first deploy):
+#   In Cloudflare: api.sdlc.cc CNAME → <app>.fly.dev (proxied: yes)
+#   flyctl certs add api.sdlc.cc --app sdlc-cc
+#
+# Roll back: flyctl releases --app sdlc-cc, flyctl deploy --image …:<sha>
+
+app = "sdlc-cc"
+primary_region = "iad"   # change to ams/syd/etc; closest to your callers
+
+[build]
+  # Pull the multi-arch image published by the publish-image workflow.
+  # Pinning to ":main" gets the freshest build; pin to a sha for prod.
+  image = "ghcr.io/finsavvyai/sdlc-cc:main"
+
+# One-shot release container runs migrations against attached Postgres
+# before the new app instances start serving. Failure aborts the deploy.
+[deploy]
+  release_command = "./migrate -dir ./migrations"
+  strategy = "rolling"
+
+# Static (non-secret) env. Secrets (ANTHROPIC_API_KEY, SDLC_ADMIN_BEARER,
+# DATABASE_URL) come via `flyctl secrets set` and arrive as env at boot.
+[env]
+  PORT = "8080"
+  # Quota: 1k calls per tenant per 24h. Tune to your plan.
+  AEGIS_AI_DAILY_CAP = "1000"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+# 256MB is plenty for the gateway today (Postgres pool is the heaviest
+# resident object). Bump when audit volume + provider-chain caching
+# justifies it.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

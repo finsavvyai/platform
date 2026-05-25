@@ -1,0 +1,42 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'landing-page/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Landing Page
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: landing-page/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: landing-page
+        run: npm ci
+
+      - name: Build
+        working-directory: landing-page
+        run: npm run pages:build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: sdlc-landing-page
+          directory: landing-page/.vercel/output/static
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}

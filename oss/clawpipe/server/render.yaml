@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: finsavvyai-gateway
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python3 -m src.api.gateway
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: FINSAVVYAI_MASTER_HOST
+        value: finsavvyai-master
+      - key: FINSAVVYAI_MASTER_PORT
+        value: "8000"
+      - key: FINSAVVYAI_GATEWAY_HOST
+        value: "0.0.0.0"
+      - key: FINSAVVYAI_GATEWAY_PORT
+        value: "8080"
+      - key: FINSAVVYAI_LOG_LEVEL
+        value: INFO
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OLLAMA_BASE_URL
+        sync: false
+
+  - type: web
+    name: finsavvyai-master
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python3 -m src.core.start_master
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: FINSAVVYAI_MASTER_HOST
+        value: "0.0.0.0"
+      - key: FINSAVVYAI_MASTER_PORT
+        value: "8000"
+      - key: FINSAVVYAI_LOG_LEVEL
+        value: INFO

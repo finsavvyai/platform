@@ -1,0 +1,807 @@
+openapi: 3.1.0
+info:
+  title: AMLIQ Screening API
+  version: 1.0.0
+  description: |
+    AMLIQ provides sanctions screening, PEP screening, and adverse-media
+    monitoring as a service. This API powers real-time entity screening,
+    alert management, audit trails, and tenant configuration.
+  contact:
+    name: AMLIQ Support
+    email: support@amliq.finance
+    url: https://amliq.finance
+  license:
+    name: Proprietary
+    url: https://amliq.finance/terms
+
+servers:
+  - url: https://api.amliq.finance
+    description: Production
+  - url: http://localhost:8080
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: screening
+    description: Entity and transaction screening
+  - name: alerts
+    description: Alert management and resolution
+  - name: lists
+    description: Sanctions list metadata and sync
+  - name: analytics
+    description: Dashboard analytics
+  - name: audit
+    description: Audit trail
+  - name: config
+    description: Tenant configuration
+  - name: billing
+    description: Subscription and usage
+  - name: team
+    description: Team management
+  - name: api-keys
+    description: API key management
+  - name: webhooks
+    description: Webhook configuration
+  - name: health
+    description: System health checks
+  - name: onboarding
+    description: Onboarding and setup
+  - name: admin
+    description: Platform administration
+  - name: ai
+    description: AI-powered features
+  - name: auth
+    description: Authentication and SSO
+
+paths:
+  /api/v1/screen:
+    post:
+      operationId: screenEntity
+      tags: [screening]
+      summary: Screen an entity against sanctions lists
+      description: |
+        Screens a named entity against all active sanctions, PEP, and
+        adverse-media lists using the multi-layer matching cascade
+        (exact, fuzzy, phonetic, token, embedding, graph).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenRequest'
+      responses:
+        '200':
+          description: Screening results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PaymentRequired'
+
+  /api/v1/screen/{id}:
+    get:
+      operationId: getScreening
+      tags: [screening]
+      summary: Retrieve a past screening result
+      parameters:
+        - $ref: '#/components/parameters/ScreeningID'
+      responses:
+        '200':
+          description: Screening detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/screen/demo:
+    post:
+      operationId: screenDemo
+      tags: [screening]
+      summary: Authenticated demo screening
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenRequest'
+      responses:
+        '200':
+          description: Demo screening results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/screen/public-demo:
+    post:
+      operationId: publicScreenDemo
+      tags: [screening]
+      summary: Unauthenticated public demo screening
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenRequest'
+      responses:
+        '200':
+          description: Public demo screening results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '429':
+          description: Rate limit exceeded
+
+  /api/v1/screen/freetext:
+    post:
+      operationId: freeTextScreen
+      tags: [screening]
+      summary: Screen free-form text for entity mentions
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text:
+                  type: string
+                  description: Free-form text to scan for entity mentions
+      responses:
+        '200':
+          description: Extracted entities and screening results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '429':
+          description: Rate limit exceeded
+
+  /api/v1/screen/fast:
+    post:
+      operationId: fastScreen
+      tags: [screening]
+      summary: Low-latency payment screening
+      description: Uses the optimized FastEngine for real-time payment decisions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScreenRequest'
+      responses:
+        '200':
+          description: Fast screening result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/screening/quota:
+    get:
+      operationId: getScreeningQuota
+      tags: [screening]
+      summary: Get current screening usage and quota
+      responses:
+        '200':
+          description: Quota information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/crypto/screen:
+    post:
+      operationId: cryptoScreen
+      tags: [screening]
+      summary: Screen a cryptocurrency wallet address
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address]
+              properties:
+                address:
+                  type: string
+                  description: Wallet address to screen
+                chain:
+                  type: string
+                  description: Blockchain network (e.g., ethereum, bitcoin)
+      responses:
+        '200':
+          description: Crypto screening results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/crypto/screen/public:
+    post:
+      operationId: publicCryptoScreen
+      tags: [screening]
+      summary: Unauthenticated crypto wallet screening
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address]
+              properties:
+                address:
+                  type: string
+      responses:
+        '200':
+          description: Public crypto screening results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/alerts:
+    get:
+      operationId: listAlerts
+      tags: [alerts]
+      summary: List screening alerts
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, resolved, all]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Paginated alert list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/alerts/stream:
+    get:
+      operationId: streamAlerts
+      tags: [alerts]
+      summary: Server-Sent Events stream of new alerts
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /api/v1/alerts/{id}:
+    get:
+      operationId: getAlert
+      tags: [alerts]
+      summary: Get alert detail
+      parameters:
+        - $ref: '#/components/parameters/AlertID'
+      responses:
+        '200':
+          description: Alert detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/alerts/{id}/resolve:
+    put:
+      operationId: resolveAlert
+      tags: [alerts]
+      summary: Resolve an alert
+      parameters:
+        - $ref: '#/components/parameters/AlertID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                disposition:
+                  type: string
+                  enum: [true_positive, false_positive, escalated]
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: Alert resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/lists:
+    get:
+      operationId: listLists
+      tags: [lists]
+      summary: List all available sanctions lists and metadata
+      responses:
+        '200':
+          description: List metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/lists/{id}:
+    get:
+      operationId: getList
+      tags: [lists]
+      summary: Get metadata for a specific sanctions list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/lists/{id}/sync:
+    post:
+      operationId: syncList
+      tags: [lists]
+      summary: Trigger a manual sync for a sanctions list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sync triggered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/analytics:
+    get:
+      operationId: getDashboard
+      tags: [analytics]
+      summary: Get dashboard analytics
+      responses:
+        '200':
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/dashboard/compliance:
+    get:
+      operationId: getComplianceStats
+      tags: [analytics]
+      summary: Get compliance dashboard statistics
+      responses:
+        '200':
+          description: Compliance stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/audit:
+    get:
+      operationId: listAudit
+      tags: [audit]
+      summary: List audit trail entries
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/audit/{id}:
+    get:
+      operationId: getAuditEntry
+      tags: [audit]
+      summary: Get a single audit entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit entry detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/config:
+    get:
+      operationId: getConfig
+      tags: [config]
+      summary: Get tenant configuration
+      responses:
+        '200':
+          description: Configuration object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+    put:
+      operationId: updateConfig
+      tags: [config]
+      summary: Update tenant configuration (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                default_threshold:
+                  type: number
+                  format: double
+                retention_days:
+                  type: integer
+      responses:
+        '200':
+          description: Configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/notifications:
+    get:
+      operationId: listNotifications
+      tags: [audit]
+      summary: List notifications for the current user
+      responses:
+        '200':
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/onboarding/lists:
+    get:
+      operationId: getSuggestedLists
+      tags: [onboarding]
+      summary: Get suggested sanctions lists for onboarding
+      security: []
+      responses:
+        '200':
+          description: Suggested lists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/onboarding/progress:
+    get:
+      operationId: getOnboardingProgress
+      tags: [onboarding]
+      summary: Get tenant onboarding completion status
+      responses:
+        '200':
+          description: Onboarding progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/marketing/claims:
+    get:
+      operationId: getMarketingClaims
+      tags: [onboarding]
+      summary: Get verified marketing claims and statistics
+      security: []
+      responses:
+        '200':
+          description: Marketing claims data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/reports/impa-sar/{id}:
+    get:
+      operationId: getIMPASAR
+      tags: [screening]
+      summary: Get IMPA SAR report for a screening
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SAR report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /api/v1/health:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Authenticate with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      user:
+                        $ref: '#/components/schemas/User'
+
+  /api/v1/auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Create a new account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, company_name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                company_name:
+                  type: string
+      responses:
+        '201':
+          description: Account created
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from /api/v1/auth/login
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Scoped API key from the dashboard
+
+  parameters:
+    ScreeningID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Screening result ID
+    AlertID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Alert ID
+
+  schemas:
+    ScreenRequest:
+      type: object
+      required:
+        - entity_name
+      properties:
+        entity_name:
+          type: string
+          description: Full name of the entity to screen
+          example: Vladimir Putin
+        entity_type:
+          type: string
+          enum: [individual, organization, vessel]
+          description: Type of entity
+        transaction_id:
+          type: string
+          description: Optional transaction reference for audit linkage
+        lists:
+          type: array
+          items:
+            type: string
+          description: Restrict screening to specific list IDs
+        threshold:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: Minimum confidence score (overrides tenant default)
+
+    MatchResult:
+      type: object
+      properties:
+        entity_id:
+          type: string
+        confidence:
+          type: number
+          format: double
+        disposition:
+          type: string
+          enum: [review, clear, match]
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchEvidence'
+        explanation:
+          type: string
+        list_id:
+          type: string
+
+    MatchEvidence:
+      type: object
+      properties:
+        layer:
+          type: string
+          enum: [exact, fuzzy, phonetic, token, embedding, graph]
+        method:
+          type: string
+        score:
+          type: number
+          format: double
+        threshold:
+          type: number
+          format: double
+        query_value:
+          type: string
+        matched_value:
+          type: string
+        explanation:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, analyst, viewer]
+        tenant_id:
+          type: string
+
+    SuccessResponse:
+      type: object
+      properties:
+        data:
+          description: Response payload (varies by endpoint)
+        timestamp:
+          type: integer
+          format: int64
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        details:
+          type: string
+        upgrade_url:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    PaymentRequired:
+      description: Quota exceeded — upgrade required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

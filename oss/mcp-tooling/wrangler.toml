@@ -1,0 +1,60 @@
+# Cloudflare Workers configuration for MCPOverflow
+name = "mcpoverflow-worker"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Development environment
+[env.development]
+vars = { ENVIRONMENT = "development" }
+
+# Staging environment
+[env.staging]
+vars = { ENVIRONMENT = "staging" }
+
+# Production environment
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+# KV Namespaces for MCPOverflow
+[[kv_namespaces]]
+binding = "MCP_KV"
+id = "your-kv-namespace-id"
+preview_id = "your-preview-kv-namespace-id"
+
+# D1 Database for AgentKit memory
+[[d1_databases]]
+binding = "MCP_DB"
+database_name = "mcpoverflow"
+database_id = "your-d1-database-id"
+
+# R2 Storage for large files and embeddings
+[[r2_buckets]]
+binding = "MCP_STORAGE"
+bucket_name = "mcpoverflow-storage"
+
+# Queue for background processing
+# [[queues]]
+# binding = "MCP_QUEUE"
+# queue = "mcpoverflow-queue"
+
+# AI Model bindings (for AgentKit integration)
+[ai]
+binding = "MCP_AI"
+
+# Service binding for AgentKit proxy
+[[services]]
+binding = "AGENTKIT_PROXY"
+service = "agentkit-proxy"
+
+# Build configuration for WASM modules
+[build]
+command = "npm run build:worker"
+
+# Custom domains for production
+[env.production.custom_domains]
+domains = ["workers.mcpoverflow.com"]
+
+# Triggers for scheduled tasks
+[[env.production.triggers]]
+crons = ["0 */6 * * *"]  # Every 6 hours for cleanup tasks

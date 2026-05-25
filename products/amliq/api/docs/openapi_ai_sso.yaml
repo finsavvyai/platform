@@ -1,0 +1,99 @@
+openapi: "3.0.3"
+info:
+  title: AMLIQ API — AI Gateway + SAML SSO
+  description: >
+    AI summarization + Anthropic-compatible drop-in + per-tenant SAML SSO.
+    Implementation in commits dbbb060, 3a99d9e, 773fc65 (aegis repo).
+  version: "2.0.0"
+servers:
+  - url: http://localhost:8080
+    description: Local development
+paths:
+  /api/v1/ai/summarize:
+    post:
+      summary: AML summarization (alert / adverse_media / case)
+      tags: [AI]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text, type]
+              properties:
+                text: { type: string, maxLength: 4000 }
+                type: { type: string, enum: [alert, adverse_media, case] }
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      summary: { type: string }
+                      model: { type: string }
+        "400": { description: Invalid type or empty text after sanitization }
+        "401": { description: Missing auth }
+        "502": { description: Upstream AI provider error }
+        "503": { description: AI provider not configured }
+  /v1/messages:
+    post:
+      summary: Anthropic Messages API drop-in (DLP-scrubbed)
+      tags: [AI]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model, max_tokens, messages]
+              properties:
+                model: { type: string }
+                max_tokens: { type: integer, minimum: 1 }
+                system: { type: string }
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role: { type: string, enum: [user, assistant] }
+                      content: { type: string }
+      responses:
+        "200": { description: Anthropic-shape response (id, content, usage) }
+        "400": { description: Empty messages array }
+        "401": { description: Missing auth }
+        "502": { description: Upstream AI error }
+        "503": { description: AI provider not configured }
+  /sso/{tenant}/login:
+    get:
+      summary: SAML SSO kick-off — 302 redirect to tenant's IdP
+      tags: [SSO]
+      parameters:
+        - { name: tenant, in: path, required: true, schema: { type: string } }
+      responses:
+        "302": { description: Redirect to IdP }
+        "400": { description: Missing tenant }
+        "404": { description: SAML not configured for tenant }
+        "500": { description: AuthnRequest build failed }
+  /sso/{tenant}/acs:
+    post:
+      summary: SAML Assertion Consumer Service
+      tags: [SSO]
+      parameters:
+        - { name: tenant, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Validated identity claims (NameID, Email, Role)
+        "401": { description: SAML response validation failed }
+        "400": { description: Missing email attribute }
+        "404": { description: SAML not configured for tenant }
+components:
+  securitySchemes:
+    BearerAuth: { type: http, scheme: bearer }

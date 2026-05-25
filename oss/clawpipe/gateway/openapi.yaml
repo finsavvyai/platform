@@ -1,0 +1,357 @@
+openapi: '3.1.0'
+info:
+  title: ClawPipe Gateway API
+  version: '3.0.0'
+  description: |
+    Multi-provider LLM gateway with cost optimization, caching, and smart routing.
+    Sits between your app and LLM providers to reduce costs 30-50%.
+  contact:
+    url: https://clawpipe.ai
+  license:
+    name: MIT
+
+servers:
+  - url: https://api.clawpipe.ai
+    description: Production gateway
+
+security:
+  - bearerAuth: []
+    projectId: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns gateway status. No authentication required.
+      security: []
+      responses:
+        '200':
+          description: Gateway is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  service:
+                    type: string
+                    example: clawpipe-gateway
+
+  /v1/prompt:
+    post:
+      summary: Send a prompt
+      description: |
+        Routes a prompt to the specified provider/model and returns the response.
+        Logs the request to D1 for analytics and learning.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PromptResponse'
+        '400':
+          description: Invalid request (missing fields, unknown provider)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Provider not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/stream:
+    post:
+      summary: Stream a prompt
+      description: |
+        Routes a prompt to a provider and streams the response via Server-Sent Events.
+        Proxies the provider's streaming endpoint directly.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptRequest'
+      responses:
+        '200':
+          description: Streaming response
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Stream failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/register:
+    post:
+      summary: Create account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                name: { type: string }
+      responses:
+        '201': { description: User created with session cookie }
+        '400': { description: Validation error }
+        '409': { description: Email already registered }
+
+  /auth/login:
+    post:
+      summary: Sign in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '200': { description: Authenticated with session cookie }
+        '401': { description: Invalid credentials }
+
+  /auth/me:
+    get:
+      summary: Get current user
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Current user profile }
+        '401': { description: Not authenticated }
+
+  /auth/logout:
+    post:
+      summary: Sign out
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Session cleared }
+
+  /auth/google:
+    get:
+      summary: Google OAuth redirect
+      security: []
+      responses:
+        '302': { description: Redirect to Google }
+
+  /auth/github:
+    get:
+      summary: GitHub OAuth redirect
+      security: []
+      responses:
+        '302': { description: Redirect to GitHub }
+
+  /v1/projects:
+    get:
+      summary: List user projects
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200': { description: Array of projects with roles }
+    post:
+      summary: Create project
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+      responses:
+        '201': { description: Project created with API key }
+
+  /v1/projects/{projectId}/keys:
+    post:
+      summary: Create API key
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '201': { description: New API key (shown once) }
+        '403': { description: Insufficient permissions (need admin+) }
+    delete:
+      summary: Revoke API key
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Key revoked }
+        '403': { description: Only owners can revoke }
+
+  /v1/projects/{projectId}/keys/rotate:
+    post:
+      summary: Rotate API key
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: New key issued, old key invalidated }
+        '403': { description: Only owners can rotate }
+
+  /v1/analytics/overview:
+    get:
+      summary: Analytics overview
+      responses:
+        '200': { description: Aggregate stats for project }
+
+  /v1/analytics/providers:
+    get:
+      summary: Provider breakdown
+      responses:
+        '200': { description: Per-provider/model request counts }
+
+  /v1/analytics/cache:
+    get:
+      summary: Cache performance
+      responses:
+        '200': { description: Daily cache hit rates }
+
+  /v1/analytics/routes:
+    get:
+      summary: Routing decisions
+      responses:
+        '200': { description: Daily routing choices by model }
+
+  /v1/weights:
+    get:
+      summary: Get learned router weights
+      responses:
+        '200': { description: Weight data for project }
+    put:
+      summary: Save router weights
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                weights: { type: array }
+      responses:
+        '200': { description: Weights saved }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API key (hashed with SHA-256, never stored in plaintext)
+    projectId:
+      type: apiKey
+      in: header
+      name: X-Project-Id
+      description: Project identifier
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: clawpipe_session
+      description: JWT session cookie (HttpOnly, Secure)
+
+  schemas:
+    PromptRequest:
+      type: object
+      required:
+        - prompt
+        - provider
+        - model
+      properties:
+        prompt:
+          type: string
+          description: The prompt text to send to the LLM
+          example: Explain recursion in simple terms
+        provider:
+          type: string
+          enum: [openai, anthropic, deepseek, groq, mistral]
+          description: LLM provider
+        model:
+          type: string
+          description: Model identifier
+          example: gpt-4o-mini
+        system:
+          type: string
+          description: Optional system prompt
+        maxTokens:
+          type: integer
+          default: 4096
+          description: Maximum tokens in response
+        temperature:
+          type: number
+          default: 0.7
+          minimum: 0
+          maximum: 2
+          description: Sampling temperature
+
+    PromptResponse:
+      type: object
+      properties:
+        text:
+          type: string
+          description: Generated response text
+        tokensIn:
+          type: integer
+          description: Input tokens consumed
+        tokensOut:
+          type: integer
+          description: Output tokens generated
+        latencyMs:
+          type: integer
+          description: End-to-end latency in milliseconds
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message

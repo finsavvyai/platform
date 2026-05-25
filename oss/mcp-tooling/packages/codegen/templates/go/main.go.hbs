@@ -1,0 +1,233 @@
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"go.uber.org/zap"
+
+	"{{config.packageName}}/internal/agentkit"
+	"{{config.packageName}}/internal/config"
+	"{{config.packageName}}/internal/server"
+	"{{config.packageName}}/internal/tools"
+)
+
+var (
+	cfgFile          string
+	logger           *zap.Logger
+	agentKitManager  *agentkit.Manager
+)
+
+func main() {
+	// Initialize logger
+	var err error
+	logger, err = zap.NewProduction()
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Sync()
+
+	rootCmd := &cobra.Command{
+		Use:   "{{config.serviceName}}",
+		Short: "{{config.description}}",
+		Long: `{{config.description}}
+
+This is a Model Context Protocol (MCP) server that provides tools for {{config.serviceName}}.
+It exposes {{tools.length}} tools for interacting with your API.
+
+Features:
+- MCP protocol support with WebSocket and HTTP transport
+- OpenAI AgentKit integration for autonomous agent capabilities
+- Real-time tool execution and monitoring
+- Automatic agent registration and lifecycle management
+
+Version: {{config.serviceVersion}}
+Author: {{config.author}}`,
+		Run: func(cmd *cobra.Command, args []string) {
+			startServer()
+		},
+	}
+
+	// Add flags
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.{{config.serviceName}}.yaml)")
+	rootCmd.Flags().BoolP("version", "v", false, "Print version information")
+
+	// Parse flags
+	if err := rootCmd.Execute(); err != nil {
+		logger.Fatal("Failed to execute command", zap.Error(err))
+	}
+}
+
+func startServer() {
+	// Load configuration
+	cfg, err := config.Load(cfgFile)
+	if err != nil {
+		logger.Fatal("Failed to load configuration", zap.Error(err))
+	}
+
+	logger.Info("Starting {{config.serviceName}} MCP server",
+		zap.String("version", "{{config.serviceVersion}}"),
+		zap.String("port", cfg.Server.Port),
+		zap.Bool("agentkit_enabled", cfg.AgentKit.Enabled),
+	)
+
+	// Create tool registry
+	toolRegistry := tools.NewRegistry(logger)
+
+	// Register all tools
+	{{#each tools}}
+	toolRegistry.Register(&{{pascalCase this.name}}Tool{})
+	{{/each}}
+
+	// Create and start server
+	srv := server.New(cfg, toolRegistry, logger)
+
+	// Setup AgentKit integration if enabled
+	if cfg.AgentKit.Enabled {
+		agentKitManager = setupAgentKit(cfg, toolRegistry, logger)
+	}
+
+	// Setup graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle shutdown signals
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		logger.Info("Shutdown signal received, gracefully shutting down...")
+
+		// Cleanup AgentKit if enabled
+		if agentKitManager != nil {
+			if err := agentKitManager.Unregister(ctx); err != nil {
+				logger.Error("Failed to unregister from AgentKit", zap.Error(err))
+			}
+		}
+
+		cancel()
+	}()
+
+	// Start AgentKit registration if enabled
+	if agentKitManager != nil {
+		go func() {
+			// Try to restore from storage first
+			if err := agentKitManager.RestoreFromStorage(ctx); err != nil {
+				logger.Warn("Failed to restore AgentKit from storage", zap.Error(err))
+			}
+
+			// Register with AgentKit
+			if err := agentKitManager.Register(ctx); err != nil {
+				logger.Error("Failed to register with AgentKit", zap.Error(err))
+			} else {
+				logger.Info("Successfully registered with AgentKit")
+			}
+
+			// Start periodic sync
+			go startAgentKitSync(ctx, agentKitManager)
+		}()
+	}
+
+	// Start server
+	if err := srv.Start(ctx); err != nil {
+		logger.Fatal("Failed to start server", zap.Error(err))
+	}
+
+	logger.Info("Server stopped gracefully")
+}
+
+func setupAgentKit(cfg *config.Config, toolRegistry *tools.Registry, logger *zap.Logger) *agentkit.Manager {
+	logger.Info("Setting up AgentKit integration")
+
+	// Create AgentKit manifest
+	manifest := createAgentKitManifest(cfg, toolRegistry)
+
+	// Create AgentKit manager
+	manager := agentkit.NewManager(
+		cfg.AgentKit.BaseURL,
+		cfg.AgentKit.APIKey,
+		manifest,
+		logger,
+	)
+
+	logger.Info("AgentKit manager created",
+		zap.String("base_url", cfg.AgentKit.BaseURL),
+		zap.String("agent_name", manifest.Name),
+	)
+
+	return manager
+}
+
+func createAgentKitManifest(cfg *config.Config, toolRegistry *tools.Registry) *agentkit.Manifest {
+	tools := toolRegistry.ListTools()
+	agentKitTools := make([]agentkit.Tool, len(tools))
+
+	for i, tool := range tools {
+		agentKitTools[i] = agentkit.Tool{
+			Name:        tool.Name(),
+			Description: tool.Description(),
+			InputSchema: tool.InputSchema(),
+		}
+	}
+
+	permissions := []agentkit.Permission{
+		{
+			Type:        "network",
+			Scope:       "outbound",
+			Description: "Allow outbound HTTP requests",
+		},
+	}
+
+	// Add additional permissions from config
+	{{#each config.agentkitPermissions}}
+	permissions = append(permissions, agentkit.Permission{
+		Type:        "{{this.type}}",
+		Scope:       "{{this.scope}}",
+		Description: "{{this.description}}",
+	})
+	{{/each}}
+
+	return &agentkit.Manifest{
+		Name:        "{{config.serviceName}}",
+		Description: "{{config.description}}",
+		Version:     "{{config.serviceVersion}}",
+		Runtime:     "cloudflare_worker",
+		Permissions: permissions,
+		Tools:       agentKitTools,
+		Metadata: map[string]interface{}{
+			"generated_by":    "MCPoverflow",
+			"connector_id":    "{{config.connectorId}}",
+			"domain":          "{{config.domain}}",
+			"mcp_version":     "2024-11-05",
+			"tools_count":     len(tools),
+			"generated_at":    time.Now().Format(time.RFC3339),
+		},
+	}
+}
+
+func startAgentKitSync(ctx context.Context, manager *agentkit.Manager) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := manager.Sync(ctx); err != nil {
+				logger.Error("AgentKit sync failed", zap.Error(err))
+			} else {
+				logger.Debug("AgentKit sync completed successfully")
+			}
+		}
+	}
+}

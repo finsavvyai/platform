@@ -1,0 +1,2639 @@
+# Sprint 24: Agent Security Platform + Thin CSPM -- Technical Design Document
+
+**Scope**: OpenSyber / Sprint 24 Agent Security Platform
+**Generated**: 2026-03-02
+**Agent**: Design Architect Agent
+**Based on**: requirements.md
+
+---
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Architecture](#architecture)
+3. [Database Design](#database-design)
+4. [Middleware Design](#middleware-design)
+5. [API Design](#api-design)
+6. [Service Layer](#service-layer)
+7. [Frontend Design](#frontend-design)
+8. [Integration Points](#integration-points)
+9. [Security Considerations](#security-considerations)
+10. [Performance Considerations](#performance-considerations)
+11. [Testing Strategy](#testing-strategy)
+12. [Implementation Order](#implementation-order)
+
+---
+
+## Overview
+
+Sprint 24 converts free OpenAgent extension users into paying enterprise customers through two pillars:
+
+1. **Thin CSPM**: Replace the mock scanner with real AWS STS AssumeRole + top-20 Prowler-equivalent checks. Position cloud posture as an extension of agent risk.
+2. **Enterprise Agent Dashboard**: Plan enforcement, alert dispatch, cross-linkage, risk trends, PDF reports, scheduled scans, and UI completeness.
+
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| AWS SDK approach | Modular AWS SDK v3 with `nodejs_compat` | Modular imports keep bundle under 1MB; fallback to SigV4 `fetch` if incompatible |
+| PDF generation | `jspdf` + `jspdf-autotable` | Pure JS, works in Workers, ~300KB, sufficient for data tables |
+| Plan enforcement | Reusable middleware factory | `requirePlanFeature()` / `requirePlanLimit()` avoids duplicating checks in every route |
+| Alert dispatch | `ctx.waitUntil()` async fire-and-forget | Does not block sync response; failures logged but non-fatal |
+| Cross-linkage | Query-time heuristic matching | No schema changes; simple LIKE queries on resource identifiers |
+| Risk snapshots | Daily cron + time-series table | D1-compatible; batched writes stay within Worker limits |
+
+### Architecture Diagram
+
+```
++-------------------+     +---------------------+     +------------------+
+|  VS Code Extension| --> |  POST /agents/       | --> | agent_activity   |
+|  (OpenAgent)      |     |  activity/sync       |     | (D1)             |
++-------------------+     +---------------------+     +------------------+
+                                    |                          |
+                          +---------v----------+     +---------v----------+
+                          | Plan Enforcement   |     | Policy Evaluator   |
+                          | Middleware         |     | + Alert Dispatch   |
+                          +--------------------+     +--------------------+
+                                                              |
+                          +--------------------+     +--------v-----------+
+                          | AWS STS AssumeRole | <-- | CSPM Scanner       |
+                          | (temporary creds)  |     | (20 Prowler checks)|
+                          +--------------------+     +--------------------+
+                                    |                          |
+                          +---------v----------+     +---------v----------+
+                          | cspm_findings      |     | alert_channels     |
+                          | cspm_scan_runs     |     | (encrypted config) |
+                          | (D1)               |     | (D1)               |
+                          +--------------------+     +--------------------+
+                                    |
+                          +---------v----------+
+                          | Activity-CSPM      |
+                          | Cross-Linker       |
+                          +--------------------+
+                                    |
+                          +---------v----------+     +--------------------+
+                          | Risk Trend Cron    | --> | agent_risk_        |
+                          | (daily snapshots)  |     | snapshots (D1)     |
+                          +--------------------+     +--------------------+
+                                    |
+                          +---------v----------+     +--------------------+
+                          | PDF Report Gen     | --> | R2 Storage         |
+                          | (jspdf)            |     | (reports/*.pdf)    |
+                          +--------------------+     +--------------------+
+```
+
+---
+
+## Architecture
+
+### High-Level System Architecture
+
+Sprint 24 adds six new services, two new database tables, two altered tables, one new middleware factory, seven new API route files, and six new proxy routes to the existing architecture. All changes follow the established Hono middleware chain pattern.
+
+```
+Request Flow:
+  Client -> CORS -> TokenForge -> RateLimiter -> Route Handler
+                                                      |
+                                              dbMiddleware
+                                              authMiddleware
+                                              resolveOrgContext / requirePermission
+                                              requirePlanFeature (NEW)
+                                              requirePlanLimit (NEW)
+                                                      |
+                                              Route Logic -> DB / Services
+```
+
+### Technology Stack Additions
+
+| Layer | New Dependency | Purpose | Size Impact |
+|---|---|---|---|
+| Backend | `@aws-sdk/client-sts` | STS AssumeRole | ~70KB |
+| Backend | `@aws-sdk/client-s3` | S3 checks | ~90KB |
+| Backend | `@aws-sdk/client-iam` | IAM checks | ~80KB |
+| Backend | `@aws-sdk/client-ec2` | EC2/VPC/SG checks | ~100KB |
+| Backend | `@aws-sdk/client-rds` | RDS checks | ~60KB |
+| Backend | `@aws-sdk/client-cloudtrail` | CloudTrail checks | ~50KB |
+| Backend | `@aws-sdk/client-guardduty` | GuardDuty check | ~50KB |
+| Backend | `jspdf` | PDF generation | ~300KB |
+| Backend | `jspdf-autotable` | PDF tables | ~50KB |
+| Frontend | `recharts` | Risk trend charts | ~180KB (tree-shaken) |
+
+**Estimated total bundle increase**: ~850KB (compressed ~350KB). Stays well within the 10MB Worker bundle limit.
+
+### File Organization
+
+All new files follow the existing pattern of one responsibility per file, max 200 lines.
+
+```
+apps/api/src/
+  middleware/
+    plan-enforcement.ts          (NEW - ~80 lines)
+  routes/
+    agent-alert-channels.ts      (NEW - ~120 lines)
+    agent-risk-trend.ts          (NEW - ~80 lines)
+    agent-sessions.ts            (NEW - ~90 lines)
+    agent-team-user.ts           (NEW - ~60 lines)
+    agent-activity-findings.ts   (NEW - ~70 lines)
+  services/
+    aws-scanner/
+      index.ts                   (NEW - ~80 lines, orchestrator)
+      sts-client.ts              (NEW - ~40 lines, STS assume role)
+      s3-checks.ts               (NEW - ~120 lines, 4 S3 checks)
+      iam-checks.ts              (NEW - ~150 lines, 5 IAM checks)
+      ec2-checks.ts              (NEW - ~120 lines, 4 EC2 checks)
+      rds-checks.ts              (NEW - ~60 lines, 2 RDS checks)
+      cloudtrail-checks.ts       (NEW - ~60 lines, 2 CloudTrail checks)
+      guardduty-check.ts         (NEW - ~40 lines, 1 GuardDuty check)
+      types.ts                   (NEW - ~30 lines, shared interfaces)
+    alert-dispatch.ts            (NEW - ~120 lines)
+    alert-channels/
+      email.ts                   (NEW - ~50 lines)
+      slack.ts                   (NEW - ~50 lines)
+      pagerduty.ts               (NEW - ~50 lines)
+      opsgenie.ts                (NEW - ~50 lines)
+      teams.ts                   (NEW - ~50 lines)
+      discord.ts                 (NEW - ~50 lines)
+    activity-cspm-linker.ts      (NEW - ~80 lines)
+    risk-snapshot-cron.ts        (NEW - ~100 lines)
+    pdf-report-generator.ts      (NEW - ~150 lines)
+    cspm-scan-scheduler.ts       (NEW - ~80 lines)
+    activity-retention-cron.ts   (NEW - ~60 lines)
+  services/
+    cspm-scanner.ts              (MODIFIED - delegates to aws-scanner/)
+    policy-evaluator.ts          (MODIFIED - calls alert-dispatch)
+    cron-handlers.ts             (MODIFIED - adds new cron jobs)
+    agent-report-export.ts       (MODIFIED - adds PDF path)
+
+packages/db/src/schema/
+  alert-channels.ts              (NEW)
+  risk-snapshots.ts              (NEW)
+  cspm.ts                        (MODIFIED - scanSchedule, nextScanAt)
+  index.ts                       (MODIFIED - new exports)
+
+packages/db/migrations/
+  0013_sprint24_agent_security.sql  (NEW)
+
+apps/web/src/
+  app/api/proxy/agents/
+    team/[userId]/route.ts       (NEW)
+    alert-channels/route.ts      (NEW)
+    alert-channels/[id]/route.ts (NEW)
+    alert-channels/[id]/test/route.ts (NEW)
+    sessions/route.ts            (NEW)
+    sessions/[sessionId]/route.ts (NEW)
+    risk-trend/route.ts          (NEW)
+  app/dashboard/agents/
+    alert-channels/page.tsx      (NEW)
+  components/dashboard/
+    Skeleton.tsx                  (NEW - reusable)
+    AgentsSkeleton.tsx            (NEW)
+    CloudSkeleton.tsx             (NEW)
+    FindingsSkeleton.tsx          (NEW)
+    TeamSkeleton.tsx              (NEW)
+    RiskTrendChart.tsx            (NEW)
+    RelatedFindings.tsx           (NEW)
+```
+
+---
+
+## Database Design
+
+### Migration: 0013_sprint24_agent_security.sql
+
+```sql
+-- Alert channels for policy violation notifications
+CREATE TABLE IF NOT EXISTS alert_channels (
+  id TEXT PRIMARY KEY,
+  org_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  channel_type TEXT NOT NULL
+    CHECK(channel_type IN ('email','slack','pagerduty','opsgenie','teams','discord')),
+  name TEXT NOT NULL,
+  config TEXT NOT NULL,  -- AES-GCM encrypted JSON
+  min_severity TEXT NOT NULL DEFAULT 'high'
+    CHECK(min_severity IN ('critical','high','medium','low')),
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_alert_channels_org
+  ON alert_channels(org_id);
+
+CREATE INDEX idx_alert_channels_org_active
+  ON alert_channels(org_id, is_active);
+
+-- Risk score snapshots for trend charts
+CREATE TABLE IF NOT EXISTS agent_risk_snapshots (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  org_id TEXT REFERENCES organizations(id),
+  agent_score INTEGER NOT NULL DEFAULT 100,
+  cspm_score INTEGER NOT NULL DEFAULT 100,
+  combined_score INTEGER NOT NULL DEFAULT 100,
+  grade TEXT NOT NULL DEFAULT 'A',
+  agent_event_count INTEGER NOT NULL DEFAULT 0,
+  cspm_finding_count INTEGER NOT NULL DEFAULT 0,
+  snapshot_date TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_risk_snapshots_user_date
+  ON agent_risk_snapshots(user_id, snapshot_date);
+
+CREATE INDEX idx_risk_snapshots_org_date
+  ON agent_risk_snapshots(org_id, snapshot_date);
+
+CREATE UNIQUE INDEX idx_risk_snapshots_user_date_unique
+  ON agent_risk_snapshots(user_id, snapshot_date)
+  WHERE user_id IS NOT NULL;
+
+CREATE UNIQUE INDEX idx_risk_snapshots_org_date_unique
+  ON agent_risk_snapshots(org_id, snapshot_date)
+  WHERE org_id IS NOT NULL AND user_id IS NULL;
+
+-- Add scan schedule columns to cloud_accounts
+ALTER TABLE cloud_accounts
+  ADD COLUMN scan_schedule TEXT NOT NULL DEFAULT 'manual'
+  CHECK(scan_schedule IN ('manual','daily','weekly'));
+
+ALTER TABLE cloud_accounts
+  ADD COLUMN next_scan_at TEXT;
+```
+
+### Drizzle Schema: `packages/db/src/schema/alert-channels.ts`
+
+```typescript
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { organizations } from './organizations.js';
+
+export const alertChannels = sqliteTable('alert_channels', {
+  id: text('id').primaryKey(),
+  orgId: text('org_id')
+    .notNull()
+    .references(() => organizations.id, { onDelete: 'cascade' }),
+  channelType: text('channel_type', {
+    enum: ['email', 'slack', 'pagerduty', 'opsgenie', 'teams', 'discord'],
+  }).notNull(),
+  name: text('name').notNull(),
+  config: text('config').notNull(), // AES-GCM encrypted JSON
+  minSeverity: text('min_severity', {
+    enum: ['critical', 'high', 'medium', 'low'],
+  }).notNull().default('high'),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+```
+
+### Drizzle Schema: `packages/db/src/schema/risk-snapshots.ts`
+
+```typescript
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { users } from './users.js';
+import { organizations } from './organizations.js';
+
+export const agentRiskSnapshots = sqliteTable('agent_risk_snapshots', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id),
+  orgId: text('org_id').references(() => organizations.id),
+  agentScore: integer('agent_score').notNull().default(100),
+  cspmScore: integer('cspm_score').notNull().default(100),
+  combinedScore: integer('combined_score').notNull().default(100),
+  grade: text('grade').notNull().default('A'),
+  agentEventCount: integer('agent_event_count').notNull().default(0),
+  cspmFindingCount: integer('cspm_finding_count').notNull().default(0),
+  snapshotDate: text('snapshot_date').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+```
+
+### Modified Schema: `packages/db/src/schema/cspm.ts`
+
+Add two new columns to the existing `cloudAccounts` table:
+
+```typescript
+// Add to the existing cloudAccounts definition:
+scanSchedule: text('scan_schedule', {
+  enum: ['manual', 'daily', 'weekly'],
+}).notNull().default('manual'),
+nextScanAt: text('next_scan_at'),
+```
+
+### Schema Barrel Export Update: `packages/db/src/schema/index.ts`
+
+```typescript
+// Append these two new exports:
+export * from './alert-channels.js';
+export * from './risk-snapshots.js';
+```
+
+### Entity Relationship Summary
+
+```
+organizations 1--* alert_channels      (orgId FK)
+organizations 1--* agent_risk_snapshots (orgId FK, nullable)
+users         1--* agent_risk_snapshots (userId FK, nullable)
+cloud_accounts     + scan_schedule (text)
+cloud_accounts     + next_scan_at  (text, nullable)
+```
+
+### Index Strategy
+
+| Table | Index | Columns | Purpose |
+|---|---|---|---|
+| alert_channels | idx_alert_channels_org | org_id | List channels by org |
+| alert_channels | idx_alert_channels_org_active | org_id, is_active | Filter active channels for dispatch |
+| agent_risk_snapshots | idx_risk_snapshots_user_date | user_id, snapshot_date | User trend queries |
+| agent_risk_snapshots | idx_risk_snapshots_org_date | org_id, snapshot_date | Org trend queries |
+| agent_risk_snapshots | idx_risk_snapshots_user_date_unique | user_id, snapshot_date (unique partial) | Prevent duplicate snapshots per user per day |
+| agent_risk_snapshots | idx_risk_snapshots_org_date_unique | org_id, snapshot_date (unique partial) | Prevent duplicate snapshots per org per day |
+
+---
+
+## Middleware Design
+
+### Plan Enforcement Middleware
+
+**File**: `apps/api/src/middleware/plan-enforcement.ts`
+
+This middleware factory provides two functions for plan-gating routes.
+
+#### Interface
+
+```typescript
+import { createMiddleware } from 'hono/factory';
+import { eq } from 'drizzle-orm';
+import { users } from '@opensyber/db';
+import { PLAN_CONFIGS } from '@opensyber/shared';
+import type { PlanConfig } from '@opensyber/shared';
+import type { Plan } from '@opensyber/shared';
+import type { Env, Variables } from '../types.js';
+
+type AppEnv = { Bindings: Env; Variables: Variables };
+
+/**
+ * Loads user plan config into context. Must run after authMiddleware.
+ * Caches in c.set('planConfig', config) for the request lifetime.
+ */
+export const loadPlanConfig = createMiddleware<AppEnv>(async (c, next) => {
+  const db = c.get('db');
+  const userId = c.get('userId');
+
+  const [user] = await db.select({ plan: users.plan })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user) {
+    return c.json({ error: 'Unauthorized', message: 'User not found' }, 401);
+  }
+
+  const plan = user.plan as Plan;
+  c.set('planConfig', PLAN_CONFIGS[plan]);
+  c.set('userPlan', plan);
+  return next();
+});
+
+/**
+ * Requires a boolean plan feature to be enabled.
+ *
+ * Usage: requirePlanFeature('cloudSync')
+ * Returns 403 with upgrade message if feature is disabled.
+ */
+export function requirePlanFeature(feature: keyof PlanConfig) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const config = c.get('planConfig') as PlanConfig;
+    if (!config) {
+      return c.json({ error: 'Internal', message: 'Plan not loaded' }, 500);
+    }
+    if (!config[feature]) {
+      return c.json({
+        error: 'Forbidden',
+        message: `This feature requires a plan upgrade. '${feature}' is not available on your current plan.`,
+        upgradeRequired: true,
+        feature,
+      }, 403);
+    }
+    return next();
+  });
+}
+
+/**
+ * Checks a numeric plan limit against a current count.
+ *
+ * Usage: requirePlanLimit('cspmAccounts', async (c) => countAccounts(c))
+ * Returns 403 if count >= limit.
+ */
+export function requirePlanLimit(
+  limitKey: keyof PlanConfig,
+  getCurrentCount: (c: Context) => Promise<number>,
+) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const config = c.get('planConfig') as PlanConfig;
+    const limit = config[limitKey] as number;
+    const current = await getCurrentCount(c);
+    if (current >= limit) {
+      return c.json({
+        error: 'Forbidden',
+        message: `Plan limit reached: ${limitKey} (${current}/${limit}). Upgrade for more.`,
+        upgradeRequired: true,
+        limitKey,
+        current,
+        limit,
+      }, 403);
+    }
+    return next();
+  });
+}
+```
+
+#### Variables Extension
+
+The `Variables` interface in `apps/api/src/types.ts` must be extended:
+
+```typescript
+export interface Variables {
+  db: DrizzleD1Database<typeof schema>;
+  userId: string;
+  orgId: string | null;
+  role: Role | null;
+  orgMember: OrgMember | null;
+  planConfig: PlanConfig | null;  // NEW
+  userPlan: Plan | null;          // NEW
+}
+```
+
+#### Usage Pattern
+
+The plan enforcement middleware is applied per-route or per-route-group, **after** `authMiddleware` and `dbMiddleware` but **before** the route handler.
+
+```typescript
+// Example: activity sync with plan enforcement
+agentMonitorRoutes.use('*', dbMiddleware, authMiddleware, resolveOrgContext, loadPlanConfig);
+
+agentMonitorRoutes.post('/activity/sync', async (c) => {
+  const config = c.get('planConfig')!;
+
+  // Check cloud sync feature
+  if (!config.cloudSync) {
+    return c.json({
+      error: 'Forbidden',
+      message: 'Cloud sync requires Pro plan or higher',
+      upgradeRequired: true,
+    }, 403);
+  }
+
+  // Check agent limit
+  const distinctAgents = await countDistinctAgents(db, userId, retentionWindow);
+  if (distinctAgents >= config.agentLimit) {
+    return c.json({
+      error: 'Forbidden',
+      message: `Agent limit reached (${distinctAgents}/${config.agentLimit})`,
+      upgradeRequired: true,
+    }, 403);
+  }
+
+  // ... rest of sync logic
+});
+```
+
+### Middleware Chain Summary
+
+The complete middleware chain for each route category:
+
+| Route Group | Middleware Chain |
+|---|---|
+| `POST /agents/activity/sync` | db -> auth -> resolveOrg -> loadPlan -> [agent limit + cloud sync check] -> handler |
+| `GET /agents/team/*` | db -> auth -> requirePermission('agent.policy.read') -> loadPlan -> requirePlanFeature('teamDashboard') -> handler |
+| `* /agents/policies/*` | db -> auth -> resolveOrg -> loadPlan -> requirePlanFeature('policyEngine') -> handler |
+| `* /agents/alert-channels/*` | db -> auth -> requirePermission('agent.policy.write') -> loadPlan -> requirePlanFeature('policyEngine') -> handler |
+| `POST /cloud/accounts` | db -> auth -> resolveOrg -> loadPlan -> [cspmAccounts limit check] -> handler |
+| `POST /agents/reports/generate` | db -> auth -> requirePermission -> loadPlan -> requirePlanFeature('pdfReports') -> handler |
+| `GET /agents/risk-trend` | db -> auth -> resolveOrg -> loadPlan -> handler |
+| `GET /agents/team/risk-trend` | db -> auth -> requirePermission('agent.policy.read') -> loadPlan -> requirePlanFeature('teamDashboard') -> handler |
+
+---
+
+## API Design
+
+### New Endpoints
+
+#### FR-3: Alert Channel CRUD
+
+**File**: `apps/api/src/routes/agent-alert-channels.ts`
+
+```
+GET    /api/agents/alert-channels           List org alert channels
+POST   /api/agents/alert-channels           Create alert channel
+PATCH  /api/agents/alert-channels/:id       Update alert channel
+DELETE /api/agents/alert-channels/:id       Delete alert channel
+POST   /api/agents/alert-channels/:id/test  Send test notification
+```
+
+**Middleware**: `dbMiddleware, authMiddleware, requirePermission('agent.policy.write'), loadPlanConfig, requirePlanFeature('policyEngine')`
+
+GET uses `requirePermission('agent.policy.read')` instead.
+
+**Request Schema (POST /alert-channels)**:
+
+```typescript
+const createChannelSchema = z.object({
+  channelType: z.enum(['email', 'slack', 'pagerduty', 'opsgenie', 'teams', 'discord']),
+  name: z.string().min(1).max(100),
+  config: z.record(z.unknown()), // Validated per channel type below
+  minSeverity: z.enum(['critical', 'high', 'medium', 'low']).default('high'),
+  isActive: z.boolean().default(true),
+});
+```
+
+**Per-Channel Config Schemas**:
+
+```typescript
+const emailConfigSchema = z.object({
+  recipients: z.array(z.string().email()).min(1).max(10),
+});
+
+const slackConfigSchema = z.object({
+  webhookUrl: z.string().url().startsWith('https://hooks.slack.com/'),
+});
+
+const pagerdutyConfigSchema = z.object({
+  routingKey: z.string().min(1),
+});
+
+const opsgenieConfigSchema = z.object({
+  apiKey: z.string().min(1),
+  region: z.enum(['us', 'eu']).default('us'),
+});
+
+const teamsConfigSchema = z.object({
+  webhookUrl: z.string().url(),
+});
+
+const discordConfigSchema = z.object({
+  webhookUrl: z.string().url().startsWith('https://discord.com/api/webhooks/'),
+});
+```
+
+**Response (POST)**:
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "orgId": "org-uuid",
+    "channelType": "slack",
+    "name": "Security Alerts",
+    "minSeverity": "high",
+    "isActive": true,
+    "createdAt": "2026-03-02T00:00:00.000Z",
+    "updatedAt": "2026-03-02T00:00:00.000Z"
+  }
+}
+```
+
+Note: The `config` field is never returned in API responses. It is encrypted at rest and only read internally by the alert dispatch service.
+
+**Request Schema (PATCH /alert-channels/:id)**:
+
+```typescript
+const updateChannelSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  config: z.record(z.unknown()).optional(),
+  minSeverity: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+  isActive: z.boolean().optional(),
+});
+```
+
+---
+
+#### FR-5: Missing API Endpoints
+
+**File**: `apps/api/src/routes/agent-team-user.ts`
+
+```
+GET /api/agents/team/:userId/activity    Per-user activity within org
+GET /api/agents/team/:userId/risk-trend  Per-user risk trend within org
+```
+
+**Middleware**: `dbMiddleware, authMiddleware, requirePermission('agent.policy.read')`
+
+**Request (GET /team/:userId/activity)**:
+
+```typescript
+const teamUserActivityQuery = z.object({
+  limit: z.coerce.number().min(1).max(500).default(100),
+  offset: z.coerce.number().min(0).default(0),
+  since: z.string().datetime().optional(),
+});
+```
+
+**Response**:
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "userId": "user-id",
+      "sessionId": "session-uuid",
+      "agent": "claude-code",
+      "type": "file_read",
+      "risk": "medium",
+      "path": "/etc/passwd",
+      "summary": "Read system file",
+      "secretsCount": 0,
+      "createdAt": "2026-03-02T00:00:00.000Z"
+    }
+  ],
+  "hasMore": true
+}
+```
+
+---
+
+**File**: `apps/api/src/routes/agent-sessions.ts`
+
+```
+GET /api/agents/activity/sessions              List distinct sessions with stats
+GET /api/agents/activity/sessions/:sessionId   All events for a session
+```
+
+**Middleware**: `dbMiddleware, authMiddleware, resolveOrgContext`
+
+**Request (GET /activity/sessions)**:
+
+```typescript
+const sessionsQuery = z.object({
+  limit: z.coerce.number().min(1).max(100).default(20),
+  offset: z.coerce.number().min(0).default(0),
+});
+```
+
+**Response (GET /activity/sessions)**:
+
+```json
+{
+  "data": [
+    {
+      "sessionId": "session-uuid",
+      "agent": "claude-code",
+      "eventCount": 42,
+      "riskBreakdown": { "critical": 0, "high": 3, "medium": 12, "low": 27 },
+      "firstEvent": "2026-03-01T09:00:00.000Z",
+      "lastEvent": "2026-03-01T17:30:00.000Z"
+    }
+  ],
+  "hasMore": false
+}
+```
+
+Implementation note: This endpoint fetches user activity, groups by `sessionId` in application code, computes per-session aggregates, then paginates. D1 lacks GROUP BY with JSON aggregation, so in-memory grouping on the limited result set (max 5000 events) is acceptable.
+
+---
+
+#### FR-4: Cross-Linkage
+
+**File**: `apps/api/src/routes/agent-activity-findings.ts`
+
+```
+GET /api/agents/activity/:activityId/related-findings
+```
+
+**Middleware**: `dbMiddleware, authMiddleware, resolveOrgContext`
+
+**Response**:
+
+```json
+{
+  "data": [
+    {
+      "id": "finding-uuid",
+      "checkId": "CIS-4.1",
+      "severity": "high",
+      "title": "Security group allows unrestricted SSH",
+      "resourceId": "sg-abc123",
+      "resourceType": "security-group",
+      "status": "open"
+    }
+  ]
+}
+```
+
+---
+
+#### FR-7: Risk Trend Time Series
+
+**File**: `apps/api/src/routes/agent-risk-trend.ts`
+
+```
+GET /api/agents/risk-trend                  Current user's risk trend
+GET /api/agents/team/risk-trend             Org-level risk trend
+GET /api/agents/team/:userId/risk-trend     Specific user's trend within org
+```
+
+**Request**:
+
+```typescript
+const riskTrendQuery = z.object({
+  days: z.enum(['7', '30', '90']).default('30'),
+});
+```
+
+**Response**:
+
+```json
+{
+  "data": [
+    {
+      "date": "2026-03-01",
+      "agentScore": 85,
+      "cspmScore": 72,
+      "combined": 80,
+      "grade": "B"
+    },
+    {
+      "date": "2026-03-02",
+      "agentScore": 88,
+      "cspmScore": 75,
+      "combined": 83,
+      "grade": "B"
+    }
+  ]
+}
+```
+
+### Modified Endpoints
+
+#### FR-2: Plan Enforcement on Activity Sync
+
+**Modified file**: `apps/api/src/routes/agent-monitor.ts`
+
+Add `loadPlanConfig` to the middleware chain. Modify the `POST /activity/sync` handler:
+
+```typescript
+agentMonitorRoutes.post('/activity/sync', async (c) => {
+  const db = c.get('db');
+  const userId = c.get('userId');
+  const config = c.get('planConfig')!;
+  const orgId = c.get('orgId') ?? null;
+
+  // 1. Check cloudSync feature gate
+  if (!config.cloudSync) {
+    return c.json({
+      error: 'Forbidden',
+      message: 'Cloud sync requires Pro plan or higher. Upgrade to sync agent activity.',
+      upgradeRequired: true,
+      feature: 'cloudSync',
+    }, 403);
+  }
+
+  // 2. Parse and validate events (existing logic)
+  const body = await c.req.json().catch(() => null);
+  // ... validation ...
+
+  // 3. Check agent limit (distinct agents within retention window)
+  const retentionCutoff = new Date(
+    Date.now() - config.agentHistoryDays * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  const existingAgents = await db
+    .selectDistinct({ agent: agentActivity.agent })
+    .from(agentActivity)
+    .where(and(
+      eq(agentActivity.userId, userId),
+      gte(agentActivity.createdAt, retentionCutoff),
+    ));
+
+  const existingNames = new Set(existingAgents.map(a => a.agent));
+  const newAgentNames = new Set(valid.map(e => e.agent));
+  const combinedCount = new Set([...existingNames, ...newAgentNames]).size;
+
+  if (combinedCount > config.agentLimit) {
+    return c.json({
+      error: 'Forbidden',
+      message: `Agent limit reached (${existingNames.size}/${config.agentLimit}). Upgrade for more agents.`,
+      upgradeRequired: true,
+      limitKey: 'agentLimit',
+      current: existingNames.size,
+      limit: config.agentLimit,
+    }, 403);
+  }
+
+  // 4. Check event timestamps against retention window
+  const validInWindow = valid.filter(e => e.timestamp >= retentionCutoff);
+  if (validInWindow.length === 0) {
+    return c.json({
+      error: 'Bad request',
+      message: `Events older than ${config.agentHistoryDays} days are not accepted on your plan.`,
+    }, 400);
+  }
+
+  // 5. Insert and evaluate (existing logic, but only validInWindow events)
+  // ...
+
+  // 6. Dispatch alerts asynchronously if violations found
+  if (violations > 0 && orgId) {
+    const ctx = c.executionCtx;
+    ctx.waitUntil(dispatchViolationAlerts(db, c.env, orgId, newViolations));
+  }
+
+  return c.json({ synced: validInWindow.length, violations }, 201);
+});
+```
+
+#### FR-9: Scheduled Scan Columns on Cloud Accounts
+
+**Modified file**: `apps/api/src/routes/cloud-accounts.ts`
+
+Update the PATCH handler to accept `scanSchedule`:
+
+```typescript
+// In the PATCH handler, add:
+const VALID_SCHEDULES = new Set(['manual', 'daily', 'weekly']);
+
+if (typeof body.scanSchedule === 'string' && VALID_SCHEDULES.has(body.scanSchedule)) {
+  updates.scanSchedule = body.scanSchedule;
+  if (body.scanSchedule === 'manual') {
+    updates.nextScanAt = null;
+  } else {
+    const interval = body.scanSchedule === 'daily' ? 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+    updates.nextScanAt = new Date(Date.now() + interval).toISOString();
+  }
+}
+```
+
+### Route Registration
+
+**Modified file**: `apps/api/src/routes/register.ts`
+
+```typescript
+// Add imports:
+import { agentAlertChannelRoutes } from './agent-alert-channels.js';
+import { agentRiskTrendRoutes } from './agent-risk-trend.js';
+import { agentSessionRoutes } from './agent-sessions.js';
+import { agentTeamUserRoutes } from './agent-team-user.js';
+import { agentActivityFindingsRoutes } from './agent-activity-findings.js';
+
+// Add to registerRoutes():
+app.route('/api/agents', agentAlertChannelRoutes);
+app.route('/api/agents', agentRiskTrendRoutes);
+app.route('/api/agents', agentSessionRoutes);
+app.route('/api/agents', agentTeamUserRoutes);
+app.route('/api/agents', agentActivityFindingsRoutes);
+```
+
+---
+
+## Service Layer
+
+### FR-1: Real AWS CSPM Scanner
+
+The AWS scanner replaces the mock implementation in `cspm-scanner.ts`. It is organized as a directory of check modules for maintainability and the 200-line file limit.
+
+#### Architecture
+
+```
+services/aws-scanner/
+  index.ts          -- orchestrator: assume role, run all checks, aggregate findings
+  sts-client.ts     -- STS AssumeRole wrapper
+  s3-checks.ts      -- 4 checks: public access, public ACL, versioning, logging
+  iam-checks.ts     -- 5 checks: root keys, root MFA, password policy, no-MFA users, admin policies
+  ec2-checks.ts     -- 4 checks: SSH SGs, RDP SGs, unencrypted EBS, default encryption, default VPC
+  rds-checks.ts     -- 2 checks: public RDS, unencrypted RDS
+  cloudtrail-checks.ts -- 2 checks: multi-region, log validation
+  guardduty-check.ts   -- 1 check: GuardDuty enabled
+  types.ts          -- shared interfaces
+```
+
+#### `types.ts`
+
+```typescript
+export interface ScanContext {
+  credentials: {
+    accessKeyId: string;
+    secretAccessKey: string;
+    sessionToken: string;
+  };
+  region: string;
+  accountId: string;
+}
+
+export interface CheckResult {
+  checkId: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  resourceType: string;
+  findings: CheckFinding[];
+  error?: string;
+}
+
+export interface CheckFinding {
+  resourceId: string;
+  region: string;
+  title: string;
+  description: string;
+  remediation: string;
+  complianceFrameworks: string[];
+}
+```
+
+#### `sts-client.ts`
+
+```typescript
+import { STSClient, AssumeRoleCommand } from '@aws-sdk/client-sts';
+import type { ScanContext } from './types.js';
+
+export async function assumeRole(
+  roleArn: string,
+  externalId: string,
+): Promise<ScanContext> {
+  const sts = new STSClient({ region: 'us-east-1' });
+
+  const result = await sts.send(new AssumeRoleCommand({
+    RoleArn: roleArn,
+    RoleSessionName: `opensyber-scan-${Date.now()}`,
+    ExternalId: externalId,
+    DurationSeconds: 900, // 15 minutes, minimum
+  }));
+
+  const creds = result.Credentials;
+  if (!creds?.AccessKeyId || !creds?.SecretAccessKey || !creds?.SessionToken) {
+    throw new Error('STS AssumeRole returned incomplete credentials');
+  }
+
+  // Extract account ID from role ARN
+  const accountId = roleArn.split(':')[4] ?? 'unknown';
+
+  return {
+    credentials: {
+      accessKeyId: creds.AccessKeyId,
+      secretAccessKey: creds.SecretAccessKey,
+      sessionToken: creds.SessionToken,
+    },
+    region: 'us-east-1',
+    accountId,
+  };
+}
+```
+
+#### `index.ts` (Orchestrator)
+
+```typescript
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
+import { cloudAccounts, cspmScanRuns, cspmFindings } from '@opensyber/db';
+import { decrypt } from '../../utils/encryption.js';
+import { assumeRole } from './sts-client.js';
+import { runS3Checks } from './s3-checks.js';
+import { runIamChecks } from './iam-checks.js';
+import { runEc2Checks } from './ec2-checks.js';
+import { runRdsChecks } from './rds-checks.js';
+import { runCloudTrailChecks } from './cloudtrail-checks.js';
+import { runGuardDutyCheck } from './guardduty-check.js';
+import type { CheckResult, ScanContext } from './types.js';
+
+type Db = DrizzleD1Database<Record<string, unknown>>;
+
+export interface AwsScanResult {
+  scanRun: { id: string; status: string; findingCount: number; criticalCount: number; highCount: number };
+  error?: string;
+}
+
+export async function runAwsScan(
+  db: Db,
+  cloudAccountId: string,
+  orgId: string | null,
+  roleArn: string,
+  externalId: string,
+  encryptionKey: string,
+): Promise<AwsScanResult> {
+  const scanId = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  // Insert scan run as "running"
+  await db.insert(cspmScanRuns).values({
+    id: scanId, cloudAccountId, orgId,
+    startedAt: now, status: 'running',
+    findingCount: 0, criticalCount: 0, highCount: 0,
+  });
+
+  try {
+    // Assume role (temporary credentials, never stored)
+    const ctx = await assumeRole(roleArn, externalId);
+
+    // Run all checks concurrently with individual error handling
+    const checkResults = await Promise.allSettled([
+      runS3Checks(ctx),
+      runIamChecks(ctx),
+      runEc2Checks(ctx),
+      runRdsChecks(ctx),
+      runCloudTrailChecks(ctx),
+      runGuardDutyCheck(ctx),
+    ]);
+
+    // Collect findings from successful checks
+    const allFindings: typeof cspmFindings.$inferInsert[] = [];
+    const errors: string[] = [];
+    let criticalCount = 0;
+    let highCount = 0;
+
+    for (const result of checkResults) {
+      if (result.status === 'rejected') {
+        errors.push(String(result.reason));
+        continue;
+      }
+      for (const check of result.value) {
+        if (check.error) {
+          errors.push(`${check.checkId}: ${check.error}`);
+          continue;
+        }
+        for (const finding of check.findings) {
+          if (check.severity === 'critical') criticalCount++;
+          if (check.severity === 'high') highCount++;
+          allFindings.push({
+            id: crypto.randomUUID(),
+            scanRunId: scanId,
+            cloudAccountId,
+            orgId,
+            checkId: check.checkId,
+            severity: check.severity,
+            status: 'open',
+            resourceId: finding.resourceId,
+            resourceType: check.resourceType,
+            region: finding.region,
+            title: finding.title,
+            description: finding.description,
+            remediation: finding.remediation,
+            complianceFrameworks: JSON.stringify(finding.complianceFrameworks),
+            firstSeenAt: now,
+          });
+        }
+      }
+    }
+
+    // Batch insert findings (max 100 per batch for D1)
+    for (let i = 0; i < allFindings.length; i += 100) {
+      const batch = allFindings.slice(i, i + 100);
+      await db.insert(cspmFindings).values(batch);
+    }
+
+    // Update scan run
+    const completedAt = new Date().toISOString();
+    await db.update(cspmScanRuns).set({
+      status: 'completed',
+      completedAt,
+      findingCount: allFindings.length,
+      criticalCount,
+      highCount,
+    }).where(eq(cspmScanRuns.id, scanId));
+
+    // Update cloud account
+    await db.update(cloudAccounts).set({
+      lastScanAt: completedAt,
+      status: 'active',
+    }).where(eq(cloudAccounts.id, cloudAccountId));
+
+    return {
+      scanRun: {
+        id: scanId,
+        status: 'completed',
+        findingCount: allFindings.length,
+        criticalCount,
+        highCount,
+      },
+    };
+  } catch (err) {
+    // Mark scan as failed
+    await db.update(cspmScanRuns).set({
+      status: 'failed',
+      completedAt: new Date().toISOString(),
+    }).where(eq(cspmScanRuns.id, scanId));
+
+    return {
+      scanRun: { id: scanId, status: 'failed', findingCount: 0, criticalCount: 0, highCount: 0 },
+      error: err instanceof Error ? err.message : 'Unknown scan error',
+    };
+  }
+}
+```
+
+#### Example Check Module: `s3-checks.ts`
+
+```typescript
+import { S3Client, ListBucketsCommand, GetPublicAccessBlockCommand,
+         GetBucketAclCommand, GetBucketVersioningCommand,
+         GetBucketLoggingCommand } from '@aws-sdk/client-s3';
+import type { ScanContext, CheckResult } from './types.js';
+
+function createClient(ctx: ScanContext): S3Client {
+  return new S3Client({
+    region: ctx.region,
+    credentials: ctx.credentials,
+  });
+}
+
+export async function runS3Checks(ctx: ScanContext): Promise<CheckResult[]> {
+  const client = createClient(ctx);
+  const results: CheckResult[] = [];
+
+  try {
+    const buckets = await client.send(new ListBucketsCommand({}));
+    const bucketList = buckets.Buckets ?? [];
+
+    // Check 1: S3 Block Public Access
+    for (const bucket of bucketList.slice(0, 100)) {
+      try {
+        const pab = await client.send(
+          new GetPublicAccessBlockCommand({ Bucket: bucket.Name })
+        );
+        const config = pab.PublicAccessBlockConfiguration;
+        if (!config?.BlockPublicAcls || !config?.BlockPublicPolicy ||
+            !config?.IgnorePublicAcls || !config?.RestrictPublicBuckets) {
+          // Finding: public access not fully blocked
+          results.push({
+            checkId: 'S3-PUB-BLOCK',
+            severity: 'critical',
+            resourceType: 's3-bucket',
+            findings: [{
+              resourceId: `arn:aws:s3:::${bucket.Name}`,
+              region: ctx.region,
+              title: 'S3 Block Public Access not fully enabled',
+              description: `Bucket ${bucket.Name} does not have all Block Public Access settings enabled.`,
+              remediation: 'Enable all four Block Public Access settings on this bucket.',
+              complianceFrameworks: ['CIS AWS 2.1.5', 'SOC2 CC6.6'],
+            }],
+          });
+        }
+      } catch {
+        // Public access block may not exist -- treat as finding
+      }
+    }
+
+    // Check 2: S3 bucket with public ACL (similar pattern)
+    // Check 3: S3 bucket versioning disabled
+    // Check 4: S3 bucket access logging disabled
+    // ... each follows the same pattern
+
+  } catch (err) {
+    return [{
+      checkId: 'S3-ALL',
+      severity: 'high',
+      resourceType: 's3-bucket',
+      findings: [],
+      error: err instanceof Error ? err.message : 'S3 checks failed',
+    }];
+  }
+
+  return results;
+}
+```
+
+#### Modified `cspm-scanner.ts`
+
+The existing file becomes a dispatcher:
+
+```typescript
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
+import { cloudAccounts } from '@opensyber/db';
+import { runAwsScan } from './aws-scanner/index.js';
+import { decrypt } from '../utils/encryption.js';
+
+type Db = DrizzleD1Database<Record<string, unknown>>;
+
+export interface ScanResult {
+  scanRun: { id: string; status: string; findingCount: number; criticalCount: number; highCount: number };
+  error?: string;
+}
+
+export async function runCspmScan(
+  db: Db,
+  cloudAccountId: string,
+  orgId: string | null,
+  provider: string,
+  encryptionKey: string,
+): Promise<ScanResult> {
+  if (provider !== 'aws') {
+    return {
+      scanRun: { id: '', status: 'failed', findingCount: 0, criticalCount: 0, highCount: 0 },
+      error: `Provider '${provider}' not yet supported. Only AWS is available.`,
+    };
+  }
+
+  // Fetch account credentials
+  const [account] = await db.select().from(cloudAccounts)
+    .where(eq(cloudAccounts.id, cloudAccountId));
+
+  if (!account?.roleArn || !account?.externalId) {
+    return {
+      scanRun: { id: '', status: 'failed', findingCount: 0, criticalCount: 0, highCount: 0 },
+      error: 'Cloud account missing roleArn or externalId',
+    };
+  }
+
+  return runAwsScan(db, cloudAccountId, orgId, account.roleArn, account.externalId, encryptionKey);
+}
+```
+
+---
+
+### FR-3: Alert Dispatch Service
+
+**File**: `apps/api/src/services/alert-dispatch.ts`
+
+```typescript
+import { eq, and } from 'drizzle-orm';
+import { alertChannels } from '@opensyber/db';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { decrypt } from '../utils/encryption.js';
+import { sendEmailAlert } from './alert-channels/email.js';
+import { sendSlackAlert } from './alert-channels/slack.js';
+import { sendPagerDutyAlert } from './alert-channels/pagerduty.js';
+import { sendOpsGenieAlert } from './alert-channels/opsgenie.js';
+import { sendTeamsAlert } from './alert-channels/teams.js';
+import { sendDiscordAlert } from './alert-channels/discord.js';
+
+type Db = DrizzleD1Database<Record<string, unknown>>;
+
+interface Violation {
+  id: string;
+  policyId: string;
+  policyName: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  summary: string;
+  userId: string;
+}
+
+interface DispatchEnv {
+  RESEND_API_KEY: string;
+  ENCRYPTION_KEY: string;
+  CACHE: KVNamespace; // for rate limiting
+}
+
+const SEVERITY_ORDER: Record<string, number> = {
+  critical: 0, high: 1, medium: 2, low: 3,
+};
+
+export async function dispatchViolationAlerts(
+  db: Db,
+  env: DispatchEnv,
+  orgId: string,
+  violations: Violation[],
+): Promise<void> {
+  // Fetch active channels for this org
+  const channels = await db.select().from(alertChannels)
+    .where(and(eq(alertChannels.orgId, orgId), eq(alertChannels.isActive, true)));
+
+  if (channels.length === 0) return;
+
+  for (const violation of violations) {
+    const violationSeverityOrder = SEVERITY_ORDER[violation.severity] ?? 3;
+
+    for (const channel of channels) {
+      const channelMinOrder = SEVERITY_ORDER[channel.minSeverity] ?? 1;
+
+      // Only dispatch if violation severity >= channel min severity
+      if (violationSeverityOrder > channelMinOrder) continue;
+
+      // Rate limit: max 10 alerts per channel per minute
+      const rateKey = `alert-rate:${channel.id}`;
+      const currentCount = parseInt(await env.CACHE.get(rateKey) ?? '0', 10);
+      if (currentCount >= 10) continue;
+      await env.CACHE.put(rateKey, String(currentCount + 1), { expirationTtl: 60 });
+
+      try {
+        const config = JSON.parse(await decrypt(channel.config, env.ENCRYPTION_KEY));
+
+        switch (channel.channelType) {
+          case 'email':
+            await sendEmailAlert(env.RESEND_API_KEY, config, violation);
+            break;
+          case 'slack':
+            await sendSlackAlert(config, violation);
+            break;
+          case 'pagerduty':
+            await sendPagerDutyAlert(config, violation);
+            break;
+          case 'opsgenie':
+            await sendOpsGenieAlert(config, violation);
+            break;
+          case 'teams':
+            await sendTeamsAlert(config, violation);
+            break;
+          case 'discord':
+            await sendDiscordAlert(config, violation);
+            break;
+        }
+      } catch (err) {
+        console.error(`[AlertDispatch] Failed to send to ${channel.channelType} channel ${channel.id}:`, err);
+      }
+    }
+  }
+}
+```
+
+#### Example Channel: `alert-channels/slack.ts`
+
+```typescript
+interface SlackConfig {
+  webhookUrl: string;
+}
+
+interface Violation {
+  severity: string;
+  summary: string;
+  policyName: string;
+  userId: string;
+}
+
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: '#dc2626',
+  high: '#ea580c',
+  medium: '#d97706',
+  low: '#6b7280',
+};
+
+export async function sendSlackAlert(config: SlackConfig, violation: Violation): Promise<void> {
+  const color = SEVERITY_COLORS[violation.severity] ?? '#6b7280';
+
+  await fetch(config.webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      attachments: [{
+        color,
+        blocks: [
+          {
+            type: 'header',
+            text: { type: 'plain_text', text: `[${violation.severity.toUpperCase()}] Policy Violation` },
+          },
+          {
+            type: 'section',
+            fields: [
+              { type: 'mrkdwn', text: `*Policy:*\n${violation.policyName}` },
+              { type: 'mrkdwn', text: `*Severity:*\n${violation.severity}` },
+            ],
+          },
+          {
+            type: 'section',
+            text: { type: 'mrkdwn', text: `*Details:*\n${violation.summary}` },
+          },
+          {
+            type: 'actions',
+            elements: [{
+              type: 'button',
+              text: { type: 'plain_text', text: 'View in Dashboard' },
+              url: 'https://opensyber.cloud/dashboard/agents/violations',
+            }],
+          },
+        ],
+      }],
+    }),
+  });
+}
+```
+
+#### Modified `policy-evaluator.ts`
+
+Add alert dispatch call after violations are inserted. The evaluator returns violations with policy names for dispatch:
+
+```typescript
+// At the end of evaluateActivity(), before return:
+// Return violations with policy name for alert dispatch
+return violations.map(v => ({
+  ...v,
+  policyName: policies.find(p => p.id === v.policyId)?.name ?? 'Unknown',
+}));
+```
+
+The caller (activity sync handler) then passes these to `dispatchViolationAlerts` via `ctx.waitUntil()`.
+
+---
+
+### FR-4: Activity-CSPM Cross-Linker
+
+**File**: `apps/api/src/services/activity-cspm-linker.ts`
+
+```typescript
+import { eq, and, like, or } from 'drizzle-orm';
+import { agentActivity, cspmFindings } from '@opensyber/db';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+
+type Db = DrizzleD1Database<Record<string, unknown>>;
+
+interface ActivityEvent {
+  id: string;
+  userId: string;
+  orgId: string | null;
+  type: string;
+  path: string | null;
+  summary: string;
+  secretsCount: number;
+}
+
+const AWS_CRED_PATHS = [
+  '.aws/credentials',
+  '.aws/config',
+  'aws-credentials',
+];
+
+const AWS_CLI_PATTERNS: Record<string, string> = {
+  'aws s3': 's3-bucket',
+  'aws ec2': 'security-group',
+  'aws rds': 'rds-instance',
+  'aws iam': 'iam-user',
+};
+
+export async function findRelatedFindings(
+  db: Db,
+  activity: ActivityEvent,
+  limit = 5,
+): Promise<Array<typeof cspmFindings.$inferSelect>> {
+  if (!activity.orgId) return [];
+
+  const conditions = [
+    eq(cspmFindings.orgId, activity.orgId),
+    eq(cspmFindings.status, 'open'),
+  ];
+
+  // Strategy 1: File reads matching AWS credential paths
+  if (activity.type === 'file_read' && activity.path) {
+    const isAwsCred = AWS_CRED_PATHS.some(p => activity.path!.includes(p));
+    if (isAwsCred) {
+      // Surface IAM-related findings
+      return db.select().from(cspmFindings).where(
+        and(
+          ...conditions,
+          or(
+            like(cspmFindings.resourceType, '%iam%'),
+            like(cspmFindings.checkId, '%CIS-1%'),
+          ),
+        ),
+      ).limit(limit);
+    }
+  }
+
+  // Strategy 2: Bash commands with AWS CLI invocations
+  if (activity.type === 'bash_exec') {
+    for (const [pattern, resourceType] of Object.entries(AWS_CLI_PATTERNS)) {
+      if (activity.summary.includes(pattern)) {
+        return db.select().from(cspmFindings).where(
+          and(...conditions, eq(cspmFindings.resourceType, resourceType)),
+        ).limit(limit);
+      }
+    }
+
+    // Extract resource identifiers (s3 bucket names, sg-ids, etc.)
+    const sgMatch = activity.summary.match(/sg-[a-f0-9]+/);
+    if (sgMatch) {
+      return db.select().from(cspmFindings).where(
+        and(...conditions, like(cspmFindings.resourceId, `%${sgMatch[0]}%`)),
+      ).limit(limit);
+    }
+
+    const s3Match = activity.summary.match(/s3:\/\/([a-z0-9.-]+)/);
+    if (s3Match) {
+      return db.select().from(cspmFindings).where(
+        and(...conditions, like(cspmFindings.resourceId, `%${s3Match[1]}%`)),
+      ).limit(limit);
+    }
+  }
+
+  // Strategy 3: Secrets detected -> IAM access key findings
+  if (activity.secretsCount > 0) {
+    return db.select().from(cspmFindings).where(
+      and(
+        ...conditions,
+        or(
+          like(cspmFindings.checkId, '%IAM%'),
+          like(cspmFindings.checkId, '%CIS-1%'),
+        ),
+      ),
+    ).limit(limit);
+  }
+
+  return [];
+}
+```
+
+---
+
+### FR-7: Risk Snapshot Cron
+
+**File**: `apps/api/src/services/risk-snapshot-cron.ts`
+
+```typescript
+import { eq, and, gte, isNotNull } from 'drizzle-orm';
+import { agentActivity, cspmFindings, agentRiskSnapshots, users } from '@opensyber/db';
+import type { Env } from '../types.js';
+import { createDb } from '../lib/db.js';
+import {
+  computeAgentScore, computeCspmScore, computeCombinedRiskScore,
+  type AgentSummary, type CspmSummary,
+} from './combined-risk-score.js';
+
+export async function generateRiskSnapshots(env: Env): Promise<void> {
+  const db = createDb(env.DB);
+  const today = new Date().toISOString().split('T')[0]!;
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  // Find users with recent activity
+  const activeUsers = await db
+    .selectDistinct({ userId: agentActivity.userId })
+    .from(agentActivity)
+    .where(gte(agentActivity.createdAt, yesterday))
+    .limit(500);
+
+  // Process users in batches of 50
+  for (let i = 0; i < activeUsers.length; i += 50) {
+    const batch = activeUsers.slice(i, i + 50);
+
+    for (const { userId } of batch) {
+      // Compute agent summary
+      const events = await db.select().from(agentActivity)
+        .where(eq(agentActivity.userId, userId)).limit(1000);
+
+      const agentSummary: AgentSummary = {
+        total: events.length, critical: 0, high: 0, medium: 0, low: 0, secretsDetected: 0,
+      };
+      for (const e of events) {
+        const k = e.risk as keyof Pick<AgentSummary, 'critical'|'high'|'medium'|'low'>;
+        if (k in agentSummary) agentSummary[k]++;
+        agentSummary.secretsDetected += e.secretsCount;
+      }
+
+      const agentScore = computeAgentScore(agentSummary);
+      const cspmScore = 100; // Per-user CSPM not applicable without org
+      const combined = Math.round(agentScore * 0.6 + cspmScore * 0.4);
+      const grade = combined >= 90 ? 'A' : combined >= 70 ? 'B' : combined >= 50 ? 'C' : combined >= 30 ? 'D' : 'F';
+
+      // Upsert (insert or ignore for idempotency)
+      await db.insert(agentRiskSnapshots).values({
+        id: crypto.randomUUID(),
+        userId,
+        orgId: null,
+        agentScore,
+        cspmScore,
+        combinedScore: combined,
+        grade,
+        agentEventCount: events.length,
+        cspmFindingCount: 0,
+        snapshotDate: today,
+        createdAt: new Date().toISOString(),
+      }).onConflictDoNothing();
+    }
+  }
+
+  // TODO: Org-level snapshots (similar pattern, grouped by orgId)
+  // Deferred to keep within cron CPU budget
+}
+```
+
+---
+
+### FR-8: PDF Report Generator
+
+**File**: `apps/api/src/services/pdf-report-generator.ts`
+
+```typescript
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import type { AgentSummary, CspmSummary, CombinedScore } from './combined-risk-score.js';
+
+interface ReportData {
+  orgName: string;
+  score: CombinedScore;
+  agentSummary: AgentSummary;
+  cspmSummary: CspmSummary;
+  violations: Array<{ summary: string; severity: string; createdAt: string }>;
+}
+
+const GRADE_COLORS: Record<string, [number, number, number]> = {
+  A: [34, 197, 94],   // green
+  B: [59, 130, 246],  // blue
+  C: [245, 158, 11],  // amber
+  D: [239, 68, 68],   // red
+  F: [220, 38, 38],   // deep red
+};
+
+export function generatePdfReport(data: ReportData): ArrayBuffer {
+  const doc = new jsPDF();
+  const now = new Date().toISOString().split('T')[0];
+
+  // Cover page
+  doc.setFontSize(28);
+  doc.setTextColor(255, 255, 255);
+  doc.setFillColor(10, 10, 10);
+  doc.rect(0, 0, 210, 297, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.text('OpenSyber', 20, 40);
+  doc.setFontSize(20);
+  doc.text('Security Report', 20, 55);
+
+  doc.setFontSize(12);
+  doc.setTextColor(160, 160, 160);
+  doc.text(`Organization: ${data.orgName}`, 20, 80);
+  doc.text(`Date: ${now}`, 20, 90);
+
+  // Grade
+  const gradeColor = GRADE_COLORS[data.score.grade] ?? [160, 160, 160];
+  doc.setFontSize(72);
+  doc.setTextColor(...gradeColor);
+  doc.text(data.score.grade, 85, 160);
+  doc.setFontSize(14);
+  doc.text(`Combined Score: ${data.score.combined}/100`, 65, 180);
+
+  // Page 2: Executive Summary
+  doc.addPage();
+  doc.setFillColor(10, 10, 10);
+  doc.rect(0, 0, 210, 297, 'F');
+
+  doc.setFontSize(18);
+  doc.setTextColor(255, 255, 255);
+  doc.text('Executive Summary', 20, 30);
+
+  doc.setFontSize(11);
+  doc.setTextColor(200, 200, 200);
+  doc.text(`Agent Risk Score: ${data.score.agentScore}/100`, 20, 50);
+  doc.text(`CSPM Score: ${data.score.cspmScore}/100`, 20, 60);
+  doc.text(`Combined Score: ${data.score.combined}/100 (Grade: ${data.score.grade})`, 20, 70);
+
+  // Agent risk table
+  autoTable(doc, {
+    startY: 85,
+    head: [['Category', 'Count']],
+    body: [
+      ['Critical Events', String(data.agentSummary.critical)],
+      ['High Events', String(data.agentSummary.high)],
+      ['Medium Events', String(data.agentSummary.medium)],
+      ['Low Events', String(data.agentSummary.low)],
+      ['Secrets Detected', String(data.agentSummary.secretsDetected)],
+    ],
+    theme: 'grid',
+    styles: { fillColor: [26, 26, 26], textColor: [200, 200, 200] },
+    headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+  });
+
+  // CSPM findings table
+  const cspmY = (doc as any).lastAutoTable.finalY + 15;
+  doc.setFontSize(14);
+  doc.setTextColor(255, 255, 255);
+  doc.text('CSPM Findings', 20, cspmY);
+
+  autoTable(doc, {
+    startY: cspmY + 10,
+    head: [['Severity', 'Open Count']],
+    body: [
+      ['Critical', String(data.cspmSummary.critical)],
+      ['High', String(data.cspmSummary.high)],
+      ['Medium', String(data.cspmSummary.medium)],
+      ['Low', String(data.cspmSummary.low)],
+    ],
+    theme: 'grid',
+    styles: { fillColor: [26, 26, 26], textColor: [200, 200, 200] },
+    headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+  });
+
+  // Page 3: Top violations
+  if (data.violations.length > 0) {
+    doc.addPage();
+    doc.setFillColor(10, 10, 10);
+    doc.rect(0, 0, 210, 297, 'F');
+
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Recent Policy Violations', 20, 30);
+
+    autoTable(doc, {
+      startY: 40,
+      head: [['Severity', 'Summary', 'Date']],
+      body: data.violations.slice(0, 20).map(v => [
+        v.severity.toUpperCase(),
+        v.summary.slice(0, 80),
+        v.createdAt.split('T')[0] ?? '',
+      ]),
+      theme: 'grid',
+      styles: { fillColor: [26, 26, 26], textColor: [200, 200, 200], fontSize: 8 },
+      headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255] },
+      columnStyles: { 1: { cellWidth: 100 } },
+    });
+  }
+
+  // Footer on each page
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Generated by OpenSyber | opensyber.cloud', 20, 290);
+    doc.text(`Page ${i} of ${pageCount}`, 170, 290);
+  }
+
+  return doc.output('arraybuffer');
+}
+```
+
+#### Modified `agent-report-export.ts`
+
+Add PDF generation alongside HTML:
+
+```typescript
+import { generatePdfReport } from './pdf-report-generator.js';
+
+export async function generateAgentReport(
+  db: Db,
+  env: ReportEnv,
+  orgId: string,
+  orgName: string,
+): Promise<ReportResult> {
+  // ... existing data fetching ...
+
+  const html = buildHtml(orgName, agentSummary, cspmSummary, score, violations);
+  const pdfBuffer = generatePdfReport({
+    orgName, score, agentSummary, cspmSummary, violations,
+  });
+
+  const reportId = crypto.randomUUID();
+
+  // Store both HTML and PDF in R2
+  await Promise.all([
+    env.STORAGE.put(`reports/${orgId}/${reportId}.html`, html, {
+      httpMetadata: { contentType: 'text/html' },
+    }),
+    env.STORAGE.put(`reports/${orgId}/${reportId}.pdf`, pdfBuffer, {
+      httpMetadata: { contentType: 'application/pdf' },
+    }),
+  ]);
+
+  return {
+    reportId,
+    downloadUrl: `/api/agents/reports/${reportId}/download`,
+    pdfUrl: `/api/agents/reports/${reportId}/download?format=pdf`,
+  };
+}
+```
+
+The download endpoint in `agent-reports.ts` is updated to support `?format=pdf`:
+
+```typescript
+agentReportRoutes.get('/reports/:id/download', async (c) => {
+  const format = c.req.query('format') === 'pdf' ? 'pdf' : 'html';
+  const ext = format;
+  const contentType = format === 'pdf' ? 'application/pdf' : 'text/html';
+  const disposition = format === 'pdf' ? 'attachment' : 'inline';
+
+  const key = `reports/${orgId}/${reportId}.${ext}`;
+  const object = await c.env.STORAGE.get(key);
+  if (!object) return c.json({ error: 'Not found' }, 404);
+
+  const body = await object.arrayBuffer();
+  return new Response(body, {
+    headers: {
+      'Content-Type': contentType,
+      'Content-Disposition': `${disposition}; filename="opensyber-report-${reportId}.${ext}"`,
+    },
+  });
+});
+```
+
+---
+
+### FR-9: CSPM Scan Scheduler
+
+**File**: `apps/api/src/services/cspm-scan-scheduler.ts`
+
+```typescript
+import { lte, and, eq, ne } from 'drizzle-orm';
+import { cloudAccounts } from '@opensyber/db';
+import type { Env } from '../types.js';
+import { createDb } from '../lib/db.js';
+import { runCspmScan } from './cspm-scanner.js';
+
+const MAX_CONCURRENT = 5;
+
+export async function processScheduledScans(env: Env): Promise<void> {
+  const db = createDb(env.DB);
+  const now = new Date().toISOString();
+
+  // Find accounts due for scanning
+  const dueAccounts = await db.select().from(cloudAccounts)
+    .where(and(
+      ne(cloudAccounts.scanSchedule, 'manual'),
+      lte(cloudAccounts.nextScanAt, now),
+      ne(cloudAccounts.status, 'scanning'),
+    ))
+    .limit(MAX_CONCURRENT);
+
+  for (const account of dueAccounts) {
+    try {
+      // Mark as scanning
+      await db.update(cloudAccounts)
+        .set({ status: 'scanning' })
+        .where(eq(cloudAccounts.id, account.id));
+
+      // Run scan
+      await runCspmScan(db, account.id, account.orgId, account.provider, env.ENCRYPTION_KEY);
+
+      // Compute next scan time
+      const interval = account.scanSchedule === 'daily'
+        ? 24 * 60 * 60 * 1000
+        : 7 * 24 * 60 * 60 * 1000;
+
+      await db.update(cloudAccounts).set({
+        nextScanAt: new Date(Date.now() + interval).toISOString(),
+        status: 'active',
+      }).where(eq(cloudAccounts.id, account.id));
+    } catch (err) {
+      console.error(`[ScheduledScan] Failed for account ${account.id}:`, err);
+      await db.update(cloudAccounts).set({ status: 'error' })
+        .where(eq(cloudAccounts.id, account.id));
+    }
+  }
+}
+```
+
+### FR-2: Activity Retention Cron
+
+**File**: `apps/api/src/services/activity-retention-cron.ts`
+
+```typescript
+import { lt, eq, and } from 'drizzle-orm';
+import { agentActivity, users } from '@opensyber/db';
+import { PLAN_CONFIGS } from '@opensyber/shared';
+import type { Plan } from '@opensyber/shared';
+import type { Env } from '../types.js';
+import { createDb } from '../lib/db.js';
+
+export async function purgeExpiredActivity(env: Env): Promise<void> {
+  const db = createDb(env.DB);
+
+  // Get all distinct users with activity
+  const activeUsers = await db.selectDistinct({ userId: agentActivity.userId })
+    .from(agentActivity).limit(1000);
+
+  for (const { userId } of activeUsers) {
+    // Fetch user plan
+    const [user] = await db.select({ plan: users.plan })
+      .from(users).where(eq(users.id, userId)).limit(1);
+
+    if (!user) continue;
+
+    const plan = user.plan as Plan;
+    const config = PLAN_CONFIGS[plan];
+    const cutoff = new Date(
+      Date.now() - config.agentHistoryDays * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    // Delete expired activity in batches
+    await db.delete(agentActivity).where(
+      and(eq(agentActivity.userId, userId), lt(agentActivity.createdAt, cutoff)),
+    );
+  }
+}
+```
+
+### Modified Cron Handlers
+
+**File**: `apps/api/src/services/cron-handlers.ts`
+
+```typescript
+import { generateRiskSnapshots } from './risk-snapshot-cron.js';
+import { processScheduledScans } from './cspm-scan-scheduler.js';
+import { purgeExpiredActivity } from './activity-retention-cron.js';
+
+export async function runScheduledJobs(env: Env): Promise<void> {
+  await Promise.allSettled([
+    escalateStaleIncidents(env),
+    sendGatewayTokenRotationReminders(env),
+    generateRiskSnapshots(env),        // NEW
+    processScheduledScans(env),        // NEW
+    purgeExpiredActivity(env),         // NEW
+  ]);
+}
+```
+
+---
+
+## Frontend Design
+
+### FR-10: Loading Skeletons
+
+#### Reusable Skeleton Component
+
+**File**: `apps/web/src/components/dashboard/Skeleton.tsx`
+
+```typescript
+interface SkeletonProps {
+  className?: string;
+}
+
+export function Skeleton({ className = '' }: SkeletonProps) {
+  return (
+    <div className={`animate-pulse rounded-lg bg-neutral-800 ${className}`} />
+  );
+}
+
+export function SkeletonCard({ children, className = '' }: { children?: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-xl border border-neutral-800 bg-neutral-900/30 p-6 ${className}`}>
+      {children}
+    </div>
+  );
+}
+```
+
+#### Agents Page Skeleton
+
+**File**: `apps/web/src/components/dashboard/AgentsSkeleton.tsx`
+
+```typescript
+import { Skeleton, SkeletonCard } from './Skeleton';
+
+export function AgentsSkeleton() {
+  return (
+    <div>
+      {/* Score card skeleton */}
+      <SkeletonCard className="mb-6 flex items-center gap-8">
+        <Skeleton className="h-14 w-14" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <div className="space-y-2 text-right">
+          <Skeleton className="h-3 w-16 ml-auto" />
+          <Skeleton className="h-4 w-24 ml-auto" />
+        </div>
+      </SkeletonCard>
+
+      {/* Stat grid skeleton (6 cards) */}
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <SkeletonCard key={i} className="p-4">
+            <Skeleton className="h-8 w-12 mb-2" />
+            <Skeleton className="h-3 w-16" />
+          </SkeletonCard>
+        ))}
+      </div>
+
+      {/* Risk distribution skeleton */}
+      <SkeletonCard>
+        <Skeleton className="h-4 w-32 mb-4" />
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-2 flex-1" />
+              <Skeleton className="h-3 w-8" />
+            </div>
+          ))}
+        </div>
+      </SkeletonCard>
+    </div>
+  );
+}
+```
+
+Similar skeleton components are created for:
+- `CloudSkeleton.tsx` -- header + 3 table rows matching account columns
+- `FindingsSkeleton.tsx` -- 4 summary cards + 5 table rows
+- `TeamSkeleton.tsx` -- summary stats + 3 member rows
+- `TeamUserSkeleton.tsx` -- member header + risk cards + 5 activity rows
+
+#### Integration Pattern
+
+Replace the spinner in each page:
+
+```typescript
+// Before:
+if (loading) {
+  return (
+    <div className="flex items-center justify-center py-24">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-700 border-t-blue-500" />
+    </div>
+  );
+}
+
+// After:
+if (loading) {
+  return <AgentsSkeleton />;
+}
+```
+
+### FR-7: Risk Trend Chart
+
+**File**: `apps/web/src/components/dashboard/RiskTrendChart.tsx`
+
+```typescript
+'use client';
+
+import { useEffect, useState } from 'react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+
+interface TrendPoint {
+  date: string;
+  agentScore: number;
+  cspmScore: number;
+  combined: number;
+  grade: string;
+}
+
+interface RiskTrendChartProps {
+  endpoint: string; // e.g., '/api/proxy/agents/risk-trend'
+  days?: '7' | '30' | '90';
+}
+
+export function RiskTrendChart({ endpoint, days = '30' }: RiskTrendChartProps) {
+  const [data, setData] = useState<TrendPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${endpoint}?days=${days}`)
+      .then(r => r.json())
+      .then(d => setData(d.data ?? []))
+      .catch(() => setData([]))
+      .finally(() => setLoading(false));
+  }, [endpoint, days]);
+
+  if (loading) return <div className="h-64 animate-pulse rounded-xl bg-neutral-800" />;
+  if (data.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-neutral-800 bg-neutral-900/30 p-6">
+      <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-neutral-500">
+        Risk Score Trend
+      </h3>
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart data={data}>
+          <XAxis dataKey="date" stroke="#525252" fontSize={11} />
+          <YAxis domain={[0, 100]} stroke="#525252" fontSize={11} />
+          <Tooltip
+            contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+            labelStyle={{ color: '#a3a3a3' }}
+          />
+          <Line type="monotone" dataKey="combined" stroke="#3b82f6" strokeWidth={2} dot={false} name="Combined" />
+          <Line type="monotone" dataKey="agentScore" stroke="#22c55e" strokeWidth={1} dot={false} name="Agent" />
+          <Line type="monotone" dataKey="cspmScore" stroke="#f59e0b" strokeWidth={1} dot={false} name="CSPM" />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+```
+
+### FR-4: Related Findings Component
+
+**File**: `apps/web/src/components/dashboard/RelatedFindings.tsx`
+
+```typescript
+'use client';
+
+import { useState } from 'react';
+import { ChevronDown, ShieldAlert } from 'lucide-react';
+
+interface Finding {
+  id: string;
+  checkId: string;
+  severity: string;
+  title: string;
+  resourceId: string;
+  status: string;
+}
+
+interface RelatedFindingsProps {
+  activityId: string;
+}
+
+const SEVERITY_COLORS: Record<string, string> = {
+  critical: 'text-red-400',
+  high: 'text-orange-400',
+  medium: 'text-amber-400',
+  low: 'text-neutral-500',
+};
+
+export function RelatedFindings({ activityId }: RelatedFindingsProps) {
+  const [findings, setFindings] = useState<Finding[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  async function loadFindings() {
+    if (findings !== null) {
+      setExpanded(!expanded);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/proxy/agents/activity/${activityId}/related-findings`);
+      const data = await res.json();
+      setFindings(data.data ?? []);
+      setExpanded(true);
+    } catch {
+      setFindings([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={loadFindings}
+        className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition"
+      >
+        <ShieldAlert className="h-3 w-3" />
+        Related Findings
+        <ChevronDown className={`h-3 w-3 transition ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+
+      {expanded && findings && findings.length > 0 && (
+        <div className="mt-2 space-y-1 rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+          {findings.map(f => (
+            <div key={f.id} className="flex items-center gap-2 text-xs">
+              <span className={`font-medium ${SEVERITY_COLORS[f.severity] ?? ''}`}>
+                {f.severity.toUpperCase()}
+              </span>
+              <span className="text-neutral-300">{f.title}</span>
+              <span className="text-neutral-600">{f.resourceId}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {expanded && findings && findings.length === 0 && (
+        <p className="mt-1 text-xs text-neutral-600">No related cloud findings</p>
+      )}
+    </div>
+  );
+}
+```
+
+### Sidebar Update
+
+Add alert channels to sidebar config:
+
+```typescript
+// In securityItems array:
+{ href: '/dashboard/agents/alert-channels', label: 'Alert Channels', icon: Bell },
+```
+
+### FR-6: Proxy Routes
+
+All proxy routes follow the established pattern from `apps/web/src/app/api/proxy/agents/route.ts`.
+
+#### `apps/web/src/app/api/proxy/agents/team/[userId]/route.ts`
+
+```typescript
+import { auth } from '@clerk/nextjs/server';
+import { NextResponse, type NextRequest } from 'next/server';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.opensyber.cloud';
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { userId: string } },
+): Promise<NextResponse> {
+  const { getToken } = await auth();
+  const token = await getToken();
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const url = `${API_URL}/api/agents/team/${params.userId}/activity${req.nextUrl.search}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  });
+  const data = await res.json();
+  return NextResponse.json(data, { status: res.status });
+}
+```
+
+Similar pattern for all six new proxy routes listed in FR-6 requirements.
+
+---
+
+## Integration Points
+
+### AWS STS AssumeRole
+
+| Aspect | Detail |
+|---|---|
+| Service | AWS STS |
+| Auth | Cross-account IAM role with external ID |
+| Duration | 900 seconds (15 min minimum) |
+| Error handling | Catch `AccessDenied`, `MalformedPolicyDocument`, `RegionDisabledException` |
+| Credentials | Never stored, never logged; used only during scan execution |
+
+**Customer IAM Policy Template** (provided in docs):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": [
+      "s3:GetPublicAccessBlock", "s3:GetBucketAcl",
+      "s3:GetBucketVersioning", "s3:GetBucketLogging", "s3:ListAllMyBuckets",
+      "iam:GetAccountSummary", "iam:GetAccountPasswordPolicy",
+      "iam:ListUsers", "iam:ListMFADevices",
+      "iam:ListPolicies", "iam:GetPolicyVersion", "iam:ListAccessKeys",
+      "cloudtrail:DescribeTrails",
+      "ec2:DescribeSecurityGroups", "ec2:DescribeVolumes",
+      "ec2:GetEbsEncryptionByDefault", "ec2:DescribeVpcs",
+      "rds:DescribeDBInstances",
+      "guardduty:ListDetectors"
+    ],
+    "Resource": "*"
+  }]
+}
+```
+
+### Resend Email API
+
+| Aspect | Detail |
+|---|---|
+| Env var | `RESEND_API_KEY` (already configured) |
+| Endpoint | `https://api.resend.com/emails` |
+| From | `OpenSyber Security <security@opensyber.cloud>` |
+| Rate limit | 100 emails/day (free tier), 1000/day (pro) |
+
+### Slack Webhooks
+
+| Aspect | Detail |
+|---|---|
+| Stored in | `alert_channels.config` (encrypted) |
+| Format | Block Kit JSON |
+| Timeout | 5 second fetch timeout |
+| Retry | No retry on failure (logged only) |
+
+### PagerDuty Events API v2
+
+| Aspect | Detail |
+|---|---|
+| Endpoint | `https://events.pagerduty.com/v2/enqueue` |
+| Auth | Routing key in config |
+| Severity mapping | critical/high -> critical, medium -> warning, low -> info |
+
+### OpsGenie Alert API
+
+| Aspect | Detail |
+|---|---|
+| Endpoint | `https://api.opsgenie.com/v2/alerts` (US) or `https://api.eu.opsgenie.com/v2/alerts` (EU) |
+| Auth | `GenieKey` header |
+| Priority mapping | critical -> P1, high -> P2, medium -> P3, low -> P5 |
+
+---
+
+## Security Considerations
+
+### Credential Storage
+
+| Data | Storage | Encryption |
+|---|---|---|
+| Cloud account role ARN | `cloud_accounts.role_arn` | Plaintext (not secret) |
+| Cloud account external ID | `cloud_accounts.external_id` | Plaintext (not secret alone) |
+| Alert channel webhook URLs | `alert_channels.config` | AES-GCM via `encrypt()` |
+| Alert channel API keys | `alert_channels.config` | AES-GCM via `encrypt()` |
+| AWS STS temp credentials | In-memory only | Never stored, never logged |
+
+### Access Control Matrix
+
+| Endpoint | Auth | RBAC | Plan Gate |
+|---|---|---|---|
+| POST /agents/activity/sync | Clerk JWT | resolveOrg | cloudSync, agentLimit |
+| GET /agents/team/* | Clerk JWT | agent.policy.read | teamDashboard |
+| POST /agents/alert-channels | Clerk JWT | agent.policy.write | policyEngine |
+| POST /cloud/accounts | Clerk JWT | cloud.write | cspmAccounts limit |
+| POST /agents/reports/generate | Clerk JWT | agent.policy.read | pdfReports |
+| POST /cloud/accounts/:id/scan | Clerk JWT | cloud.write | cspmAccounts > 0 |
+
+### Confused Deputy Prevention
+
+The `externalId` parameter on STS AssumeRole prevents confused deputy attacks. Each cloud account has a unique `externalId` generated at creation time. The customer's IAM trust policy must include a condition matching this `externalId`.
+
+### Input Validation
+
+All new endpoints use Zod schemas for request validation. The Zod schemas are defined at the top of each route file. No user input reaches the database without validation.
+
+### Rate Limiting
+
+| Resource | Limit | Implementation |
+|---|---|---|
+| Scan trigger per account | 5 per hour | KV counter with TTL |
+| Alert dispatch per channel | 10 per minute | KV counter with 60s TTL |
+| Activity sync | 200 events per request | Validated in handler |
+| Scheduled scans per cron | 5 accounts per invocation | LIMIT clause |
+
+---
+
+## Performance Considerations
+
+### D1 Query Optimization
+
+| Query | Optimization |
+|---|---|
+| Risk trend (user) | `idx_risk_snapshots_user_date` composite index; simple range scan |
+| Risk trend (org) | `idx_risk_snapshots_org_date` composite index; simple range scan |
+| Alert channels for dispatch | `idx_alert_channels_org_active` filtered index |
+| Activity sessions grouping | Fetch max 5000 events, group in JS; acceptable for single-user history |
+| Cross-linkage LIKE queries | Bounded by max 5 results; LIKE on small result sets |
+| Retention purge | Delete per-user with compound condition; batched by user |
+
+### Cron Batching Strategy
+
+| Cron Job | Batch Size | Rationale |
+|---|---|---|
+| Risk snapshots | 50 users per batch | Each user requires 2 queries (events + findings) |
+| Scheduled scans | 5 accounts per invocation | Each scan involves multiple AWS API calls |
+| Activity retention | 1000 users, delete per-user | DELETE is a single query per user |
+
+### Bundle Size Management
+
+AWS SDK v3 modules are imported individually to enable tree-shaking. Only the specific command classes needed are imported:
+
+```typescript
+// Good: individual imports
+import { S3Client, GetPublicAccessBlockCommand } from '@aws-sdk/client-s3';
+
+// Bad: full client import
+import * as S3 from '@aws-sdk/client-s3';
+```
+
+If the total bundle size with all 7 AWS SDK clients exceeds comfortable limits, the fallback plan is to use raw `fetch` calls with AWS SigV4 signing via `@smithy/signature-v4`.
+
+### Worker CPU Budget
+
+| Operation | Estimated CPU time | Within 30s limit? |
+|---|---|---|
+| Activity sync (100 events) | ~50ms | Yes |
+| Plan enforcement middleware | ~10ms (one DB query) | Yes |
+| AWS scan (20 checks) | ~5-20s (mostly I/O wait) | Yes, borderline |
+| PDF report generation | ~2-5s | Yes |
+| Risk snapshot cron (50 users) | ~10-15s | Yes |
+| Scheduled scan cron (5 accounts) | ~25s | Tight; parallelize I/O |
+
+---
+
+## Testing Strategy
+
+### Test Organization
+
+Every new service and route file has a co-located test file.
+
+```
+apps/api/src/
+  middleware/
+    plan-enforcement.test.ts
+  routes/
+    agent-alert-channels.test.ts
+    agent-risk-trend.test.ts
+    agent-sessions.test.ts
+    agent-team-user.test.ts
+    agent-activity-findings.test.ts
+  services/
+    aws-scanner/
+      index.test.ts
+      s3-checks.test.ts
+      iam-checks.test.ts
+      ec2-checks.test.ts
+      rds-checks.test.ts
+      cloudtrail-checks.test.ts
+      guardduty-check.test.ts
+    alert-dispatch.test.ts
+    activity-cspm-linker.test.ts
+    risk-snapshot-cron.test.ts
+    pdf-report-generator.test.ts
+    cspm-scan-scheduler.test.ts
+    activity-retention-cron.test.ts
+```
+
+### Unit Tests
+
+#### Plan Enforcement Middleware
+
+```typescript
+describe('plan-enforcement', () => {
+  describe('requirePlanFeature', () => {
+    it('allows request when feature is enabled', async () => {
+      // Setup: user on pro plan, feature: cloudSync = true
+      // Expect: next() called, 200 response
+    });
+
+    it('returns 403 with upgrade message when feature is disabled', async () => {
+      // Setup: user on free plan, feature: cloudSync = false
+      // Expect: 403 with upgradeRequired: true
+    });
+
+    it('handles all 4 plan tiers correctly', async () => {
+      // Test each feature gate across free/personal/pro/team
+    });
+  });
+
+  describe('requirePlanLimit', () => {
+    it('allows when under limit', async () => {
+      // Setup: user has 2 agents, limit is 10
+      // Expect: next() called
+    });
+
+    it('returns 403 when at or over limit', async () => {
+      // Setup: user has 10 agents, limit is 10
+      // Expect: 403
+    });
+  });
+});
+```
+
+#### AWS Scanner Checks
+
+Each check module has tests that mock AWS SDK responses:
+
+```typescript
+describe('s3-checks', () => {
+  it('detects bucket without public access block', async () => {
+    // Mock: ListBuckets returns 1 bucket
+    // Mock: GetPublicAccessBlock throws NoSuchPublicAccessBlockConfiguration
+    // Expect: 1 finding with checkId S3-PUB-BLOCK
+  });
+
+  it('passes bucket with all public access blocked', async () => {
+    // Mock: GetPublicAccessBlock returns all true
+    // Expect: 0 findings
+  });
+
+  it('handles API error gracefully', async () => {
+    // Mock: ListBuckets throws AccessDenied
+    // Expect: CheckResult with error field, no crash
+  });
+});
+```
+
+#### Alert Dispatch
+
+```typescript
+describe('alert-dispatch', () => {
+  it('sends to all active channels matching severity', async () => {
+    // Setup: 2 channels (Slack critical, email high), violation is critical
+    // Expect: both channels receive alert
+  });
+
+  it('skips channels below severity threshold', async () => {
+    // Setup: channel minSeverity=critical, violation is medium
+    // Expect: no dispatch
+  });
+
+  it('respects rate limit per channel', async () => {
+    // Setup: 11 violations in 1 minute
+    // Expect: only 10 dispatched, 1 skipped
+  });
+
+  it('continues on individual channel failure', async () => {
+    // Setup: Slack webhook returns 500
+    // Expect: error logged, no throw, other channels still process
+  });
+});
+```
+
+### Integration Tests
+
+#### Route Tests
+
+Following the established pattern with `app.request()` and mock DB queues:
+
+```typescript
+describe('GET /api/agents/risk-trend', () => {
+  it('returns 30-day trend for authenticated user', async () => {
+    // Setup: mock auth, 30 snapshot rows
+    // Expect: 200 with data array of 30 points
+  });
+
+  it('returns 401 for unauthenticated request', async () => {
+    // Expect: 401
+  });
+
+  it('respects days query parameter', async () => {
+    // Setup: ?days=7
+    // Expect: data filtered to last 7 days
+  });
+});
+```
+
+### Coverage Targets
+
+| Module | Target | Rationale |
+|---|---|---|
+| Plan enforcement middleware | 100% | Revenue-critical path |
+| AWS scanner checks | 90% | Security-critical; edge cases are complex |
+| Alert dispatch | 90% | Enterprise-critical; multiple channel types |
+| Route handlers | 85% | Standard CRUD with auth/plan checks |
+| PDF generator | 80% | Output format testing is limited |
+| Cron jobs | 80% | Tested via service unit tests |
+| Frontend skeletons | 70% | Visual components; snapshot tests sufficient |
+
+---
+
+## Implementation Order
+
+The recommended implementation order optimizes for unblocking dependencies and quick wins.
+
+### Phase 1: Foundation (Days 1-3)
+
+| # | Task | FR | Est |
+|---|---|---|---|
+| 1 | Create migration 0013 + Drizzle schemas | DB | 0.5d |
+| 2 | Implement plan enforcement middleware | FR-2 | 1d |
+| 3 | Add missing API endpoints (sessions, team user) | FR-5 | 1d |
+| 4 | Add missing proxy routes | FR-6 | 0.5d |
+
+### Phase 2: Core Features (Days 4-8)
+
+| # | Task | FR | Est |
+|---|---|---|---|
+| 5 | Loading skeletons for all pages | FR-10 | 0.5d |
+| 6 | Plan enforcement on activity sync + all routes | FR-2 | 1d |
+| 7 | Real AWS CSPM scanner (all 20 checks) | FR-1 | 3d |
+| 8 | Alert dispatch service + channel CRUD | FR-3 | 1.5d |
+
+### Phase 3: Enhancement (Days 9-12)
+
+| # | Task | FR | Est |
+|---|---|---|---|
+| 9 | Risk trend time series (cron + API + chart) | FR-7 | 1.5d |
+| 10 | Scheduled CSPM re-scan | FR-9 | 0.5d |
+| 11 | Activity-CSPM cross-linkage | FR-4 | 1d |
+| 12 | PDF report export | FR-8 | 1d |
+
+### Phase 4: Polish + Testing (Days 13-14)
+
+| # | Task | FR | Est |
+|---|---|---|---|
+| 13 | Activity retention cron | FR-2 | 0.5d |
+| 14 | Integration tests for all new routes | All | 1d |
+| 15 | UI polish: upgrade CTAs, empty states | All | 0.5d |
+
+### Critical Path
+
+```
+Migration 0013 -> Plan Middleware -> Activity Sync Enforcement -> AWS Scanner -> Alert Dispatch
+                                  -> Missing Endpoints/Proxies -> Skeletons -> Cross-linkage
+                                  -> Risk Trend Cron -> Scheduled Scans
+                                  -> PDF Reports
+```
+
+---
+
+## Appendices
+
+### Design Decisions Log
+
+| # | Decision | Options Considered | Choice | Rationale |
+|---|---|---|---|---|
+| DD-1 | AWS SDK in Workers | SDK v3 / SigV4 fetch | SDK v3 with `nodejs_compat` | Maintainability; fallback to fetch if incompatible |
+| DD-2 | PDF generation | @react-pdf / jspdf / client-side print | jspdf + autotable | Pure JS, works in Workers, server-side download |
+| DD-3 | Risk trend storage | Materialized view / Time-series table | Dedicated table with daily cron | D1 has no materialized views; cron is idempotent |
+| DD-4 | Cross-linkage | Sync-time / Query-time | Query-time | Avoids slowing sync; heuristic matching improves over time |
+| DD-5 | Alert dispatch | Synchronous / Async waitUntil | waitUntil | Does not block sync response; failure is non-fatal |
+| DD-6 | Channel config storage | Separate KV / D1 encrypted | D1 encrypted column | Consistent with existing credential storage pattern |
+| DD-7 | Plan check caching | Per-request / Per-session | Per-request via c.set() | Workers are stateless; one DB query per request is acceptable |
+| DD-8 | Scanner error handling | Fail-all / Partial results | Partial results | A single failed check should not invalidate the entire scan |
+
+### Conventions
+
+- All new files follow `kebab-case.ts` naming
+- All new route files export a named Hono instance (e.g., `export const agentAlertChannelRoutes = new Hono<...>()`)
+- All new services use the `Db = DrizzleD1Database<Record<string, unknown>>` type alias
+- All new API responses use `{ data }` on success, `{ error, message }` on failure
+- All timestamps are ISO 8601 strings in UTC
+- All IDs are UUID v4 via `crypto.randomUUID()`
+- All encrypted fields use the existing `encrypt()`/`decrypt()` utility with `ENCRYPTION_KEY`
+
+### Dependencies Added
+
+| Package | Version | Purpose | Dev/Prod |
+|---|---|---|---|
+| `@aws-sdk/client-sts` | ^3.x | STS AssumeRole | prod |
+| `@aws-sdk/client-s3` | ^3.x | S3 checks | prod |
+| `@aws-sdk/client-iam` | ^3.x | IAM checks | prod |
+| `@aws-sdk/client-ec2` | ^3.x | EC2/VPC checks | prod |
+| `@aws-sdk/client-rds` | ^3.x | RDS checks | prod |
+| `@aws-sdk/client-cloudtrail` | ^3.x | CloudTrail checks | prod |
+| `@aws-sdk/client-guardduty` | ^3.x | GuardDuty check | prod |
+| `jspdf` | ^2.x | PDF generation | prod |
+| `jspdf-autotable` | ^3.x | PDF tables | prod |
+| `recharts` | ^2.x | Trend charts (frontend) | prod |
+
+### wrangler.toml Changes
+
+```toml
+# Add nodejs_compat for AWS SDK v3
+compatibility_flags = ["nodejs_compat"]
+
+# Add cron trigger if not already present
+[triggers]
+crons = ["*/5 * * * *"]  # Every 5 minutes
+```
+
+### Environment Variables (No New Secrets)
+
+All required environment variables are already configured:
+- `ENCRYPTION_KEY` -- for encrypting alert channel configs
+- `RESEND_API_KEY` -- for email alerts
+- `STORAGE` -- R2 binding for PDF reports
+
+No new Cloudflare secrets are required. Slack webhooks, PagerDuty routing keys, and OpsGenie API keys are stored per-org in the `alert_channels` table, encrypted with the existing `ENCRYPTION_KEY`.

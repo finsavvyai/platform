@@ -1,0 +1,97 @@
+module.exports = {
+  env: {
+    browser: false,
+    es2022: true,
+    node: true,
+    worker: true,
+  },
+  extends: ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
+  parser: "@typescript-eslint/parser",
+  parserOptions: {
+    ecmaVersion: "latest",
+    sourceType: "module",
+    project: "./tsconfig.json",
+  },
+  plugins: ["@typescript-eslint"],
+  rules: {
+    // TypeScript specific rules
+    "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+    "@typescript-eslint/explicit-function-return-type": "warn",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-non-null-assertion": "warn",
+    // Disabled because current root tsconfig has strictNullChecks=false.
+    "@typescript-eslint/prefer-nullish-coalescing": "off",
+    "@typescript-eslint/prefer-optional-chain": "error",
+    "@typescript-eslint/no-unnecessary-type-assertion": "error",
+
+    // General JavaScript/TypeScript rules
+    "no-console": "warn",
+    "no-debugger": "error",
+    "no-alert": "error",
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error",
+    "prefer-const": "error",
+    "no-var": "error",
+    "object-shorthand": "error",
+    "prefer-arrow-callback": "error",
+    "prefer-template": "error",
+    "template-curly-spacing": "error",
+    "arrow-spacing": "error",
+    "comma-dangle": ["error", "never"],
+    quotes: ["error", "single", { avoidEscape: true }],
+    semi: ["error", "never"],
+    indent: ["error", 2, { SwitchCase: 1 }],
+    "max-len": ["warn", { code: 100, ignoreUrls: true }],
+    "eol-last": "error",
+    "no-trailing-spaces": "error",
+    "comma-spacing": "error",
+    "key-spacing": "error",
+    "space-before-function-paren": [
+      "error",
+      {
+        anonymous: "always",
+        named: "never",
+        asyncArrow: "always",
+      },
+    ],
+    "keyword-spacing": "error",
+    "space-infix-ops": "error",
+    "space-unary-ops": "error",
+    "spaced-comment": "error",
+    "brace-style": ["error", "1tbs", { allowSingleLine: true }],
+    curly: "error",
+  },
+  overrides: [
+    {
+      files: ["*.js"],
+      rules: {
+        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/explicit-function-return-type": "off",
+      },
+    },
+    {
+      files: ["**/*.test.ts", "**/*.spec.ts"],
+      env: {
+        jest: true,
+      },
+      rules: {
+        "@typescript-eslint/no-explicit-any": "off",
+        "no-console": "off",
+      },
+    },
+  ],
+  ignorePatterns: [
+    "node_modules/",
+    "dist/",
+    "frontend/",
+    "backend/",
+    "mobile/",
+    "agent/",
+    "vscode-extension/",
+    "browser-extension/",
+    "docs/",
+    "*.config.js",
+  ],
+};

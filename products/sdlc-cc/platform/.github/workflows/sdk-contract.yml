@@ -1,0 +1,66 @@
+name: SDK contract gate
+
+on:
+  pull_request:
+    paths:
+      - "services/gateway/api/openapi*.yaml"
+      - "services/gateway/scripts/generate-sdk.sh"
+      - "services/gateway/Makefile"
+      - ".github/workflows/sdk-contract.yml"
+  workflow_dispatch:
+
+jobs:
+  contract:
+    name: Regenerate + build generated SDKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python YAML
+        run: pip install pyyaml
+
+      - name: Install oapi-codegen
+        run: |
+          go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Regenerate SDKs from spec
+        working-directory: services/gateway
+        run: make sdk-generate
+
+      - name: Build generated Go SDK (contract assertion)
+        working-directory: services/gateway/internal/sdk-generated/go
+        run: go build ./...
+
+      - name: TypeScript typecheck on generated client
+        working-directory: services/gateway/internal/sdk-generated/ts
+        run: |
+          npm install --silent
+          npx --yes typescript@5 tsc --noEmit || (echo "::error::Generated TS SDK fails typecheck — fix the spec or pin a different openapi-generator version" && exit 1)
+
+      - name: Python compile on generated client
+        working-directory: services/gateway/internal/sdk-generated/py
+        run: python -m compileall -q .

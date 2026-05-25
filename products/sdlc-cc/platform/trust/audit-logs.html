@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Audit-log architecture · Trust Center</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <article class="doc wrap">
+      <a class="back" href="./">← Trust Center</a>
+      <h1>Audit-log architecture</h1>
+      <p class="meta">Same shape across sdlc-platform · AMLIQ · Claw. Last reviewed 2026-05-20.</p>
+
+      <h2>Row shape</h2>
+      <p>Every auditable event — auth, admin action, sensitive data mutation, DLP detection, billing change — produces one row:</p>
+      <pre style="background:var(--card-bg);padding:16px;border-radius:10px;overflow:auto;font-size:13px;line-height:1.45">
+{
+  "id":         "ulid",
+  "tenant_id":  "uuid",
+  "actor_type": "user | service | system",
+  "actor_id":   "uuid | null",
+  "action":     "domain.verb",      // e.g. dlp.inbound, rbac.grant
+  "target_type":"http_request | tool_use | document | user | tenant | …",
+  "target_id":  "string",
+  "before":     { … }  | null,
+  "after":      { … },
+  "created_at": "RFC3339",
+  "hmac":       "hex"                // chained over (prev_hmac || row)
+}
+      </pre>
+
+      <h2>HMAC chain</h2>
+      <ul>
+        <li>Each row's <code>hmac</code> is computed over the previous row's hmac concatenated with the canonical JSON of the current row.</li>
+        <li>The chain key is per-tenant and rotatable; rotation creates an audit row of its own (<code>action: audit.key_rotate</code>).</li>
+        <li>Reading the log verifies the chain end-to-end; a tampered or removed row breaks verification and produces a console-visible warning + a Prometheus counter increment.</li>
+      </ul>
+
+      <h2>Replay semantics</h2>
+      <ul>
+        <li>Any past detection event can be replayed against the current preset set without re-touching the original prompt text. This means: change a preset → reprocess the audit log → see whether a previously-allowed call would be redacted today.</li>
+        <li>Replay output is itself an audit row (<code>action: audit.replay</code>), so a what-if exercise is also auditable.</li>
+      </ul>
+
+      <h2>Retention</h2>
+      <p>Default 13 months. Configurable to 24/36/60 months on Enterprise. We do not delete audit rows on a tenant's request without a documented business reason — that itself produces an audit row.</p>
+
+      <h2>Reading the log</h2>
+      <ul>
+        <li><strong>GET /v1/me/redactions</strong> — every DLP detection the caller's user id appears in (GDPR Art. 15).</li>
+        <li><strong>GET /v1/audit/events</strong> — admin-only, full tenant scope (RBAC: <code>audit:read</code>).</li>
+      </ul>
+    </article>
+  </body>
+</html>

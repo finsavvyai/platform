@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qestro OAuth Setup Guide</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:linear-gradient(135deg,#0f0c29,#302b63,#24243e);color:#e5e5e5;min-height:100vh;line-height:1.6}
+.container{max-width:900px;margin:0 auto;padding:2rem 1.5rem}
+h1{font-size:2.5rem;font-weight:700;color:#fff;margin-bottom:.5rem;background:linear-gradient(90deg,#7c3aed,#3b82f6,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:#a3a3a3;font-size:1.1rem;margin-bottom:2rem}
+.progress{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:2rem}
+.progress span{padding:.25rem .75rem;border-radius:999px;font-size:.75rem;font-weight:600;border:1px solid rgba(255,255,255,.1);color:#a3a3a3}
+.card{background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:16px;margin-bottom:1.5rem;overflow:hidden;transition:all .2s}
+.card:hover{border-color:rgba(124,58,237,.3)}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;cursor:pointer;user-select:none}
+.card-header h2{font-size:1.1rem;font-weight:600;color:#fff;display:flex;align-items:center;gap:.75rem}
+.badge{font-size:.7rem;padding:.15rem .5rem;border-radius:999px;font-weight:500}
+.badge-ready{background:rgba(52,199,89,.15);color:#34c759;border:1px solid rgba(52,199,89,.2)}
+.badge-new{background:rgba(124,58,237,.15);color:#c4b5fd;border:1px solid rgba(124,58,237,.2)}
+.chevron{color:#737373;transition:transform .2s;font-size:1.2rem}
+.card-body{padding:0 1.5rem 1.5rem;display:none}
+.card.open .card-body{display:block}
+.card.open .chevron{transform:rotate(90deg)}
+.step{margin-bottom:1rem;padding-left:1.5rem;position:relative}
+.step::before{content:attr(data-num);position:absolute;left:0;top:0;width:1.25rem;height:1.25rem;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#3b82f6);color:#fff;font-size:.7rem;display:flex;align-items:center;justify-content:center;font-weight:700}
+.step h3{font-size:.9rem;font-weight:600;color:#d4d4d4;margin-bottom:.25rem}
+.step p{font-size:.85rem;color:#a3a3a3}
+code{background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2);padding:.1rem .4rem;border-radius:6px;font-family:'SF Mono',monospace;font-size:.8rem;color:#c4b5fd;cursor:pointer}
+code:hover{background:rgba(124,58,237,.2)}
+.url-box{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:.75rem 1rem;font-family:'SF Mono',monospace;font-size:.8rem;color:#06b6d4;margin:.75rem 0;word-break:break-all}
+.env-table{width:100%;border-collapse:collapse;margin:1rem 0}
+.env-table th{text-align:left;padding:.5rem .75rem;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:#737373;border-bottom:1px solid rgba(255,255,255,.08)}
+.env-table td{padding:.5rem .75rem;font-size:.85rem;border-bottom:1px solid rgba(255,255,255,.05)}
+.env-table td:first-child{font-family:'SF Mono',monospace;color:#c4b5fd;font-size:.8rem}
+.icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.section-title{font-size:1.3rem;font-weight:700;color:#fff;margin:2.5rem 0 1rem;display:flex;align-items:center;gap:.5rem}
+.warn{background:rgba(255,149,0,.1);border:1px solid rgba(255,149,0,.2);border-radius:10px;padding:.75rem 1rem;font-size:.85rem;color:#ff9f0a;margin:.75rem 0}
+.tip{background:rgba(52,199,89,.1);border:1px solid rgba(52,199,89,.2);border-radius:10px;padding:.75rem 1rem;font-size:.85rem;color:#30d158;margin:.75rem 0}
+.scope-list{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
+.scope{padding:.15rem .5rem;border-radius:6px;font-size:.75rem;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);color:#93c5fd;font-family:'SF Mono',monospace}
+footer{text-align:center;padding:2rem;color:#525252;font-size:.8rem}
+a{color:#93c5fd;text-decoration:none}a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Qestro OAuth Setup Guide</h1>
+<p class="subtitle">Configure social login for all 7 providers. Click each card for step-by-step instructions.</p>
+
+<!-- Google -->
+<div class="card open">
+<div class="card-header" onclick="toggle(this.parentElement)"><h2><div class="icon" style="background:#4285F4"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/></svg></div> Google OAuth <span class="badge badge-ready">Ready</span></h2><span class="chevron">&#9654;</span></div>
+<div class="card-body">
+<div class="step" data-num="1"><h3>Go to Google Cloud Console</h3><p>Visit <a href="https://console.cloud.google.com/apis/credentials">console.cloud.google.com/apis/credentials</a></p></div>
+<div class="step" data-num="2"><h3>Create OAuth Client ID</h3><p>"Create Credentials" &rarr; "OAuth Client ID" &rarr; Application type: "Web application"</p></div>
+<div class="step" data-num="3"><h3>Configure consent screen</h3><p>Set app name "Qestro", add domain, select "External" user type.</p></div>
+<div class="step" data-num="4"><h3>Add redirect URIs</h3><p>Production:</p><div class="url-box">https://api.qestro.app/api/auth/google/callback</div><p>Development:</p><div class="url-box">http://localhost:8787/api/auth/google/callback</div></div>
+<div class="step" data-num="5"><h3>Set environment variables</h3></div>
+<table class="env-table"><tr><th>Variable</th><th>Value</th></tr><tr><td><code onclick="copy(this)">GOOGLE_OAUTH_CLIENT_ID</code></td><td>From Credentials page</td></tr><tr><td><code onclick="copy(this)">GOOGLE_OAUTH_CLIENT_SECRET</code></td><td>From Credentials page</td></tr></table>
+<div class="scope-list"><span class="scope">openid</span><span class="scope">email</span><span class="scope">profile</span></div>
+</div></div>
+
+<!-- GitHub -->
+<div class="card">
+<div class="card-header" onclick="toggle(this.parentElement)"><h2><div class="icon" style="background:#333"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg></div> GitHub OAuth <span class="badge badge-ready">Ready</span></h2><span class="chevron">&#9654;</span></div>
+<div class="card-body">
+<div class="step" data-num="1"><h3>Go to GitHub Developer Settings</h3><p><a href="https://github.com/settings/developers">github.com/settings/developers</a> &rarr; "OAuth Apps" &rarr; "New OAuth App"</p></div>
+<div class="step" data-num="2"><h3>Fill in details</h3><p>App name: "Qestro", Homepage: <code>https://qestro.app</code></p></div>
+<div class="step" data-num="3"><h3>Set callback URL</h3><div class="url-box">https://api.qestro.app/api/auth/github/callback</div></div>
+<div class="step" data-num="4"><h3>Set environment variables</h3></div>
+<table class="env-table"><tr><th>Variable</th><th>Value</th></tr><tr><td><code onclick="copy(this)">GITHUB_OAUTH_CLIENT_ID</code></td><td>Client ID from app page</td></tr><tr><td><code onclick="copy(this)">GITHUB_OAUTH_CLIENT_SECRET</code></td><td>Generate new client secret</td></tr></table>
+<div class="scope-list"><span class="scope">user:email</span><span class="scope">read:user</span></div>
+</div></div>
+
+<!-- Microsoft -->
+<div class="card">
+<div class="card-header" onclick="toggle(this.parentElement)"><h2><div class="icon" style="background:#00A4EF"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M0 0h11.377v11.372H0zm12.623 0H24v11.372H12.623zM0 12.623h11.377V24H0zm12.623 0H24V24H12.623z"/></svg></div> Microsoft (Azure AD) <span class="badge badge-ready">Ready</span></h2><span class="chevron">&#9654;</span></div>
+<div class="card-body">
+<div class="step" data-num="1"><h3>Go to Azure Portal</h3><p><a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps">App Registrations</a> &rarr; "New registration"</p></div>
+<div class="step" data-num="2"><h3>Register app</h3><p>Name: "Qestro", Account types: "Any org + personal Microsoft"</p></div>
+<div class="step" data-num="3"><h3>Add redirect URI (Web)</h3><div class="url-box">https://api.qestro.app/api/auth/microsoft/callback</div></div>
+<div class="step" data-num="4"><h3>Create client secret</h3><p>"Certificates & secrets" &rarr; "New client secret" &rarr; Copy Value immediately</p></div>
+<table class="env-table"><tr><th>Variable</th><th>Value</th></tr><tr><td><code onclick="copy(this)">AZURE_OAUTH_CLIENT_ID</code></td><td>Application (client) ID</td></tr><tr><td><code onclick="copy(this)">AZURE_OAUTH_CLIENT_SECRET</code></td><td>Client secret Value</td></tr><tr><td><code onclick="copy(this)">AZURE_TENANT_ID</code></td><td><code>common</code> for multi-tenant</td></tr></table>
+<div class="scope-list"><span class="scope">openid</span><span class="scope">profile</span><span class="scope">email</span><span class="scope">User.Read</span></div>
+</div></div>
+
+<!-- LinkedIn -->
+<div class="card">
+<div class="card-header" onclick="toggle(this.parentElement)"><h2><div class="icon" style="background:#0A66C2"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452z"/></svg></div> LinkedIn <span class="badge badge-new">NEW</span></h2><span class="chevron">&#9654;</span></div>
+<div class="card-body">
+<div class="step" data-num="1"><h3>Go to LinkedIn Developer Portal</h3><p><a href="https://www.linkedin.com/developers/apps">linkedin.com/developers/apps</a> &rarr; "Create app"</p></div>
+<div class="step" data-num="2"><h3>Request OpenID Connect product</h3><p>"Products" tab &rarr; Request <strong>"Sign In with LinkedIn using OpenID Connect"</strong></p></div>
+<div class="step" data-num="3"><h3>Add redirect URL</h3><p>"Auth" tab &rarr; Authorized redirect URLs:</p><div class="url-box">https://api.qestro.app/api/auth/linkedin/callback</div></div>
+<table class="env-table"><tr><th>Variable</th><th>Value</th></tr><tr><td><code onclick="copy(this)">LINKEDIN_OAUTH_CLIENT_ID</code></td><td>Client ID from Auth tab</td></tr><tr><td><code onclick="copy(this)">LINKEDIN_OAUTH_CLIENT_SECRET</code></td><td>Client Secret from Auth tab</td></tr></table>
+<div class="scope-list"><span class="scope">openid</span><span class="scope">profile</span><span class="scope">email</span></div>
+</div></div>
+
+<!-- Apple -->
+<div class="card">
+<div class="card-header" onclick="toggle(this.parentElement)"><h2><div class="icon" style="background:#000"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11"/></svg></div> Apple Sign-In <span class="badge badge-new">NEW</span></h2><span class="chevron">&#9654;</span></div>
+<div class="card-body">
+<div class="warn">Requires Apple Developer Program ($99/yr). Client secret is a signed JWT from a .p8 key.</div>
+<div class="step" data-num="1"><h3>Create Services ID</h3><p><a href="https://developer.apple.com/account/resources/identifiers">Apple Identifiers</a> &rarr; Register "Services ID"</p></div>
+<div class="step" data-num="2"><h3>Enable Sign In with Apple</h3><p>Configure, add domain <code>api.qestro.app</code></p></div>
+<div class="step" data-num="3"><h3>Add return URL</h3><div class="url-box">https://api.qestro.app/api/auth/apple/callback</div><div class="warn">Apple uses <code>form_post</code> — callback receives POST, not GET.</div></div>
+<table class="env-table"><tr><th>Variable</th><th>Value</th></tr><tr><td><code onclick="copy(this)">APPLE_CLIENT_ID</code></td><td>Services ID identifier</td></tr><tr><td><code onclick="copy(this)">APPLE_CLIENT_SECRET</code></td><td>Signed JWT from .p8 key</td></tr></table>
+<div class="scope-list"><span class="scope">name</span><span class="scope">email</span></div>
+</div></div>
+
+<!-- Discord -->
+<div class="card">
+<div class="card-header" onclick="toggle(this.parentElement)"><h2><div class="icon" style="background:#5865F2"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M20.317 4.37a19.79 19.79 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.865-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.618-1.25.077.077 0 00-.079-.037A19.74 19.74 0 003.677 4.37a.07.07 0 00-.032.028C.533 9.046-.32 13.58.099 18.058a.082.082 0 00.031.056 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.873-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.11 13.11 0 01-1.872-.892.077.077 0 01-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 01.078-.01c3.928 1.793 8.18 1.793 12.061 0a.074.074 0 01.079.009c.12.1.245.198.372.292a.077.077 0 01-.006.128 12.3 12.3 0 01-1.873.891.076.076 0 00-.041.107c.36.698.772 1.363 1.225 1.993a.076.076 0 00.084.029 19.84 19.84 0 006.002-3.03.077.077 0 00.031-.055c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.029z"/></svg></div> Discord <span class="badge badge-new">NEW</span></h2><span class="chevron">&#9654;</span></div>
+<div class="card-body">
+<div class="step" data-num="1"><h3>Go to Discord Developer Portal</h3><p><a href="https://discord.com/developers/applications">discord.com/developers</a> &rarr; "New Application"</p></div>
+<div class="step" data-num="2"><h3>Configure OAuth2</h3><p>Sidebar &rarr; "OAuth2". Copy Client ID, generate Client Secret.</p></div>
+<div class="step" data-num="3"><h3>Add redirect</h3><div class="url-box">https://api.qestro.app/api/auth/discord/callback</div></div>
+<table class="env-table"><tr><th>Variable</th><th>Value</th></tr><tr><td><code onclick="copy(this)">DISCORD_OAUTH_CLIENT_ID</code></td><td>Application ID</td></tr><tr><td><code onclick="copy(this)">DISCORD_OAUTH_CLIENT_SECRET</code></td><td>Client Secret</td></tr></table>
+<div class="scope-list"><span class="scope">identify</span><span class="scope">email</span></div>
+</div></div>
+
+<!-- Twitter -->
+<div class="card">
+<div class="card-header" onclick="toggle(this.parentElement)"><h2><div class="icon" style="background:#000"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></div> Twitter / X <span class="badge badge-new">NEW</span></h2><span class="chevron">&#9654;</span></div>
+<div class="card-body">
+<div class="step" data-num="1"><h3>Go to Twitter Developer Portal</h3><p><a href="https://developer.twitter.com/en/portal/projects-and-apps">developer.twitter.com</a> &rarr; Create project + app</p></div>
+<div class="step" data-num="2"><h3>Enable OAuth 2.0</h3><p>User auth settings &rarr; OAuth 2.0 &rarr; Type: <strong>Web App (Confidential)</strong></p></div>
+<div class="step" data-num="3"><h3>Add callback</h3><div class="url-box">https://api.qestro.app/api/auth/twitter/callback</div><div class="tip">PKCE (S256) is required by Twitter. Qestro handles this automatically.</div></div>
+<table class="env-table"><tr><th>Variable</th><th>Value</th></tr><tr><td><code onclick="copy(this)">TWITTER_OAUTH_CLIENT_ID</code></td><td>OAuth 2.0 Client ID</td></tr><tr><td><code onclick="copy(this)">TWITTER_OAUTH_CLIENT_SECRET</code></td><td>OAuth 2.0 Client Secret</td></tr></table>
+<div class="scope-list"><span class="scope">users.read</span><span class="scope">tweet.read</span></div>
+</div></div>
+
+<h2 class="section-title">Security</h2>
+<div class="card open"><div class="card-body" style="padding-top:1.5rem">
+<div class="tip"><strong>PKCE (S256)</strong> enabled on all flows. Prevents code interception attacks.</div>
+<div class="tip"><strong>State parameter</strong> — UUID-based CSRF protection, single-use, 10-minute TTL.</div>
+<div class="warn"><strong>Generate JWT secret:</strong> <code onclick="copy(this)">openssl rand -base64 32</code></div>
+<div class="warn"><strong>Deploy secrets:</strong> <code onclick="copy(this)">wrangler secret put GOOGLE_OAUTH_CLIENT_ID</code></div>
+</div></div>
+
+<h2 class="section-title">All Environment Variables</h2>
+<div class="card open"><div class="card-body" style="padding-top:1.5rem">
+<table class="env-table">
+<tr><th>Variable</th><th>Provider</th><th>Required</th></tr>
+<tr><td><code onclick="copy(this)">JWT_SECRET</code></td><td>Core</td><td>Yes</td></tr>
+<tr><td><code onclick="copy(this)">GOOGLE_OAUTH_CLIENT_ID</code></td><td>Google</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">GOOGLE_OAUTH_CLIENT_SECRET</code></td><td>Google</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">GITHUB_OAUTH_CLIENT_ID</code></td><td>GitHub</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">GITHUB_OAUTH_CLIENT_SECRET</code></td><td>GitHub</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">AZURE_OAUTH_CLIENT_ID</code></td><td>Microsoft</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">AZURE_OAUTH_CLIENT_SECRET</code></td><td>Microsoft</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">AZURE_TENANT_ID</code></td><td>Microsoft</td><td>Default: common</td></tr>
+<tr><td><code onclick="copy(this)">LINKEDIN_OAUTH_CLIENT_ID</code></td><td>LinkedIn</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">LINKEDIN_OAUTH_CLIENT_SECRET</code></td><td>LinkedIn</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">APPLE_CLIENT_ID</code></td><td>Apple</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">APPLE_CLIENT_SECRET</code></td><td>Apple</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">DISCORD_OAUTH_CLIENT_ID</code></td><td>Discord</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">DISCORD_OAUTH_CLIENT_SECRET</code></td><td>Discord</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">TWITTER_OAUTH_CLIENT_ID</code></td><td>Twitter</td><td>Optional</td></tr>
+<tr><td><code onclick="copy(this)">TWITTER_OAUTH_CLIENT_SECRET</code></td><td>Twitter</td><td>Optional</td></tr>
+</table></div></div>
+
+<h2 class="section-title">Troubleshooting</h2>
+<div class="card open"><div class="card-body" style="padding-top:1.5rem">
+<div class="step" data-num="!"><h3>redirect_uri_mismatch</h3><p>Callback URL doesn't match exactly. Check trailing slashes, http vs https, port numbers.</p></div>
+<div class="step" data-num="!"><h3>invalid_client</h3><p>Wrong client ID or secret. Re-copy from provider console. Check <code>wrangler secret list</code>.</p></div>
+<div class="step" data-num="!"><h3>CORS errors</h3><p>OAuth uses server-side 302 redirects, not AJAX. Use <code>window.location.href</code>, not fetch.</p></div>
+<div class="step" data-num="!"><h3>Apple form_post fails</h3><p>Apple POSTs to callback. Qestro has both GET and POST handlers registered.</p></div>
+</div></div>
+
+<footer>Qestro Auth Setup Guide &mdash; Generated 2026-04-09 &mdash; All flows use PKCE (S256) + state CSRF protection</footer>
+</div>
+<script>function toggle(c){c.classList.toggle('open')}function copy(e){navigator.clipboard.writeText(e.textContent)}</script>
+</body>
+</html>

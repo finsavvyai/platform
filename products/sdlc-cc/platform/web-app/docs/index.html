@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation — SDLC.ai</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --blue: #0071e3;
+            --blue-hover: #0077ED;
+            --green: #34c759;
+            --red: #ff3b30;
+            --orange: #ff9f0a;
+            --purple: #af52de;
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-tertiary: #86868b;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f7;
+            --bg-dark: #1d1d1f;
+            --border: #d2d2d7;
+            --border-light: #e8e8ed;
+            --sidebar-w: 240px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+            display: flex; min-height: 100vh;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: var(--sidebar-w); background: var(--bg-secondary);
+            border-right: 1px solid var(--border-light);
+            position: fixed; top: 0; left: 0; bottom: 0; z-index: 30;
+            overflow-y: auto;
+        }
+        .sidebar-logo {
+            padding: 20px 20px 16px;
+            display: flex; align-items: center; gap: 10px;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .sidebar-logo a { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text-primary); }
+        .sidebar-logo .icon {
+            width: 28px; height: 28px; background: var(--text-primary);
+            border-radius: 6px; display: flex; align-items: center; justify-content: center;
+        }
+        .sidebar-logo .icon i { color: #fff; font-size: 12px; }
+        .sidebar-logo span { font-size: 14px; font-weight: 700; }
+        .sidebar-logo .docs-badge {
+            font-size: 10px; font-weight: 700; background: var(--blue);
+            color: #fff; padding: 2px 6px; border-radius: 4px; margin-left: 4px;
+        }
+
+        .nav-section { padding: 16px 12px 4px; font-size: 10px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+        .nav-link {
+            display: block; padding: 7px 12px 7px 16px; font-size: 13px;
+            color: var(--text-secondary); text-decoration: none;
+            border-radius: 8px; margin: 1px 8px; transition: all 0.12s;
+        }
+        .nav-link:hover { background: rgba(0,0,0,0.04); color: var(--text-primary); }
+        .nav-link.active { background: rgba(0,113,227,0.1); color: var(--blue); font-weight: 600; }
+        .nav-link .method {
+            font-size: 9px; font-weight: 700; padding: 1px 5px;
+            border-radius: 3px; margin-right: 6px; font-family: 'SF Mono', monospace;
+        }
+        .method.get { background: rgba(52,199,89,0.15); color: var(--green); }
+        .method.post { background: rgba(0,113,227,0.12); color: var(--blue); }
+        .method.delete { background: rgba(255,59,48,0.12); color: var(--red); }
+
+        /* ── Main ── */
+        .main { margin-left: var(--sidebar-w); flex: 1; }
+        .topbar {
+            background: var(--bg-primary); border-bottom: 1px solid var(--border-light);
+            padding: 14px 32px; display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 20;
+        }
+        .search-box {
+            display: flex; align-items: center; gap: 8px;
+            background: var(--bg-secondary); border: 1px solid var(--border-light);
+            border-radius: 10px; padding: 8px 14px; width: 320px;
+        }
+        .search-box i { color: var(--text-tertiary); font-size: 13px; }
+        .search-box input { border: none; background: none; font-size: 13px; font-family: inherit; color: var(--text-primary); outline: none; width: 100%; }
+        .search-box kbd { font-size: 10px; background: var(--bg-primary); border: 1px solid var(--border-light); padding: 1px 5px; border-radius: 4px; color: var(--text-tertiary); }
+        .topbar-links { display: flex; gap: 16px; }
+        .topbar-link { font-size: 13px; color: var(--text-secondary); text-decoration: none; font-weight: 500; }
+        .topbar-link:hover { color: var(--blue); }
+
+        .content { max-width: 860px; margin: 0 auto; padding: 40px 32px 80px; }
+
+        /* ── Typography ── */
+        .doc-section { margin-bottom: 56px; scroll-margin-top: 80px; }
+        .doc-section h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; }
+        .doc-section h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; margin-top: 40px; }
+        .doc-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; margin-top: 28px; }
+        .doc-section p { font-size: 15px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 16px; }
+        .doc-section ul { padding-left: 20px; margin-bottom: 16px; }
+        .doc-section li { font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 6px; }
+
+        /* ── Code blocks ── */
+        .code-block {
+            background: var(--bg-dark); border-radius: 14px;
+            margin-bottom: 20px; overflow: hidden;
+        }
+        .code-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 16px; background: rgba(255,255,255,0.06);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .code-lang { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.5); text-transform: uppercase; }
+        .code-copy {
+            font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.4);
+            background: none; border: none; cursor: pointer; font-family: inherit;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .code-copy:hover { color: rgba(255,255,255,0.8); }
+        pre {
+            padding: 16px; font-size: 13px; line-height: 1.6; overflow-x: auto;
+            color: #e5e5e5; font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+        pre .comment { color: #6a737d; }
+        pre .keyword { color: #ff7b72; }
+        pre .string { color: #a5d6ff; }
+        pre .function { color: #d2a8ff; }
+        pre .number { color: #79c0ff; }
+
+        /* ── Endpoint card ── */
+        .endpoint {
+            border: 1px solid var(--border-light); border-radius: 14px;
+            margin-bottom: 20px; overflow: hidden;
+        }
+        .endpoint-header {
+            display: flex; align-items: center; gap: 12px;
+            padding: 14px 18px; background: var(--bg-secondary);
+            cursor: pointer;
+        }
+        .endpoint-method {
+            font-size: 11px; font-weight: 700; padding: 3px 8px;
+            border-radius: 5px; font-family: 'SF Mono', monospace;
+        }
+        .endpoint-method.get { background: rgba(52,199,89,0.15); color: var(--green); }
+        .endpoint-method.post { background: rgba(0,113,227,0.12); color: var(--blue); }
+        .endpoint-method.delete { background: rgba(255,59,48,0.12); color: var(--red); }
+        .endpoint-path { font-size: 14px; font-weight: 600; font-family: 'SF Mono', monospace; }
+        .endpoint-desc { font-size: 13px; color: var(--text-secondary); margin-left: auto; }
+        .endpoint-body { padding: 18px; border-top: 1px solid var(--border-light); }
+
+        /* ── Param table ── */
+        .param-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        .param-table th {
+            text-align: left; padding: 8px 12px; font-size: 11px;
+            font-weight: 600; color: var(--text-tertiary); text-transform: uppercase;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .param-table td { padding: 8px 12px; font-size: 13px; border-bottom: 1px solid var(--border-light); }
+        .param-table code { font-family: 'SF Mono', monospace; font-size: 12px; background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px; }
+        .param-required { font-size: 10px; font-weight: 700; color: var(--red); }
+        .param-optional { font-size: 10px; font-weight: 700; color: var(--text-tertiary); }
+
+        /* ── Info boxes ── */
+        .info-box {
+            padding: 14px 18px; border-radius: 12px; margin-bottom: 16px;
+            font-size: 13px; line-height: 1.6; display: flex; gap: 10px;
+        }
+        .info-box.tip { background: rgba(52,199,89,0.08); border: 1px solid rgba(52,199,89,0.15); color: #1a7a2e; }
+        .info-box.warning { background: rgba(255,159,10,0.08); border: 1px solid rgba(255,159,10,0.15); color: #996100; }
+        .info-box.danger { background: rgba(255,59,48,0.08); border: 1px solid rgba(255,59,48,0.15); color: #cc0000; }
+        .info-box i { margin-top: 2px; flex-shrink: 0; }
+
+        /* ── Tabs ── */
+        .lang-tabs { display: flex; gap: 2px; margin-bottom: 0; }
+        .lang-tab {
+            padding: 6px 14px; font-size: 12px; font-weight: 600;
+            border-radius: 8px 8px 0 0; cursor: pointer;
+            color: var(--text-secondary); background: var(--bg-secondary);
+            border: none; font-family: inherit; transition: all 0.12s;
+        }
+        .lang-tab.active { background: var(--bg-dark); color: #fff; }
+
+        /* ── Status codes ── */
+        .status-code { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; margin-right: 4px; }
+        .status-code.s200 { background: rgba(52,199,89,0.12); color: var(--green); }
+        .status-code.s400 { background: rgba(255,159,10,0.12); color: var(--orange); }
+        .status-code.s401 { background: rgba(255,59,48,0.12); color: var(--red); }
+        .status-code.s429 { background: rgba(175,82,222,0.12); color: var(--purple); }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+            .search-box { width: 200px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══════ SIDEBAR ═══════ -->
+<aside class="sidebar">
+    <div class="sidebar-logo">
+        <a href="../landing/">
+            <div class="icon"><i class="fas fa-shield-alt"></i></div>
+            <span>SDLC.ai</span>
+            <span class="docs-badge">DOCS</span>
+        </a>
+    </div>
+
+    <div class="nav-section">Getting Started</div>
+    <a class="nav-link active" href="#introduction">Introduction</a>
+    <a class="nav-link" href="#quickstart">Quickstart</a>
+    <a class="nav-link" href="#authentication">Authentication</a>
+
+    <div class="nav-section">API Reference</div>
+    <a class="nav-link" href="#completions"><span class="method post">POST</span> Completions</a>
+    <a class="nav-link" href="#scan"><span class="method post">POST</span> Scan Text</a>
+    <a class="nav-link" href="#scan-file"><span class="method post">POST</span> Scan File</a>
+    <a class="nav-link" href="#audit-logs"><span class="method get">GET</span> Audit Logs</a>
+    <a class="nav-link" href="#keys"><span class="method post">POST</span> Create API Key</a>
+    <a class="nav-link" href="#keys-revoke"><span class="method delete">DEL</span> Revoke Key</a>
+
+    <div class="nav-section">SDKs</div>
+    <a class="nav-link" href="#sdk-node">Node.js / TypeScript</a>
+    <a class="nav-link" href="#sdk-python">Python</a>
+    <a class="nav-link" href="#sdk-go">Go</a>
+
+    <div class="nav-section">Guides</div>
+    <a class="nav-link" href="#guide-openai">OpenAI Integration</a>
+    <a class="nav-link" href="#guide-claude">Anthropic Integration</a>
+    <a class="nav-link" href="#guide-policies">Compliance Policies</a>
+
+    <div class="nav-section">Reference</div>
+    <a class="nav-link" href="#errors">Error Codes</a>
+    <a class="nav-link" href="#rate-limits">Rate Limits</a>
+    <a class="nav-link" href="#changelog">Changelog</a>
+
+    <div style="padding:16px 12px;">
+        <a href="../dashboard/" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-tertiary);text-decoration:none;">
+            <i class="fas fa-arrow-left"></i> Dashboard
+        </a>
+    </div>
+</aside>
+
+<!-- ═══════ MAIN ═══════ -->
+<div class="main">
+    <div class="topbar">
+        <div class="search-box">
+            <i class="fas fa-search"></i>
+            <input placeholder="Search documentation...">
+            <kbd>/</kbd>
+        </div>
+        <div class="topbar-links">
+            <a class="topbar-link" href="../landing/">Home</a>
+            <a class="topbar-link" href="../dashboard/">Dashboard</a>
+            <a class="topbar-link" href="https://github.com/sdlc-ai" target="_blank">GitHub</a>
+            <a class="topbar-link" href="#changelog">v2.4.0</a>
+        </div>
+    </div>
+
+    <div class="content">
+
+        <!-- ═══ INTRODUCTION ═══ -->
+        <section class="doc-section" id="introduction">
+            <h1>SDLC.ai API Documentation</h1>
+            <p>SDLC.ai is an AI compliance middleware that sits between your application and AI providers (OpenAI, Anthropic, Google). It automatically detects and redacts PII, generates audit trails, and ensures regulatory compliance — all with a single line of code.</p>
+
+            <div class="info-box tip">
+                <i class="fas fa-lightbulb"></i>
+                <div><strong>Zero-knowledge architecture.</strong> Your data never touches our servers. PII detection and redaction happens in-memory at the edge. We process, redact, forward, and immediately discard.</div>
+            </div>
+
+            <h3>Base URL</h3>
+            <div class="code-block">
+                <pre>https://api.sdlc.cc/v1</pre>
+            </div>
+
+            <h3>Key Features</h3>
+            <ul>
+                <li><strong>Drop-in proxy</strong> — works with any OpenAI-compatible client by changing one line</li>
+                <li><strong>12+ PII types</strong> — SSN, email, phone, credit card, medical records, IP addresses, and more</li>
+                <li><strong>File scanning</strong> — automatically scan CSV, JSON, TXT, and other attachments</li>
+                <li><strong>Audit trails</strong> — every request logged with PII detection details</li>
+                <li><strong>&lt;50ms overhead</strong> — edge processing with minimal latency impact</li>
+                <li><strong>SOC 2, HIPAA, GDPR</strong> — compliant out of the box</li>
+            </ul>
+        </section>
+
+        <!-- ═══ QUICKSTART ═══ -->
+        <section class="doc-section" id="quickstart">
+            <h2>Quickstart</h2>
+            <p>Get up and running in under 5 minutes. Just change your base URL — that's it.</p>
+
+            <h3>1. Get your API key</h3>
+            <p>Sign up at <a href="../auth/" style="color:var(--blue);font-weight:600;">sdlc.cc</a> and generate an API key from the <a href="../dashboard/" style="color:var(--blue);font-weight:600;">dashboard</a>.</p>
+
+            <h3>2. Change one line of code</h3>
+            <div class="lang-tabs">
+                <button class="lang-tab active" onclick="showLang(this,'qs')">Node.js</button>
+                <button class="lang-tab" onclick="showLang(this,'qs')">Python</button>
+                <button class="lang-tab" onclick="showLang(this,'qs')">cURL</button>
+            </div>
+            <div class="code-block" style="border-radius:0 14px 14px 14px;">
+                <div class="code-header"><span class="code-lang" id="qs-lang">Node.js</span><button class="code-copy" onclick="copyCode(this)"><i class="fas fa-copy"></i> Copy</button></div>
+<pre id="qs-code"><span class="keyword">import</span> OpenAI <span class="keyword">from</span> <span class="string">'openai'</span>;
+
+<span class="keyword">const</span> openai = <span class="keyword">new</span> <span class="function">OpenAI</span>({
+  apiKey: <span class="string">'sk-your-openai-key'</span>,
+  <span class="comment">// Add this one line for compliance</span>
+  baseURL: <span class="string">'https://api.sdlc.cc/v1'</span>,
+  defaultHeaders: {
+    <span class="string">'X-SDLC-Key'</span>: <span class="string">'sk-sdlc-your-key'</span>
+  }
+});
+
+<span class="comment">// That's it! Use OpenAI normally — PII is auto-redacted</span>
+<span class="keyword">const</span> response = <span class="keyword">await</span> openai.chat.completions.<span class="function">create</span>({
+  model: <span class="string">'gpt-4'</span>,
+  messages: [{ role: <span class="string">'user'</span>, content: <span class="string">'Analyze this customer data...'</span> }]
+});</pre>
+            </div>
+
+            <h3>3. Verify in your dashboard</h3>
+            <p>Every request now appears in your <a href="../dashboard/" style="color:var(--blue);font-weight:600;">audit trail</a> with PII detection details, redaction status, and provider metadata.</p>
+
+            <div class="info-box tip">
+                <i class="fas fa-check-circle"></i>
+                <div><strong>That's it!</strong> Every request through SDLC.ai is automatically scanned for PII. Sensitive data is redacted before reaching the AI provider, and a full audit log is kept.</div>
+            </div>
+        </section>
+
+        <!-- ═══ AUTHENTICATION ═══ -->
+        <section class="doc-section" id="authentication">
+            <h2>Authentication</h2>
+            <p>All API requests require two keys: your AI provider key and your SDLC.ai key.</p>
+
+            <table class="param-table">
+                <thead><tr><th>Header</th><th>Description</th><th></th></tr></thead>
+                <tbody>
+                    <tr><td><code>Authorization</code></td><td>Your AI provider API key (e.g. OpenAI, Anthropic)</td><td><span class="param-required">required</span></td></tr>
+                    <tr><td><code>X-SDLC-Key</code></td><td>Your SDLC.ai API key from the dashboard</td><td><span class="param-required">required</span></td></tr>
+                    <tr><td><code>X-SDLC-Policy</code></td><td>Override default compliance policy (e.g. <code>strict</code>, <code>permissive</code>)</td><td><span class="param-optional">optional</span></td></tr>
+                </tbody>
+            </table>
+
+            <div class="info-box warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                <div><strong>Keep your keys secure.</strong> Never expose API keys in client-side code. Use environment variables and rotate keys regularly from the <a href="../dashboard/" style="color:inherit;font-weight:600;">API Keys</a> panel.</div>
+            </div>
+        </section>
+
+        <!-- ═══ POST /v1/chat/completions ═══ -->
+        <section class="doc-section" id="completions">
+            <h2>API Reference</h2>
+
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="endpoint-method post">POST</span>
+                    <span class="endpoint-path">/v1/chat/completions</span>
+                    <span class="endpoint-desc">Proxy to AI provider with PII protection</span>
+                </div>
+                <div class="endpoint-body">
+                    <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px;">Drop-in replacement for the OpenAI chat completions endpoint. Requests are scanned for PII, redacted, forwarded to the provider, and logged.</p>
+
+                    <h3>Request Body</h3>
+                    <table class="param-table">
+                        <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>model</code></td><td>string</td><td>Model ID (e.g. <code>gpt-4</code>, <code>claude-3-opus</code>)</td></tr>
+                            <tr><td><code>messages</code></td><td>array</td><td>Array of message objects with <code>role</code> and <code>content</code></td></tr>
+                            <tr><td><code>temperature</code></td><td>number</td><td>Sampling temperature (0–2). Optional.</td></tr>
+                            <tr><td><code>stream</code></td><td>boolean</td><td>Enable streaming responses. Default: <code>false</code></td></tr>
+                        </tbody>
+                    </table>
+
+                    <h3>Response</h3>
+                    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">Standard OpenAI-compatible response with additional SDLC.ai headers:</p>
+                    <table class="param-table">
+                        <thead><tr><th>Header</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>X-SDLC-Request-Id</code></td><td>Unique audit trail ID for this request</td></tr>
+                            <tr><td><code>X-SDLC-PII-Detected</code></td><td>Number of PII entities found</td></tr>
+                            <tr><td><code>X-SDLC-PII-Types</code></td><td>Comma-separated PII types (e.g. <code>ssn,email,phone</code>)</td></tr>
+                            <tr><td><code>X-SDLC-Latency-Ms</code></td><td>Processing latency added by SDLC.ai</td></tr>
+                        </tbody>
+                    </table>
+
+                    <div class="code-block">
+                        <div class="code-header"><span class="code-lang">Response Example</span><button class="code-copy" onclick="copyCode(this)"><i class="fas fa-copy"></i> Copy</button></div>
+<pre>{
+  <span class="string">"id"</span>: <span class="string">"chatcmpl-abc123"</span>,
+  <span class="string">"object"</span>: <span class="string">"chat.completion"</span>,
+  <span class="string">"model"</span>: <span class="string">"gpt-4"</span>,
+  <span class="string">"choices"</span>: [{
+    <span class="string">"message"</span>: {
+      <span class="string">"role"</span>: <span class="string">"assistant"</span>,
+      <span class="string">"content"</span>: <span class="string">"Based on the data provided..."</span>
+    }
+  }],
+  <span class="string">"usage"</span>: { <span class="string">"prompt_tokens"</span>: <span class="number">142</span>, <span class="string">"completion_tokens"</span>: <span class="number">89</span> },
+  <span class="string">"sdlc"</span>: {
+    <span class="string">"request_id"</span>: <span class="string">"req_7f8a2b3c"</span>,
+    <span class="string">"pii_detected"</span>: <span class="number">3</span>,
+    <span class="string">"pii_types"</span>: [<span class="string">"ssn"</span>, <span class="string">"email"</span>],
+    <span class="string">"action"</span>: <span class="string">"redacted"</span>,
+    <span class="string">"latency_ms"</span>: <span class="number">38</span>
+  }
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ POST /v1/scan ═══ -->
+        <section class="doc-section" id="scan">
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="endpoint-method post">POST</span>
+                    <span class="endpoint-path">/v1/scan</span>
+                    <span class="endpoint-desc">Scan text for PII without forwarding</span>
+                </div>
+                <div class="endpoint-body">
+                    <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px;">Standalone PII detection. Scans text and returns detected entities without forwarding to any AI provider.</p>
+                    <table class="param-table">
+                        <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>text</code></td><td>string</td><td>The text to scan for PII</td></tr>
+                            <tr><td><code>types</code></td><td>array</td><td>Optional filter: only detect these PII types</td></tr>
+                            <tr><td><code>redact</code></td><td>boolean</td><td>Return redacted version. Default: <code>true</code></td></tr>
+                        </tbody>
+                    </table>
+
+                    <div class="code-block">
+                        <div class="code-header"><span class="code-lang">cURL</span><button class="code-copy" onclick="copyCode(this)"><i class="fas fa-copy"></i> Copy</button></div>
+<pre>curl -X POST https://api.sdlc.cc/v1/scan \
+  -H <span class="string">"X-SDLC-Key: sk-sdlc-your-key"</span> \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{
+    "text": "Contact John at john@acme.com or 555-0123. SSN: 123-45-6789",
+    "redact": true
+  }'</span></pre>
+                    </div>
+                    <div class="code-block">
+                        <div class="code-header"><span class="code-lang">Response</span></div>
+<pre>{
+  <span class="string">"redacted"</span>: <span class="string">"Contact John at [EMAIL_REDACTED] or [PHONE_REDACTED]. SSN: [SSN_REDACTED]"</span>,
+  <span class="string">"entities"</span>: [
+    { <span class="string">"type"</span>: <span class="string">"email"</span>, <span class="string">"value"</span>: <span class="string">"j***@acme.com"</span>, <span class="string">"start"</span>: <span class="number">20</span>, <span class="string">"end"</span>: <span class="number">33</span> },
+    { <span class="string">"type"</span>: <span class="string">"phone"</span>, <span class="string">"value"</span>: <span class="string">"555-****"</span>, <span class="string">"start"</span>: <span class="number">37</span>, <span class="string">"end"</span>: <span class="number">45</span> },
+    { <span class="string">"type"</span>: <span class="string">"ssn"</span>, <span class="string">"value"</span>: <span class="string">"***-**-****"</span>, <span class="string">"start"</span>: <span class="number">52</span>, <span class="string">"end"</span>: <span class="number">63</span> }
+  ],
+  <span class="string">"pii_count"</span>: <span class="number">3</span>
+}</pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ POST /v1/scan/file ═══ -->
+        <section class="doc-section" id="scan-file">
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="endpoint-method post">POST</span>
+                    <span class="endpoint-path">/v1/scan/file</span>
+                    <span class="endpoint-desc">Scan file attachments for PII</span>
+                </div>
+                <div class="endpoint-body">
+                    <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px;">Upload a file to scan for PII. Supports CSV, JSON, TXT, XML, HTML, TSV, MD, and LOG files up to 10 MB.</p>
+                    <table class="param-table">
+                        <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>file</code></td><td>multipart</td><td>The file to scan (multipart/form-data)</td></tr>
+                            <tr><td><code>redact</code></td><td>boolean</td><td>Return redacted file content. Default: <code>true</code></td></tr>
+                        </tbody>
+                    </table>
+                    <div class="code-block">
+                        <div class="code-header"><span class="code-lang">cURL</span><button class="code-copy" onclick="copyCode(this)"><i class="fas fa-copy"></i> Copy</button></div>
+<pre>curl -X POST https://api.sdlc.cc/v1/scan/file \
+  -H <span class="string">"X-SDLC-Key: sk-sdlc-your-key"</span> \
+  -F <span class="string">"file=@patient-records.csv"</span> \
+  -F <span class="string">"redact=true"</span></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ GET /v1/audit ═══ -->
+        <section class="doc-section" id="audit-logs">
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="endpoint-method get">GET</span>
+                    <span class="endpoint-path">/v1/audit</span>
+                    <span class="endpoint-desc">Retrieve audit trail logs</span>
+                </div>
+                <div class="endpoint-body">
+                    <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px;">Query your organization's audit trail. Supports filtering, pagination, and date ranges.</p>
+                    <table class="param-table">
+                        <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>start_date</code></td><td>string</td><td>ISO 8601 start date</td></tr>
+                            <tr><td><code>end_date</code></td><td>string</td><td>ISO 8601 end date</td></tr>
+                            <tr><td><code>pii_type</code></td><td>string</td><td>Filter by PII type (e.g. <code>ssn</code>, <code>email</code>)</td></tr>
+                            <tr><td><code>action</code></td><td>string</td><td>Filter by action: <code>redacted</code>, <code>blocked</code>, <code>passed</code></td></tr>
+                            <tr><td><code>limit</code></td><td>integer</td><td>Results per page (max 100). Default: 50</td></tr>
+                            <tr><td><code>cursor</code></td><td>string</td><td>Pagination cursor from previous response</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ API Keys endpoints ═══ -->
+        <section class="doc-section" id="keys">
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="endpoint-method post">POST</span>
+                    <span class="endpoint-path">/v1/keys</span>
+                    <span class="endpoint-desc">Create a new API key</span>
+                </div>
+                <div class="endpoint-body">
+                    <table class="param-table">
+                        <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>name</code></td><td>string</td><td>Human-readable key name</td></tr>
+                            <tr><td><code>environment</code></td><td>string</td><td><code>production</code>, <code>staging</code>, or <code>development</code></td></tr>
+                            <tr><td><code>ip_allowlist</code></td><td>array</td><td>Optional list of allowed IP addresses</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="doc-section" id="keys-revoke">
+            <div class="endpoint">
+                <div class="endpoint-header">
+                    <span class="endpoint-method delete">DELETE</span>
+                    <span class="endpoint-path">/v1/keys/{key_id}</span>
+                    <span class="endpoint-desc">Revoke an API key</span>
+                </div>
+                <div class="endpoint-body">
+                    <p style="font-size:14px;color:var(--text-secondary);margin-bottom:8px;">Immediately revokes the specified key. This action cannot be undone.</p>
+                    <div class="info-box danger"><i class="fas fa-exclamation-circle"></i><div><strong>Destructive action.</strong> Any applications using this key will immediately lose access.</div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ SDKs ═══ -->
+        <section class="doc-section" id="sdk-node">
+            <h2>SDKs</h2>
+            <h3>Node.js / TypeScript</h3>
+            <div class="code-block">
+                <div class="code-header"><span class="code-lang">Install</span><button class="code-copy" onclick="copyCode(this)"><i class="fas fa-copy"></i> Copy</button></div>
+<pre>npm install @sdlc-ai/node</pre>
+            </div>
+            <div class="code-block">
+                <div class="code-header"><span class="code-lang">Usage</span><button class="code-copy" onclick="copyCode(this)"><i class="fas fa-copy"></i> Copy</button></div>
+<pre><span class="keyword">import</span> { SDLCClient } <span class="keyword">from</span> <span class="string">'@sdlc-ai/node'</span>;
+
+<span class="keyword">const</span> sdlc = <span class="keyword">new</span> <span class="function">SDLCClient</span>({
+  sdlcKey: process.env.SDLC_API_KEY,
+  providerKey: process.env.OPENAI_API_KEY,
+});
+
+<span class="comment">// Proxy completion with auto PII protection</span>
+<span class="keyword">const</span> result = <span class="keyword">await</span> sdlc.<span class="function">complete</span>({
+  model: <span class="string">'gpt-4'</span>,
+  messages: [{ role: <span class="string">'user'</span>, content: userInput }]
+});
+
+<span class="comment">// Standalone scan</span>
+<span class="keyword">const</span> scan = <span class="keyword">await</span> sdlc.<span class="function">scan</span>(<span class="string">'SSN: 123-45-6789'</span>);
+console.<span class="function">log</span>(scan.entities); <span class="comment">// [{ type: 'ssn', ... }]</span></pre>
+            </div>
+        </section>
+
+        <section class="doc-section" id="sdk-python">
+            <h3>Python</h3>
+            <div class="code-block">
+                <div class="code-header"><span class="code-lang">Install</span><button class="code-copy" onclick="copyCode(this)"><i class="fas fa-copy"></i> Copy</button></div>
+<pre>pip install sdlc-ai</pre>
+            </div>
+            <div class="code-block">
+                <div class="code-header"><span class="code-lang">Usage</span><button class="code-copy" onclick="copyCode(this)"><i class="fas fa-copy"></i> Copy</button></div>
+<pre><span class="keyword">from</span> sdlc_ai <span class="keyword">import</span> SDLCClient
+
+client = <span class="function">SDLCClient</span>(
+    sdlc_key=<span class="string">"sk-sdlc-your-key"</span>,
+    provider_key=<span class="string">"sk-your-openai-key"</span>
+)
+
+<span class="comment"># Protected completion</span>
+response = client.<span class="function">complete</span>(
+    model=<span class="string">"gpt-4"</span>,
+    messages=[{<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: user_input}]
+)
+
+<span class="comment"># Standalone scan</span>
+result = client.<span class="function">scan</span>(<span class="string">"Email: jane@corp.com, SSN: 987-65-4321"</span>)
+<span class="keyword">print</span>(result.redacted)  <span class="comment"># "Email: [EMAIL_REDACTED], SSN: [SSN_REDACTED]"</span></pre>
+            </div>
+        </section>
+
+        <section class="doc-section" id="sdk-go">
+            <h3>Go</h3>
+            <div class="code-block">
+                <div class="code-header"><span class="code-lang">Install</span><button class="code-copy" onclick="copyCode(this)"><i class="fas fa-copy"></i> Copy</button></div>
+<pre>go get github.com/sdlc-ai/go-sdk</pre>
+            </div>
+        </section>
+
+        <!-- ═══ GUIDES ═══ -->
+        <section class="doc-section" id="guide-openai">
+            <h2>Integration Guides</h2>
+            <h3>OpenAI</h3>
+            <p>SDLC.ai works as a transparent proxy. Simply change your <code>baseURL</code> and add the <code>X-SDLC-Key</code> header. All OpenAI features work normally — streaming, function calling, vision, assistants, etc.</p>
+            <div class="info-box tip"><i class="fas fa-bolt"></i><div>Streaming is fully supported. PII scanning happens on the prompt before it reaches OpenAI. Streamed responses pass through unchanged.</div></div>
+        </section>
+
+        <section class="doc-section" id="guide-claude">
+            <h3>Anthropic (Claude)</h3>
+            <p>For Anthropic, use the same proxy pattern. SDLC.ai automatically detects the provider from the model name and routes to the correct upstream API.</p>
+            <div class="code-block">
+                <div class="code-header"><span class="code-lang">Python</span><button class="code-copy" onclick="copyCode(this)"><i class="fas fa-copy"></i> Copy</button></div>
+<pre><span class="keyword">import</span> anthropic
+
+client = anthropic.<span class="function">Anthropic</span>(
+    api_key=<span class="string">"sk-ant-your-key"</span>,
+    base_url=<span class="string">"https://api.sdlc.cc/v1/anthropic"</span>,
+    default_headers={<span class="string">"X-SDLC-Key"</span>: <span class="string">"sk-sdlc-your-key"</span>}
+)</pre>
+            </div>
+        </section>
+
+        <section class="doc-section" id="guide-policies">
+            <h3>Compliance Policies</h3>
+            <p>Configure how SDLC.ai handles different PII types. Policies can be set globally in the dashboard or per-request via the <code>X-SDLC-Policy</code> header.</p>
+            <table class="param-table">
+                <thead><tr><th>Policy</th><th>Behavior</th></tr></thead>
+                <tbody>
+                    <tr><td><code>strict</code></td><td>Block requests containing high-risk PII (SSN, credit card, medical)</td></tr>
+                    <tr><td><code>redact</code></td><td>Replace PII with tokens before forwarding (default)</td></tr>
+                    <tr><td><code>permissive</code></td><td>Log PII detections but do not modify the request</td></tr>
+                    <tr><td><code>audit-only</code></td><td>Log everything, no redaction or blocking</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ═══ ERROR CODES ═══ -->
+        <section class="doc-section" id="errors">
+            <h2>Error Codes</h2>
+            <table class="param-table">
+                <thead><tr><th>Status</th><th>Code</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><span class="status-code s200">200</span></td><td><code>success</code></td><td>Request processed successfully</td></tr>
+                    <tr><td><span class="status-code s400">400</span></td><td><code>invalid_request</code></td><td>Missing or malformed parameters</td></tr>
+                    <tr><td><span class="status-code s401">401</span></td><td><code>unauthorized</code></td><td>Invalid or missing API key</td></tr>
+                    <tr><td><span class="status-code s401">403</span></td><td><code>pii_blocked</code></td><td>Request blocked due to high-risk PII (strict policy)</td></tr>
+                    <tr><td><span class="status-code s429">429</span></td><td><code>rate_limited</code></td><td>Too many requests. Check <code>Retry-After</code> header.</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ═══ RATE LIMITS ═══ -->
+        <section class="doc-section" id="rate-limits">
+            <h2>Rate Limits</h2>
+            <table class="param-table">
+                <thead><tr><th>Plan</th><th>Requests / min</th><th>Requests / day</th><th>File uploads / day</th></tr></thead>
+                <tbody>
+                    <tr><td><strong>Starter</strong></td><td>60</td><td>10,000</td><td>100</td></tr>
+                    <tr><td><strong>Professional</strong></td><td>300</td><td>100,000</td><td>1,000</td></tr>
+                    <tr><td><strong>Enterprise</strong></td><td>Custom</td><td>Unlimited</td><td>Unlimited</td></tr>
+                </tbody>
+            </table>
+            <p>Rate limit headers are included in every response: <code>X-RateLimit-Remaining</code>, <code>X-RateLimit-Reset</code>.</p>
+        </section>
+
+        <!-- ═══ CHANGELOG ═══ -->
+        <section class="doc-section" id="changelog">
+            <h2>Changelog</h2>
+            <h3>v2.4.0 — February 7, 2026</h3>
+            <ul>
+                <li><strong>File attachment scanning</strong> — CSV, JSON, TXT, XML, HTML, TSV, MD, LOG</li>
+                <li><strong>Anthropic Claude 3 support</strong> — full proxy compatibility</li>
+                <li><strong>Compliance policies</strong> — per-request policy override via header</li>
+                <li>Latency reduced to &lt;40ms average (from 52ms)</li>
+            </ul>
+            <h3>v2.3.0 — January 15, 2026</h3>
+            <ul>
+                <li><strong>SSO / SAML 2.0</strong> — enterprise single sign-on</li>
+                <li><strong>Scheduled compliance reports</strong> — automated SOC 2, HIPAA, GDPR</li>
+                <li>API key rotation policies with IP allowlisting</li>
+            </ul>
+            <h3>v2.2.0 — December 2025</h3>
+            <ul>
+                <li>Gemini Pro support</li>
+                <li>Audit trail export to CSV and PDF</li>
+                <li>Team RBAC (Admin, Developer, Viewer roles)</li>
+            </ul>
+        </section>
+
+    </div>
+</div>
+
+<script>
+    function copyCode(btn) {
+        const pre = btn.closest('.code-block').querySelector('pre');
+        navigator.clipboard.writeText(pre.textContent).then(() => {
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            setTimeout(() => { btn.innerHTML = '<i class="fas fa-copy"></i> Copy'; }, 2000);
+        });
+    }
+
+    function showLang(tab, group) {
+        // Simple tab switcher placeholder
+        tab.parentElement.querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+    }
+
+    // Active nav link on scroll
+    const sections = document.querySelectorAll('.doc-section');
+    const navLinks = document.querySelectorAll('.nav-link');
+    window.addEventListener('scroll', () => {
+        let current = '';
+        sections.forEach(s => {
+            if (window.scrollY >= s.offsetTop - 100) current = s.id;
+        });
+        navLinks.forEach(l => {
+            l.classList.remove('active');
+            if (l.getAttribute('href') === '#' + current) l.classList.add('active');
+        });
+    });
+
+    // Keyboard shortcut for search
+    document.addEventListener('keydown', e => {
+        if (e.key === '/' && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) {
+            e.preventDefault();
+            document.querySelector('.search-box input').focus();
+        }
+    });
+</script>
+</body>
+</html>

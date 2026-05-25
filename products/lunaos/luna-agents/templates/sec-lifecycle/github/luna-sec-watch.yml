@@ -1,0 +1,44 @@
+name: Luna Security — Continuous Watch
+
+on:
+  schedule:
+    - cron: '0 6 * * *'        # daily 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  luna-sec-watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - name: Install luna-agents
+        run: npm install -g luna-agents
+
+      - name: Run continuous watch
+        run: npx luna-agents ll-sec-watch --cadence daily --notify ${{ vars.LUNA_SEC_NOTIFY }}
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Upload watch history
+        uses: actions/upload-artifact@v4
+        with:
+          name: luna-sec-watch-history
+          path: .luna/*/security/watch-history.json
+          retention-days: 90
+
+      - name: Open issue on new findings
+        if: failure()
+        run: |
+          gh issue create --title "New CVE / drift detected by daily watch" \
+                          --label "security,watch" \
+                          --body-file .luna/*/security/watch-latest-summary.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

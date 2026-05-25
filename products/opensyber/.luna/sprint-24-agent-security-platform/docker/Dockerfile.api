@@ -1,0 +1,85 @@
+# OpenSyber API - Production Dockerfile
+# Multi-stage build for minimal image size
+
+# Stage 1: Dependencies
+FROM node:22-alpine AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+COPY packages/db/package.json ./packages/db/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/tokenforge/package.json ./packages/tokenforge/
+COPY apps/api/package.json ./apps/api/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile --prod=false
+
+# Stage 2: Build
+FROM node:22-alpine AS builder
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
+
+# Copy dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Build packages and app
+RUN pnpm build --filter=@opensyber/db...
+RUN pnpm build --filter=@opensyber/shared...
+RUN pnpm build --filter=@opensyber/tokenforge...
+RUN pnpm build --filter=@opensyber/api
+
+# Stage 3: Production
+FROM node:22-alpine AS runner
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.6.2 --activate
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 opensyber
+
+# Set environment
+ENV NODE_ENV=production
+ENV PORT=8787
+
+# Copy necessary files
+COPY --from=builder /app/apps/api/package.json ./apps/api/
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/src ./apps/api/src
+COPY --from=builder /app/packages/db/dist ./packages/db/dist
+COPY --from=builder /app/packages/db/src ./packages/db/src
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/tokenforge/dist ./packages/tokenforge/dist
+
+# Install production dependencies only
+COPY package.json pnpm-lock.yaml ./
+COPY packages/db/package.json ./packages/db/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/tokenforge/package.json ./packages/tokenforge/
+COPY apps/api/package.json ./apps/api/
+
+RUN pnpm install --frozen-lockfile --prod
+
+# Set permissions
+RUN chown -R opensyber:nodejs /app
+USER opensyber
+
+# Expose port
+EXPOSE 8787
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:8787/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Run the application
+CMD ["node", "apps/api/dist/index.js"]

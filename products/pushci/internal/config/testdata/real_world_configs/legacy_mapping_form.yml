@@ -1,0 +1,44 @@
+# Legacy pre-1.4.4 form where `deploy:` was a single mapping with
+# nested `environments:`. Must still parse byte-identically after
+# the UnmarshalYAML compat path added in v1.4.4. If this breaks,
+# every pushci.yml generated before v1.4.4 stops working.
+on:
+  - push
+  - pull_request
+
+stages:
+  - name: install
+    checks:
+      - name: deps
+        run: npm ci
+  - name: check
+    parallel: true
+    depends_on:
+      - install
+    checks:
+      - name: build
+        run: npm run build
+      - name: test
+        run: npm test
+      - name: lint
+        run: npm run lint
+
+deploy:
+  trigger: push
+  only_on:
+    - main
+  environments:
+    - name: staging
+      run: npx wrangler deploy --env staging
+      only_on:
+        - develop
+        - main
+      env:
+        NODE_ENV: staging
+    - name: production
+      run: npx wrangler deploy --env production
+      only_on:
+        - main
+      approve: true
+      env:
+        NODE_ENV: production

@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+# Luna security pre-commit hook
+# Installed by: /ll-sec-lifecycle install --hooks pre-commit
+# Bypass (logged): LUNA_SEC_BYPASS=1 git commit ...
+
+. "$(dirname -- "$0")/_/husky.sh" 2>/dev/null || true
+
+if [ "$LUNA_SEC_BYPASS" = "1" ]; then
+  mkdir -p .luna/$(basename "$PWD")/security
+  echo "$(date -u +%FT%TZ) bypass: pre-commit by ${USER:-unknown}" \
+    >> ".luna/$(basename "$PWD")/security/bypass.log"
+  exit 0
+fi
+
+# Fast staged-only scan, <5s budget
+npx --yes luna-agents ll-sec-precommit --staged_only true || {
+  echo ""
+  echo "✗ luna-sec-precommit found Critical/High issues."
+  echo "  Review:  .luna/$(basename "$PWD")/security/precommit-summary.md"
+  echo "  Bypass:  LUNA_SEC_BYPASS=1 git commit ..."
+  exit 1
+}

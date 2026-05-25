@@ -1,0 +1,175 @@
+# FinSavvyAI SLO Burn-Rate Alert Rules
+# Reference: docs/SLOS_SLAS.md
+
+groups:
+  - name: finsavvyai-slo-alerts
+    interval: 30s
+    rules:
+      # ── Service Health ───────────────────────────────────────────────────
+      - alert: ServiceDown
+        expr: up{job="finsavvyai-gateway"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: gateway
+        annotations:
+          summary: "API Gateway is down"
+          description: >-
+            Gateway instance {{ $labels.instance }} has been unreachable
+            for over 1 minute. Immediate investigation required.
+          runbook: "docs/DEPLOYMENT_RUNBOOK.md#troubleshooting"
+
+      - alert: MasterDown
+        expr: up{job="finsavvyai-master"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: master
+        annotations:
+          summary: "Master server is down"
+          description: >-
+            Master instance {{ $labels.instance }} unreachable for 1 minute.
+            Worker coordination and routing are impacted.
+
+      - alert: WorkerDown
+        expr: up{job="finsavvyai-worker"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: worker
+        annotations:
+          summary: "Worker node {{ $labels.instance }} is down"
+          description: "Worker has been offline for 2 minutes."
+
+      # ── Error Rate SLO (<1% 5xx) ────────────────────────────────────────
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_responses_total{job="finsavvyai-gateway",status=~"5.."}[5m]))
+            / sum(rate(http_responses_total{job="finsavvyai-gateway"}[5m]))
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          service: gateway
+          slo: error-rate
+        annotations:
+          summary: "Error rate exceeds 1% SLO"
+          description: >-
+            5xx error rate is {{ $value | humanizePercentage }} over
+            the last 5 minutes. SLO target: < 1%.
+          runbook: "docs/DEPLOYMENT_RUNBOOK.md#troubleshooting"
+
+      - alert: ElevatedErrorRate
+        expr: |
+          (
+            sum(rate(http_responses_total{job="finsavvyai-gateway",status=~"5.."}[5m]))
+            / sum(rate(http_responses_total{job="finsavvyai-gateway"}[5m]))
+          ) > 0.005
+        for: 10m
+        labels:
+          severity: warning
+          service: gateway
+          slo: error-rate
+        annotations:
+          summary: "Error rate elevated (>0.5%)"
+          description: >-
+            5xx error rate is {{ $value | humanizePercentage }}.
+            Approaching 1% SLO threshold.
+
+      # ── Latency SLO (P95 < 2s) ──────────────────────────────────────────
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{
+              job="finsavvyai-gateway",
+              path="/v1/chat/completions"
+            }[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: critical
+          service: gateway
+          slo: latency
+        annotations:
+          summary: "P95 latency exceeds 2s SLO"
+          description: >-
+            /v1/chat/completions P95 latency is {{ $value | humanizeDuration }}.
+            SLO target: < 2s.
+
+      - alert: HighLatencyP99
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket{
+              job="finsavvyai-gateway",
+              path="/v1/chat/completions"
+            }[5m])) by (le)
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: gateway
+          slo: latency
+        annotations:
+          summary: "P99 latency exceeds 5s target"
+          description: "P99 latency is {{ $value | humanizeDuration }}."
+
+      # ── Error Budget Burn Rate ───────────────────────────────────────────
+      - alert: ErrorBudgetBurning
+        expr: |
+          (
+            sum(rate(http_responses_total{job="finsavvyai-gateway",status=~"5.."}[1h]))
+            / sum(rate(http_responses_total{job="finsavvyai-gateway"}[1h]))
+          ) / 0.001 > 2
+        for: 1h
+        labels:
+          severity: warning
+          service: gateway
+          slo: error-budget
+        annotations:
+          summary: "Error budget burning at >2x rate"
+          description: >-
+            Current burn rate is {{ $value }}x. At this rate the monthly
+            error budget will be exhausted in {{ printf "%.0f" (divf 30 $value) }} days.
+
+      - alert: ErrorBudgetCritical
+        expr: |
+          (
+            sum(rate(http_responses_total{job="finsavvyai-gateway",status=~"5.."}[1h]))
+            / sum(rate(http_responses_total{job="finsavvyai-gateway"}[1h]))
+          ) / 0.001 > 5
+        for: 30m
+        labels:
+          severity: critical
+          service: gateway
+          slo: error-budget
+        annotations:
+          summary: "Error budget burning at >5x rate - feature freeze recommended"
+          description: >-
+            Burn rate is {{ $value }}x. Budget will be exhausted
+            in {{ printf "%.0f" (divf 30 $value) }} days.
+            Freeze non-critical deployments.
+
+      # ── Resource Alerts ──────────────────────────────────────────────────
+      - alert: HighMemoryUsage
+        expr: |
+          process_resident_memory_bytes{job=~"finsavvyai-.*"}
+          / on(instance) node_memory_MemTotal_bytes > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: resource
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanizePercentage }}."
+
+      - alert: HighCPUUsage
+        expr: |
+          rate(process_cpu_seconds_total{job=~"finsavvyai-.*"}[5m]) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+          service: resource
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage sustained above 90% for 10 minutes."

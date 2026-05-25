@@ -1,0 +1,50 @@
+"on":
+    - push
+    - pull_request
+# Production critical-path CI for OpenSyber.
+#
+# Scope: only the packages that actually ship to api.opensyber.cloud and
+# opensyber.cloud on push. The agent daemon (apps/agent), MCP server
+# (packages/opensyber-mcp), and tokenforge-samples have their own
+# release cycles and known pre-existing issues; they are intentionally
+# excluded from the push gate so legitimate web/api deploys aren't
+# blocked by unrelated code.
+#
+# Build is also excluded from the gate because `wrangler deploy` inside
+# deploy.sh runs its own production build — double-building would just
+# slow the hook down.
+stages:
+    - name: install
+      checks:
+        - name: pnpm-install
+          run: pnpm install --frozen-lockfile
+    - name: test
+      checks:
+        - name: api-tests
+          run: pnpm --filter @opensyber/api test
+        - name: web-tests
+          run: pnpm --filter @opensyber/web test
+        - name: db-tests
+          run: pnpm --filter @opensyber/db test
+        - name: shared-tests
+          run: pnpm --filter @opensyber/shared test
+        - name: ui-tests
+          run: pnpm --filter @opensyber/ui test
+        - name: tokenforge-tests
+          run: pnpm --filter @opensyber/tokenforge test
+        - name: claw-sdk-tests
+          run: pnpm --filter @opensyber/claw-sdk test
+        - name: mcp-drift-watcher-tests
+          run: pnpm --filter @opensyber/mcp-drift-watcher test
+        - name: mcp-drift-watcher-typecheck
+          run: pnpm --filter @opensyber/mcp-drift-watcher typecheck
+        - name: mcp-drift-server-rugpull-typecheck
+          run: pnpm --filter @opensyber/mcp-drift-server-rugpull typecheck
+      depends_on:
+        - install
+      parallel: true
+deploy:
+    trigger: push
+    run: ./deploy.sh
+    only_on:
+        - main

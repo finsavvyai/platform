@@ -1,0 +1,33 @@
+# Build stage — Go 1.24
+FROM golang:1.24-alpine AS builder
+
+RUN apk add --no-cache git make
+
+WORKDIR /build
+
+COPY go.mod go.sum* ./
+RUN go mod download
+
+COPY cmd ./cmd
+COPY internal ./internal
+COPY api ./api
+COPY pkg ./pkg
+COPY migrations ./migrations
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o reingest-gleif ./cmd/reingest-gleif
+
+# Runtime stage
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+COPY --from=builder /build/reingest-gleif .
+COPY migrations ./migrations
+
+# Default small run — suitable for the starter Postgres plan as a
+# smoke check. Override at job-run time for larger windows, e.g.
+#   ./reingest-gleif --start-page 1 --max-pages 500
+CMD ["./reingest-gleif", "--max-pages", "5"]

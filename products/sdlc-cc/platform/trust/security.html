@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Security overview · Trust Center</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <article class="doc wrap">
+      <a class="back" href="./">← Trust Center</a>
+      <h1>Security overview</h1>
+      <p class="meta">Applies to: sdlc-platform · AMLIQ · Claw. Last reviewed 2026-05-20.</p>
+
+      <h2>Privacy-gateway guarantees (sdlc-platform)</h2>
+      <ul>
+        <li>Pre-prompt redaction runs in-process; prompt bytes never reach an upstream provider before the DLP scanner has scored them.</li>
+        <li>Detector pattern set is open-source under AGPL-3.0 — any customer can verify what is matched and what is not.</li>
+        <li>Per-tenant action policy: <code>allow · mask · redact · block · tokenize</code>. Tokenize is the only mode that round-trips through the provider.</li>
+        <li>Replay-with-redaction: every audited event can be replayed against the current preset set without re-touching the original prompt.</li>
+      </ul>
+
+      <h2>Authentication &amp; access</h2>
+      <ul>
+        <li>SAML 2.0, OIDC, and SCIM 2.0 — first-class, not paywalled.</li>
+        <li>WebAuthn / FIDO2 for admin accounts.</li>
+        <li>RBAC evaluated against an OPA-Rego policy. Policies version-controlled.</li>
+        <li>Tenant scoping enforced at the database layer via Postgres RLS.</li>
+      </ul>
+
+      <h2>Cryptography</h2>
+      <ul>
+        <li>TLS 1.2+ in transit; HSTS on all public surfaces.</li>
+        <li>Customer-Managed Encryption Keys (CMEK) supported via envelope encryption — customer holds the KEK.</li>
+        <li>Audit log is HMAC-chained; tampering breaks the chain and is detectable on read.</li>
+      </ul>
+
+      <h2>Data isolation</h2>
+      <ul>
+        <li>Postgres row-level security on every multi-tenant table.</li>
+        <li>RAG pgvector indexes are tenant-scoped.</li>
+        <li>Claw's provider routing reads the tenant id from the request and never crosses provider keys between tenants.</li>
+      </ul>
+
+      <h2>Observability &amp; incident response</h2>
+      <ul>
+        <li>Structured JSON logs with request id correlation across the three products.</li>
+        <li>Cross-product audit log shape — see <a href="./audit-logs.html">Audit-log architecture</a>.</li>
+        <li>Disclosure: <a href="mailto:security@sdlc.cc">security@sdlc.cc</a> — PGP key published on request.</li>
+      </ul>
+
+      <h2>Open items (publicly tracked)</h2>
+      <p class="meta">We document what's in flight so prospects don't have to guess.</p>
+      <ul>
+        <li>SOC 2 Type II audit — kicks off after the first ~$30K of revenue clears. <a href="./soc2.html">Status</a>.</li>
+        <li>Independent penetration test — scheduled with the SOC 2 engagement.</li>
+        <li>FedRAMP / HIPAA — out of scope for yr-1; re-opened when revenue funds the bundle.</li>
+      </ul>
+    </article>
+  </body>
+</html>

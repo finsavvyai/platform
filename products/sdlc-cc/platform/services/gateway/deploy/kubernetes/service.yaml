@@ -1,0 +1,53 @@
+# Service for Gateway
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: sdlc-platform
+  labels:
+    app: gateway
+    component: api-gateway
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: gateway
+    component: api-gateway
+
+---
+# Headless service for StatefulSet-like behavior
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-headless
+  namespace: sdlc-platform
+  labels:
+    app: gateway
+    component: api-gateway
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: gateway
+    component: api-gateway

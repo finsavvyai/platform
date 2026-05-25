@@ -1,0 +1,124 @@
+{
+  "name": "scheduled-pipeline-scan",
+  "version": "1.1.0",
+  "description": "Automated cron-scheduled PipeWarden security scans with Slack notifications for critical findings",
+  "author": "OpenClaw",
+  "license": "MIT",
+  "runtime": "openhands",
+  "triggers": {
+    "schedule": {
+      "presets": {
+        "hourly": "0 * * * *",
+        "daily": "0 9 * * *",
+        "daily-evening": "0 18 * * *",
+        "weekdays": "0 9 * * 1-5",
+        "weekly": "0 9 * * 1",
+        "twice-daily": "0 9,18 * * *"
+      },
+      "cron": "0 9 * * 1-5",
+      "timezone": "UTC",
+      "description": "Run at specified schedule. Use presets or custom cron expression."
+    }
+  },
+  "tools": [
+    {
+      "name": "pipewarden-client",
+      "description": "Connect to PipeWarden API for pipeline security scanning"
+    },
+    {
+      "name": "slack-notifier",
+      "description": "Send Slack messages with findings and mobile push notifications"
+    },
+    {
+      "name": "webhook-dispatcher",
+      "description": "Dispatch webhooks to connected CI/CD platforms"
+    }
+  ],
+  "environment": {
+    "PIPEWARDEN_API_URL": "http://localhost:8080",
+    "PIPEWARDEN_API_KEY": "${PIPEWARDEN_API_KEY}",
+    "SLACK_WEBHOOK_URL": "${SLACK_WEBHOOK_URL}",
+    "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
+    "CRITICAL_THRESHOLD": "3",
+    "ENABLE_MOBILE_PUSH": "true"
+  },
+  "config": {
+    "schedule_preset": {
+      "type": "enum",
+      "values": ["hourly", "daily", "daily-evening", "weekdays", "weekly", "twice-daily", "custom"],
+      "default": "weekdays",
+      "description": "Schedule preset: hourly, daily, daily-evening, weekdays, weekly, twice-daily, or custom cron"
+    },
+    "custom_cron": {
+      "type": "string",
+      "default": "",
+      "description": "Custom cron expression (used only if schedule_preset=custom)"
+    },
+    "connection_id": {
+      "type": "string",
+      "default": "",
+      "description": "Optional: limit scans to specific PipeWarden connection ID"
+    },
+    "scan_type": {
+      "type": "enum",
+      "values": ["heuristic", "ai", "dlp", "all"],
+      "default": "all",
+      "description": "Scan type: heuristic (fast), ai (smart), dlp (secrets), or all"
+    },
+    "notification_channels": {
+      "type": "array",
+      "items": {
+        "type": "enum",
+        "values": ["slack", "email", "webhook", "mobile-push"]
+      },
+      "default": ["slack", "mobile-push"],
+      "description": "Notification channels to use"
+    },
+    "notification_level": {
+      "type": "enum",
+      "values": ["critical-only", "high-and-above", "all"],
+      "default": "high-and-above",
+      "description": "Minimum severity level for notifications"
+    },
+    "include_metrics": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include risk metrics in notifications"
+    },
+    "include_trends": {
+      "type": "boolean",
+      "default": false,
+      "description": "Include trend analysis in notifications"
+    },
+    "include_remediation": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include remediation steps in notifications"
+    },
+    "group_by_pipeline": {
+      "type": "boolean",
+      "default": true,
+      "description": "Group findings by pipeline in notifications"
+    }
+  },
+  "outputs": {
+    "scan_results": {
+      "type": "object",
+      "description": "Complete scan results with findings and risk scores"
+    },
+    "notification_status": {
+      "type": "object",
+      "description": "Status of notification delivery across all channels"
+    },
+    "execution_summary": {
+      "type": "object",
+      "description": "Summary of scan execution: pipelines scanned, findings detected, execution time"
+    }
+  },
+  "permissions": {
+    "pipewarden": ["read:pipelines", "read:findings", "read:connections"],
+    "slack": ["chat:write", "files:write"],
+    "notifications": ["push:critical", "push:high"],
+    "email": ["send:alerts"]
+  }
+}

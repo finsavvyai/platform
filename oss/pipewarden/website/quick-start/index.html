@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PipeWarden Quick Start</title>
+    <meta name="description" content="Quick-start guide for evaluating PipeWarden in self-hosted, local, or hosted operator mode.">
+    <link rel="stylesheet" href="/design-system/tokens.css">
+    <style>
+        :root {
+            /* Map legacy aliases to design-system tokens */
+            --primary: var(--accent);
+            --primary-dark: var(--accent-hover);
+            --secondary: var(--sys-indigo);
+            --success: var(--sys-green);
+            --surface: var(--bg-elev-1);
+            --surface-alt: var(--bg-elev-2);
+            --border: var(--hairline-strong);
+            --muted: var(--text-tertiary);
+        }
+
+        * { box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            background:
+                radial-gradient(ellipse 60% 40% at top right, rgba(10, 132, 255, 0.14), transparent 55%),
+                radial-gradient(ellipse 40% 30% at left center, rgba(94, 92, 230, 0.10), transparent 50%),
+                var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+        }
+
+        a { color: var(--accent); text-decoration: none; transition: color var(--dur-short) var(--ease-standard); }
+        a:hover { color: var(--accent-hover); }
+
+        code,
+        pre {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+        }
+
+        .page {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .brand {
+            font-size: 1.35rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .back-link {
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 0.65rem 1rem;
+            background: rgba(15, 23, 42, 0.75);
+        }
+
+        .hero {
+            padding: 3rem 0 2rem;
+        }
+
+        .eyebrow {
+            display: inline-block;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--success);
+            margin-bottom: 1rem;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.4rem, 5vw, 4rem);
+            line-height: 1.05;
+            max-width: 12ch;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            max-width: 760px;
+            color: var(--text-secondary);
+            font-size: 1.08rem;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 1.75rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.85rem;
+            padding: 0.95rem 1.25rem;
+            font-weight: 600;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            color: #fff;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            box-shadow: 0 18px 36px rgba(99, 102, 241, 0.22);
+        }
+
+        .btn-secondary {
+            color: var(--text);
+            border: 1px solid var(--border);
+            background: rgba(15, 23, 42, 0.65);
+        }
+
+        .route-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0 3rem;
+        }
+
+        .route-card,
+        .section-card {
+            border: 1px solid var(--border);
+            border-radius: 1.1rem;
+            background: rgba(15, 23, 42, 0.74);
+            backdrop-filter: blur(14px);
+        }
+
+        .route-card {
+            padding: 1.35rem;
+        }
+
+        .route-card h2 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .route-card p {
+            color: var(--text-secondary);
+            margin-bottom: 0.9rem;
+        }
+
+        .route-meta {
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .section-list {
+            display: grid;
+            gap: 1rem;
+            margin-bottom: 3rem;
+        }
+
+        .section-card {
+            padding: 1.5rem;
+        }
+
+        .section-card h2 {
+            font-size: 1.4rem;
+            margin-bottom: 0.7rem;
+        }
+
+        .section-card p,
+        .section-card li {
+            color: var(--text-secondary);
+        }
+
+        .section-card ul {
+            margin-left: 1.2rem;
+        }
+
+        .section-card li + li {
+            margin-top: 0.45rem;
+        }
+
+        .callout {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 0.9rem;
+            border: 1px solid rgba(16, 185, 129, 0.28);
+            background: rgba(16, 185, 129, 0.10);
+            color: var(--text);
+        }
+
+        pre {
+            overflow-x: auto;
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 0.9rem;
+            background: #020617;
+            border: 1px solid #1e293b;
+            color: #e2e8f0;
+        }
+
+        .footer {
+            padding: 2rem 0 3rem;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        @media (max-width: 720px) {
+            .page {
+                padding: 1.25rem;
+            }
+
+            .topbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <header class="topbar">
+            <div class="brand">PipeWarden</div>
+            <a class="back-link" href="/">Back to home</a>
+        </header>
+
+        <main>
+            <section class="hero">
+                <div class="eyebrow">Quick Start</div>
+                <h1>Choose a real PipeWarden entry point.</h1>
+                <p>
+                    The public Cloudflare Workers deployment hosts the marketing surface. PipeWarden itself currently ships as a single Go application for local or self-hosted operation, while hosted SaaS access is provisioned directly by the PipeWarden team.
+                </p>
+                <div class="hero-actions">
+                    <a class="btn btn-primary" href="#self-hosted">Self-Hosted Docker</a>
+                    <a class="btn btn-secondary" href="#hosted">Hosted Access</a>
+                </div>
+            </section>
+
+            <section class="route-grid" aria-label="Evaluation paths">
+                <article class="route-card" id="trial">
+                    <h2>Free evaluation</h2>
+                    <p>Run PipeWarden locally or with Docker. Trial mode does not require billing setup and does not block boot.</p>
+                    <a class="btn btn-secondary" href="#local-development">Local setup</a>
+                    <div class="route-meta">Best for validation, demos, and feature walkthroughs.</div>
+                </article>
+                <article class="route-card" id="self-hosted-card">
+                    <h2>Self-hosted</h2>
+                    <p>Deploy the same application with SQLite for a single-node customer environment using the supported Docker path.</p>
+                    <a class="btn btn-secondary" href="#self-hosted">Docker quick start</a>
+                    <div class="route-meta">Recommended for enterprise evaluation.</div>
+                </article>
+                <article class="route-card">
+                    <h2>Hosted operator mode</h2>
+                    <p>Hosted SaaS access uses the same application with Postgres and managed secrets. Access is currently provisioned manually.</p>
+                    <a class="btn btn-secondary" href="/?signup=enterprise">Request hosted access</a>
+                    <div class="route-meta">Use this path if you want a managed deployment.</div>
+                </article>
+            </section>
+
+            <section class="section-list">
+                <article class="section-card" id="self-hosted">
+                    <h2>Self-hosted Docker</h2>
+                    <p>PipeWarden supports a single-node self-hosted deployment with SQLite. If <code>PIPEWARDEN_VAULT_KEY</code> is unset, the container entrypoint auto-generates one and persists it to <code>/app/data/.vault_key</code> — back up that file with your data volume.</p>
+                    <pre><code>docker compose up --build
+# dashboard → http://localhost:8080</code></pre>
+                    <div class="callout">Want to supply your own key? <code>export PIPEWARDEN_VAULT_KEY=$(openssl rand -hex 32)</code> before <code>docker compose up</code>.</div>
+                </article>
+
+                <article class="section-card" id="provider-scopes">
+                    <h2>Required provider token scopes</h2>
+                    <p>When adding a CI/CD connection, the dashboard shows scope requirements inline. For reference:</p>
+                    <table style="width:100%;border-collapse:collapse;margin-top:8px">
+                      <thead><tr><th style="text-align:left;padding:8px;border-bottom:1px solid #334155">Provider</th><th style="text-align:left;padding:8px;border-bottom:1px solid #334155">Token type</th><th style="text-align:left;padding:8px;border-bottom:1px solid #334155">Scopes</th><th style="text-align:left;padding:8px;border-bottom:1px solid #334155">Setup link</th></tr></thead>
+                      <tbody>
+                        <tr><td style="padding:8px">GitHub Actions</td><td style="padding:8px">GitHub App <em>(preferred)</em></td><td style="padding:8px"><code>actions:read · contents:read · metadata:read · security_events:write</code></td><td style="padding:8px"><a href="https://github.com/apps/pipewarden/installations/new">Install app</a></td></tr>
+                        <tr><td style="padding:8px">GitHub Actions</td><td style="padding:8px">PAT (fallback)</td><td style="padding:8px"><code>repo · workflow · read:org</code></td><td style="padding:8px"><a href="https://github.com/settings/tokens/new?scopes=repo,workflow,read:org&amp;description=PipeWarden">Create PAT</a></td></tr>
+                        <tr><td style="padding:8px">GitLab CI/CD</td><td style="padding:8px">OAuth App <em>(preferred)</em></td><td style="padding:8px"><code>read_api · read_repository</code></td><td style="padding:8px"><a href="/?signup=starter">Connect via OAuth</a></td></tr>
+                        <tr><td style="padding:8px">GitLab CI/CD</td><td style="padding:8px">Project access token</td><td style="padding:8px"><code>read_api · read_repository</code>, role <code>Reporter</code></td><td style="padding:8px"><a href="https://gitlab.com/-/user_settings/personal_access_tokens">Create token</a></td></tr>
+                        <tr><td style="padding:8px">Bitbucket Pipelines</td><td style="padding:8px">App password</td><td style="padding:8px"><code>pipelines:read · repository:read · account:read</code></td><td style="padding:8px"><a href="https://bitbucket.org/account/settings/app-passwords/">Create app password</a></td></tr>
+                        <tr><td style="padding:8px">Jenkins</td><td style="padding:8px">API token</td><td style="padding:8px">User with <code>Overall/Read · Job/Read</code></td><td style="padding:8px">Jenkins → User → Configure → API Token</td></tr>
+                        <tr><td style="padding:8px">Azure DevOps</td><td style="padding:8px">PAT</td><td style="padding:8px"><code>Build (Read) · Code (Read) · Project and Team (Read)</code></td><td style="padding:8px"><a href="https://dev.azure.com/_usersSettings/tokens">Create PAT</a></td></tr>
+                        <tr><td style="padding:8px">CircleCI</td><td style="padding:8px">Personal API token</td><td style="padding:8px">All scopes (read-only)</td><td style="padding:8px"><a href="https://app.circleci.com/settings/user/tokens">Create token</a></td></tr>
+                      </tbody>
+                    </table>
+                </article>
+
+                <article class="section-card" id="local-development">
+                    <h2>Local development</h2>
+                    <p>The current local baseline is a single binary with the embedded dashboard on port <code>8080</code>.</p>
+                    <pre><code>make build
+export PIPEWARDEN_VAULT_KEY='replace-with-a-long-random-secret'
+./bin/pipewarden</code></pre>
+                    <p>Optional features such as Claude-backed analysis and LemonSqueezy billing stay disabled until their environment variables are set.</p>
+                </article>
+
+                <article class="section-card" id="hosted">
+                    <h2>Hosted access</h2>
+                    <p>Hosted mode uses Postgres plus secret-backed configuration and is intended for operator-managed SaaS deployments.</p>
+                    <ul>
+                        <li>Provisioning is currently handled directly by the PipeWarden team.</li>
+                        <li>GitHub App, GitLab, and Bitbucket connection flows are part of the GA surface.</li>
+                        <li>Experimental providers remain feature-flagged and are not part of hosted launch acceptance.</li>
+                    </ul>
+                    <div class="callout">Request access via the <a href="/?signup=enterprise">hosted access form</a>.</div>
+                </article>
+
+                <article class="section-card" id="api">
+                    <h2>API and health endpoints</h2>
+                    <p>The same application serves the dashboard, REST APIs, and subsystem health reporting.</p>
+                    <ul>
+                        <li><code>GET /health</code></li>
+                        <li><code>GET /readiness</code></li>
+                        <li><code>GET /api/v1/status</code></li>
+                        <li><code>GET|POST /api/v1/connections</code></li>
+                        <li><code>GET /api/v1/analysis/findings</code></li>
+                        <li><code>POST /api/v1/dlp/scan</code></li>
+                    </ul>
+                </article>
+
+                <article class="section-card" id="billing">
+                    <h2>Billing and plans</h2>
+                    <p>Billing is optional for boot and local evaluation. PipeWarden runs in trial or unlicensed mode until LemonSqueezy is configured.</p>
+                    <ul>
+                        <li>Free usage is intended for local validation and early testing.</li>
+                        <li>Pro and hosted access are provisioned through the sales workflow.</li>
+                        <li>Enterprise terms are handled during onboarding.</li>
+                    </ul>
+                </article>
+
+                <article class="section-card" id="security">
+                    <h2>Security contact and posture</h2>
+                    <p>Provider credentials are designed to remain encrypted at rest behind the vault abstraction, with AES-256-GCM in supported self-hosted flows.</p>
+                    <ul>
+                        <li>GitHub webhook verification uses HMAC-SHA256 in the application runtime.</li>
+                        <li>Hosted mode requires Postgres and managed secret injection.</li>
+                        <li>Security disclosures: see <a href="/.well-known/security.txt">/.well-known/security.txt</a>.</li>
+                    </ul>
+                </article>
+
+                <article class="section-card" id="privacy">
+                    <h2>Privacy summary</h2>
+                    <p>PipeWarden is designed to minimize stored secret material and to avoid plaintext credential persistence. Self-hosted customers control their own deployment data and retention settings.</p>
+                    <p>Full policy: <a href="/privacy/">Privacy Policy</a>. For data-processing terms, <a href="/?signup=enterprise">request DPA</a>.</p>
+                </article>
+
+                <article class="section-card" id="terms">
+                    <h2>Terms summary</h2>
+                    <p>Self-hosted evaluation is governed by the software and configuration you run in your own environment. Hosted access, commercial support, and enterprise commitments are finalized during onboarding.</p>
+                    <p>Full terms: <a href="/terms/">Terms of Service</a>. For commercial MSA, <a href="/?signup=enterprise">contact sales</a>.</p>
+                </article>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>Questions or sales: <a href="/?signup=enterprise">request contact</a>.</p>
+        </footer>
+    </div>
+</body>
+</html>

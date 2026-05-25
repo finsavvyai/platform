@@ -1,0 +1,82 @@
+openapi: 3.1.0
+info:
+  title: Agent Platform Internal API
+  version: 0.1.0
+servers:
+  - url: https://agent-core.internal
+paths:
+  /sessions:
+    post:
+      summary: Create a new agent session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product, tenant_id]
+              properties:
+                product:
+                  type: string
+                  example: pushci
+                tenant_id:
+                  type: string
+                  example: org_123
+                user_id:
+                  type: string
+                context:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Session created
+  /sessions/{session_id}:
+    get:
+      summary: Get current session snapshot
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session snapshot
+  /sessions/{session_id}/messages:
+    post:
+      summary: Append a user message and trigger runtime processing
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "202":
+          description: Message accepted
+  /sessions/{session_id}/events:
+    get:
+      summary: Stream runtime events for the session
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SSE stream
+

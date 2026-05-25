@@ -1,0 +1,1411 @@
+openapi: 3.0.3
+info:
+  title: SDLC RAG Service
+  description: |
+    Production-ready Retrieval-Augmented Generation (RAG) service for SDLC.ai platform.
+
+    ## Features
+
+    - **End-to-end RAG Pipeline**: Complete workflow from query to contextual response
+    - **Document Processing**: Multi-format document ingestion (PDF, DOCX, TXT, HTML, Markdown)
+    - **Vector Search**: Semantic and hybrid search with multiple ranking strategies
+    - **Embedding Generation**: Multi-provider support (OpenAI, Cohere, Sentence Transformers)
+    - **Context Assembly**: Intelligent context retrieval and assembly with compression
+    - **Citation Management**: Automatic citation extraction, validation, and formatting
+    - **Quality Monitoring**: Comprehensive quality assessment and analytics
+    - **Streaming Responses**: Real-time streaming for RAG queries
+
+    ## Authentication
+
+    All endpoints require JWT authentication. Include the token in the Authorization header:
+
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+
+  version: 1.0.0
+  contact:
+    name: SDLC.ai Team
+    email: support@sdlc.cc
+    url: https://sdlc.cc
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Development server
+  - url: https://api.sdlc.cc/rag/api/v1
+    description: Production server
+
+tags:
+  - name: RAG Pipeline
+    description: End-to-end RAG query processing
+  - name: Search
+    description: Document and content search operations
+  - name: Vector Search
+    description: Vector similarity search operations
+  - name: Context
+    description: Context retrieval and assembly operations
+  - name: Documents
+    description: Document processing and management
+  - name: Embeddings
+    description: Text embedding generation and management
+  - name: Monitoring
+    description: Service monitoring and metrics
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+        - message
+        - timestamp
+      properties:
+        error:
+          type: string
+          description: Error type
+        message:
+          type: string
+          description: Error message
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+        details:
+          type: object
+          description: Additional error details
+        path:
+          type: string
+          description: Request path
+        status:
+          type: integer
+          description: HTTP status code
+
+    # RAG Pipeline Schemas
+    RAGQueryRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: The query to process
+          example: "What is the best approach for microservices architecture?"
+        config:
+          type: object
+          description: Pipeline configuration options
+          properties:
+            enable_query_understanding:
+              type: boolean
+              default: true
+            enable_citation_processing:
+              type: boolean
+              default: true
+            enable_quality_assessment:
+              type: boolean
+              default: true
+            enable_streaming:
+              type: boolean
+              default: false
+            max_context_tokens:
+              type: integer
+              default: 4000
+              minimum: 100
+              maximum: 32000
+        user_id:
+          type: string
+          format: uuid
+          description: User ID for personalization
+        tenant_id:
+          type: string
+          format: uuid
+          description: Tenant ID for multi-tenancy
+        session_id:
+          type: string
+          format: uuid
+          description: Session ID for context
+        conversation_id:
+          type: string
+          format: uuid
+          description: Conversation ID for context
+        retrieval_strategy:
+          type: string
+          enum: [dense_only, sparse_only, hybrid_fusion, multi_stage, cross_encoder_rerank, diversity_aware, personalized, temporal_weighted, authority_weighted]
+          default: multi_stage
+        assembly_strategy:
+          type: string
+          enum: [sequential, importance_weighted, diversity_optimized, coherence_focused, citation_aware, compressive, hierarchical, adaptive]
+          default: adaptive
+        citation_styles:
+          type: array
+          items:
+            type: string
+            enum: [APA, MLA, Chicago, IEEE, Harvard, Vancouver, AMA, APS, Nature, numeric, inline, footnote]
+          default: ["APA"]
+        context_window_type:
+          type: string
+          default: llm
+          enum: [llm, summary, analysis]
+        metadata:
+          type: object
+          description: Additional metadata
+
+    RAGQueryResponse:
+      type: object
+      required:
+        - pipeline_id
+        - status
+        - query
+        - answer
+        - sources
+        - execution_time_ms
+        - timestamp
+      properties:
+        pipeline_id:
+          type: string
+          format: uuid
+          description: Unique pipeline execution ID
+        status:
+          type: string
+          enum: [initiated, query_understanding, context_retrieval, context_assembly, citation_processing, quality_assessment, completed, failed, cancelled]
+          description: Pipeline execution status
+        query:
+          type: string
+          description: Original query
+        answer:
+          type: string
+          description: Generated answer
+        context:
+          type: string
+          description: Retrieved and assembled context
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              text:
+                type: string
+              source:
+                type: string
+              page:
+                type: integer
+              confidence:
+                type: number
+                format: float
+              style:
+                type: string
+          description: Source citations
+        confidence_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Answer confidence score
+        quality_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Response quality score
+        execution_time_ms:
+          type: number
+          format: float
+          description: Total execution time
+        metadata:
+          type: object
+          description: Additional metadata
+        timestamp:
+          type: string
+          format: date-time
+          description: Execution timestamp
+
+    # Search Schemas
+    SearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Search query text
+        search_type:
+          type: string
+          enum: [semantic, keyword, hybrid]
+          default: hybrid
+        ranking:
+          type: string
+          enum: [semantic_only, hybrid, personalized, recency_weighted, authority_weighted, diversity_weighted]
+          default: hybrid
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          default: 0
+        filters:
+          type: object
+          description: Search filters
+          properties:
+            document_type:
+              type: array
+              items:
+                type: string
+            source:
+              type: array
+              items:
+                type: string
+            date_range:
+              type: object
+              properties:
+                start:
+                  type: string
+                  format: date-time
+                end:
+                  type: string
+                  format: date-time
+            topics:
+              type: array
+              items:
+                type: string
+            custom_metadata:
+              type: object
+        include_highlights:
+          type: boolean
+          default: true
+        include_explanations:
+          type: boolean
+          default: false
+        min_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          default: 0.1
+        include_expired:
+          type: boolean
+          default: false
+
+    SearchResult:
+      type: object
+      properties:
+        chunk_id:
+          type: string
+          format: uuid
+        document_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        score:
+          type: number
+          format: float
+        rank_score:
+          type: number
+          format: float
+        metadata:
+          type: object
+        document_metadata:
+          type: object
+        highlights:
+          type: array
+          items:
+            type: string
+        ranking_explanation:
+          type: object
+        similarity_score:
+          type: number
+          format: float
+        authority_score:
+          type: number
+          format: float
+        recency_score:
+          type: number
+          format: float
+
+    SearchResponse:
+      type: object
+      required:
+        - results
+        - total_count
+        - query
+        - search_time_ms
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+        total_count:
+          type: integer
+        query:
+          type: string
+        search_time_ms:
+          type: number
+          format: float
+        cache_hit:
+          type: boolean
+        ranking_algorithm:
+          type: string
+        filters_applied:
+          type: boolean
+        suggestions:
+          type: array
+          items:
+            type: string
+
+    # Document Schemas
+    DocumentUploadRequest:
+      type: object
+      required:
+        - file
+      properties:
+        file:
+          type: string
+          format: binary
+          description: Document file to upload (max 50MB)
+        metadata:
+          type: object
+          description: Document metadata
+          properties:
+            title:
+              type: string
+            author:
+              type: string
+            source:
+              type: string
+            publication_date:
+              type: string
+              format: date-time
+            topics:
+              type: array
+              items:
+                type: string
+            language:
+              type: string
+              default: en
+        processing_options:
+          type: object
+          description: Processing options
+          properties:
+            chunking_strategy:
+              type: string
+              enum: [fixed_size, sentence_based, paragraph_based, semantic, hybrid]
+              default: hybrid
+            chunk_size:
+              type: integer
+              default: 1024
+              minimum: 256
+              maximum: 4096
+            chunk_overlap:
+              type: integer
+              default: 256
+              minimum: 0
+              maximum: 1024
+            extract_tables:
+              type: boolean
+              default: true
+            ocr_enabled:
+              type: boolean
+              default: false
+
+    DocumentInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        content_type:
+          type: string
+        size_bytes:
+          type: integer
+        chunk_count:
+          type: integer
+        status:
+          type: string
+          enum: [processing, completed, failed]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+
+    # Embedding Schemas
+    EmbeddingRequest:
+      type: object
+      required:
+        - texts
+      properties:
+        texts:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 100
+        provider:
+          type: string
+          enum: [openai, cohere, sentence_transformers, onnx]
+          default: sentence_transformers
+        model:
+          type: string
+          description: Model to use for embeddings
+          default: all-MiniLM-L6-v2
+        batch_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 32
+
+    EmbeddingResponse:
+      type: object
+      required:
+        - embeddings
+        - model
+        - dimensions
+      properties:
+        embeddings:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+              format: float
+        model:
+          type: string
+        provider:
+          type: string
+        dimensions:
+          type: integer
+        usage:
+          type: object
+          properties:
+            total_tokens:
+              type: integer
+            prompt_tokens:
+              type: integer
+        processing_time_ms:
+          type: integer
+        cached_count:
+          type: integer
+        cost_estimate_usd:
+          type: number
+          format: float
+
+    # Context Schemas
+    ContextRetrievalRequest:
+      type: object
+      required:
+        - query_text
+      properties:
+        query_text:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        max_chunks:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 10
+        retrieval_strategy:
+          type: string
+          enum: [dense_only, sparse_only, hybrid_fusion, multi_stage, cross_encoder_rerank, diversity_aware, personalized]
+          default: multi_stage
+        min_relevance_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          default: 0.3
+        boost_recent:
+          type: boolean
+          default: true
+        boost_authoritative:
+          type: boolean
+          default: true
+        filters:
+          type: object
+
+    ContextAssemblyRequest:
+      type: object
+      required:
+        - chunks
+      properties:
+        chunks:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: List of chunk IDs to assemble
+        max_tokens:
+          type: integer
+          default: 4000
+          minimum: 100
+          maximum: 32000
+        assembly_strategy:
+          type: string
+          enum: [sequential, importance_weighted, diversity_optimized, coherence_focused, citation_aware, compressive, hierarchical, adaptive]
+          default: adaptive
+        compression_level:
+          type: string
+          enum: [none, light, moderate, aggressive, extreme]
+          default: none
+        include_citations:
+          type: boolean
+          default: true
+        citation_style:
+          type: string
+          enum: [apa, mla, chicago, ieee, harvard, vancouver, ama, numeric, inline, footnote]
+          default: apa
+
+paths:
+  /rag/query:
+    post:
+      tags:
+        - RAG Pipeline
+      summary: Execute RAG query
+      description: |
+        Execute a complete RAG pipeline for the given query. This processes the query through:
+        1. Query understanding and analysis
+        2. Context retrieval from document embeddings
+        3. Context assembly and compression
+        4. Citation processing
+        5. Quality assessment
+      operationId: executeRagQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RAGQueryRequest'
+      responses:
+        '200':
+          description: Successful RAG query execution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RAGQueryResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /rag/query/stream:
+    post:
+      tags:
+        - RAG Pipeline
+      summary: Execute RAG query with streaming
+      description: |
+        Execute RAG pipeline with real-time streaming updates. Returns Server-Sent Events
+        with progress information and intermediate results.
+      operationId: executeRagQueryStreaming
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RAGQueryRequest'
+      responses:
+        '200':
+          description: Streaming response
+          content:
+            text/event-stream:
+              schema:
+                type: object
+                properties:
+                  event_type:
+                    type: string
+                  pipeline_id:
+                    type: string
+                    format: uuid
+                  timestamp:
+                    type: string
+                    format: date-time
+                  data:
+                    type: object
+                  progress:
+                    type: number
+                    format: float
+                    minimum: 0
+                    maximum: 1
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /rag/status/{pipeline_id}:
+    get:
+      tags:
+        - RAG Pipeline
+      summary: Get pipeline status
+      description: Get the current status and progress of a running RAG pipeline
+      operationId: getPipelineStatus
+      parameters:
+        - name: pipeline_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Pipeline execution ID
+      responses:
+        '200':
+          description: Pipeline status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pipeline_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [initiated, query_understanding, context_retrieval, context_assembly, citation_processing, quality_assessment, completed, failed, cancelled]
+                  progress:
+                    type: number
+                    format: float
+                    minimum: 0
+                    maximum: 1
+                  current_step:
+                    type: string
+                  execution_time_ms:
+                    type: number
+                    format: float
+                  estimated_remaining_ms:
+                    type: number
+                    format: float
+                  error:
+                    type: string
+                  metadata:
+                    type: object
+        '404':
+          description: Pipeline not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /rag/cancel/{pipeline_id}:
+    delete:
+      tags:
+        - RAG Pipeline
+      summary: Cancel running pipeline
+      description: Cancel a running RAG pipeline
+      operationId: cancelPipeline
+      parameters:
+        - name: pipeline_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Pipeline execution ID
+      responses:
+        '200':
+          description: Pipeline cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pipeline_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [cancelled]
+                  message:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+        '404':
+          description: Pipeline not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /search:
+    post:
+      tags:
+        - Search
+      summary: Search documents
+      description: |
+        Perform semantic, keyword, or hybrid search across documents with advanced
+        ranking algorithms and filtering capabilities.
+      operationId: search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Search completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Invalid search request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /search/suggestions:
+    get:
+      tags:
+        - Search
+      summary: Get query suggestions
+      description: Get autocomplete suggestions based on partial query input
+      operationId: getSearchSuggestions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: Partial query text
+          example: "microservices"
+      responses:
+        '200':
+          description: Suggestions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: string
+                  popular_queries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        query:
+                          type: string
+                        count:
+                          type: integer
+                  recent_searches:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents/upload:
+    post:
+      tags:
+        - Documents
+      summary: Upload document
+      description: |
+        Upload and process a document. Supports PDF, DOCX, TXT, HTML, Markdown, and more.
+        The document will be processed, chunked, and embeddings will be generated.
+      operationId: uploadDocument
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                metadata:
+                  type: string
+                  description: JSON string with document metadata
+                processing_options:
+                  type: string
+                  description: JSON string with processing options
+      responses:
+        '200':
+          description: Document uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document_id:
+                    type: string
+                    format: uuid
+                  filename:
+                    type: string
+                  status:
+                    type: string
+                    enum: [processing, completed, failed]
+                  chunk_count:
+                    type: integer
+                  processing_time_ms:
+                    type: number
+                    format: float
+        '400':
+          description: Invalid file or request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '415':
+          description: Unsupported file type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Processing error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents:
+    get:
+      tags:
+        - Documents
+      summary: List documents
+      description: List all processed documents with pagination and filtering
+      operationId: listDocuments
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [processing, completed, failed]
+        - name: content_type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Documents retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DocumentInfo'
+                  total_count:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents/{document_id}:
+    get:
+      tags:
+        - Documents
+      summary: Get document
+      description: Get document details and metadata
+      operationId: getDocument
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document ID
+      responses:
+        '200':
+          description: Document retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentInfo'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+        - Documents
+      summary: Delete document
+      description: Delete a document and its embeddings
+      operationId: deleteDocument
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Document ID
+      responses:
+        '200':
+          description: Document deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  document_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum: [deleted]
+                  message:
+                    type: string
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /embeddings/generate:
+    post:
+      tags:
+        - Embeddings
+      summary: Generate embeddings
+      description: |
+        Generate embeddings for text input. Supports multiple providers and models
+        with intelligent caching and batch processing.
+      operationId: generateEmbeddings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingRequest'
+      responses:
+        '200':
+          description: Embeddings generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Generation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /embeddings/models:
+    get:
+      tags:
+        - Embeddings
+      summary: List embedding models
+      description: List all available embedding models with their capabilities
+      operationId: listEmbeddingModels
+      responses:
+        '200':
+          description: Models retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        available:
+                          type: boolean
+                        models:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              dimensions:
+                                type: integer
+                              max_tokens:
+                                type: integer
+                              cost_per_1k_tokens:
+                                type: number
+                                format: float
+                              description:
+                                type: string
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /context/retrieve:
+    post:
+      tags:
+        - Context
+      summary: Retrieve context
+      description: Retrieve relevant context for a query using advanced retrieval strategies
+      operationId: retrieveContext
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextRetrievalRequest'
+      responses:
+        '200':
+          description: Context retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  context_id:
+                    type: string
+                    format: uuid
+                  chunks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        chunk_id:
+                          type: string
+                          format: uuid
+                          content:
+                            type: string
+                          score:
+                            type: number
+                            format: float
+                          metadata:
+                            type: object
+                  retrieval_strategy:
+                    type: string
+                  total_candidates_evaluated:
+                    type: integer
+                  retrieval_time_ms:
+                    type: number
+                    format: float
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Retrieval failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /context/assemble:
+    post:
+      tags:
+        - Context
+      summary: Assemble context
+      description: Assemble retrieved context into coherent response with compression
+      operationId: assembleContext
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextAssemblyRequest'
+      responses:
+        '200':
+          description: Context assembled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  assembled_context:
+                    type: string
+                  total_tokens:
+                    type: integer
+                  chunks_included:
+                    type: integer
+                  assembly_strategy:
+                    type: string
+                  citations:
+                    type: array
+                    items:
+                      type: object
+                  quality_metrics:
+                    type: object
+                  assembly_time_ms:
+                    type: number
+                    format: float
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Assembly failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /monitoring/health:
+    get:
+      tags:
+        - Monitoring
+      summary: Service health check
+      description: Get comprehensive service health status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, unhealthy, degraded]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                  checks:
+                    type: object
+                    additionalProperties:
+                      type: object
+                        properties:
+                          status:
+                            type: string
+                          message:
+                            type: string
+                          response_time_ms:
+                            type: number
+                            format: float
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /monitoring/metrics:
+    get:
+      tags:
+        - Monitoring
+      summary: Get service metrics
+      description: Get detailed service performance metrics
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Metrics retrieved successfully
+          content:
+            text/plain:
+            schema:
+              type: string
+        '404':
+          description: Metrics not available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /monitoring/errors:
+    get:
+    tags:
+      - Monitoring
+    summary: Get error summary
+    description: Get recent error summary and trends
+    operationId: getErrors
+    parameters:
+      - name: hours
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 168
+          default: 24
+          description: Number of hours to analyze
+    responses:
+        '200':
+          description: Error summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_errors:
+                    type: integer
+                  error_types:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  recent_errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        error_type:
+                          type: string
+                        message:
+                          type: string
+                        count:
+                          type: integer
+                        last_occurrence:
+                          type: string
+                          format: date-time
+                  error_rate:
+                    type: number
+                    format: float
+                  trend:
+                    type: string
+                    enum: [increasing, decreasing, stable]
+        '500':
+          description: Failed to retrieve errors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

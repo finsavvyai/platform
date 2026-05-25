@@ -1,0 +1,204 @@
+# Production Configuration Values for UPM.Plus
+# Domain: upm.plus
+
+# Global Configuration
+global:
+  domain: upm.plus
+  environment: production
+  clusterIssuer: letsencrypt-prod-upmplus
+
+# Frontend Configuration
+frontend:
+  image:
+    repository: ghcr.io/your-org/upm-plus/frontend
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 3
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  env:
+    - name: REACT_APP_API_URL
+      value: "https://api.upm.plus"
+    - name: REACT_APP_WS_URL
+      value: "wss://api.upm.plus/ws"
+    - name: REACT_APP_ENVIRONMENT
+      value: "production"
+
+# Backend Configuration
+backend:
+  image:
+    repository: ghcr.io/your-org/upm-plus/backend
+    tag: latest
+    pullPolicy: Always
+  replicaCount: 3
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  env:
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: upm-plus-production-secrets
+          key: DATABASE_URL
+    - name: REDIS_URL
+      valueFrom:
+        secretKeyRef:
+          name: upm-plus-production-secrets
+          key: REDIS_URL
+    - name: OPENAI_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: upm-plus-production-secrets
+          key: OPENAI_API_KEY
+    - name: SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: upm-plus-production-secrets
+          key: SECRET_KEY
+    - name: ENVIRONMENT
+      value: "production"
+    - name: ALLOWED_HOSTS
+      value: "upm.plus,www.upm.plus,api.upm.plus,app.upm.plus,dashboard.upm.plus"
+    - name: CORS_ORIGINS
+      value: "https://upm.plus,https://www.upm.plus,https://app.upm.plus,https://dashboard.upm.plus"
+    - name: CHROMA_HOST
+      value: "chromadb"
+    - name: CHROMA_PORT
+      value: "8000"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Database Configuration
+postgres:
+  image: postgres:15-alpine
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "8Gi"
+      cpu: "4000m"
+  storage:
+    size: 100Gi
+    storageClass: fast-ssd
+  env:
+    - name: POSTGRES_DB
+      valueFrom:
+        secretKeyRef:
+          name: upm-plus-production-secrets
+          key: POSTGRES_DB
+    - name: POSTGRES_USER
+      valueFrom:
+        secretKeyRef:
+          name: upm-plus-production-secrets
+          key: POSTGRES_USER
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: upm-plus-production-secrets
+          key: POSTGRES_PASSWORD
+
+# Redis Configuration
+redis:
+  image: redis:7-alpine
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  storage:
+    size: 20Gi
+    storageClass: fast-ssd
+
+# ChromaDB Configuration
+chromadb:
+  image: chromadb/chroma:latest
+  replicaCount: 1
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "8Gi"
+      cpu: "4000m"
+  storage:
+    size: 200Gi
+    storageClass: fast-ssd
+
+# Monitoring Configuration
+monitoring:
+  prometheus:
+    enabled: true
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
+    storage:
+      size: 50Gi
+      storageClass: fast-ssd
+  grafana:
+    enabled: true
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+    storage:
+      size: 20Gi
+      storageClass: fast-ssd
+
+# Security Configuration
+security:
+  networkPolicy:
+    enabled: true
+  podSecurityPolicy:
+    enabled: true
+  rateLimiting:
+    enabled: true
+  httpsOnly: true
+  securityHeaders:
+    enabled: true
+
+# Backup Configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+  storage:
+    size: 100Gi
+    storageClass: backup-storage
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  class: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod-upmplus"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/websocket-services: "upm-plus-backend"
+  tls:
+    enabled: true
+    secretName: upm-plus-production-tls

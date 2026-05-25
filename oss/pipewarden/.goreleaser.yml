@@ -1,0 +1,182 @@
+version: 2
+
+project_name: pipewarden
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: pipewarden-linux-amd64
+    main: ./cmd/pipewarden
+    binary: pipewarden
+    goos: [linux]
+    goarch: [amd64]
+    env:
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+  - id: pipewarden-linux-arm64
+    main: ./cmd/pipewarden
+    binary: pipewarden
+    goos: [linux]
+    goarch: [arm64]
+    env:
+      - CGO_ENABLED=1
+      - CC=aarch64-linux-gnu-gcc
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+  # Cross-compiled CGO targets via zig.  Release workflow installs zig
+  # and exposes it as `CC` so mattn/go-sqlite3 can build for these
+  # platforms from the Linux runner. macOS users get a real darwin
+  # binary; Windows users get an MSVC-compatible exe.
+  - id: pipewarden-darwin-amd64
+    main: ./cmd/pipewarden
+    binary: pipewarden
+    goos: [darwin]
+    goarch: [amd64]
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target x86_64-macos
+      - CXX=zig c++ -target x86_64-macos
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+  - id: pipewarden-darwin-arm64
+    main: ./cmd/pipewarden
+    binary: pipewarden
+    goos: [darwin]
+    goarch: [arm64]
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target aarch64-macos
+      - CXX=zig c++ -target aarch64-macos
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+  - id: pipewarden-windows-amd64
+    main: ./cmd/pipewarden
+    binary: pipewarden
+    goos: [windows]
+    goarch: [amd64]
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target x86_64-windows-gnu
+      - CXX=zig c++ -target x86_64-windows-gnu
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    name_template: >-
+      {{ .ProjectName }}-
+      {{- .Version }}-
+      {{- .Os }}-
+      {{- .Arch }}
+    ids:
+      - pipewarden-linux-amd64
+      - pipewarden-linux-arm64
+      - pipewarden-darwin-amd64
+      - pipewarden-darwin-arm64
+      - pipewarden-windows-amd64
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+      - configs/**/*
+      - docs/**/*
+
+  # Air-gap variant lives in a separate config (.goreleaser.airgap.yml) so
+  # vanilla `goreleaser release` works on a fresh checkout without
+  # requiring the bundled llamafile binary. Build the air-gap archive
+  # with: `make airgap-stage && goreleaser release --config .goreleaser.airgap.yml`
+
+dockers:
+  - id: amd64
+    ids: [pipewarden-linux-amd64]
+    image_templates:
+      - 'docker.io/{{ .Env.DOCKER_USERNAME }}/pipewarden:{{ .Version }}-amd64'
+      - 'docker.io/{{ .Env.DOCKER_USERNAME }}/pipewarden:latest-amd64'
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - '--platform=linux/amd64'
+      - '--build-arg=VERSION={{ .Version }}'
+      - '--label=org.opencontainers.image.version={{ .Version }}'
+      - '--label=org.opencontainers.image.created={{ .Date }}'
+
+  - id: arm64
+    ids: [pipewarden-linux-arm64]
+    image_templates:
+      - 'docker.io/{{ .Env.DOCKER_USERNAME }}/pipewarden:{{ .Version }}-arm64'
+      - 'docker.io/{{ .Env.DOCKER_USERNAME }}/pipewarden:latest-arm64'
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - '--platform=linux/arm64'
+      - '--build-arg=VERSION={{ .Version }}'
+      - '--label=org.opencontainers.image.version={{ .Version }}'
+      - '--label=org.opencontainers.image.created={{ .Date }}'
+
+docker_manifests:
+  - name_template: 'docker.io/{{ .Env.DOCKER_USERNAME }}/pipewarden:{{ .Version }}'
+    image_templates:
+      - 'docker.io/{{ .Env.DOCKER_USERNAME }}/pipewarden:{{ .Version }}-amd64'
+      - 'docker.io/{{ .Env.DOCKER_USERNAME }}/pipewarden:{{ .Version }}-arm64'
+  - name_template: 'docker.io/{{ .Env.DOCKER_USERNAME }}/pipewarden:latest'
+    image_templates:
+      - 'docker.io/{{ .Env.DOCKER_USERNAME }}/pipewarden:latest-amd64'
+      - 'docker.io/{{ .Env.DOCKER_USERNAME }}/pipewarden:latest-arm64'
+
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))?!?:.+$'
+      order: 0
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))?!?:.+$'
+      order: 1
+    - title: Security
+      regexp: '^.*?security(\(.+\))?!?:.+$'
+      order: 2
+    - title: Documentation
+      regexp: '^.*?docs(\(.+\))?!?:.+$'
+      order: 3
+    - title: Others
+      order: 999
+  filters:
+    exclude:
+      - '^test:'
+      - '^chore'
+      - Merge pull request
+      - Merge branch
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+sboms:
+  - artifacts: archive
+    documents:
+      - '{{ .ProjectName }}_{{ .Version }}_sbom.spdx.json'

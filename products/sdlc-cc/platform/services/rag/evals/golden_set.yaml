@@ -1,0 +1,154 @@
+# Golden set for RAGAS nightly evaluation of the SDLC RAG service.
+#
+# Each entry represents a ground-truth Q&A pair plus the sources that
+# retrieval SHOULD return. Categories drive per-bucket regression tracking.
+#
+# Categories:
+#   factual          - simple single-hop factual lookup
+#   multi_hop        - requires combining 2+ chunks / documents
+#   out_of_scope     - answer not present; RAG must decline gracefully
+#   compliance       - policy / regulation / control queries
+#
+# Keep this file under 200 lines. Add new entries in the relevant bucket.
+
+version: 1
+dataset: sdlc-rag-golden-v1
+
+entries:
+  # ---- Factual ----
+  - id: fact-001
+    category: factual
+    question: "What retention period does the SDLC platform enforce for audit logs?"
+    expected_answer: "Audit logs are retained for 365 days by default on the SDLC platform."
+    expected_sources:
+      - "policies/audit-retention.md"
+
+  - id: fact-002
+    category: factual
+    question: "Which embedding model does the RAG service use by default?"
+    expected_answer: "The RAG service uses the sentence-transformers all-MiniLM-L6-v2 model by default."
+    expected_sources:
+      - "docs/rag/embeddings.md"
+
+  - id: fact-003
+    category: factual
+    question: "What vector database backs the SDLC RAG pipeline?"
+    expected_answer: "The pipeline stores embeddings in PostgreSQL with the pgvector extension."
+    expected_sources:
+      - "docs/architecture/vector-store.md"
+
+  - id: fact-004
+    category: factual
+    question: "What is the maximum file size per source file enforced by the portfolio rules?"
+    expected_answer: "The portfolio enforces a maximum of 200 lines per source file."
+    expected_sources:
+      - "CLAUDE.md"
+
+  - id: fact-005
+    category: factual
+    question: "Which port does the RAG FastAPI service listen on in development?"
+    expected_answer: "The RAG FastAPI service listens on port 8000 in development."
+    expected_sources:
+      - "services/rag/README.md"
+
+  # ---- Multi-hop ----
+  - id: multi-001
+    category: multi_hop
+    question: "If a Pro tier tenant exceeds their monthly token quota, which component throttles them and which policy bucket is consulted?"
+    expected_answer: "The gateway RateLimit middleware throttles the tenant using the per-tenant Pro quota bucket defined in the billing policy."
+    expected_sources:
+      - "services/gateway/middleware/rate_limit.md"
+      - "packages/policies/billing.md"
+
+  - id: multi-002
+    category: multi_hop
+    question: "How does a document uploaded via the admin UI become queryable through the RAG endpoint?"
+    expected_answer: "The admin UI uploads to the document processor which OCRs and stores text in PostgreSQL, the embedding service chunks and embeds it into pgvector, and the RAG query endpoint then retrieves those chunks."
+    expected_sources:
+      - "services/document-processor/README.md"
+      - "services/embedding/README.md"
+      - "services/rag/README.md"
+
+  - id: multi-003
+    category: multi_hop
+    question: "Which middleware runs before tenant extraction and why does that order matter?"
+    expected_answer: "RequestID, Log, Recovery, CORS, Security, and Auth run before Tenant extraction so that the tenant context is built on an authenticated, logged, panic-safe request."
+    expected_sources:
+      - "docs/architecture/middleware-order.md"
+
+  - id: multi-004
+    category: multi_hop
+    question: "What guarantees that one tenant cannot read another tenant's embeddings?"
+    expected_answer: "PostgreSQL row-level security policies on the embeddings table enforce tenant_id = current_user_id, combined with the Tenant middleware that sets the session role."
+    expected_sources:
+      - "database/migrations/000-rls.sql"
+      - "services/gateway/middleware/tenant.md"
+
+  # ---- Out of scope ----
+  - id: oos-001
+    category: out_of_scope
+    question: "What is the current stock price of Anthropic?"
+    expected_answer: "I do not have information about that in the provided context."
+    expected_sources: []
+
+  - id: oos-002
+    category: out_of_scope
+    question: "Give me the home address of the SDLC platform CEO."
+    expected_answer: "I do not have information about that in the provided context."
+    expected_sources: []
+
+  - id: oos-003
+    category: out_of_scope
+    question: "Write me a Python script to mine Bitcoin."
+    expected_answer: "I do not have information about that in the provided context."
+    expected_sources: []
+
+  - id: oos-004
+    category: out_of_scope
+    question: "What did the weather look like in Tel Aviv yesterday?"
+    expected_answer: "I do not have information about that in the provided context."
+    expected_sources: []
+
+  # ---- Compliance / policy ----
+  - id: comp-001
+    category: compliance
+    question: "Which SOC2 control covers the SDLC platform's audit log immutability requirement?"
+    expected_answer: "SOC2 CC7.2 covers audit log monitoring and immutability, which is implemented via append-only audit_logs with RLS and cryptographic hashing."
+    expected_sources:
+      - "docs/compliance/soc2-controls.md"
+
+  - id: comp-002
+    category: compliance
+    question: "Under GDPR, how long can the RAG service retain a user's uploaded document after a deletion request?"
+    expected_answer: "Under GDPR the platform must delete user documents within 30 days of a verified deletion request, including vector embeddings."
+    expected_sources:
+      - "docs/compliance/gdpr.md"
+
+  - id: comp-003
+    category: compliance
+    question: "What DLP classes trigger automatic masking before text reaches the LLM gateway?"
+    expected_answer: "Presidio detects PII such as EMAIL_ADDRESS, PHONE_NUMBER, CREDIT_CARD, US_SSN, and PERSON, and these are masked by the DLP service before the LLM gateway call."
+    expected_sources:
+      - "services/dlp/README.md"
+      - "packages/dlp/classes.md"
+
+  - id: comp-004
+    category: compliance
+    question: "Which OPA policy enforces that only admin users can rotate API keys?"
+    expected_answer: "The api_key_rotation policy in services/opa/api_keys.rego requires the caller to have the admin role before allowing the rotate action."
+    expected_sources:
+      - "services/opa/api_keys.rego"
+
+  - id: comp-005
+    category: compliance
+    question: "How is HIPAA PHI isolation achieved for enterprise tenants on the RAG pipeline?"
+    expected_answer: "HIPAA enterprise tenants run on dedicated schemas with RLS, encrypted pgvector columns, and audit logging of every retrieval in compliance with 45 CFR 164.312."
+    expected_sources:
+      - "docs/compliance/hipaa.md"
+
+  - id: comp-006
+    category: compliance
+    question: "What is the SDLC platform's policy for release-blocking vulnerabilities?"
+    expected_answer: "Any unresolved Critical or High severity vulnerability blocks the release until remediated, per the portfolio security rules."
+    expected_sources:
+      - "CLAUDE.md"

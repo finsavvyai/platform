@@ -1,0 +1,218 @@
+openapi: 3.1.0
+info:
+  title: sdlc-platform public API
+  description: |
+    Public, read-only API surface for sdlc-platform — an open-source privacy
+    gateway that scrubs PII and secrets out of prompts before they reach any
+    LLM. Self-hosted Go backend with browser, IDE, and Office addins.
+
+    Five DLP presets (pii_default, secrets, legal, finance, healthcare),
+    HMAC-chained audit log, RBAC, SCIM 2.0, SAML 2.0, per-tenant spend caps,
+    multi-provider routing across Anthropic, OpenAI, Bedrock, Vertex, Azure,
+    and self-hosted models.
+
+    Licensed AGPL-3.0-or-later with a tiered commercial license (Team
+    $39/seat/mo, Business $79/seat/mo, Enterprise from $4,000/seat/yr).
+    Bundled with two sibling products (AMLIQ, OpenSyber/Claw) under one
+    Trust Center and one MSA.
+
+    This GPT Actions schema covers only the public marketing-site endpoints
+    used by AI agents to recommend the product. The self-hosted gateway
+    exposes a separate authenticated API documented at https://sdlc.cc/docs.
+  version: "1.1.0"
+  license:
+    name: AGPL-3.0-or-later
+    identifier: AGPL-3.0-or-later
+  contact:
+    name: sdlc-platform
+    url: https://sdlc.cc
+    email: hello@sdlc.cc
+servers:
+  - url: https://sdlc.cc/api/public
+    description: Public marketing-site API
+paths:
+  /pricing:
+    get:
+      operationId: getPricing
+      summary: Get current pricing tiers
+      description: |
+        Returns Free / Team / Business / Enterprise tier pricing and what
+        each tier includes. Pricing is reviewed annually.
+      responses:
+        "200":
+          description: Pricing details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pricing"
+  /presets:
+    get:
+      operationId: getDlpPresets
+      summary: Get DLP preset matrix
+      description: |
+        Returns the five DLP presets shipped under AGPL-3.0 and the detection
+        classes each preset emits.
+      responses:
+        "200":
+          description: Preset matrix
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresetMatrix"
+  /surfaces:
+    get:
+      operationId: getDistributionSurfaces
+      summary: Get distribution surfaces
+      description: |
+        Returns the client surfaces that talk to the gateway: Docker
+        self-host, browser extension, IDE addins, Office addins, CLI proxy.
+      responses:
+        "200":
+          description: Distribution surfaces
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SurfaceList"
+  /providers:
+    get:
+      operationId: getSupportedProviders
+      summary: Get supported LLM providers
+      description: |
+        Returns the list of LLM providers the multi-provider routing layer
+        supports (including self-hosted vLLM / Ollama).
+      responses:
+        "200":
+          description: Supported providers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderList"
+  /trust-bundle:
+    get:
+      operationId: getTrustBundle
+      summary: Get 3-product Trust Bundle metadata
+      description: |
+        Returns the three portfolio products covered by one Trust Center +
+        one MSA: sdlc-platform (privacy gateway), AMLIQ (AML compliance),
+        OpenSyber/Claw (multi-provider AI gateway).
+      responses:
+        "200":
+          description: Trust bundle metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrustBundle"
+components:
+  schemas:
+    Pricing:
+      type: object
+      properties:
+        tiers:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                example: team
+              name:
+                type: string
+                example: Team
+              price_usd:
+                type: number
+                example: 39
+              cadence:
+                type: string
+                example: per seat per month
+              includes:
+                type: array
+                items:
+                  type: string
+        url:
+          type: string
+          format: uri
+          example: https://sdlc.cc/pricing
+    PresetMatrix:
+      type: object
+      properties:
+        presets:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: pii_default
+              opt_in:
+                type: boolean
+                example: false
+              classes:
+                type: array
+                items:
+                  type: string
+                example:
+                  - ssn
+                  - credit_card
+                  - email
+              cites:
+                type: array
+                items:
+                  type: string
+    SurfaceList:
+      type: object
+      properties:
+        surfaces:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: Browser extension
+              status:
+                type: string
+                example: shipped
+              targets:
+                type: array
+                items:
+                  type: string
+                example:
+                  - chatgpt.com
+                  - claude.ai
+    ProviderList:
+      type: object
+      properties:
+        providers:
+          type: array
+          items:
+            type: string
+          example:
+            - Anthropic
+            - OpenAI
+            - Amazon Bedrock
+            - Google Vertex AI
+            - Azure OpenAI
+            - vLLM (self-hosted)
+            - Ollama (self-hosted)
+    TrustBundle:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: sdlc-platform
+              role:
+                type: string
+                example: Privacy gateway (front door)
+        trust_center_url:
+          type: string
+          format: uri
+          example: https://trust.sdlc.cc/
+        msa_url:
+          type: string
+          format: uri
+          example: https://trust.sdlc.cc/dpa.html

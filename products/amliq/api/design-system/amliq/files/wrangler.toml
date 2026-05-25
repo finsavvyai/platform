@@ -1,0 +1,48 @@
+name = "amliq-screening"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+# ── KV namespaces ─────────────────────────────────────────────────────────────
+# Create with: wrangler kv namespace create SANCTIONS_KV
+# Paste the resulting id below
+[[kv_namespaces]]
+binding = "SANCTIONS_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_PREVIEW_KV_NAMESPACE_ID"
+
+# ── R2 buckets ────────────────────────────────────────────────────────────────
+# Create with: wrangler r2 bucket create amliq-lists
+[[r2_buckets]]
+binding = "SANCTIONS_R2"
+bucket_name = "amliq-lists"
+
+# ── Queues ────────────────────────────────────────────────────────────────────
+# Create with: wrangler queues create sanctions-ingest
+[[queues.producers]]
+binding = "INGEST_QUEUE"
+queue = "sanctions-ingest"
+
+[[queues.consumers]]
+queue = "sanctions-ingest"
+max_batch_size = 10
+max_retries = 3
+dead_letter_queue = "sanctions-ingest-dlq"
+
+# ── Cron triggers ─────────────────────────────────────────────────────────────
+[triggers]
+crons = ["0 3 * * *"]           # 3am UTC — continuous monitoring sweep
+
+# ── Secrets (set via: wrangler secret put SECRET_NAME) ───────────────────────
+# GO_SERVICE_URL     — your Render service URL
+# INTERNAL_SECRET    — shared secret between Worker and Go service
+
+# ── Per-environment overrides ─────────────────────────────────────────────────
+[env.production]
+vars = { ENV = "production" }
+
+[env.development]
+vars = { ENV = "development", GO_SERVICE_URL = "http://localhost:8080" }

@@ -1,0 +1,38 @@
+name: lunaos
+services:
+- name: lunaos-api
+  source_dir: /
+  github:
+    repo: lunaos-ai/luna-os.ai
+    branch: main
+  run_command: python -m lunaos.cli run --host 0.0.0.0 --port $PORT
+  environment_slug: python
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  http_port: 8000
+  health_check:
+    http_path: /health
+  envs:
+  - key: ENVIRONMENT
+    value: production
+  - key: DEBUG
+    value: false
+  - key: SECRET_KEY
+    value: ${SECRET_KEY}
+  - key: DATABASE_URL
+    value: ${DATABASE_URL}
+  - key: REDIS_URL
+    value: ${REDIS_URL}
+
+databases:
+- name: lunaos-db
+  engine: PG
+  version: "15"
+  size: db-s-dev-database
+  num_nodes: 1
+
+- name: lunaos-redis
+  engine: REDIS
+  version: "7"
+  size: db-s-dev-database
+  num_nodes: 1

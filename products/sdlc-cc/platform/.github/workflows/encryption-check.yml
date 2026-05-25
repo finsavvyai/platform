@@ -1,0 +1,83 @@
+name: Encryption-at-rest check
+
+# Phase 2 Day 36 — fail-closed CI gate that proves every storage
+# resource declared in deployments/encryption-manifest.json is
+# encrypted. SCAFFOLD: real AWS API calls require credentials in
+# repository secrets (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) plus
+# an IAM role with rds:Describe*, s3:GetEncryption*, ec2:Describe*.
+# Without those the job runs in manifest-only mode and still fails on
+# any manifest entry that allows unencrypted state.
+
+on:
+  pull_request:
+    paths:
+      - 'deployments/**'
+      - 'scripts/encryption_check.go'
+      - '.github/workflows/encryption-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'deployments/**'
+      - 'scripts/encryption_check.go'
+      - '.github/workflows/encryption-check.yml'
+  schedule:
+    # Nightly sweep so a manually-created bucket without SSE surfaces
+    # within 24h.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  encryption-check:
+    name: Verify encryption manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Manifest must exist (fail closed)
+        run: |
+          if [ ! -f deployments/encryption-manifest.json ]; then
+            echo "::error::deployments/encryption-manifest.json missing — fail closed."
+            exit 1
+          fi
+
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.25", cache: false }
+
+      - name: Run encryption_check
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.ENCRYPTION_CHECK_AWS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.ENCRYPTION_CHECK_AWS_SECRET }}
+          AWS_REGION: us-east-1
+        run: |
+          # encryption_check.go is built with `//go:build ignore_for_module`
+          # so it stays out of `go build ./...` of the gateway. The CI
+          # job below copies the file to a fresh module dir with the
+          # build tag stripped, fetches the aws-sdk-go-v2 deps, and runs
+          # the verification (and tests) standalone.
+          tmp=$(mktemp -d)
+          cp scripts/encryption_check.go "$tmp/encryption_check.go"
+          cp scripts/encryption_check_test.go "$tmp/encryption_check_test.go"
+          # strip the build tag lines
+          for f in "$tmp"/*.go; do
+            grep -v 'go:build ignore_for_module' "$f" \
+              | grep -v '+build ignore_for_module' > "$f.tmp" && mv "$f.tmp" "$f"
+          done
+          (
+            cd "$tmp"
+            go mod init encryption_check
+            go get github.com/aws/aws-sdk-go-v2@latest
+            go get github.com/aws/aws-sdk-go-v2/config@latest
+            go get github.com/aws/aws-sdk-go-v2/service/s3@latest
+            go get github.com/aws/aws-sdk-go-v2/service/rds@latest
+            go get github.com/aws/aws-sdk-go-v2/service/ec2@latest
+            go test -v ./...
+          )
+          # Now run against the real manifest using the same temp module.
+          (
+            cd "$tmp"
+            go run . -manifest "$GITHUB_WORKSPACE/deployments/encryption-manifest.json"
+          )

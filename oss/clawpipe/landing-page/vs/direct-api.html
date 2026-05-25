@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawPipe vs Direct OpenAI / Anthropic API — what you save</title>
+  <meta name="description" content="Calling OpenAI or Anthropic directly is simple — and expensive. ClawPipe drops in as a one-line replacement that runs Booster + cache + smart routing on every call. Measured benchmark in progress.">
+  <link rel="canonical" href="https://clawpipe.ai/vs/direct-api">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/legal.css">
+</head>
+<body>
+<div class="container">
+  <header class="legal-header">
+    <a href="/" class="logo" style="text-decoration:none">ClawPipe</a>
+    <nav><a href="/#pricing">Pricing</a><a href="https://docs.clawpipe.ai">Docs</a><a href="https://app.clawpipe.ai/signup">Sign in</a></nav>
+  </header>
+  <main class="content">
+    <h1>ClawPipe vs Direct OpenAI / Anthropic API</h1>
+    <p class="lead">Direct API calls are the simplest path — and the most expensive. Every token costs full price. Every retry costs full price. Every "format this JSON" costs full price. ClawPipe fixes that with one line.</p>
+
+    <h2>What direct API usage looks like</h2>
+    <ul>
+      <li>Every request goes full-price to your chosen model.</li>
+      <li>Duplicate prompts cost 100% of the duplicate tokens.</li>
+      <li>"Calculate 17 × 34" — an LLM call at full price.</li>
+      <li>"Format this JSON" — an LLM call at full price.</li>
+      <li>A provider outage means your app is down; no fallback.</li>
+      <li>No budget cap — a runaway loop can cost $1000 before you notice.</li>
+    </ul>
+
+    <h2>What ClawPipe adds</h2>
+    <table class="compare-table">
+      <thead><tr><th>Capability</th><th>Direct API</th><th>ClawPipe</th></tr></thead>
+      <tbody>
+        <tr><td>Math, JSON, dates resolved locally at $0</td><td>❌</td><td>✅ Booster</td></tr>
+        <tr><td>Duplicate prompts return cached response</td><td>❌</td><td>✅ Cache + Semantic Cache</td></tr>
+        <tr><td>Context compressed before send</td><td>❌</td><td>✅ Packer (20–60% fewer tokens)</td></tr>
+        <tr><td>Automatic failover across providers</td><td>❌</td><td>✅</td></tr>
+        <tr><td>Router picks cheapest model that meets quality</td><td>❌</td><td>✅ Learning Router</td></tr>
+        <tr><td>Hard budget cap + circuit breakers</td><td>❌</td><td>✅</td></tr>
+        <tr><td>Prompt injection detection + PII redaction</td><td>❌</td><td>✅ Guard</td></tr>
+        <tr><td>Audit log + analytics dashboard</td><td>❌</td><td>✅</td></tr>
+        <tr><td>Cost overhead</td><td>0%</td><td>0% — we make calls cheaper, not more expensive</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Migration is one line</h2>
+    <pre><code>// before — direct OpenAI
+const res = await openai.chat.completions.create({ model: 'gpt-4o', messages });
+
+// after — ClawPipe OpenAI-compatible SDK, same shape
+const oi = new ClawPipe.OpenAICompat({ apiKey: 'cp_xxx', projectId: 'my-app' });
+const res = await oi.chat.completions.create({ model: 'gpt-4o', messages });</code></pre>
+
+    <p>Or use the native SDK for access to Booster, Packer, Swarm, Router Weights:</p>
+    <pre><code>import { ClawPipe } from 'clawpipe-ai';
+
+const pipe = new ClawPipe({ apiKey: 'cp_xxx', projectId: 'my-app' });
+const { text, meta } = await pipe.prompt('Explain this code', { maxTokens: 500 });
+console.log(meta.estimatedCostUsd); // 0 if boosted or cached</code></pre>
+
+    <h2>What you save</h2>
+    <p>Booster + cache + Packer run on every call. Public measured benchmark in progress at <a href="https://github.com/finsavvyai/clawpipe-booster-benchmark">github.com/finsavvyai/clawpipe-booster-benchmark</a>; methodology v1.0 locked 2026-05-18. Per-bucket skip and cache rates will be published with 95% Wilson CIs once the run lands.</p>
+
+    <p><a class="cta" href="https://app.clawpipe.ai/signup">Start free →</a></p>
+  </main>
+  <footer class="legal-footer">
+    <div><a href="/">Home</a> · <a href="/vs/cloudflare">vs Cloudflare AI</a> · <a href="/vs/portkey">vs Portkey</a> · <a href="/vs/litellm">vs LiteLLM</a></div>
+    <div>&copy; 2026 ClawPipe</div>
+  </footer>
+</div>
+</body>
+</html>

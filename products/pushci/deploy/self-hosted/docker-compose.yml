@@ -1,0 +1,105 @@
+version: "3.9"
+
+# PushCI self-hosted runner pool
+#
+# ┌──────────────────────────────────────────────────────────────┐
+# │ SECURITY NOTICE — READ README.md "Security" SECTION FIRST    │
+# │                                                              │
+# │ This file mounts /var/run/docker.sock into the runner        │
+# │ container (line ~47). The :ro flag protects the socket FILE  │
+# │ but NOT Docker daemon operations — a compromised pipeline    │
+# │ can still escape to host root via POST /containers/create    │
+# │ with Privileged:true. This matches Jenkins/GitLab runner     │
+# │ defaults and is acceptable ONLY when every pipeline config   │
+# │ comes from a trusted Git repo. If you run untrusted code,    │
+# │ use sysbox / gVisor / Kata or the rootless compose profile.  │
+# │                                                              │
+# │ Full threat model + mitigation options: README.md#security   │
+# └──────────────────────────────────────────────────────────────┘
+#
+# This deploys a cluster of PushCI runners inside your network.
+# Runners register with api.pushci.dev (managed control plane)
+# and execute pipelines against your private repos without ever
+# transmitting source code to PushCI infrastructure.
+#
+# Enterprise Self-Hosted SaaS (full control plane inside your VPC)
+# is on the H2 2026 roadmap — contact sales@pushci.dev to pilot.
+#
+# Prerequisites:
+#   - Docker Engine 24+
+#   - Docker Compose v2+
+#   - PUSHCI_TOKEN exported (get from https://app.pushci.dev/cli-auth)
+#
+# Quick start:
+#   export PUSHCI_TOKEN=pcl_...
+#   docker compose up -d
+#   docker compose logs -f runner
+
+services:
+  runner:
+    image: pushci/runner:latest
+    container_name: pushci-runner
+    restart: unless-stopped
+    environment:
+      PUSHCI_TOKEN: ${PUSHCI_TOKEN:?set PUSHCI_TOKEN — get one at app.pushci.dev/cli-auth}
+      PUSHCI_API_URL: ${PUSHCI_API_URL:-https://api.pushci.dev}
+      PUSHCI_RUNNER_NAME: ${PUSHCI_RUNNER_NAME:-runner-1}
+      PUSHCI_RUNNER_TAGS: ${PUSHCI_RUNNER_TAGS:-linux,docker,self-hosted}
+      PUSHCI_RUNNER_CONCURRENCY: ${PUSHCI_RUNNER_CONCURRENCY:-4}
+      PUSHCI_LOG_LEVEL: ${PUSHCI_LOG_LEVEL:-info}
+    volumes:
+      - runner-work:/var/lib/pushci/work
+      # SECURITY: :ro is NOT a sandbox — see README.md "Security" section.
+      # Anyone with shell access inside this container can talk to the host
+      # Docker daemon and escape to host root. Only deploy in environments
+      # where pipeline configs come from trusted Git repositories.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "pushci", "doctor", "--quiet"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8G
+        reservations:
+          cpus: "1.0"
+          memory: 2G
+
+  # Optional: local Prometheus for runner metrics. Runner exposes
+  # /metrics on :9090. Scrape config included below — remove if
+  # you ship metrics to your existing observability stack.
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: pushci-prometheus
+    profiles: [observability]
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=30d
+
+  # Optional: Loki for runner log aggregation. Comment out if you
+  # already have centralized logging (Splunk, Datadog, ELK).
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: pushci-loki
+    profiles: [observability]
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+
+volumes:
+  runner-work:
+  prometheus-data:
+  loki-data:

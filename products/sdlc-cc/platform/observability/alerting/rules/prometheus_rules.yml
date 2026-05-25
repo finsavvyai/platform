@@ -1,0 +1,338 @@
+groups:
+  # Infrastructure Health Rules
+  - name: infrastructure.rules
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} has been down for more than 1 minute."
+          runbook_url: "https://runbooks.sdlc.cc/service-down"
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: "infrastructure"
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}."
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: "infrastructure"
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}."
+
+      - alert: DiskSpaceLow
+        expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 90
+        for: 10m
+        labels:
+          severity: critical
+          service: "infrastructure"
+        annotations:
+          summary: "Disk space low on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value }}% on {{ $labels.device }} at {{ $labels.instance }}."
+
+      - alert: DiskIOHigh
+        expr: irate(node_disk_io_time_seconds_total[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: "infrastructure"
+        annotations:
+          summary: "High disk I/O on {{ $labels.instance }}"
+          description: "Disk I/O wait time is {{ $value }}% on {{ $labels.instance }}."
+
+  # Application Health Rules
+  - name: application.rules
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status_code=~"5.."}[5m]) / rate(http_requests_total[5m]) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "High error rate in {{ $labels.service }}"
+          description: "Error rate is {{ $value }}% for {{ $labels.service }}."
+
+      - alert: High4xxErrorRate
+        expr: rate(http_requests_total{status_code=~"4.."}[5m]) / rate(http_requests_total[5m]) * 100 > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "High 4xx error rate in {{ $labels.service }}"
+          description: "4xx error rate is {{ $value }}% for {{ $labels.service }}."
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "High latency in {{ $labels.service }}"
+          description: "95th percentile latency is {{ $value }}s for {{ $labels.service }}."
+
+      - alert: VeryHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Very high latency in {{ $labels.service }}"
+          description: "95th percentile latency is {{ $value }}s for {{ $labels.service }}."
+
+      - alert: ActiveConnectionsHigh
+        expr: active_connections > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "High number of active connections in {{ $labels.service }}"
+          description: "{{ $value }} active connections in {{ $labels.service }}."
+
+  # Database Health Rules
+  - name: database.rules
+    rules:
+      - alert: DatabaseDown
+        expr: up{job="postgresql"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "database"
+        annotations:
+          summary: "Database is down"
+          description: "PostgreSQL database has been down for more than 1 minute."
+
+      - alert: DatabaseConnectionsHigh
+        expr: pg_stat_database_numbackends / pg_settings_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: "database"
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection usage is {{ $value }}%."
+
+      - alert: DatabaseSlowQueries
+        expr: rate(pg_stat_statements_mean_time_seconds[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: "database"
+        annotations:
+          summary: "Database slow queries detected"
+          description: "Average query time is {{ $value }} seconds."
+
+      - alert: DatabaseLockWaitTimeHigh
+        expr: pg_locks_wait_time > 1000
+        for: 2m
+        labels:
+          severity: warning
+          service: "database"
+        annotations:
+          summary: "High database lock wait time"
+          description: "Database lock wait time is {{ $value }}ms."
+
+  # Redis Health Rules
+  - name: redis.rules
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "redis"
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute."
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: "redis"
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis memory usage is {{ $value }}%."
+
+      - alert: RedisConnectionsHigh
+        expr: redis_connected_clients > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: "redis"
+        annotations:
+          summary: "High Redis connections"
+          description: "Redis has {{ $value }} connected clients."
+
+  # Business Metrics Rules
+  - name: business.rules
+    rules:
+      - alert: LowRAGQuerySuccessRate
+        expr: rate(rag_queries_total{result_type="success"}[5m]) / rate(rag_queries_total[5m]) * 100 < 90
+        for: 5m
+        labels:
+          severity: warning
+          service: "rag-service"
+        annotations:
+          summary: "Low RAG query success rate"
+          description: "RAG query success rate is {{ $value }}%."
+
+      - alert: SlowRAGQueries
+        expr: histogram_quantile(0.95, rate(rag_query_duration_seconds_bucket[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: "rag-service"
+        annotations:
+          summary: "Slow RAG queries"
+          description: "95th percentile RAG query time is {{ $value }}s."
+
+      - alert: LowDocumentProcessingRate
+        expr: rate(documents_total{operation="processed"}[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          service: "document-service"
+        annotations:
+          summary: "Low document processing rate"
+          description: "Document processing rate is {{ $value }} docs/sec."
+
+      - alert: VectorSearchHighLatency
+        expr: histogram_quantile(0.95, rate(vector_search_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: "vector-service"
+        annotations:
+          summary: "High vector search latency"
+          description: "95th percentile vector search time is {{ $value }}s."
+
+      - alert: LowVectorSearchSuccessRate
+        expr: rate(vector_searches_total{result_type="success"}[5m]) / rate(vector_searches_total[5m]) * 100 < 95
+        for: 5m
+        labels:
+          severity: warning
+          service: "vector-service"
+        annotations:
+          summary: "Low vector search success rate"
+          description: "Vector search success rate is {{ $value }}%."
+
+  # Authentication Rules
+  - name: authentication.rules
+    rules:
+      - alert: HighAuthenticationFailureRate
+        expr: rate(auth_attempts_total{result="failure"}[5m]) / rate(auth_attempts_total[5m]) * 100 > 20
+        for: 5m
+        labels:
+          severity: warning
+          service: "auth-service"
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value }}%."
+
+      - alert: SuspiciousLoginActivity
+        expr: rate(auth_attempts_total{result="failure"}[1m]) > 50
+        for: 1m
+        labels:
+          severity: security
+          service: "auth-service"
+        annotations:
+          summary: "Suspicious login activity detected"
+          description: "High rate of authentication failures: {{ $value }} attempts per minute."
+
+  # Security Rules
+  - name: security.rules
+    rules:
+      - alert: UnusualAPIAccessPattern
+        expr: rate(http_requests_total[5m]) > 1000
+        for: 2m
+        labels:
+          severity: security
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Unusual API access pattern"
+          description: "API request rate is {{ $value }} req/sec, which is unusually high."
+
+      - alert: PotentialDDoSAttack
+        expr: rate(http_requests_total[1m]) > 5000
+        for: 1m
+        labels:
+          severity: critical
+          service: "gateway"
+        annotations:
+          summary: "Potential DDoS attack"
+          description: "API request rate is {{ $value }} req/sec, indicating potential DDoS attack."
+
+  # Container Health Rules
+  - name: containers.rules
+    rules:
+      - alert: ContainerCPUHigh
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: "containers"
+        annotations:
+          summary: "High CPU usage in container {{ $labels.name }}"
+          description: "Container CPU usage is {{ $value }}%."
+
+      - alert: ContainerMemoryHigh
+        expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          service: "containers"
+        annotations:
+          summary: "High memory usage in container {{ $labels.name }}"
+          description: "Container memory usage is {{ $value }}%."
+
+      - alert: ContainerRestarts
+        expr: increase(container_start_time_seconds{name!=""}[1h]) > 3
+        for: 0m
+        labels:
+          severity: warning
+          service: "containers"
+        annotations:
+          summary: "Container {{ $labels.name }} is restarting frequently"
+          description: "Container has restarted {{ $value }} times in the last hour."
+
+  # Multi-tenant Rules
+  - name: multitenancy.rules
+    rules:
+      - alert: TenantHighResourceUsage
+        expr: tenant_storage_bytes / 1e9 > 100  # More than 100GB
+        for: 15m
+        labels:
+          severity: warning
+          service: "tenant-{{ $labels.tenant_id }}"
+        annotations:
+          summary: "High storage usage for tenant {{ $labels.tenant_id }}"
+          description: "Tenant {{ $labels.tenant_id }} is using {{ $value }}GB of storage."
+
+      - alert: TenantHighRequestRate
+        expr: rate(tenant_requests_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: "tenant-{{ $labels.tenant_id }}"
+        annotations:
+          summary: "High request rate for tenant {{ $labels.tenant_id }}"
+          description: "Tenant {{ $labels.tenant_id }} is making {{ $value }} requests per second."

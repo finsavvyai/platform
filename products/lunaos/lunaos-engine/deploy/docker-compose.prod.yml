@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  engine-api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: production
+    container_name: luna-engine-api
+    ports:
+      - "8040:8040"
+    environment:
+      - NODE_ENV=production
+      - PORT=8040
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - LEMONSQUEEZY_API_KEY=${LEMONSQUEEZY_API_KEY}
+      - LOG_LEVEL=info
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - luna-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8040/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  dashboard:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: luna-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://engine-api:8040
+      - NEXT_PUBLIC_WS_URL=ws://engine-api:8040
+    depends_on:
+      - engine-api
+    networks:
+      - luna-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: luna-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-luna}
+      - POSTGRES_USER=${POSTGRES_USER:-luna}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - luna-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-luna}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: luna-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - luna-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  workers-proxy:
+    image: node:20-alpine
+    container_name: luna-workers-proxy
+    working_dir: /app
+    volumes:
+      - ../packages/workers:/app
+    command: npm run dev
+    ports:
+      - "8787:8787"
+    environment:
+      - WRANGLER_TOKEN=${WRANGLER_TOKEN}
+      - CF_ACCOUNT_ID=${CF_ACCOUNT_ID}
+      - CF_NAMESPACE_ID=${CF_NAMESPACE_ID}
+    networks:
+      - luna-network
+    restart: unless-stopped
+
+networks:
+  luna-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
