@@ -1,0 +1,1 @@
+# AI-powered features for Ultimate Database Manager

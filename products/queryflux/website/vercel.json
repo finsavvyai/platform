@@ -1,0 +1,144 @@
+{
+  "version": 2,
+  "name": "queryflux",
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "out"
+      }
+    },
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "functions": {
+    "src/app/api/lemonsqueezy/webhook/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/lemonsqueezy/checkout/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains; preload"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(.*\\.(ico|png|jpg|jpeg|gif|svg|webp))",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/_next/static/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/favicon.ico",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=2592000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/sitemap.xml",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "NEXT_PUBLIC_LEMONSQUEEZY_API_URL": "@lemonsqueezy-api-url",
+    "NEXT_PUBLIC_LEMONSQUEEZY_WEBHOOK_SECRET": "@lemonsqueezy-webhook-secret",
+    "NEXT_PUBLIC_SITE_URL": "https://queryflux.com",
+    "NEXT_PUBLIC_ANALYTICS_ID": "@google-analytics-id"
+  },
+  "domains": [
+    "queryflux.com",
+    "www.queryflux.com"
+  ],
+  "redirects": [
+    {
+      "source": "/download",
+      "destination": "/downloads",
+      "permanent": true
+    },
+    {
+      "source": "/docs",
+      "destination": "/docs",
+      "permanent": true
+    },
+    {
+      "source": "/pricing",
+      "destination": "/#pricing",
+      "permanent": true
+    },
+    {
+      "source": "/features",
+      "destination": "/#features",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/lemonsqueezy/(.*)",
+      "destination": "/api/lemonsqueezy/$1"
+    }
+  ]
+}

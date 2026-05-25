@@ -1,0 +1,43 @@
+# Complete Railway Configuration with PostgreSQL Database
+
+[build]
+builder = "NIXPACKS"
+# Use the simple Dockerfile for better control
+dockerfilePath = "Dockerfile.simple"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+# Automatically deploy on git push
+autoDeploy = true
+
+# Backend Service Configuration
+[[services]]
+name = "api"
+source = "."
+[services.variables]
+PORT = "8080"
+ENVIRONMENT = "production"
+LOG_LEVEL = "info"
+JWT_SECRET = "${{ secrets.JWT_SECRET }}"
+[services.health_checks]
+[services.health_checks.http]
+path = "/health"
+port = 8080
+[services.ports]
+port = 8080
+protocol = "TCP"
+
+# PostgreSQL Database Service
+[[services]]
+name = "postgres"
+source = "docker://postgres:15-alpine"
+[services.variables]
+POSTGRES_USER = "queryflux"
+POSTGRES_PASSWORD = "${{ secrets.POSTGRES_PASSWORD }}"
+POSTGRES_DB = "queryflux_prod"
+[services.ports]
+port = 5432
+protocol = "TCP"

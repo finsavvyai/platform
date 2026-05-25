@@ -1,0 +1,315 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+
+require 'fastlane/action'
+require 'fastlane_core/configuration/config_item'
+require 'json'
+
+default_platform(:ios)
+
+# App identifier
+APP_IDENTIFIER = 'com.queryflux.mobile'
+
+# Configuration
+def load_config
+  @config ||= begin
+    config_file = File.join(File.dirname(__FILE__), '..', 'config', 'release.json')
+    if File.exist?(config_file)
+      JSON.parse(File.read(config_file))
+    else
+      {}
+    end
+  end
+end
+
+platform :ios do
+  before_all do
+    setup_circle_ci if ENV['CI']
+    import_certificate(
+      certificate_path: 'certificates/dist.p12',
+      certificate_password: ENV['CERTIFICATE_PASSWORD'] || load_config['certificate_password'],
+      keychain_name: ENV['KEYCHAIN_NAME'] || 'fastlane_tmp_keychain'
+    )
+  end
+
+  desc "Run tests"
+  lane :test do
+    run_tests(
+      workspace: "QueryFlux.xcworkspace",
+      scheme: "QueryFlux",
+      device: "iPhone 14",
+      clean: true,
+      code_coverage: true
+    )
+  end
+
+  desc "Build for testing"
+  lane :build_for_testing do
+    build_app(
+      workspace: "QueryFlux.xcworkspace",
+      scheme: "QueryFlux",
+      configuration: "Debug",
+      skip_archive: true,
+      skip_package_ipa: true,
+      destination: "platform=iOS Simulator,name=iPhone 14"
+    )
+  end
+
+  desc "Build development version"
+  lane :build_development do
+    build_app(
+      workspace: "QueryFlux.xcworkspace",
+      scheme: "QueryFlux",
+      configuration: "Debug",
+      export_method: "development",
+      output_directory: "./build",
+      output_name: "QueryFlux-dev.ipa"
+    )
+  end
+
+  desc "Build ad-hoc version"
+  lane :build_adhoc do
+    update_app_identifier(
+      xcodeproj: "QueryFlux.xcodeproj",
+      plist_path: "QueryFlux/Info.plist",
+      app_identifier: "#{APP_IDENTIFIER}.adhoc"
+    )
+
+    update_project_team(
+      path: "QueryFlux.xcodeproj",
+      teamid: ENV['TEAM_ID'] || load_config['team_id']
+    )
+
+    update_info_plist(
+      plist_path: "QueryFlux/Info.plist",
+      block: proc do |plist|
+        plist['CFBundleDisplayName'] = "QueryFlux (Ad-Hoc)"
+        plist['CFBundleVersion'] = "#{get_version_number}.#{get_build_number}"
+      end
+    )
+
+    build_app(
+      workspace: "QueryFlux.xcworkspace",
+      scheme: "QueryFlux",
+      configuration: "Release",
+      export_method: "ad-hoc",
+      output_directory: "./build",
+      output_name: "QueryFlux-adhoc.ipa"
+    )
+  end
+
+  desc "Build App Store version"
+  lane :build_appstore do
+    update_project_team(
+      path: "QueryFlux.xcodeproj",
+      teamid: ENV['TEAM_ID'] || load_config['team_id']
+    )
+
+    update_info_plist(
+      plist_path: "QueryFlux/Info.plist",
+      block: proc do |plist|
+        plist['CFBundleVersion'] = "#{get_version_number}.#{get_build_number}"
+        plist['ITSAppUsesNonExemptEncryption'] = false
+      end
+    )
+
+    build_app(
+      workspace: "QueryFlux.xcworkspace",
+      scheme: "QueryFlux",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "QueryFlux-AppStore.ipa"
+    )
+  end
+
+  desc "Upload to TestFlight"
+  lane :beta do
+    build_appstore
+
+    upload_to_testflight(
+      skip_submission: false,
+      skip_waiting_for_build_processing: false,
+      notify_external_testers: false,
+      changelog: File.exist?('changelog.txt') ? File.read('changelog.txt') : "Bug fixes and improvements."
+    )
+  end
+
+  desc "Upload to App Store"
+  lane :release do
+    build_appstore
+
+    deliver(
+      submit_for_review: true,
+      automatic_release: false,
+      force_skip_upload_screenshots: true,
+      force_skip_upload_metadata: true,
+      skip_metadata: true,
+      skip_screenshots: true,
+      precheck_include_in_app_purchase: false,
+      submission_information: {
+        add_id_info: true,
+        add_id_info_tracking: false,
+        content_rights_has_third_party_content: false,
+        content_rights_contains_third_party_content: false,
+        export_compliance_encryption_updated: false,
+        export_compliance_app_type: nil,
+        export_compliance_encryption: false,
+        export_compliance_is_exempt: false,
+        export_compliance_platforms: [],
+        export_compliance_algorithm: false,
+        export_compliance_key_length: 0,
+        export_compliance_available_in_france: false
+      }
+    )
+  end
+
+  desc "Update metadata and screenshots"
+  lane :update_metadata do
+    deliver(
+      skip_binary_upload: true,
+      skip_submission: true,
+      force: true,
+      screenshots_path: "./fastlane/metadata/screenshots",
+      metadata_path: "./fastlane/metadata"
+    )
+  end
+
+  desc "Sync certificates and provisioning profiles"
+  lane :sync_certificates do
+    match(
+      type: "development",
+      app_identifier: APP_IDENTIFIER,
+      readonly: true,
+      keychain_name: ENV['KEYCHAIN_NAME'] || 'fastlane_tmp_keychain'
+    )
+
+    match(
+      type: "appstore",
+      app_identifier: APP_IDENTIFIER,
+      readonly: true,
+      keychain_name: ENV['KEYCHAIN_NAME'] || 'fastlane_tmp_keychain'
+    )
+  end
+
+  desc "Generate screenshots"
+  lane :screenshots do
+    capture_screenshots(
+      scheme: "QueryFlux",
+      workspace: "QueryFlux.xcworkspace",
+      devices: [
+        "iPhone 14",
+        "iPhone 14 Plus",
+        "iPhone 14 Pro",
+        "iPhone 14 Pro Max",
+        "iPad Air (5th generation)"
+      ],
+      languages: [
+        "en-US"
+      ],
+      clear_previous_screenshots: true
+    )
+  end
+
+  desc "Run pre-flight checks"
+  lane :preflight do
+    run_tests
+
+    # Check for common issues
+    ensure_git_status_clean
+    ensure_no_debug_code(text: "NSLog", text: "console.log")
+    verify_xcode_version(target_version: "15.0+")
+
+    # Security checks
+    check_static_frameworks
+    check_app_identifier
+    check_bundle_id
+  end
+
+  # Helper methods
+  private_lane :get_version_number do
+    get_info_plist_value(path: "QueryFlux/Info.plist", key: "CFBundleShortVersionString")
+  end
+
+  private_lane :get_build_number do
+    get_info_plist_value(path: "QueryFlux/Info.plist", key: "CFBundleVersion")
+  end
+
+  # Error handling
+  error do |lane, exception|
+    UI.error("Lane #{lane} failed with exception: #{exception}")
+  end
+end
+
+# Android platform configuration
+platform :android do
+  desc "Run Android tests"
+  lane :test do
+    gradle(task: "testDebugUnitTest")
+  end
+
+  desc "Build Android debug version"
+  lane :build_debug do
+    gradle(
+      task: "assembleDebug",
+      build_type: "Debug"
+    )
+  end
+
+  desc "Build Android release version"
+  lane :build_release do
+    gradle(
+      task: "assembleRelease",
+      build_type: "Release",
+      properties: {
+        "android.injected.signing.store.file" => ENV['KEYSTORE_FILE'] || "queryflux-release.keystore",
+        "android.injected.signing.store.password" => ENV['KEYSTORE_PASSWORD'] || load_config['keystore_password'],
+        "android.injected.signing.key.alias" => ENV['KEY_ALIAS'] || load_config['key_alias'],
+        "android.injected.signing.key.password" => ENV['KEY_PASSWORD'] || load_config['key_password']
+      }
+    )
+  end
+
+  desc "Upload to Google Play Internal Testing"
+  lane :beta do
+    upload_to_play_store(
+      track: 'internal',
+      release_status: 'draft',
+      apk_paths: ["../android/app/build/outputs/apk/release/app-release.apk"],
+      changelog: File.exist?('changelog.txt') ? File.read('changelog.txt') : "Bug fixes and improvements."
+    )
+  end
+
+  desc "Deploy to Google Play"
+  lane :release do
+    build_release
+
+    upload_to_play_store(
+      track: 'production',
+      release_status: 'draft',
+      apk_paths: ["../android/app/build/outputs/apk/release/app-release.apk"],
+      changelog: File.exist?('changelog.txt') ? File.read('changelog.txt') : "New features and improvements."
+    )
+  end
+
+  desc "Bump version"
+  lane :bump_version do
+    current_version = android_get_version_code
+    new_version = current_version + 1
+
+    android_set_version_code(
+      version_code: new_version
+    )
+
+    git_commit(
+      path: "app/build.gradle",
+      message: "Bump version to #{new_version}"
+    )
+
+    add_git_tag(
+      tag: "v#{new_version}"
+    )
+
+    push_to_git_remote
+  end
+end

@@ -1,0 +1,224 @@
+groups:
+  - name: queryflux-backend
+    rules:
+      # Alert for high error rate
+      - alert: QueryFluxHighErrorRate
+        expr: rate(http_requests_total{status=~"5..",service="queryflux-backend"}[5m]) / rate(http_requests_total{service="queryflux-backend"}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: queryflux-backend
+        annotations:
+          summary: "High error rate detected in QueryFlux backend"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+          runbook_url: "https://docs.queryflux.com/runbooks/backend-error-rate"
+
+      # Alert for high latency
+      - alert: QueryFluxHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="queryflux-backend"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: queryflux-backend
+        annotations:
+          summary: "High latency detected in QueryFlux backend"
+          description: "95th percentile latency is {{ $value }}s over the last 5 minutes"
+          runbook_url: "https://docs.queryflux.com/runbooks/backend-latency"
+
+      # Alert for service down
+      - alert: QueryFluxServiceDown
+        expr: up{service="queryflux-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+          service: queryflux-backend
+        annotations:
+          summary: "QueryFlux backend service is down"
+          description: "Service {{ $labels.instance }} has been down for more than 1 minute"
+          runbook_url: "https://docs.queryflux.com/runbooks/service-down"
+
+      # Alert for high memory usage
+      - alert: QueryFluxHighMemoryUsage
+        expr: (container_memory_working_set_bytes{pod=~"queryflux-backend-.*"} / container_spec_memory_limit_bytes) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+          service: queryflux-backend
+        annotations:
+          summary: "High memory usage in QueryFlux backend"
+          description: "Memory usage is {{ $value }}% for pod {{ $labels.pod }}"
+          runbook_url: "https://docs.queryflux.com/runbooks/high-memory"
+
+      # Alert for high CPU usage
+      - alert: QueryFluxHighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{pod=~"queryflux-backend-.*"}[5m]) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+          service: queryflux-backend
+        annotations:
+          summary: "High CPU usage in QueryFlux backend"
+          description: "CPU usage is {{ $value }}% for pod {{ $labels.pod }}"
+          runbook_url: "https://docs.queryflux.com/runbooks/high-cpu"
+
+      # Alert for database connection pool exhaustion
+      - alert: QueryFluxDatabasePoolExhaustion
+        expr: db_connections_pool_active / db_connections_pool_max > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+          service: queryflux-backend
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value | humanizePercentage }} of database connections are in use"
+          runbook_url: "https://docs.queryflux.com/runbooks/db-pool-exhaustion"
+
+      # Alert for too many database connections
+      - alert: QueryFluxTooManyDBConnections
+        expr: db_connections_active > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: queryflux-backend
+        annotations:
+          summary: "Too many active database connections"
+          description: "{{ $value }} active database connections detected"
+          runbook_url: "https://docs.queryflux.com/runbooks/too-many-db-connections"
+
+      # Alert for Redis connection issues
+      - alert: QueryFluxRedisConnectionDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+          service: queryflux-backend
+        annotations:
+          summary: "Redis connection is down"
+          description: "Cannot connect to Redis server"
+          runbook_url: "https://docs.queryflux.com/runbooks/redis-down"
+
+      # Alert for high Redis memory usage
+      - alert: QueryFluxRedisHighMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: queryflux-backend
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.queryflux.com/runbooks/redis-memory"
+
+      # Alert for event store lag
+      - alert: QueryFluxEventStoreLag
+        expr: event_store_lag_seconds > 60
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+          service: queryflux-backend
+        annotations:
+          summary: "Event store processing lag"
+          description: "Event store is lagging by {{ $value }} seconds"
+          runbook_url: "https://docs.queryflux.com/runbooks/event-store-lag"
+
+      # Alert for authentication failures
+      - alert: QueryFluxHighAuthFailures
+        expr: rate(authentication_failures_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          service: queryflux-backend
+        annotations:
+          summary: "High rate of authentication failures"
+          description: "{{ $value }} authentication failures per second over the last 5 minutes"
+          runbook_url: "https://docs.queryflux.com/runbooks/auth-failures"
+
+      # Alert for potential security breach
+      - alert: QueryFluxPotentialSecurityBreach
+        expr: rate(security_threats_detected_total[5m]) > 1
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+          service: queryflux-backend
+        annotations:
+          summary: "Potential security breach detected"
+          description: "{{ $value }} security threats detected per second"
+          runbook_url: "https://docs.queryflux.com/runbooks/security-breach"
+
+      # Recording rules for SLA monitoring
+      - record: queryflux:http_requests:rate5m
+        expr: rate(http_requests_total{service="queryflux-backend"}[5m])
+
+      - record: queryflux:http_requests:rate5m:errors
+        expr: rate(http_requests_total{service="queryflux-backend",status=~"5.."}[5m])
+
+      - record: queryflux:http_request_duration:p95:5m
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="queryflux-backend"}[5m]))
+
+      - record: queryflux:http_request_duration:p99:5m
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{service="queryflux-backend"}[5m]))
+
+      - record: queryflux:database_connections:active
+        expr: db_connections_active
+
+      - record: queryflux:database_connections:pool_utilization
+        expr: db_connections_pool_active / db_connections_pool_max
+
+      - record: queryflux:redis:memory_utilization
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) * 100
+
+      - record: queryflux:event_store:processing_rate
+        expr: rate(event_store_events_processed_total[5m])
+
+      - record: queryflux:event_store:lag_seconds
+        expr: event_store_lag_seconds
+
+  - name: queryflux-sla
+    rules:
+      # SLA: 99.9% uptime
+      - alert: QueryFluxSLAViolation
+        expr: (sum(queryflux_http_requests_total{code!~"5.."}) / sum(queryflux_http_requests_total)) < 0.999
+        for: 15m
+        labels:
+          severity: critical
+          team: reliability
+          sla: "99.9%"
+        annotations:
+          summary: "SLA violation detected"
+          description: "Success rate is {{ $value | humanizePercentage }}, below SLA of 99.9%"
+
+      # SLA: 95th percentile latency < 500ms
+      - alert: QueryFluxLatencySLAViolation
+        expr: queryflux_http_request_duration_p95_5m > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: reliability
+          sla: "p95 < 500ms"
+        annotations:
+          summary: "Latency SLA violation"
+          description: "95th percentile latency is {{ $value }}s, above SLA of 500ms"
+
+      # SLA: Error rate < 0.1%
+      - alert: QueryFluxErrorRateSLAViolation
+        expr: (queryflux_http_requests_rate5m_errors / queryflux_http_requests_rate5m) > 0.001
+        for: 10m
+        labels:
+          severity: warning
+          team: reliability
+          sla: "error < 0.1%"
+        annotations:
+          summary: "Error rate SLA violation"
+          description: "Error rate is {{ $value | humanizePercentage }}, above SLA of 0.1%"

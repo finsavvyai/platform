@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: querylens-core
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/querylens
+      - SPRING_DATASOURCE_USERNAME=querylens
+      - SPRING_DATASOURCE_PASSWORD=querylens
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:14
+    container_name: querylens-postgres
+    environment:
+      POSTGRES_DB: querylens
+      POSTGRES_USER: querylens
+      POSTGRES_PASSWORD: querylens
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

@@ -1,0 +1,224 @@
+# Documentation Auto-Updater Configuration
+
+# Source Configuration
+source:
+  # Directories to watch for changes
+  directories:
+    - "./internal/interfaces/http/routes"
+    - "./internal/interfaces/http/swagger"
+    - "./internal/infrastructure/middleware"
+    - "./internal/domain/services"
+    - "./cmd/server"
+
+  # File patterns to watch
+  patterns:
+    - "*.go"
+    - "*.yaml"
+    - "*.yml"
+    - "*.json"
+
+  # Patterns to ignore
+  ignore_patterns:
+    - "*_test.go"
+    - "*.tmp"
+    - "*.bak"
+    - ".*"
+
+# Output Configuration
+output:
+  # Main output directory
+  directory: "./docs"
+
+  # Generated files
+  files:
+    - name: "index.html"
+      type: "html"
+      template: "templates/index.html.template"
+
+    - name: "openapi.json"
+      type: "openapi_json"
+      format: "pretty"
+
+    - name: "openapi.yaml"
+      type: "openapi_yaml"
+      format: "pretty"
+
+    - name: "postman-collection.json"
+      type: "postman"
+      config: "postman.yaml"
+
+# OpenAPI Specification
+openapi:
+  # Path to the main specification file
+  spec_file: "./api/openapi.yaml"
+
+  # Validation settings
+  validation:
+    enabled: true
+    strict_mode: false
+    validate_examples: true
+
+  # Linting settings
+  linting:
+    enabled: true
+    rules:
+      - "no_empty_descriptions"
+      - "no_undefined_examples"
+      - "operation_ids_unique"
+      - "path_parameters_defined"
+      - "tag_defined"
+      - "no_missing_required_properties"
+
+# Update Configuration
+update:
+  # Update interval for watch mode
+  interval: "5m"
+
+  # Hot reload settings
+  hot_reload:
+    enabled: true
+    debounce: "500ms"
+
+  # Git integration
+  git:
+    enabled: true
+    repository_path: "."
+    auto_commit: false
+    commit_message_template: "docs: update API documentation"
+
+  # Cache settings
+  cache:
+    enabled: true
+    directory: ".cache"
+    ttl: "1h"
+
+# Generation Settings
+generation:
+  # HTML documentation
+  html:
+    theme: "default"
+    custom_css: "./assets/custom.css"
+    custom_js: "./assets/custom.js"
+    include_examples: true
+    include_try_it_out: true
+
+  # SDK generation
+  sdks:
+    enabled: true
+    languages:
+      - name: "python"
+        output: "./sdks/python"
+        package_name: "sdlc-ai"
+      - name: "typescript"
+        output: "./sdks/typescript"
+        package_name: "@sdlc-ai/sdk"
+      - name: "go"
+        output: "./sdks/go"
+        module_name: "github.com/sdlc-ai/platform-sdk-go"
+
+  # Postman collection
+  postman:
+    enabled: true
+    environment: "production"
+    include_tests: true
+    authentication:
+      type: "bearer"
+      token_var: "jwt_token"
+
+# Notification Settings
+notifications:
+  enabled: true
+  channels:
+    - type: "slack"
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#api-updates"
+      template: "slack_notification.template"
+
+    - type: "email"
+      smtp_host: "${SMTP_HOST}"
+      smtp_port: 587
+      username: "${SMTP_USERNAME}"
+      password: "${SMTP_PASSWORD}"
+      recipients:
+        - "dev-team@sdlc.ai"
+        - "docs-team@sdlc.ai"
+
+# Webhook Configuration
+webhooks:
+  enabled: true
+  secret: "${WEBHOOK_SECRET}"
+  endpoints:
+    - url: "https://api.sdlc.ai/v1/webhooks/docs-update"
+      events:
+        - "documentation_updated"
+        - "spec_validated"
+        - "sdk_generated"
+
+# Logging Configuration
+logging:
+  level: "info"
+  format: "json"
+  outputs:
+    - type: "console"
+    - type: "file"
+      path: "./logs/docs-updater.log"
+      max_size: "100MB"
+      max_backups: 5
+      compress: true
+
+# Metrics Configuration
+metrics:
+  enabled: true
+  prometheus:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+
+  custom_metrics:
+    - name: "docs_update_duration_seconds"
+      type: "histogram"
+      help: "Duration of documentation updates"
+
+    - name: "docs_update_count_total"
+      type: "counter"
+      help: "Total number of documentation updates"
+
+    - name: "openapi_validation_errors_total"
+      type: "counter"
+      help: "Total number of OpenAPI validation errors"
+
+# Security Settings
+security:
+  # Rate limiting for webhook endpoints
+  rate_limit:
+    enabled: true
+    requests_per_minute: 60
+
+  # CORS settings
+  cors:
+    enabled: true
+    origins:
+      - "https://docs.sdlc.ai"
+      - "https://sdlc.ai"
+    methods:
+      - "GET"
+      - "POST"
+      - "OPTIONS"
+    headers:
+      - "Content-Type"
+      - "Authorization"
+      - "X-API-Key"
+
+# Development Settings
+development:
+  # Debug mode
+  debug: false
+
+  # Profile mode
+  profile: false
+
+  # Mock external services
+  mock_services: false
+
+  # Generate test data
+  generate_test_data: false

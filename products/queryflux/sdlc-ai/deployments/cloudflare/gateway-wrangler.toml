@@ -1,0 +1,190 @@
+# Gateway Service - Cloudflare Workers Configuration
+name = "sdlc-gateway"
+main = "src/index.ts"
+compatibility_date = "2025-10-29"
+compatibility_flags = ["nodejs_compat"]
+
+# Gateway-specific configuration
+[limits]
+cpu_ms = 30000  # 30 seconds for complex auth and policy evaluation
+memory_mb = 256  # Higher memory for caching and JWT processing
+
+# Environment configurations
+[env.development]
+name = "sdlc-gateway-dev"
+workers_dev = true
+vars = {
+  ENVIRONMENT = "development",
+  LOG_LEVEL = "debug",
+  RATE_LIMIT_REQUESTS = "1000",
+  RATE_LIMIT_WINDOW = "3600",
+  CIRCUIT_BREAKER_THRESHOLD = "5",
+  CIRCUIT_BREAKER_TIMEOUT = "30000"
+}
+
+[env.staging]
+name = "sdlc-gateway-staging"
+vars = {
+  ENVIRONMENT = "staging",
+  LOG_LEVEL = "info",
+  RATE_LIMIT_REQUESTS = "5000",
+  RATE_LIMIT_WINDOW = "3600",
+  CIRCUIT_BREAKER_THRESHOLD = "10",
+  CIRCUIT_BREAKER_TIMEOUT = "30000"
+}
+
+[env.production]
+name = "sdlc-gateway"
+vars = {
+  ENVIRONMENT = "production",
+  LOG_LEVEL = "warn",
+  RATE_LIMIT_REQUESTS = "10000",
+  RATE_LIMIT_WINDOW = "3600",
+  CIRCUIT_BREAKER_THRESHOLD = "20",
+  CIRCUIT_BREAKER_TIMEOUT = "30000"
+}
+
+# D1 Database for Gateway (metadata, policies)
+[[env.development.d1_databases]]
+binding = "DB"
+database_name = "sdlc-gateway-db-dev"
+database_id = "gateway-dev-database-placeholder"
+migrations_dir = "migrations/gateway"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "sdlc-gateway-db-staging"
+database_id = "gateway-staging-database-placeholder"
+migrations_dir = "migrations/gateway"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "sdlc-gateway-db"
+database_id = "gateway-production-database-placeholder"
+migrations_dir = "migrations/gateway"
+
+# KV Namespaces for Gateway
+[[env.development.kv_namespaces]]
+binding = "AUTH_CACHE"
+id = "gateway-auth-cache-dev-placeholder"
+preview_id = "gateway-auth-cache-dev-preview-placeholder"
+
+[[env.development.kv_namespaces]]
+binding = "RATE_LIMIT_STORE"
+id = "gateway-rate-limit-dev-placeholder"
+preview_id = "gateway-rate-limit-dev-preview-placeholder"
+
+[[env.development.kv_namespaces]]
+binding = "POLICY_CACHE"
+id = "gateway-policy-cache-dev-placeholder"
+preview_id = "gateway-policy-cache-dev-preview-placeholder"
+
+[[env.staging.kv_namespaces]]
+binding = "AUTH_CACHE"
+id = "gateway-auth-cache-staging-placeholder"
+
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT_STORE"
+id = "gateway-rate-limit-staging-placeholder"
+
+[[env.staging.kv_namespaces]]
+binding = "POLICY_CACHE"
+id = "gateway-policy-cache-staging-placeholder"
+
+[[env.production.kv_namespaces]]
+binding = "AUTH_CACHE"
+id = "gateway-auth-cache-production-placeholder"
+
+[[env.production.kv_namespaces]]
+binding = "RATE_LIMIT_STORE"
+id = "gateway-rate-limit-production-placeholder"
+
+[[env.production.kv_namespaces]]
+binding = "POLICY_CACHE"
+id = "gateway-policy-cache-production-placeholder"
+
+# Durable Objects for Circuit Breaker State
+[[env.development.durable_objects.bindings]]
+name = "CIRCUIT_BREAKER"
+class_name = "CircuitBreakerManager"
+
+[[env.staging.durable_objects.bindings]]
+name = "CIRCUIT_BREAKER"
+class_name = "CircuitBreakerManager"
+
+[[env.production.durable_objects.bindings]]
+name = "CIRCUIT_BREAKER"
+class_name = "CircuitBreakerManager"
+
+# Service Bindings for downstream services
+[[env.development.services]]
+binding = "RAG_SERVICE"
+service = "sdlc-rag-dev"
+environment = "development"
+
+[[env.development.services]]
+binding = "LLM_SERVICE"
+service = "sdlc-llm-gateway-dev"
+environment = "development"
+
+[[env.development.services]]
+binding = "VECTOR_SERVICE"
+service = "sdlc-vector-core-dev"
+environment = "development"
+
+[[env.staging.services]]
+binding = "RAG_SERVICE"
+service = "sdlc-rag-staging"
+environment = "staging"
+
+[[env.staging.services]]
+binding = "LLM_SERVICE"
+service = "sdlc-llm-gateway-staging"
+environment = "staging"
+
+[[env.staging.services]]
+binding = "VECTOR_SERVICE"
+service = "sdlc-vector-core-staging"
+environment = "staging"
+
+[[env.production.services]]
+binding = "RAG_SERVICE"
+service = "sdlc-rag"
+environment = "production"
+
+[[env.production.services]]
+binding = "LLM_SERVICE"
+service = "sdlc-llm-gateway"
+environment = "production"
+
+[[env.production.services]]
+binding = "VECTOR_SERVICE"
+service = "sdlc-vector-core"
+environment = "production"
+
+# Build Configuration
+[build]
+command = "npm run build:gateway"
+watch_dir = "services/gateway/src"
+
+# Custom domains for production
+[env.production.routes]
+patterns = ["api.sdlc.ai/*", "gateway.sdlc.ai/*"]
+
+# Analytics Engine for Gateway metrics
+[[env.production.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "sdlc_gateway_metrics"
+
+# Queue Configuration for async operations
+[[env.development.queues]]
+binding = "AUDIT_QUEUE"
+queue_name = "sdlc-audit-queue-dev"
+
+[[env.staging.queues]]
+binding = "AUDIT_QUEUE"
+queue_name = "sdlc-audit-queue-staging"
+
+[[env.production.queues]]
+binding = "AUDIT_QUEUE"
+queue_name = "sdlc-audit-queue"

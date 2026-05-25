@@ -1,0 +1,376 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sdlc-platform-worker
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: worker
+    tier: backend
+    environment: production
+  annotations:
+    description: "SDLC Platform Background Worker"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: sdlc-platform
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: sdlc-platform
+        component: worker
+        tier: backend
+        environment: production
+        version: "3.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: sdlc-platform
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-services
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              until nslookup sdlc-platform-api.sdlc-platform.svc.cluster.local; do
+                echo "Waiting for API service..."
+                sleep 2
+              done
+              until nslookup redis-primary.sdlc-platform.svc.cluster.local; do
+                echo "Waiting for Redis..."
+                sleep 2
+              done
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      containers:
+        - name: worker
+          image: sdlc/platform-worker:3.0.0
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: sdlc-platform-config
+            - secretRef:
+                name: sdlc-platform-secrets
+          env:
+            - name: WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          command:
+            - /app/worker
+            - --queue-name=background-jobs
+            - --concurrency=5
+            - --prefetch=10
+            - --heartbeat=30
+            - --max-retries=3
+            - --retry-delay=60
+          readinessProbe:
+            exec:
+              command:
+                - /app/healthcheck
+                - --type=ready
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command:
+                - /app/healthcheck
+                - --type=live
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 1Gi
+              ephemeral-storage: 2Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+              ephemeral-storage: 10Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+            volumeMounts:
+              - name: tmp
+                mountPath: /tmp
+              - name: cache
+                mountPath: /var/cache/app
+              - name: logs
+                mountPath: /var/log/app
+              - name: storage
+                mountPath: /app/storage
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    # Stop accepting new jobs
+                    /app/worker --stop-accepting
+                    sleep 30
+        - name: exporter
+          image: prom/mysqld-exporter:latest
+          ports:
+            - name: metrics
+              containerPort: 9104
+              protocol: TCP
+          env:
+            - name: DATA_SOURCE_NAME
+              value: "user:password@tcp(db-host:3306)/"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: cache
+          emptyDir:
+            sizeLimit: 2Gi
+        - name: logs
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: storage
+          persistentVolumeClaim:
+            claimName: sdlc-platform-storage-pvc
+      nodeSelector:
+        kubernetes.io/os: linux
+        node-type: worker
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - sdlc-platform
+                    - key: component
+                      operator: In
+                      values:
+                        - worker
+                topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+                  - key: node-type
+                    operator: In
+                    values:
+                      - worker
+      tolerations:
+        - key: worker
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      terminationGracePeriodSeconds: 60
+      priorityClassName: medium-priority
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sdlc-platform-worker-pdb
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: sdlc-platform
+      component: worker
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sdlc-platform-cleanup
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: cleanup
+spec:
+  schedule: "0 2 * * *"  # Run daily at 2 AM
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: sdlc-platform
+            component: cleanup
+            job-name: cleanup
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 2000
+          containers:
+            - name: cleanup
+              image: sdlc/platform-cleanup:3.0.0
+              imagePullPolicy: Always
+              envFrom:
+                - configMapRef:
+                    name: sdlc-platform-config
+                - secretRef:
+                    name: sdlc-platform-secrets
+              command:
+                - /app/cleanup
+                - --retention-days=30
+                - --dry-run=false
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 512Mi
+                limits:
+                  cpu: 1000m
+                  memory: 1Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+          nodeSelector:
+            kubernetes.io/os: linux
+          tolerations:
+            - key: dedicated
+              operator: Exists
+              effect: NoSchedule
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sdlc-platform-backup
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: backup
+spec:
+  schedule: "0 3 * * 0"  # Run weekly on Sunday at 3 AM
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: sdlc-platform
+            component: backup
+            job-name: backup
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 2000
+          volumes:
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: sdlc-platform-backup-pvc
+          containers:
+            - name: backup
+              image: sdlc/platform-backup:3.0.0
+              imagePullPolicy: Always
+              envFrom:
+                - configMapRef:
+                    name: sdlc-platform-config
+                - secretRef:
+                    name: sdlc-platform-secrets
+              env:
+                - name: BACKUP_TYPE
+                  value: "full"
+                - name: BACKUP_RETENTION_DAYS
+                  value: "30"
+              command:
+                - /app/backup
+                - --type=full
+                - --compress=true
+                - --encrypt=true
+                - --verify=true
+              resources:
+                requests:
+                  cpu: 1000m
+                  memory: 2Gi
+                limits:
+                  cpu: 2000m
+                  memory: 4Gi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /backup
+          nodeSelector:
+            kubernetes.io/os: linux
+          tolerations:
+            - key: backup
+              operator: Equal
+              value: "true"
+              effect: NoSchedule

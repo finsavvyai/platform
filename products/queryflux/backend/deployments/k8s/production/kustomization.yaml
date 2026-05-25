@@ -1,0 +1,49 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: queryflux-production
+  namespace: queryflux
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - network-policy.yaml
+  - service-monitor.yaml
+  - rbac.yaml
+
+patchesStrategicMerge:
+  - replica-count.yaml
+  - resource-limits.yaml
+  - affinity.yaml
+  - tolerations.yaml
+
+configurations:
+  - kustomizeconfig.yaml
+
+vars:
+  - name: QUERYFLUX_NAMESPACE
+    objref:
+      kind: Namespace
+      name: queryflux
+    fieldref:
+      fieldpath: metadata.name
+
+images:
+  - name: queryflux/backend
+    newTag: v1.0.0
+
+commonLabels:
+  app.kubernetes.io/name: queryflux
+  app.kubernetes.io/component: backend
+  app.kubernetes.io/managed-by: kustomize
+
+replicas:
+  - name: queryflux-backend
+    count: 3

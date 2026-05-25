@@ -1,0 +1,425 @@
+services:
+  # PostgreSQL (existing baseline)
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: queryflux-postgres-test
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=test_db
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./tests/integration/database/init-scripts/postgres:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # MySQL
+  mysql-test:
+    image: mysql:8.0
+    container_name: queryflux-mysql-test
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=test_db
+      - MYSQL_USER=test_user
+      - MYSQL_PASSWORD=test_password
+      - MYSQL_ROOT_PASSWORD=root_password
+    volumes:
+      - mysql_test_data:/var/lib/mysql
+      - ./tests/integration/database/init-scripts/mysql:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3307:3306"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "test_user", "-ptest_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # MariaDB
+  mariadb-test:
+    image: mariadb:10.11
+    container_name: queryflux-mariadb-test
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=test_db
+      - MYSQL_USER=test_user
+      - MYSQL_PASSWORD=test_password
+      - MYSQL_ROOT_PASSWORD=root_password
+    volumes:
+      - mariadb_test_data:/var/lib/mysql
+      - ./tests/integration/database/init-scripts/mariadb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3308:3306"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "test_user", "-ptest_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # CockroachDB
+  cockroachdb-test:
+    image: cockroachdb/cockroach:v22.2.0
+    container_name: queryflux-cockroachdb-test
+    restart: unless-stopped
+    command: start-single-node --insecure --advertise-addr=localhost
+    volumes:
+      - cockroachdb_test_data:/cockroach/cockroach-data
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "cockroach", "sql", "--insecure", "-e", "SELECT 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # MongoDB
+  mongodb-test:
+    image: mongo:7.0
+    container_name: queryflux-mongodb-test
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=test_user
+      - MONGO_INITDB_ROOT_PASSWORD=test_password
+      - MONGO_INITDB_DATABASE=test_db
+    volumes:
+      - mongodb_test_data:/data/db
+      - ./tests/integration/database/init-scripts/mongodb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "27018:27017"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Redis
+  redis-test:
+    image: redis:7-alpine
+    container_name: queryflux-redis-test
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass test_password
+    volumes:
+      - redis_test_data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Memcached
+  memcached-test:
+    image: memcached:1.6-alpine
+    container_name: queryflux-memcached-test
+    restart: unless-stopped
+    command: memcached -m 64
+    ports:
+      - "11212:11211"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "11211"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Cassandra
+  cassandra-test:
+    image: cassandra:4.1
+    container_name: queryflux-cassandra-test
+    restart: unless-stopped
+    environment:
+      - CASSANDRA_CLUSTER_NAME=TestCluster
+      - CASSANDRA_DC=DC1
+      - CASSANDRA_RACK=RAC1
+      - CASSANDRA_ENDPOINT_SNITCH=GossipingPropertyFileSnitch
+      - CASSANDRA_NUM_TOKENS=128
+    volumes:
+      - cassandra_test_data:/var/lib/cassandra
+    ports:
+      - "9043:9042"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "cqlsh", "-e", "DESCRIBE KEYSPACES"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # CouchDB
+  couchdb-test:
+    image: couchdb:3.3
+    container_name: queryflux-couchdb-test
+    restart: unless-stopped
+    environment:
+      - COUCHDB_USER=test_user
+      - COUCHDB_PASSWORD=test_password
+    volumes:
+      - couchdb_test_data:/opt/couchdb/data
+    ports:
+      - "5985:5984"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5984/_up"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ArangoDB
+  arangodb-test:
+    image: arangodb:3.11
+    container_name: queryflux-arangodb-test
+    restart: unless-stopped
+    environment:
+      - ARANGO_ROOT_PASSWORD=test_password
+    volumes:
+      - arangodb_test_data:/var/lib/arangodb3
+    ports:
+      - "8530:8529"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8529/_api/version"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # InfluxDB
+  influxdb-test:
+    image: influxdb:2.7
+    container_name: queryflux-influxdb-test
+    restart: unless-stopped
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=test_user
+      - DOCKER_INFLUXDB_INIT_PASSWORD=test_password
+      - DOCKER_INFLUXDB_INIT_ORG=test_org
+      - DOCKER_INFLUXDB_INIT_BUCKET=test_bucket
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=test_token_123456789
+    volumes:
+      - influxdb_test_data:/var/lib/influxdb2
+    ports:
+      - "8087:8086"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # QuestDB (uses PostgreSQL wire protocol)
+  questdb-test:
+    image: questdb/questdb:6.6
+    container_name: queryflux-questdb-test
+    restart: unless-stopped
+    environment:
+      - QDB_PG_USER=test_user
+      - QDB_PG_PASSWORD=test_password
+    volumes:
+      - questdb_test_data:/root/.questdb
+    ports:
+      - "9000:9000"   # HTTP interface
+      - "8812:8812"   # PostgreSQL wire protocol
+      - "9009:9009"   # InfluxDB line protocol
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/exec?query=SELECT%201"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # TimescaleDB (PostgreSQL extension)
+  timescaledb-test:
+    image: timescale/timescaledb:latest-pg15
+    container_name: queryflux-timescaledb-test
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=test_db
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - timescaledb_test_data:/var/lib/postgresql/data
+      - ./tests/integration/database/init-scripts/timescaledb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5434:5432"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Neo4j
+  neo4j-test:
+    image: neo4j:5.12
+    container_name: queryflux-neo4j-test
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=neo4j/test_password
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=2G
+    volumes:
+      - neo4j_test_data:/data
+      - neo4j_test_logs:/logs
+    ports:
+      - "7688:7687"   # Bolt protocol
+      - "7475:7474"   # HTTP
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "test_password", "RETURN 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # DynamoDB Local
+  dynamodb-test:
+    image: amazon/dynamodb-local:latest
+    container_name: queryflux-dynamodb-test
+    restart: unless-stopped
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    ports:
+      - "8001:8000"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Elasticsearch (for DocumentDB testing simulation)
+  elasticsearch-test:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: queryflux-elasticsearch-test
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_test_data:/usr/share/elasticsearch/data
+    ports:
+      - "9201:9200"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # SQL Server
+  sqlserver-test:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: queryflux-sqlserver-test
+    restart: unless-stopped
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=TestPassword123!
+      - MSSQL_PID=Express
+    volumes:
+      - sqlserver_test_data:/var/opt/mssql
+    ports:
+      - "1434:1433"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "TestPassword123!", "-Q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Oracle Database (Express Edition)
+  oracle-test:
+    image: container-registry.oracle.com/database/express:21.3.0-xe
+    container_name: queryflux-oracle-test
+    restart: unless-stopped
+    environment:
+      - ORACLE_PWD=TestPassword123
+      - ORACLE_CHARACTERSET=AL32UTF8
+    volumes:
+      - oracle_test_data:/opt/oracle/oradata
+    ports:
+      - "1522:1521"
+      - "5501:5500"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "sqlplus", "system/TestPassword123@localhost:1521/XE", "@<<EOF\nSELECT 1 FROM DUAL;\nEOF"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+networks:
+  test-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_test_data:
+    driver: local
+  mysql_test_data:
+    driver: local
+  mariadb_test_data:
+    driver: local
+  cockroachdb_test_data:
+    driver: local
+  mongodb_test_data:
+    driver: local
+  redis_test_data:
+    driver: local
+  cassandra_test_data:
+    driver: local
+  couchdb_test_data:
+    driver: local
+  arangodb_test_data:
+    driver: local
+  influxdb_test_data:
+    driver: local
+  questdb_test_data:
+    driver: local
+  timescaledb_test_data:
+    driver: local
+  neo4j_test_data:
+    driver: local
+  neo4j_test_logs:
+    driver: local
+  sqlserver_test_data:
+    driver: local
+  oracle_test_data:
+    driver: local
+  elasticsearch_test_data:
+    driver: local

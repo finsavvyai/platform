@@ -1,0 +1,135 @@
+{
+  "functions": [
+    {
+      "name": "queryflux_execute_query",
+      "description": "Execute SQL query on a connected database using QueryFlux. Supports SELECT, INSERT, UPDATE, DELETE, and other SQL statements. Can be run in dry-run mode for validation without execution.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "database_id": {
+            "type": "string",
+            "description": "Database connection identifier (e.g., 'db-prod', 'db-staging', 'db-dev')"
+          },
+          "sql": {
+            "type": "string",
+            "description": "SQL query to execute. Can be any valid SQL statement (SELECT, INSERT, UPDATE, DELETE, CREATE, etc.)"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "description": "If true, validates the query without executing it. Useful for testing query syntax. Default: false"
+          }
+        },
+        "required": ["database_id", "sql"]
+      }
+    },
+    {
+      "name": "queryflux_get_schema",
+      "description": "Get complete database schema including all tables, columns, data types, primary keys, foreign keys, and indexes. Essential for understanding database structure before writing queries.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "database_id": {
+            "type": "string",
+            "description": "Database connection identifier"
+          }
+        },
+        "required": ["database_id"]
+      }
+    },
+    {
+      "name": "queryflux_natural_language_query",
+      "description": "Convert a natural language question into an optimized SQL query using AI. The AI understands the database schema and generates accurate, efficient SQL. Returns the SQL query with a confidence score and explanation.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "database_id": {
+            "type": "string",
+            "description": "Database connection identifier"
+          },
+          "question": {
+            "type": "string",
+            "description": "Natural language question about the data (e.g., 'Show me all users who signed up last week', 'What are the top 10 products by revenue?')"
+          }
+        },
+        "required": ["database_id", "question"]
+      }
+    },
+    {
+      "name": "queryflux_create_migration",
+      "description": "Generate SQL migration scripts (both up and down) from a natural language description of database changes. Includes safety validation to prevent data loss. Returns idempotent DDL statements.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "database_id": {
+            "type": "string",
+            "description": "Database connection identifier"
+          },
+          "description": {
+            "type": "string",
+            "description": "Natural language description of the migration (e.g., 'Add index on users.email for faster lookups', 'Add a status column to orders table', 'Create a payments table')"
+          },
+          "validate": {
+            "type": "boolean",
+            "description": "If true, runs safety validation to check for destructive operations. Default: true"
+          }
+        },
+        "required": ["database_id", "description"]
+      }
+    },
+    {
+      "name": "queryflux_seed_test_data",
+      "description": "Generate realistic test data for database tables using AI. Can create human-like names, emails, addresses, or random data. Useful for development, testing, and demos. Dry-run by default for safety.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "database_id": {
+            "type": "string",
+            "description": "Database connection identifier"
+          },
+          "table_name": {
+            "type": "string",
+            "description": "Name of the table to seed data into"
+          },
+          "row_count": {
+            "type": "number",
+            "description": "Number of rows to generate (between 1 and 1000)",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "data_type": {
+            "type": "string",
+            "description": "Type of data to generate: 'realistic' for human-like data (names, emails, addresses) or 'random' for UUIDs and random strings",
+            "enum": ["realistic", "random"]
+          },
+          "execute": {
+            "type": "boolean",
+            "description": "If true, inserts the data into the database. If false (default), returns the SQL preview only. Default: false"
+          }
+        },
+        "required": ["database_id", "table_name", "row_count"]
+      }
+    },
+    {
+      "name": "queryflux_explain_query",
+      "description": "Analyze query execution plan and provide optimization suggestions. Uses PostgreSQL EXPLAIN ANALYZE to identify slow operations, missing indexes, and inefficient joins. Returns actionable recommendations prioritized by impact.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "database_id": {
+            "type": "string",
+            "description": "Database connection identifier"
+          },
+          "query": {
+            "type": "string",
+            "description": "SQL query to analyze for performance optimization"
+          },
+          "analyze": {
+            "type": "boolean",
+            "description": "If true, runs EXPLAIN ANALYZE (executes query and shows actual timing). If false, runs EXPLAIN only (estimates without execution). Default: true"
+          }
+        },
+        "required": ["database_id", "query"]
+      }
+    }
+  ]
+}

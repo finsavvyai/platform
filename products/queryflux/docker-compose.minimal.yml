@@ -1,0 +1,74 @@
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: queryflux-postgres-test
+    environment:
+      POSTGRES_DB: queryflux_test
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./tests/fixtures/postgres:/docker-entrypoint-initdb.d
+    networks:
+      - queryflux-test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d queryflux_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: queryflux-mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: queryflux_test
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpass
+    ports:
+      - "3309:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./tests/fixtures/mysql:/docker-entrypoint-initdb.d
+    networks:
+      - queryflux-test
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "testuser", "-ptestpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB
+  mongodb:
+    image: mongo:6.0
+    container_name: queryflux-mongodb-test
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: testuser
+      MONGO_INITDB_ROOT_PASSWORD: testpass
+      MONGO_INITDB_DATABASE: queryflux_test
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./tests/fixtures/mongodb:/docker-entrypoint-initdb.d
+    networks:
+      - queryflux-test
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  mysql_data:
+  mongodb_data:
+
+networks:
+  queryflux-test:
+    driver: bridge

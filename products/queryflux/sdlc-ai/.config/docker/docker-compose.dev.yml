@@ -1,0 +1,277 @@
+version: "3.8"
+
+services:
+  # Gateway Service (Go)
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/sdlc_dev
+      - REDIS_URL=redis://redis:6379
+      - JWT_SIGNING_KEY=dev-jwt-signing-key-change-in-production
+      - RAG_SERVICE_URL=http://rag:8001
+      - VECTOR_SERVICE_URL=http://vector:8002
+      - OPA_SERVICE_URL=http://opa:8181
+    depends_on:
+      - postgres
+      - redis
+      - opa
+    volumes:
+      - ./services/gateway:/app
+      - ./shared:/shared
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # RAG Service (Python)
+  rag:
+    build:
+      context: ./services/rag
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/sdlc_dev
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - VECTOR_SERVICE_URL=http://vector:8002
+      - DLP_ENABLED=true
+      - EMBEDDING_MODEL=text-embedding-ada-002
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./services/rag:/app
+      - ./shared:/shared
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Vector Core Service (Rust)
+  vector:
+    build:
+      context: ./services/vector-core
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8002:8002"
+    environment:
+      - PORT=8002
+      - ENVIRONMENT=development
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/sdlc_dev
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - EMBEDDING_DIMENSIONS=1536
+      - INDEX_TYPE=hnsw
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./services/vector-core:/app
+      - ./shared:/shared
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Admin UI (Next.js)
+  admin:
+    build:
+      context: ./services/admin-ui
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_ENVIRONMENT=development
+    depends_on:
+      - gateway
+    volumes:
+      - ./services/admin-ui:/app
+      - /app/node_modules
+      - ./shared:/shared
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: pgvector/pgvector:pg15
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=sdlc_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sdlc_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass redis-password
+    volumes:
+      - redis_data:/data
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Open Policy Agent (OPA)
+  opa:
+    image: openpolicyagent/opa:latest
+    ports:
+      - "8181:8181"
+    command:
+      - "run"
+      - "--server"
+      - "--log-level=debug"
+      - "--set=decision_logs.console=true"
+      - "/policies"
+    volumes:
+      - ./config/policies:/policies
+      - opa_data:/data
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        ["CMD", "curl", "-f", "http://localhost:8181/v1/data/system/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MinIO (S3-compatible storage for development)
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Prometheus Metrics
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/monitoring/grafana:/etc/grafana/provisioning
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+
+  # Jaeger Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+
+  # Development Tools
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - sdlc-network
+    restart: unless-stopped
+
+networks:
+  sdlc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  opa_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

@@ -1,0 +1,348 @@
+version: '3.8'
+
+services:
+  # QueryFlux Backend API (Production)
+  queryflux-backend:
+    image: queryflux/backend:${VERSION:-latest}
+    container_name: queryflux-backend-prod
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - GIN_MODE=release
+      - LOG_LEVEL=warn
+      - SERVER_PORT=8080
+      - DB_HOST=postgres-primary
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis-cluster
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - PROMETHEUS_ENABLED=true
+      - PROMETHEUS_PORT=9090
+      - JAEGER_ENABLED=true
+      - JAEGER_ENDPOINT=http://jaeger-collector:14268/api/traces
+      - SENTRY_DSN=${SENTRY_DSN}
+      - SENTRY_ENVIRONMENT=production
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_REQUESTS_PER_MINUTE=1000
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      redis-cluster:
+        condition: service_healthy
+    volumes:
+      - queryflux_logs:/app/logs
+      - queryflux_data:/app/data
+      - queryflux_uploads:/app/uploads
+    networks:
+      - queryflux-network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # PostgreSQL Primary (Production)
+  postgres-primary:
+    image: postgres:15-alpine
+    container_name: queryflux-postgres-primary
+    restart: always
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_REPLICATION_USER=replicator
+      - POSTGRES_REPLICATION_PASSWORD=${REPLICATION_PASSWORD}
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./configs/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./configs/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./scripts/init-postgres-prod.sql:/docker-entrypoint-initdb.d/init-postgres-prod.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - queryflux-network
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Replica (Production)
+  postgres-replica:
+    image: postgres:15-alpine
+    container_name: queryflux-postgres-replica
+    restart: always
+    environment:
+      - PGUSER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_MASTER_SERVICE=postgres-primary
+      - POSTGRES_REPLICATION_USER=replicator
+      - POSTGRES_REPLICATION_PASSWORD=${REPLICATION_PASSWORD}
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./configs/postgresql-replica.conf:/etc/postgresql/postgresql.conf:ro
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    networks:
+      - queryflux-network
+    command: |
+      bash -c "
+      if [ ! -f /var/lib/postgresql/data/PG_VERSION ]; then
+        pg_basebackup -h postgres-primary -D /var/lib/postgresql/data -U ${DB_USER} -v -P -W
+        echo 'standby_mode = on' >> /var/lib/postgresql/data/recovery.conf
+        echo 'primary_conninfo = ''host=postgres-primary port=5432 user=${DB_USER}''' >> /var/lib/postgresql/data/recovery.conf
+      fi
+      postgres -c config_file=/etc/postgresql/postgresql.conf
+      "
+
+  # Redis Cluster (Production)
+  redis-cluster:
+    image: redis:7-alpine
+    container_name: queryflux-redis-cluster
+    restart: always
+    command: redis-server --appendonly yes --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_cluster_data:/data
+      - ./configs/redis-cluster.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "6379:6379"
+      - "16379:16379"
+    networks:
+      - queryflux-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Prometheus (Production)
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: queryflux-prometheus-prod
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./configs/prometheus-prod.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - queryflux-network
+    depends_on:
+      - queryflux-backend
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Grafana (Production)
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: queryflux-grafana-prod
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource,grafana-piechart-panel
+      - GF_SECURITY_CONTENT_TYPE_HEADER=application/json
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - queryflux-network
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Jaeger (Production)
+  jaeger-collector:
+    image: jaegertracing/jaeger-collector:1.47
+    container_name: queryflux-jaeger-collector
+    restart: always
+    command:
+      - --es.server-urls=http://elasticsearch:9200
+      - --es.username=elastic
+      - --es.password=${ELASTIC_PASSWORD}
+      - --collector.otlp.enabled=true
+    depends_on:
+      - elasticsearch
+    networks:
+      - queryflux-network
+    ports:
+      - "14269:14269"
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+
+  jaeger-query:
+    image: jaegertracing/jaeger-query:1.47
+    container_name: queryflux-jaeger-query
+    restart: always
+    environment:
+      - JAEGER_QUERY_PORT=16686
+      - JAEGER_QUERY_BASEPATH=/jaeger
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - ES_SERVER_URLS=http://elasticsearch:9200
+      - ES_USERNAME=elastic
+      - ES_PASSWORD=${ELASTIC_PASSWORD}
+    ports:
+      - "16686:16686"
+      - "16687:16687"
+    depends_on:
+      - jaeger-collector
+    networks:
+      - queryflux-network
+
+  # Elasticsearch (Production)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: queryflux-elasticsearch-prod
+    restart: always
+    environment:
+      - cluster.name=queryflux-prod
+      - node.name=queryflux-node-1
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=false
+      - xpack.monitoring.collection.enabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+      - ./configs/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - queryflux-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Nginx Load Balancer (Production)
+  nginx:
+    image: nginx:alpine
+    container_name: queryflux-nginx-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./configs/nginx-prod.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - queryflux-backend
+    networks:
+      - queryflux-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+networks:
+  queryflux-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_primary_data:
+    driver: local
+  postgres_replica_data:
+    driver: local
+  redis_cluster_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  queryflux_logs:
+    driver: local
+  queryflux_data:
+    driver: local
+  queryflux_uploads:
+    driver: local
+  nginx_logs:
+    driver: local

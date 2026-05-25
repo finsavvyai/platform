@@ -1,0 +1,125 @@
+groups:
+  - name: sdlc_alerts
+    rules:
+      # High Error Rate Alert
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: sdlc
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+
+      # High Response Time Alert
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: sdlc
+        annotations:
+          summary: "High response time detected"
+          description: "95th percentile response time is {{ $value }}s over the last 5 minutes"
+
+      # Service Down Alert
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: sdlc
+        annotations:
+          summary: "Service is down"
+          description: "{{ $labels.instance }} has been down for more than 1 minute"
+
+      # High Memory Usage Alert
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      # High CPU Usage Alert
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% over the last 5 minutes"
+
+      # Database Connection Alert
+      - alert: DatabaseConnectionHigh
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database connections"
+          description: "Database has {{ $value }} active connections"
+
+      # Disk Space Alert
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value }}% available"
+
+      # Demo Request Failure Rate Alert
+      - alert: DemoRequestFailureRate
+        expr: rate(demo_requests_total{status="error"}[5m]) / rate(demo_requests_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: landing-page
+        annotations:
+          summary: "High demo request failure rate"
+          description: "Demo request failure rate is {{ $value | humanizePercentage }}"
+
+      # Landing Page Traffic Spike Alert
+      - alert: LandingPageTrafficSpike
+        expr: rate(http_requests_total{job="sdlc-landing-page"}[5m]) > 100
+        for: 2m
+        labels:
+          severity: info
+          service: landing-page
+        annotations:
+          summary: "Landing page traffic spike"
+          description: "Landing page is receiving {{ $value }} requests per second"
+
+  - name: sdlc_business_metrics
+    rules:
+      # Low Demo Request Rate Alert
+      - alert: LowDemoRequestRate
+        expr: rate(demo_requests_total[1h]) < 0.1
+        for: 30m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "Low demo request rate"
+          description: "Demo request rate is {{ $value }} requests per hour"
+
+      # Daily Active Users Alert
+      - alert: LowDailyActiveUsers
+        expr: increase(daily_active_users_total[24h]) < 10
+        for: 1h
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "Low daily active users"
+          description: "Daily active users count is {{ $value }}"

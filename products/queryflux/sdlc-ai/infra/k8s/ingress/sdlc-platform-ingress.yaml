@@ -1,0 +1,425 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sdlc-platform-ingress
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: ingress
+    environment: production
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/enable-modsecurity: "true"
+    nginx.ingress.kubernetes.io/modsecurity-snippet: |
+      SecRuleEngine On
+      SecRequestBodyAccess On
+      SecResponseBodyAccess On
+      SecResponseBodyMimeType text/plain text/html text/xml application/json
+      SecRequestBodyLimit 13107200
+      SecRequestBodyNoFilesLimit 131072
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://sdlc.ai,https://app.sdlc.ai,https://admin.sdlc.ai"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/client-max-body-size: "100m"
+    nginx.ingress.kubernetes.io/large-client-header-buffers: "4 32k"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout invalid_header http_500 http_502 http_503 http_504"
+    nginx.ingress.kubernetes.io/upstream-keepalive-connections: "100"
+    nginx.ingress.kubernetes.io/upstream-keepalive-requests: "10000"
+    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "60"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.sdlc.ai wss://api.sdlc.ai; frame-ancestors 'none';";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "Permissions-Policy: camera=(), microphone=(), geolocation=()";
+      more_set_headers "X-Request-ID: $request_id";
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/private-key-rotation-policy: "Always"
+    external-dns.alpha.kubernetes.io/hostname: "api.sdlc.ai,app.sdlc.ai,admin.sdlc.ai"
+    external-dns.alpha.kubernetes.io/ttl: "300"
+    nginx.ingress.kubernetes.io/auth-url: "https://auth.sdlc.ai/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://auth.sdlc.ai/oauth2/start?rd=$scheme://$http_host$request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Groups"
+    nginx.ingress.kubernetes.io/log-format-upstream: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" $request_length $request_time [$proxy_upstream_status] [$proxy_upstream_addr] [$proxy_upstream_response_time]'
+    nginx.ingress.kubernetes.io/server-snippet: |
+      server_tokens off;
+      add_header X-Clacks-Overhead "GNU Terry Pratchett" always;
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.sdlc.ai
+        - app.sdlc.ai
+        - admin.sdlc.ai
+      secretName: sdlc-platform-tls
+  rules:
+    - host: api.sdlc.ai
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sdlc-platform-api
+                port:
+                  number: 80
+    - host: app.sdlc.ai
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: sdlc-platform-api
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sdlc-platform-ui
+                port:
+                  number: 80
+    - host: admin.sdlc.ai
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: sdlc-platform-api
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: sdlc-platform-admin
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sdlc-platform-monitoring-ingress
+  namespace: sdlc-monitoring
+  labels:
+    app: sdlc-platform
+    component: monitoring-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-type: "basic"
+    nginx.ingress.kubernetes.io/auth-secret: "monitoring-basic-auth"
+    nginx.ingress.kubernetes.io/auth-realm: "SDLC Monitoring"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    external-dns.alpha.kubernetes.io/hostname: "monitoring.sdlc.ai"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - monitoring.sdlc.ai
+      secretName: sdlc-monitoring-tls
+  rules:
+    - host: monitoring.sdlc.ai
+      http:
+        paths:
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 80
+          - path: /prometheus
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090
+          - path: /alertmanager
+            pathType: Prefix
+            backend:
+              service:
+                name: alertmanager
+                port:
+                  number: 9093
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sdlc-platform-logs-ingress
+  namespace: sdlc-logging
+  labels:
+    app: sdlc-platform
+    component: logs-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-type: "basic"
+    nginx.ingress.kubernetes.io/auth-secret: "logging-basic-auth"
+    nginx.ingress.kubernetes.io/auth-realm: "SDLC Logs"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    external-dns.alpha.kubernetes.io/hostname: "logs.sdlc.ai"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - logs.sdlc.ai
+      secretName: sdlc-logs-tls
+  rules:
+    - host: logs.sdlc.ai
+      http:
+        paths:
+          - path: /kibana
+            pathType: Prefix
+            backend:
+              service:
+                name: kibana
+                port:
+                  number: 5601
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sdlc-platform-network-policy
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: sdlc-platform
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              name: sdlc-monitoring
+        - namespaceSelector:
+            matchLabels:
+              name: sdlc-logging
+        - podSelector:
+            matchLabels:
+              app: sdlc-platform
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 8081
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sdlc-platform-deny-all
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: deny-all
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: monitoring-basic-auth
+  namespace: sdlc-monitoring
+  labels:
+    app: sdlc-platform
+    component: monitoring-auth
+type: Opaque
+data:
+  auth: YWRtaW46JGFwcjEkSDZSa3ZwVzckTDY5dHJkR0FkL1ZQWlR2VzJLc2V5MAo= # admin:password
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: logging-basic-auth
+  namespace: sdlc-logging
+  labels:
+    app: sdlc-platform
+    component: logging-auth
+type: Opaque
+data:
+  auth: YWRtaW46JGFwcjEkSDZSa3ZwVzckTDY5dHJkR0FkL1ZQWlR2VzJLc2V5MAo= # admin:password
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: sdlc-platform-tls
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: certificate
+spec:
+  secretName: sdlc-platform-tls
+  dnsNames:
+    - api.sdlc.ai
+    - app.sdlc.ai
+    - admin.sdlc.ai
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  privateKey:
+    rotationPolicy: Always
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: sdlc-monitoring-tls
+  namespace: sdlc-monitoring
+  labels:
+    app: sdlc-platform
+    component: certificate
+spec:
+  secretName: sdlc-monitoring-tls
+  dnsNames:
+    - monitoring.sdlc.ai
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  privateKey:
+    rotationPolicy: Always
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: sdlc-logs-tls
+  namespace: sdlc-logging
+  labels:
+    app: sdlc-platform
+    component: certificate
+spec:
+  secretName: sdlc-logs-tls
+  dnsNames:
+    - logs.sdlc.ai
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  privateKey:
+    rotationPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sdlc-platform-ui
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: ui
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: ClusterIP
+  selector:
+    app: sdlc-platform
+    component: ui
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sdlc-platform-admin
+  namespace: sdlc-platform
+  labels:
+    app: sdlc-platform
+    component: admin
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: ClusterIP
+  selector:
+    app: sdlc-platform
+    component: admin
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP

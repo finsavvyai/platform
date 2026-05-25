@@ -1,0 +1,8 @@
+export { Navbar } from './navbar'
+export { Hero } from './hero'
+export { TrustBar } from './trust-bar'
+export { Features } from './features'
+export { HowItWorks } from './how-it-works'
+export { Pricing } from './pricing'
+export { CtaSection } from './cta-section'
+export { Footer } from './footer'

@@ -1,0 +1,1171 @@
+package websocket
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/queryflux/backend/internal/application/ports"
+	"github.com/queryflux/backend/internal/domain"
+	"go.uber.org/zap"
+)
+
+// DashboardServer serves the real-time metrics dashboard via WebSocket
+type DashboardServer struct {
+	logger     *zap.Logger
+	hub        *WebSocketHub
+	monitoringService MonitoringService
+	port       int
+	upgrader   websocket.Upgrader
+}
+
+// MonitoringService interface for the monitoring service
+type MonitoringService interface {
+	GetMetrics(ctx context.Context, query *ports.MetricsQuery) ([]*domain.Metric, error)
+	GetAlerts(ctx context.Context, filters ports.AlertFilters) ([]*domain.Alert, error)
+	GetDashboards(ctx context.Context, filters ports.DashboardFilters) ([]*domain.MonitoringDashboard, error)
+	GetHealthChecks(ctx context.Context) ([]*domain.HealthCheck, error)
+}
+
+// NewDashboardServer creates a new dashboard server
+func NewDashboardServer(
+	logger *zap.Logger,
+	hub *WebSocketHub,
+	monitoringService MonitoringService,
+	port int,
+) *DashboardServer {
+	return &DashboardServer{
+		logger:            logger,
+		hub:               hub,
+		monitoringService: monitoringService,
+		port:              port,
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				// In production, implement proper origin checking
+				return true
+			},
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		},
+	}
+}
+
+// Start starts the dashboard server
+func (s *DashboardServer) Start(ctx context.Context) error {
+	mux := http.NewServeMux()
+
+	// WebSocket endpoint for dashboard
+	mux.HandleFunc("/ws", s.handleWebSocket)
+
+	// Serve static dashboard files
+	mux.HandleFunc("/", s.handleDashboard)
+	mux.HandleFunc("/dashboard.js", s.handleDashboardJS)
+	mux.HandleFunc("/dashboard.css", s.handleDashboardCSS)
+
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", s.port),
+		Handler: mux,
+	}
+
+	// Start WebSocket hub in background
+	go s.hub.Start(ctx)
+
+	s.logger.Info("Starting dashboard server", zap.Int("port", s.port))
+
+	// Start HTTP server
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("failed to start dashboard server: %w", err)
+	}
+
+	return nil
+}
+
+// Stop stops the dashboard server
+func (s *DashboardServer) Stop(ctx context.Context) error {
+	s.logger.Info("Stopping dashboard server")
+	return s.hub.Stop(ctx)
+}
+
+// HTTP handlers
+
+func (s *DashboardServer) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprint(w, s.getDashboardHTML())
+}
+
+func (s *DashboardServer) handleDashboardJS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/javascript")
+	fmt.Fprint(w, s.getDashboardJS())
+}
+
+func (s *DashboardServer) handleDashboardCSS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/css")
+	fmt.Fprint(w, s.getDashboardCSS())
+}
+
+func (s *DashboardServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		s.logger.Error("Failed to upgrade WebSocket connection", zap.Error(err))
+		return
+	}
+
+	clientID := fmt.Sprintf("dashboard_%d", time.Now().UnixNano())
+	client := s.hub.RegisterClient(conn, clientID)
+
+	s.logger.Info("Dashboard client connected", zap.String("client_id", clientID))
+
+	// Send initial data
+	go s.sendInitialData(client, r.Context())
+
+	// Handle messages in a separate goroutine
+	go s.handleClientMessages(client, r.Context())
+}
+
+// WebSocket message handling
+
+func (s *DashboardServer) handleClientMessages(client *Client, ctx context.Context) {
+	defer client.close()
+
+	for {
+		var msg map[string]interface{}
+		if err := client.conn.ReadJSON(&msg); err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				s.logger.Error("WebSocket error", zap.Error(err), zap.String("client_id", client.id))
+			}
+			break
+		}
+
+		s.handleDashboardMessage(ctx, client, msg)
+	}
+}
+
+func (s *DashboardServer) handleDashboardMessage(ctx context.Context, client *Client, msg map[string]interface{}) {
+	msgType, ok := msg["type"].(string)
+	if !ok {
+		s.sendError(client, "Message type is required")
+		return
+	}
+
+	switch msgType {
+	case "subscribe":
+		s.handleSubscribe(ctx, client, msg)
+	case "unsubscribe":
+		s.handleUnsubscribe(ctx, client, msg)
+	case "get_metrics":
+		s.handleGetMetrics(ctx, client, msg)
+	case "get_alerts":
+		s.handleGetAlerts(ctx, client, msg)
+	case "get_dashboards":
+		s.handleGetDashboards(ctx, client, msg)
+	case "get_health":
+		s.handleGetHealth(ctx, client, msg)
+	case "ping":
+		s.sendPong(client)
+	default:
+		s.sendError(client, fmt.Sprintf("Unknown message type: %s", msgType))
+	}
+}
+
+func (s *DashboardServer) handleSubscribe(ctx context.Context, client *Client, msg map[string]interface{}) {
+	subType, ok := msg["subscription_type"].(string)
+	if !ok {
+		s.sendError(client, "subscription_type is required")
+		return
+	}
+
+	switch subType {
+	case "metrics":
+		s.handleMetricsSubscribe(ctx, client, msg)
+	case "alerts":
+		s.handleAlertsSubscribe(ctx, client, msg)
+	default:
+		s.sendError(client, fmt.Sprintf("Unknown subscription type: %s", subType))
+	}
+}
+
+func (s *DashboardServer) handleMetricsSubscribe(ctx context.Context, client *Client, msg map[string]interface{}) {
+	subscription := &ports.MetricsSubscription{
+		ID:       fmt.Sprintf("metrics_%s_%d", client.id, time.Now().UnixNano()),
+		ClientID: client.id,
+		Interval: 5 * time.Second,
+	}
+
+	// Parse interval
+	if interval, ok := msg["interval"].(string); ok {
+		if parsed, err := time.ParseDuration(interval); err == nil {
+			subscription.Interval = parsed
+		}
+	}
+
+	// Parse filters
+	if filters, ok := msg["filters"].(map[string]interface{}); ok {
+		if names, ok := filters["names"].([]interface{}); ok {
+			for _, name := range names {
+				if nameStr, ok := name.(string); ok {
+					subscription.Filters.Names = append(subscription.Filters.Names, nameStr)
+				}
+			}
+		}
+		if labels, ok := filters["labels"].(map[string]interface{}); ok {
+			subscription.Filters.Labels = make(map[string]string)
+			for k, v := range labels {
+				if vStr, ok := v.(string); ok {
+					subscription.Filters.Labels[k] = vStr
+				}
+			}
+		}
+	}
+
+	if err := s.hub.SubscribeToMetrics(ctx, subscription); err != nil {
+		s.sendError(client, fmt.Sprintf("Failed to subscribe to metrics: %v", err))
+		return
+	}
+
+	s.sendResponse(client, "subscription_confirmed", gin.H{
+		"subscription_id": subscription.ID,
+		"type":            "metrics",
+	})
+}
+
+func (s *DashboardServer) handleAlertsSubscribe(ctx context.Context, client *Client, msg map[string]interface{}) {
+	subscription := &ports.AlertsSubscription{
+		ID:       fmt.Sprintf("alerts_%s_%d", client.id, time.Now().UnixNano()),
+		ClientID: client.id,
+	}
+
+	// Parse filters
+	if filters, ok := msg["filters"].(map[string]interface{}); ok {
+		if severities, ok := filters["severity"].([]interface{}); ok {
+			for _, severity := range severities {
+				if severityStr, ok := severity.(string); ok {
+					subscription.Filters.Severity = append(subscription.Filters.Severity, domain.AlertSeverity(severityStr))
+				}
+			}
+		}
+		if statuses, ok := filters["status"].([]interface{}); ok {
+			for _, status := range statuses {
+				if statusStr, ok := status.(string); ok {
+					subscription.Filters.Status = append(subscription.Filters.Status, domain.AlertStatus(statusStr))
+				}
+			}
+		}
+	}
+
+	if err := s.hub.SubscribeToAlerts(ctx, subscription); err != nil {
+		s.sendError(client, fmt.Sprintf("Failed to subscribe to alerts: %v", err))
+		return
+	}
+
+	s.sendResponse(client, "subscription_confirmed", gin.H{
+		"subscription_id": subscription.ID,
+		"type":            "alerts",
+	})
+}
+
+func (s *DashboardServer) handleUnsubscribe(ctx context.Context, client *Client, msg map[string]interface{}) {
+	subscriptionID, ok := msg["subscription_id"].(string)
+	if !ok {
+		s.sendError(client, "subscription_id is required")
+		return
+	}
+
+	if s.hub != nil {
+		if err := s.hub.UnsubscribeFromMetrics(ctx, subscriptionID); err != nil {
+			s.logger.Debug("Failed to unsubscribe from metrics", zap.Error(err))
+		}
+		if err := s.hub.UnsubscribeFromAlerts(ctx, subscriptionID); err != nil {
+			s.logger.Debug("Failed to unsubscribe from alerts", zap.Error(err))
+		}
+	}
+
+	s.sendResponse(client, "unsubscription_confirmed", gin.H{
+		"subscription_id": subscriptionID,
+	})
+}
+
+func (s *DashboardServer) handleGetMetrics(ctx context.Context, client *Client, msg map[string]interface{}) {
+	query := &ports.MetricsQuery{}
+
+	// Parse query parameters from message
+	if name, ok := msg["name"].(string); ok {
+		query.Name = name
+	}
+
+	if from, ok := msg["from"].(string); ok {
+		if parsed, err := time.Parse(time.RFC3339, from); err == nil {
+			query.From = parsed
+		}
+	}
+	if query.From.IsZero() {
+		query.From = time.Now().Add(-1 * time.Hour)
+	}
+
+	if to, ok := msg["to"].(string); ok {
+		if parsed, err := time.Parse(time.RFC3339, to); err == nil {
+			query.To = parsed
+		}
+	}
+	if query.To.IsZero() {
+		query.To = time.Now()
+	}
+
+	if limit, ok := msg["limit"].(float64); ok {
+		query.Limit = int(limit)
+	}
+	if query.Limit == 0 {
+		query.Limit = 100
+	}
+
+	metrics, err := s.monitoringService.GetMetrics(ctx, query)
+	if err != nil {
+		s.sendError(client, fmt.Sprintf("Failed to get metrics: %v", err))
+		return
+	}
+
+	s.sendResponse(client, "metrics_response", gin.H{
+		"metrics": metrics,
+		"count":   len(metrics),
+	})
+}
+
+func (s *DashboardServer) handleGetAlerts(ctx context.Context, client *Client, msg map[string]interface{}) {
+	filters := ports.AlertFilters{}
+
+	// Parse filters from message
+	if status, ok := msg["status"].(string); ok {
+		filters.Status = []domain.AlertStatus{domain.AlertStatus(status)}
+	}
+
+	if severity, ok := msg["severity"].(string); ok {
+		filters.Severity = []domain.AlertSeverity{domain.AlertSeverity(severity)}
+	}
+
+	if limit, ok := msg["limit"].(float64); ok {
+		filters.Limit = int(limit)
+	}
+
+	alerts, err := s.monitoringService.GetAlerts(ctx, filters)
+	if err != nil {
+		s.sendError(client, fmt.Sprintf("Failed to get alerts: %v", err))
+		return
+	}
+
+	s.sendResponse(client, "alerts_response", gin.H{
+		"alerts": alerts,
+		"count":   len(alerts),
+	})
+}
+
+func (s *DashboardServer) handleGetDashboards(ctx context.Context, client *Client, msg map[string]interface{}) {
+	filters := ports.DashboardFilters{}
+
+	// Parse filters from message
+	if enabled, ok := msg["enabled"].(bool); ok {
+		filters.Enabled = &enabled
+	}
+
+	if search, ok := msg["search"].(string); ok {
+		filters.Search = search
+	}
+
+	dashboards, err := s.monitoringService.GetDashboards(ctx, filters)
+	if err != nil {
+		s.sendError(client, fmt.Sprintf("Failed to get dashboards: %v", err))
+		return
+	}
+
+	s.sendResponse(client, "dashboards_response", gin.H{
+		"dashboards": dashboards,
+		"count":      len(dashboards),
+	})
+}
+
+func (s *DashboardServer) handleGetHealth(ctx context.Context, client *Client, msg map[string]interface{}) {
+	healthChecks, err := s.monitoringService.GetHealthChecks(ctx)
+	if err != nil {
+		s.sendError(client, fmt.Sprintf("Failed to get health checks: %v", err))
+		return
+	}
+
+	// Determine overall status
+	overallStatus := "healthy"
+	for _, check := range healthChecks {
+		if check.Status != "healthy" {
+			overallStatus = "unhealthy"
+			break
+		}
+	}
+
+	s.sendResponse(client, "health_response", gin.H{
+		"health_checks":   healthChecks,
+		"overall_status":  overallStatus,
+		"timestamp":      time.Now(),
+	})
+}
+
+func (s *DashboardServer) sendInitialData(client *Client, ctx context.Context) {
+	// Send initial metrics
+	query := &ports.MetricsQuery{
+		From: time.Now().Add(-1 * time.Hour),
+		To:   time.Now(),
+		Limit: 100,
+	}
+
+	metrics, err := s.monitoringService.GetMetrics(ctx, query)
+	if err == nil {
+		s.sendResponse(client, "initial_metrics", gin.H{
+			"metrics": metrics,
+			"count":   len(metrics),
+		})
+	}
+
+	// Send initial alerts
+	alerts, err := s.monitoringService.GetAlerts(ctx, ports.AlertFilters{})
+	if err == nil {
+		s.sendResponse(client, "initial_alerts", gin.H{
+			"alerts": alerts,
+			"count":   len(alerts),
+		})
+	}
+
+	// Send initial health checks
+	healthChecks, err := s.monitoringService.GetHealthChecks(ctx)
+	if err == nil {
+		s.sendResponse(client, "initial_health", gin.H{
+			"health_checks": healthChecks,
+		})
+	}
+}
+
+// WebSocket message helpers
+
+func (s *DashboardServer) sendResponse(client *Client, msgType string, data interface{}) {
+	response := gin.H{
+		"type":      msgType,
+		"data":      data,
+		"timestamp": time.Now(),
+	}
+
+	if err := client.conn.WriteJSON(response); err != nil {
+		s.logger.Error("Failed to send WebSocket response", zap.Error(err), zap.String("client_id", client.id))
+	}
+}
+
+func (s *DashboardServer) sendError(client *Client, message string) {
+	s.sendResponse(client, "error", gin.H{"message": message})
+}
+
+func (s *DashboardServer) sendPong(client *Client) {
+	s.sendResponse(client, "pong", gin.H{"timestamp": time.Now()})
+}
+
+// Dashboard assets
+
+func (s *DashboardServer) getDashboardHTML() string {
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueryFlux Monitoring Dashboard</title>
+    <link rel="stylesheet" href="/dashboard.css">
+</head>
+<body>
+    <div class="dashboard">
+        <header class="dashboard-header">
+            <h1>QueryFlux Monitoring Dashboard</h1>
+            <div class="status-indicators">
+                <div id="connection-status" class="status-indicator">Connecting...</div>
+                <div id="last-update">Never</div>
+            </div>
+        </header>
+
+        <main class="dashboard-main">
+            <section class="overview-section">
+                <h2>System Overview</h2>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h3>CPU Usage</h3>
+                        <div id="cpu-usage" class="metric-value">--%</div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Memory Usage</h3>
+                        <div id="memory-usage" class="metric-value">--%</div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Active Connections</h3>
+                        <div id="connections" class="metric-value">--</div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Queries/sec</h3>
+                        <div id="queries-per-sec" class="metric-value">--</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="charts-section">
+                <div class="chart-container">
+                    <h3>System Metrics</h3>
+                    <canvas id="system-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Database Performance</h3>
+                    <canvas id="database-chart"></canvas>
+                </div>
+            </section>
+
+            <section class="alerts-section">
+                <h2>Active Alerts</h2>
+                <div id="alerts-list" class="alerts-list">
+                    <div class="no-alerts">No active alerts</div>
+                </div>
+            </section>
+
+            <section class="health-section">
+                <h2>System Health</h2>
+                <div id="health-checks" class="health-grid">
+                    <div class="health-item">
+                        <span class="health-label">Loading...</span>
+                        <span class="health-status">--</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/dashboard.js"></script>
+</body>
+</html>`
+}
+
+func (s *DashboardServer) getDashboardJS() string {
+	return `class MonitoringDashboard {
+    constructor() {
+        this.ws = null;
+        this.charts = {};
+        this.metrics = {};
+        this.alerts = [];
+        this.init();
+    }
+
+    init() {
+        this.connectWebSocket();
+        this.initCharts();
+        this.setupEventListeners();
+    }
+
+    connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+            console.log('Connected to monitoring dashboard');
+            this.updateConnectionStatus('Connected');
+            this.subscribeToData();
+        };
+
+        this.ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            this.handleMessage(message);
+        };
+
+        this.ws.onclose = () => {
+            console.log('Disconnected from monitoring dashboard');
+            this.updateConnectionStatus('Disconnected');
+            // Attempt to reconnect after 5 seconds
+            setTimeout(() => this.connectWebSocket(), 5000);
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.updateConnectionStatus('Error');
+        };
+    }
+
+    subscribeToData() {
+        // Subscribe to metrics
+        this.send({
+            type: 'subscribe',
+            subscription_type: 'metrics',
+            interval: '5s',
+            filters: {
+                names: ['cpu_usage_percent', 'memory_usage_percent', 'active_connections', 'queries_per_second']
+            }
+        });
+
+        // Subscribe to alerts
+        this.send({
+            type: 'subscribe',
+            subscription_type: 'alerts',
+            filters: {
+                status: ['active']
+            }
+        });
+
+        // Get initial data
+        this.send({ type: 'get_health' });
+    }
+
+    handleMessage(message) {
+        switch (message.type) {
+            case 'metric':
+                this.updateMetric(message.data);
+                break;
+            case 'alert':
+                this.updateAlert(message.data);
+                break;
+            case 'initial_metrics':
+                this.setInitialMetrics(message.data.metrics);
+                break;
+            case 'initial_alerts':
+                this.setInitialAlerts(message.data.alerts);
+                break;
+            case 'initial_health':
+                this.updateHealthChecks(message.data.health_checks);
+                break;
+            case 'health_response':
+                this.updateHealthChecks(message.data.health_checks);
+                break;
+            case 'subscription_confirmed':
+                console.log('Subscription confirmed:', message.data);
+                break;
+            case 'error':
+                console.error('Dashboard error:', message.data.message);
+                break;
+        }
+
+        this.updateLastUpdate();
+    }
+
+    updateMetric(metric) {
+        this.metrics[metric.name] = metric.value;
+
+        switch (metric.name) {
+            case 'cpu_usage_percent':
+                document.getElementById('cpu-usage').textContent = metric.value.toFixed(1) + '%';
+                break;
+            case 'memory_usage_percent':
+                document.getElementById('memory-usage').textContent = metric.value.toFixed(1) + '%';
+                break;
+            case 'active_connections':
+                document.getElementById('connections').textContent = Math.round(metric.value);
+                break;
+            case 'queries_per_second':
+                document.getElementById('queries-per-sec').textContent = metric.value.toFixed(1);
+                break;
+        }
+
+        this.updateCharts(metric);
+    }
+
+    updateAlert(alert) {
+        const existingIndex = this.alerts.findIndex(a => a.id === alert.id);
+        if (existingIndex >= 0) {
+            this.alerts[existingIndex] = alert;
+        } else {
+            this.alerts.push(alert);
+        }
+
+        this.renderAlerts();
+    }
+
+    updateHealthChecks(healthChecks) {
+        const container = document.getElementById('health-checks');
+        container.innerHTML = '';
+
+        healthChecks.forEach(check => {
+            const item = document.createElement('div');
+            item.className = 'health-item';
+            item.innerHTML = \`
+                <span class="health-label">\${check.name}</span>
+                <span class="health-status status-\${check.status}">\${check.status}</span>
+            \`;
+            container.appendChild(item);
+        });
+    }
+
+    setInitialMetrics(metrics) {
+        metrics.forEach(metric => this.updateMetric(metric));
+    }
+
+    setInitialAlerts(alerts) {
+        this.alerts = alerts;
+        this.renderAlerts();
+    }
+
+    renderAlerts() {
+        const container = document.getElementById('alerts-list');
+
+        if (this.alerts.length === 0) {
+            container.innerHTML = '<div class="no-alerts">No active alerts</div>';
+            return;
+        }
+
+        container.innerHTML = this.alerts.map(alert => \`
+            <div class="alert-item alert-\${alert.severity}">
+                <div class="alert-header">
+                    <span class="alert-title">\${alert.name}</span>
+                    <span class="alert-severity">\${alert.severity}</span>
+                </div>
+                <div class="alert-description">\${alert.description}</div>
+                <div class="alert-time">\${new Date(alert.created_at).toLocaleString()}</div>
+            </div>
+        \`).join('');
+    }
+
+    initCharts() {
+        const systemCtx = document.getElementById('system-chart').getContext('2d');
+        this.charts.system = new Chart(systemCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'CPU Usage (%)',
+                        data: [],
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Memory Usage (%)',
+                        data: [],
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        const databaseCtx = document.getElementById('database-chart').getContext('2d');
+        this.charts.database = new Chart(databaseCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Active Connections',
+                        data: [],
+                        borderColor: '#f39c12',
+                        backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Queries/sec',
+                        data: [],
+                        borderColor: '#27ae60',
+                        backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    updateCharts(metric) {
+        const timestamp = new Date().toLocaleTimeString();
+
+        if (this.charts.system) {
+            if (metric.name === 'cpu_usage_percent' || metric.name === 'memory_usage_percent') {
+                const datasetIndex = metric.name === 'cpu_usage_percent' ? 0 : 1;
+                const chart = this.charts.system;
+
+                chart.data.labels.push(timestamp);
+                chart.data.datasets[datasetIndex].data.push(metric.value);
+
+                // Keep only last 20 data points
+                if (chart.data.labels.length > 20) {
+                    chart.data.labels.shift();
+                    chart.data.datasets.forEach(dataset => dataset.data.shift());
+                }
+
+                chart.update('none');
+            }
+        }
+
+        if (this.charts.database) {
+            if (metric.name === 'active_connections' || metric.name === 'queries_per_second') {
+                const datasetIndex = metric.name === 'active_connections' ? 0 : 1;
+                const chart = this.charts.database;
+
+                chart.data.labels.push(timestamp);
+                chart.data.datasets[datasetIndex].data.push(metric.value);
+
+                // Keep only last 20 data points
+                if (chart.data.labels.length > 20) {
+                    chart.data.labels.shift();
+                    chart.data.datasets.forEach(dataset => dataset.data.shift());
+                }
+
+                chart.update('none');
+            }
+        }
+    }
+
+    updateConnectionStatus(status) {
+        const element = document.getElementById('connection-status');
+        element.textContent = status;
+        element.className = 'status-indicator status-' + status.toLowerCase();
+    }
+
+    updateLastUpdate() {
+        document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+    }
+
+    setupEventListeners() {
+        // Add refresh button functionality
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'r' && event.ctrlKey) {
+                event.preventDefault();
+                this.send({ type: 'get_health' });
+            }
+        });
+    }
+
+    send(message) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify(message));
+        }
+    }
+}
+
+// Initialize dashboard when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    new MonitoringDashboard();
+});`
+}
+
+func (s *DashboardServer) getDashboardCSS() string {
+	return `* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.dashboard {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.dashboard-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dashboard-header h1 {
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+.status-indicators {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+}
+
+.status-indicator {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.2);
+    font-weight: 500;
+}
+
+.status-indicator.status-connected {
+    background: rgba(39, 174, 96, 0.3);
+}
+
+.status-indicator.status-disconnected {
+    background: rgba(231, 76, 60, 0.3);
+}
+
+.status-indicator.status-error {
+    background: rgba(243, 156, 18, 0.3);
+}
+
+.dashboard-main {
+    flex: 1;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+section {
+    margin-bottom: 2rem;
+}
+
+section h2 {
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+    color: #2c3e50;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.metric-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+}
+
+.metric-card h3 {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.charts-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.chart-container {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.chart-container h3 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: #2c3e50;
+}
+
+.chart-container canvas {
+    max-height: 300px;
+}
+
+.alerts-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.no-alerts {
+    text-align: center;
+    color: #7f8c8d;
+    font-style: italic;
+}
+
+.alert-item {
+    padding: 1rem;
+    border-radius: 6px;
+    border-left: 4px solid;
+}
+
+.alert-critical {
+    background: #fdf2f2;
+    border-color: #e53e3e;
+}
+
+.alert-high {
+    background: #fffbf0;
+    border-color: #dd6b20;
+}
+
+.alert-medium {
+    background: #fffbf0;
+    border-color: #d69e2e;
+}
+
+.alert-low {
+    background: #f0fff4;
+    border-color: #38a169;
+}
+
+.alert-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.alert-title {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.alert-severity {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.alert-critical .alert-severity {
+    background: #e53e3e;
+    color: white;
+}
+
+.alert-high .alert-severity {
+    background: #dd6b20;
+    color: white;
+}
+
+.alert-medium .alert-severity {
+    background: #d69e2e;
+    color: white;
+}
+
+.alert-low .alert-severity {
+    background: #38a169;
+    color: white;
+}
+
+.alert-description {
+    color: #4a5568;
+    margin-bottom: 0.5rem;
+}
+
+.alert-time {
+    font-size: 0.8rem;
+    color: #718096;
+}
+
+.health-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.health-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-radius: 6px;
+    background: #f8f9fa;
+}
+
+.health-label {
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.health-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.health-status.status-healthy {
+    background: #c6f6d5;
+    color: #22543d;
+}
+
+.health-status.status-unhealthy {
+    background: #fed7d7;
+    color: #742a2a;
+}
+
+.health-status.status-warning {
+    background: #feebc8;
+    color: #7c2d12;
+}
+
+@media (max-width: 768px) {
+    .dashboard-main {
+        padding: 1rem;
+    }
+
+    .dashboard-header {
+        padding: 1rem;
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .charts-section {
+        grid-template-columns: 1fr;
+    }
+
+    .chart-container canvas {
+        max-height: 200px;
+    }
+}`
+}
+
+// Import gin for gin.H type
+import "github.com/gin-gonic/gin"

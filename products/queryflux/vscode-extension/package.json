@@ -1,0 +1,280 @@
+{
+  "name": "queryflux",
+  "displayName": "QueryFlux - AI Database Manager",
+  "description": "AI-powered database management with 35+ database support, query optimization, and real-time collaboration",
+  "version": "1.0.0",
+  "publisher": "QueryFlux",
+  "author": {
+    "name": "QueryFlux Team",
+    "email": "team@queryflux.com"
+  },
+  "license": "MIT",
+  "homepage": "https://queryflux.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/queryflux/vscode-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/queryflux/vscode-extension/issues"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Database",
+    "Data Science",
+    "Other",
+    "Snippets"
+  ],
+  "keywords": [
+    "database",
+    "sql",
+    "query",
+    "mysql",
+    "postgresql",
+    "mongodb",
+    "redis",
+    "cassandra",
+    "oracle",
+    "sqlserver",
+    "ai",
+    "queryflux",
+    "database management",
+    "query optimization",
+    "schema browser",
+    "data visualization"
+  ],
+  "activationEvents": [
+    "onCommand:queryflux.connectDatabase",
+    "onCommand:queryflux.executeQuery",
+    "onCommand:queryflux.showConnections",
+    "onCommand:queryflux.openQueryEditor",
+    "onCommand:queryflux.showSchema",
+    "onLanguage:sql",
+    "workspaceContains:**/*.sql"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "queryflux.connectDatabase",
+        "title": "Connect to Database",
+        "category": "QueryFlux"
+      },
+      {
+        "command": "queryflux.executeQuery",
+        "title": "Execute Query",
+        "category": "QueryFlux"
+      },
+      {
+        "command": "queryflux.showConnections",
+        "title": "Show Connections",
+        "category": "QueryFlux"
+      },
+      {
+        "command": "queryflux.openQueryEditor",
+        "title": "New Query Editor",
+        "category": "QueryFlux"
+      },
+      {
+        "command": "queryflux.showSchema",
+        "title": "Browse Schema",
+        "category": "QueryFlux"
+      },
+      {
+        "command": "queryflux.explainQuery",
+        "title": "Explain Query",
+        "category": "QueryFlux"
+      },
+      {
+        "command": "queryflux.optimizeQuery",
+        "title": "Optimize Query with AI",
+        "category": "QueryFlux"
+      },
+      {
+        "command": "queryflux.exportResults",
+        "title": "Export Results",
+        "category": "QueryFlux"
+      },
+      {
+        "command": "queryflux.refreshSchema",
+        "title": "Refresh Schema",
+        "category": "QueryFlux"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "queryfluxConnections",
+          "name": "QueryFlux Connections",
+          "when": "queryflux:connected"
+        },
+        {
+          "id": "queryfluxSchema",
+          "name": "Database Schema",
+          "when": "queryflux:connected"
+        }
+      ]
+    },
+    "viewMenus": {
+      "explorer": [
+        {
+          "submenu": "queryflux.connectionMenu",
+          "group": "queryflux"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "queryflux.showConnections",
+          "when": "view == queryfluxConnections",
+          "group": "navigation"
+        },
+        {
+          "command": "queryflux.refreshSchema",
+          "when": "view == queryfluxSchema",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "queryflux.showSchema",
+          "when": "view == queryfluxConnections && viewItem == connection",
+          "group": "inline"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "queryflux.executeQuery",
+          "when": "resourceLangId == sql",
+          "group": "queryflux"
+        },
+        {
+          "command": "queryflux.explainQuery",
+          "when": "resourceLangId == sql",
+          "group": "queryflux"
+        },
+        {
+          "command": "queryflux.optimizeQuery",
+          "when": "resourceLangId == sql",
+          "group": "queryflux"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "queryflux.executeQuery",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorTextFocus && resourceLangId == sql"
+      },
+      {
+        "command": "queryflux.openQueryEditor",
+        "key": "ctrl+n",
+        "mac": "cmd+n",
+        "when": "queryflux:connected"
+      }
+    ],
+    "configuration": {
+      "title": "QueryFlux",
+      "properties": {
+        "queryflux.defaultConnectionTimeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "Default connection timeout in milliseconds"
+        },
+        "queryflux.maxResultRows": {
+          "type": "number",
+          "default": 1000,
+          "description": "Maximum number of rows to return in query results"
+        },
+        "queryflux.autoComplete": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable SQL autocomplete suggestions"
+        },
+        "queryflux.formatOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Format SQL code on save"
+        },
+        "queryflux.aiOptimization": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable AI-powered query optimization suggestions"
+        }
+      }
+    },
+    "snippets": [
+      {
+        "language": "sql",
+        "path": "./snippets/sql.json"
+      }
+    ],
+    "languages": [
+      {
+        "id": "sql",
+        "extensions": [
+          ".sql"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "lint:fix": "eslint src --ext ts --fix",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "package:prod": "vsce package --baseContentUrl https://queryflux.com --baseImagesUrl https://queryflux.com/assets",
+    "publish": "vsce publish",
+    "publish:prod": "vsce publish --baseContentUrl https://queryflux.com --baseImagesUrl https://queryflux.com/assets",
+    "clean": "rimraf out *.vsix"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "18.x",
+    "@typescript-eslint/eslint-plugin": "^6.4.0",
+    "@typescript-eslint/parser": "^6.4.0",
+    "eslint": "^8.47.0",
+    "mocha": "^10.2.0",
+    "typescript": "^5.1.6",
+    "@vscode/test-electron": "^2.3.2",
+    "rimraf": "^5.0.1",
+    "vsce": "^2.19.0"
+  },
+  "dependencies": {
+    "mysql2": "^3.6.5",
+    "pg": "^8.11.3",
+    "mongodb": "^6.3.0",
+    "ioredis": "^5.3.2",
+    "ssh2": "^1.14.0",
+    "tedious": "^16.7.1",
+    "cassandra-driver": "^4.6.4",
+    "oracledb": "^6.3.0",
+    "better-sqlite3": "^8.7.0"
+  },
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#1e293b",
+    "theme": "dark"
+  },
+  "badges": [
+    {
+      "url": "https://img.shields.io/badge/vscode-1.80.0+-blue.svg",
+      "href": "https://code.visualstudio.com/",
+      "description": "Compatible with VS Code 1.80.0+"
+    },
+    {
+      "url": "https://img.shields.io/badge/license-MIT-green.svg",
+      "href": "https://opensource.org/licenses/MIT",
+      "description": "MIT License"
+    }
+  ]
+}

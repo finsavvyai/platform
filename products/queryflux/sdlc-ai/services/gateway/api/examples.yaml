@@ -1,0 +1,636 @@
+# API Examples for SDLC.ai Platform
+# This file contains comprehensive example requests and responses for all API endpoints
+
+# Authentication Examples
+auth:
+  login:
+    request:
+      summary: "User login example"
+      description: "Authenticate a user with email and password"
+      value:
+        email: "john.doe@company.com"
+        password: "SecurePass123!"
+        tenant_id: "123e4567-e89b-12d3-a456-426614174000"
+        remember_me: true
+    response:
+      success:
+        summary: "Successful login response"
+        description: "Returns JWT tokens and user information"
+        value:
+          success: true
+          data:
+            access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+            refresh_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+            token_type: "Bearer"
+            expires_in: 3600
+            user:
+              id: "123e4567-e89b-12d3-a456-426614174001"
+              email: "john.doe@company.com"
+              first_name: "John"
+              last_name: "Doe"
+              role: "admin"
+              tenant_id: "123e4567-e89b-12d3-a456-426614174000"
+              is_active: true
+              last_login: "2025-01-15T10:30:00Z"
+              created_at: "2025-01-01T00:00:00Z"
+      error_invalid_credentials:
+        summary: "Invalid credentials error"
+        description: "Returned when email or password is incorrect"
+        value:
+          success: false
+          error:
+            code: "INVALID_CREDENTIALS"
+            message: "Invalid email or password"
+            details:
+              field: "password"
+              message: "Password does not match our records"
+          meta:
+            request_id: "req_123456789"
+            timestamp: "2025-01-15T10:30:00Z"
+            version: "v1"
+      error_mfa_required:
+        summary: "MFA required"
+        description: "Returned when multi-factor authentication is required"
+        value:
+          success: false
+          error:
+            code: "MFA_REQUIRED"
+            message: "Multi-factor authentication is required"
+            details:
+              mfa_methods: ["totp", "sms"]
+              masked_phone: "***-***-7890"
+          meta:
+            request_id: "req_123456789"
+            timestamp: "2025-01-15T10:30:00Z"
+            version: "v1"
+
+  logout:
+    request:
+      headers:
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    response:
+      success:
+        value:
+          success: true
+          data:
+            message: "Successfully logged out"
+          meta:
+            request_id: "req_123456789"
+            timestamp: "2025-01-15T10:30:00Z"
+            version: "v1"
+
+# Document Management Examples
+documents:
+  upload:
+    request:
+      summary: "Upload document example"
+      description: "Upload a PDF document with metadata"
+      multipart_form:
+        file:
+          type: "file"
+          filename: "contract.pdf"
+          content_type: "application/pdf"
+        metadata:
+          type: "object"
+          value:
+            title: "Service Agreement"
+            description: "Master service agreement for Q1 2025"
+            tags: ["legal", "contract", "2025"]
+            classification: "confidential"
+            retention_days: 2555
+        processing_options:
+          type: "object"
+          value:
+            extract_text: true
+            generate_embeddings: true
+            run_dlp_scan: true
+            chunk_size: 1000
+            chunk_overlap: 200
+    response:
+      success:
+        value:
+          success: true
+          data:
+            id: "doc_1234567890"
+            filename: "contract.pdf"
+            content_type: "application/pdf"
+            file_size: 2048576
+            checksum: "sha256:a1b2c3d4e5f6..."
+            status: "processing"
+            processing_progress: 0
+            metadata:
+              title: "Service Agreement"
+              description: "Master service agreement for Q1 2025"
+              tags: ["legal", "contract", "2025"]
+              classification: "confidential"
+            storage:
+              provider: "cloudflare_r2"
+              bucket: "documents"
+              path: "/tenant-123/2025/01/15/contract.pdf"
+              url: "https://documents.sdlc.ai/tenant-123/2025/01/15/contract.pdf?expires=1737338200&signature=abc123"
+            created_at: "2025-01-15T10:30:00Z"
+            created_by: "123e4567-e89b-12d3-a456-426614174001"
+          meta:
+            request_id: "req_123456789"
+            timestamp: "2025-01-15T10:30:00Z"
+            version: "v1"
+
+  list:
+    request:
+      headers:
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      query_parameters:
+        limit: 20
+        offset: 0
+        search: "contract"
+        content_type: "application/pdf"
+        tags: "legal,contract"
+        sort: "created_at:desc"
+    response:
+      success:
+        value:
+          success: true
+          data:
+            documents:
+              - id: "doc_1234567890"
+                filename: "contract.pdf"
+                content_type: "application/pdf"
+                file_size: 2048576
+                status: "completed"
+                processing_progress: 100
+                metadata:
+                  title: "Service Agreement"
+                  tags: ["legal", "contract", "2025"]
+                  classification: "confidential"
+                created_at: "2025-01-15T10:30:00Z"
+                updated_at: "2025-01-15T10:32:00Z"
+                chunks_count: 15
+                embeddings_count: 15
+                dlp_scan_status: "completed"
+                dlp_violations: 0
+              - id: "doc_1234567891"
+                filename: "presentation.pptx"
+                content_type: "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                file_size: 5242880
+                status: "completed"
+                metadata:
+                  title: "Q1 Business Review"
+                  tags: ["business", "presentation", "2025"]
+                  classification: "internal"
+                created_at: "2025-01-14T14:20:00Z"
+                chunks_count: 25
+                embeddings_count: 25
+                dlp_scan_status: "completed"
+                dlp_violations: 0
+            pagination:
+              total: 2
+              limit: 20
+              offset: 0
+              has_more: false
+              next_cursor: null
+          meta:
+            request_id: "req_123456789"
+            timestamp: "2025-01-15T10:30:00Z"
+            version: "v1"
+
+# RAG Query Examples
+rag:
+  query:
+    request:
+      summary: "RAG query example"
+      description: "Query documents using natural language"
+      headers:
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        X-API-Version: "v1"
+      body:
+        query: "What are the payment terms in the service agreement?"
+        model: "gpt-4"
+        max_context_length: 4000
+        temperature: 0.1
+        max_tokens: 1000
+        include_sources: true
+        filters:
+          document_types: ["application/pdf"]
+          tags: ["legal", "contract"]
+          date_range:
+            start: "2025-01-01"
+            end: "2025-01-31"
+          classification: ["confidential", "internal"]
+        rerank: true
+        rerank_method: "cross-encoder"
+        top_k: 5
+        citations: true
+        streaming: false
+    response:
+      success:
+        value:
+          success: true
+          data:
+            id: "query_1234567890"
+            query: "What are the payment terms in the service agreement?"
+            answer: "Based on the service agreement document, the payment terms are as follows:\n\n1. **Payment Schedule**: Payments are due monthly, within 30 days of invoice date\n2. **Payment Methods**: Accepted payment methods include bank transfer, credit card, and ACH\n3. **Late Fees**: Late payments incur a 1.5% monthly interest charge\n4. **Early Payment Discount**: 2% discount for payments made within 10 days\n5. **Currency**: All payments are in USD unless otherwise specified\n\nThe agreement also specifies that all payments must be made to the designated bank account provided in Section 4.2 of the contract."
+            sources:
+              - document_id: "doc_1234567890"
+                document_title: "Service Agreement"
+                chunk_id: "chunk_15"
+                content: "Section 4.1 Payment Terms. The Client shall pay the Service Provider monthly fees as outlined in Schedule A. Payments are due within 30 days of invoice date. Late payments shall incur interest at a rate of 1.5% per month..."
+                score: 0.95
+                page: 8
+                created_at: "2025-01-15T10:30:00Z"
+              - document_id: "doc_1234567890"
+                document_title: "Service Agreement"
+                chunk_id: "chunk_16"
+                content: "Section 4.2 Payment Methods. The Service Provider accepts payments via bank transfer, credit card, and ACH. Early payments made within 10 days of invoice date shall receive a 2% discount..."
+                score: 0.89
+                page: 9
+                created_at: "2025-01-15T10:30:00Z"
+            model_used: "gpt-4"
+            tokens_used:
+              prompt: 1250
+              completion: 320
+              total: 1570
+            cost:
+              prompt: 0.00625
+              completion: 0.0096
+              total: 0.01585
+            citations:
+              - text: "Payments are due within 30 days of invoice date"
+                source: {
+                  "document_id": "doc_1234567890",
+                  "page": 8,
+                  "chunk_id": "chunk_15"
+                }
+              - text: "Early payments made within 10 days of invoice date shall receive a 2% discount"
+                source: {
+                  "document_id": "doc_1234567890",
+                  "page": 9,
+                  "chunk_id": "chunk_16"
+                }
+            created_at: "2025-01-15T10:32:00Z"
+            duration_ms: 1250
+          meta:
+            request_id: "req_123456789"
+            timestamp: "2025-01-15T10:30:00Z"
+            version: "v1"
+
+# Vector Search Examples
+vector_search:
+  semantic:
+    request:
+      summary: "Semantic search example"
+      description: "Search for documents using semantic similarity"
+      headers:
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      body:
+        query: "quarterly business review metrics"
+        search_type: "semantic"
+        top_k: 10
+        threshold: 0.7
+        filters:
+          document_types: ["application/pdf", "application/vnd.openxmlformats-officedocument.presentationml.presentation"]
+          date_range:
+            start: "2024-01-01"
+            end: "2025-01-31"
+        rerank: true
+        include_metadata: true
+    response:
+      success:
+        value:
+          success: true
+          data:
+            query_id: "search_1234567890"
+            results:
+              - document_id: "doc_1234567891"
+                document_title: "Q1 Business Review"
+                chunk_id: "chunk_5"
+                content: "Our Q1 2025 business review shows exceptional growth metrics with revenue increasing by 35% year-over-year..."
+                score: 0.94
+                metadata:
+                  page: 3
+                  section: "Revenue Metrics"
+                  created_at: "2025-01-14T14:20:00Z"
+              - document_id: "doc_1234567892"
+                document_title: "Annual Report 2024"
+                chunk_id: "chunk_12"
+                content: "The quarterly business review process has been streamlined to provide real-time insights into key performance indicators..."
+                score: 0.88
+                metadata:
+                  page: 15
+                  section: "Business Processes"
+                  created_at: "2025-01-10T09:15:00Z"
+            search_type: "semantic"
+            model_used: "text-embedding-ada-002"
+            total_results: 2
+            search_time_ms: 45
+            created_at: "2025-01-15T10:30:00Z"
+          meta:
+            request_id: "req_123456789"
+            timestamp: "2025-01-15T10:30:00Z"
+            version: "v1"
+
+  hybrid:
+    request:
+      summary: "Hybrid search example"
+      description: "Search using both semantic and keyword matching"
+      headers:
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      body:
+        query: "service agreement payment terms"
+        search_type: "hybrid"
+        top_k: 5
+        semantic_weight: 0.7
+        keyword_weight: 0.3
+        filters:
+          tags: ["legal", "contract"]
+          classification: ["confidential"]
+    response:
+      success:
+        value:
+          success: true
+          data:
+            query_id: "search_1234567891"
+            results:
+              - document_id: "doc_1234567890"
+                document_title: "Service Agreement"
+                chunk_id: "chunk_15"
+                content: "Section 4.1 Payment Terms. The Client shall pay the Service Provider monthly fees..."
+                score: 0.92
+                match_scores:
+                  semantic: 0.89
+                  keyword: 0.95
+                metadata:
+                  page: 8
+                  section: "Payment Terms"
+              - document_id: "doc_1234567890"
+                document_title: "Service Agreement"
+                chunk_id: "chunk_16"
+                content: "Section 4.2 Payment Methods. The Service Provider accepts payments via bank transfer..."
+                score: 0.88
+                match_scores:
+                  semantic: 0.85
+                  keyword: 0.92
+                metadata:
+                  page: 9
+                  section: "Payment Methods"
+            search_type: "hybrid"
+            total_results: 2
+            search_time_ms: 62
+            created_at: "2025-01-15T10:30:00Z"
+          meta:
+            request_id: "req_123456789"
+            timestamp: "2025-01-15T10:30:00Z"
+            version: "v1"
+
+# DLP Examples
+dlp:
+  scan:
+    request:
+      summary: "DLP scan example"
+      description: "Scan content for sensitive data"
+      headers:
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      body:
+        content: "Please contact John Smith at john.smith@company.com or call 555-123-4567. His SSN is 123-45-6789 and credit card is 4111-1111-1111-1111."
+        scan_types: ["pii", "phi", "financial", "custom"]
+        policies:
+          - name: "email_detection"
+            enabled: true
+            action: "redact"
+          - name: "phone_detection"
+            enabled: true
+            action: "mask"
+          - name: "ssn_detection"
+            enabled: true
+            action: "tokenize"
+          - name: "credit_card_detection"
+            enabled: true
+            action: "redact"
+        return_tokens: true
+    response:
+      success:
+        value:
+          success: true
+          data:
+            scan_id: "scan_1234567890"
+            status: "completed"
+            findings:
+              - type: "email"
+                start: 31
+                end: 52
+                value: "john.smith@company.com"
+                redacted_value: "***@***.com"
+                confidence: 0.99
+                policy: "email_detection"
+                action: "redact"
+              - type: "phone"
+                start: 61
+                end: 73
+                value: "555-123-4567"
+                redacted_value: "***-***-4567"
+                confidence: 0.98
+                policy: "phone_detection"
+                action: "mask"
+              - type: "ssn"
+                start: 89
+                end: 99
+                value: "123-45-6789"
+                token: "tok_abc123def456"
+                redacted_value: "[SSN:TOK:tok_abc123def456]"
+                confidence: 0.99
+                policy: "ssn_detection"
+                action: "tokenize"
+              - type: "credit_card"
+                start: 123
+                end: 141
+                value: "4111-1111-1111-1111"
+                redacted_value: "[REDACTED]"
+                confidence: 0.95
+                policy: "credit_card_detection"
+                action: "redact"
+            redacted_content: "Please contact ***@***.com or call ***-***-4567. His SSN is [SSN:TOK:tok_abc123def456] and credit card is [REDACTED]."
+            risk_score: 85
+            risk_level: "high"
+            tokens:
+              - token: "tok_abc123def456"
+                type: "ssn"
+                value: "123-45-6789"
+                expires_at: "2025-02-15T10:30:00Z"
+            scan_time_ms: 125
+            created_at: "2025-01-15T10:30:00Z"
+          meta:
+            request_id: "req_123456789"
+            timestamp: "2025-01-15T10:30:00Z"
+            version: "v1"
+
+# Tenant Management Examples
+tenants:
+  create:
+    request:
+      summary: "Create tenant example"
+      description: "Create a new tenant"
+      headers:
+        Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      body:
+        name: "Acme Corporation"
+        domain: "acme.sdlc.ai"
+        plan: "enterprise"
+        settings:
+          max_users: 1000
+          max_documents: 100000
+          features: ["dlp", "advanced_search", "custom_models"]
+          security:
+            require_mfa: true
+            session_timeout: 3600
+            password_policy:
+              min_length: 12
+              require_special_chars: true
+          ai:
+            default_model: "gpt-4"
+            max_tokens_per_month: 10000000
+        admin_user:
+          email: "admin@acme.com"
+          first_name: "Admin"
+          last_name: "User"
+          password: "SecurePass123!"
+          phone: "+1-555-123-4567"
+    response:
+      success:
+        value:
+          success: true
+          data:
+            id: "tenant_1234567890"
+            name: "Acme Corporation"
+            domain: "acme.sdlc.ai"
+            status: "active"
+            plan: "enterprise"
+            settings:
+              max_users: 1000
+              max_documents: 100000
+              features: ["dlp", "advanced_search", "custom_models"]
+            admin_user:
+              id: "user_1234567890"
+              email: "admin@acme.com"
+              first_name: "Admin"
+              last_name: "User"
+              role: "tenant_admin"
+              is_active: true
+            created_at: "2025-01-15T10:30:00Z"
+            subscription:
+              id: "sub_1234567890"
+              status: "active"
+              current_period_start: "2025-01-15T00:00:00Z"
+              current_period_end: "2025-02-15T00:00:00Z"
+          meta:
+            request_id: "req_123456789"
+            timestamp: "2025-01-15T10:30:00Z"
+            version: "v1"
+
+# Rate Limiting Examples
+rate_limits:
+  exceeded:
+    response:
+      value:
+        success: false
+        error:
+          code: "RATE_LIMIT_EXCEEDED"
+          message: "API rate limit exceeded"
+          details:
+            limit: 1000
+            remaining: 0
+            reset_time: 1736986800
+            retry_after: 3600
+            scope: "user"
+        headers:
+          X-RateLimit-Limit: "1000"
+          X-RateLimit-Remaining: "0"
+          X-RateLimit-Reset: "1736986800"
+          X-RateLimit-Retry-After: "3600"
+          X-RateLimit-Scope: "user"
+        meta:
+          request_id: "req_123456789"
+          timestamp: "2025-01-15T10:30:00Z"
+          version: "v1"
+
+# Error Examples
+errors:
+  validation:
+    response:
+      value:
+        success: false
+        error:
+          code: "VALIDATION_ERROR"
+          message: "Request validation failed"
+          details:
+            - field: "email"
+              message: "Invalid email format"
+              code: "INVALID_EMAIL"
+            - field: "password"
+              message: "Password must be at least 8 characters"
+              code: "PASSWORD_TOO_SHORT"
+        meta:
+          request_id: "req_123456789"
+          timestamp: "2025-01-15T10:30:00Z"
+          version: "v1"
+
+  unauthorized:
+    response:
+      value:
+        success: false
+        error:
+          code: "UNAUTHORIZED"
+          message: "Authentication required"
+          details:
+            reason: "Missing or invalid authorization header"
+          resolution: "Please provide a valid JWT token in the Authorization header"
+        meta:
+          request_id: "req_123456789"
+          timestamp: "2025-01-15T10:30:00Z"
+          version: "v1"
+
+  forbidden:
+    response:
+      value:
+        success: false
+        error:
+          code: "FORBIDDEN"
+          message: "Access denied"
+          details:
+            reason: "Insufficient permissions to access this resource"
+            required_permissions: ["documents:read", "admin"]
+            current_permissions: ["documents:read"]
+        meta:
+          request_id: "req_123456789"
+          timestamp: "2025-01-15T10:30:00Z"
+          version: "v1"
+
+  not_found:
+    response:
+      value:
+        success: false
+        error:
+          code: "NOT_FOUND"
+          message: "Resource not found"
+          details:
+            resource_type: "document"
+            resource_id: "doc_nonexistent"
+          resolution: "Please check the resource ID and try again"
+        meta:
+          request_id: "req_123456789"
+          timestamp: "2025-01-15T10:30:00Z"
+          version: "v1"
+
+  internal_server_error:
+    response:
+      value:
+        success: false
+        error:
+          code: "INTERNAL_SERVER_ERROR"
+          message: "An unexpected error occurred"
+          details:
+            error_id: "err_abc123def456"
+            message: "Database connection timeout"
+          resolution: "Please try again later. If the issue persists, contact support"
+        meta:
+          request_id: "req_123456789"
+          timestamp: "2025-01-15T10:30:00Z"
+          version: "v1"

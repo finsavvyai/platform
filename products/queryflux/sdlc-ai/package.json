@@ -1,0 +1,93 @@
+{
+  "name": "sdlc-platform",
+  "version": "1.0.0",
+  "description": "SDLC.ai - Secure Data Learning Platform v3: Cloudflare-native, zero-trust middleware fabric for secure AI-data interactions",
+  "private": true,
+  "workspaces": [
+    "services/*",
+    "shared/libs/*",
+    "tools/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:gateway\" \"npm run dev:rag\" \"npm run dev:vector\" \"npm run dev:admin\"",
+    "dev:gateway": "cd services/gateway && go run cmd/main.go",
+    "dev:rag": "cd services/rag && uvicorn app.main:app --reload --host 0.0.0.0 --port 8001",
+    "dev:vector": "cd services/vector-core && cargo run",
+    "dev:admin": "cd services/admin-ui && npm run dev",
+    "build": "npm run build:gateway && npm run build:rag && npm run build:vector && npm run build:admin",
+    "build:gateway": "cd services/gateway && go build -o bin/gateway cmd/main.go",
+    "build:rag": "cd services/rag && pip install -r requirements.txt",
+    "build:vector": "cd services/vector-core && cargo build --release",
+    "build:admin": "cd services/admin-ui && npm run build",
+    "test": "npm run test:gateway && npm run test:rag && npm run test:vector && npm run test:admin",
+    "test:gateway": "cd services/gateway && go test ./...",
+    "test:rag": "cd services/rag && pytest",
+    "test:vector": "cd services/vector-core && cargo test",
+    "test:admin": "cd services/admin-ui && npm run test",
+    "lint": "npm run lint:gateway && npm run lint:rag && npm run lint:vector && npm run lint:admin",
+    "lint:gateway": "cd services/gateway && golangci-lint run",
+    "lint:rag": "cd services/rag && ruff check .",
+    "lint:vector": "cd services/vector-core && cargo clippy",
+    "lint:admin": "cd services/admin-ui && npm run lint",
+    "docker:dev": "docker-compose -f .config/docker/docker-compose.dev.yml up --build",
+    "docker:prod": "docker-compose -f .config/docker/docker-compose.prod.yml up -d --build",
+    "docker:staging": "docker-compose -f .config/docker/docker-compose.staging.yml up -d --build",
+    "docs:serve": "cd docs && python -m http.server 8080",
+    "security:scan": "npm run security:gateway && npm run security:rag && npm run security:vector && npm run security:admin",
+    "security:gateway": "cd services/gateway && gosec ./...",
+    "security:rag": "cd services/rag && bandit -r .",
+    "security:vector": "cd services/vector-core && cargo audit",
+    "security:admin": "cd services/admin-ui && npm audit",
+    "ci:local": "npm run lint && npm run test && npm run security:scan && npm run build",
+    "clean": "npm run clean:gateway && npm run clean:rag && npm run clean:vector && npm run clean:admin",
+    "clean:gateway": "cd services/gateway && rm -rf bin/",
+    "clean:rag": "cd services/rag && find . -type d -name '__pycache__' -exec rm -rf {} +",
+    "clean:vector": "cd services/vector-core && cargo clean",
+    "clean:admin": "cd services/admin-ui && rm -rf .next node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.1",
+    "@commitlint/cli": "^18.4.4",
+    "@commitlint/config-conventional": "^18.4.4"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0",
+    "go": ">=1.21.0",
+    "python": ">=3.11.0",
+    "rust": ">=1.75.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/finsavvyai/enterprise-ai-stack.git"
+  },
+  "keywords": [
+    "ai",
+    "rag",
+    "security",
+    "privacy",
+    "compliance",
+    "gdpr",
+    "hipaa",
+    "dlp",
+    "zero-trust",
+    "cloudflare",
+    "enterprise",
+    "multi-tenant"
+  ],
+  "author": "SDLC.ai Team",
+  "license": "BUSL-1.1",
+  "bugs": {
+    "url": "https://github.com/finsavvyai/enterprise-ai-stack/issues"
+  },
+  "homepage": "https://sdlc.ai",
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  }
+}

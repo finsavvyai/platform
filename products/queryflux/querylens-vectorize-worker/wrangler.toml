@@ -1,0 +1,42 @@
+# Cloudflare Worker configuration for QueryLens Vectorize
+# Run: wrangler deploy
+# Local dev: wrangler dev
+
+name = "querylens-vectorize-worker"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Vectorize binding
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "querylens-schema-index"
+
+# Environment variables (secrets)
+# Run: wrangler secret put OPENAI_API_KEY
+# Optional: wrangler secret put VECTORIZE_INGRESS_SECRET (must match QueryLens VECTORIZE_INGRESS_SECRET)
+
+# Route (optional - configure after deployment)
+# routes = [
+#   { pattern = "vectorize.querylens.ai/*", zone_name = "querylens.ai" }
+# ]
+
+# Worker configuration
+[vars]
+ENVIRONMENT = "production"
+
+# Development environment
+[env.development]
+name = "querylens-vectorize-worker-dev"
+vars = { ENVIRONMENT = "development" }
+
+[[env.development.vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "querylens-schema-index-dev"
+
+[env.staging]
+name = "querylens-vectorize-worker-staging"
+vars = { ENVIRONMENT = "staging" }
+
+[[env.staging.vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "querylens-schema-index-staging"

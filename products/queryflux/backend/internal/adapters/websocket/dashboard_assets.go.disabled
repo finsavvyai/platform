@@ -1,0 +1,1711 @@
+package websocket
+
+// getDashboardHTML returns the complete HTML for the monitoring dashboard
+func (d *RealtimeDashboard) getDashboardHTML() string {
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueryFlux Real-time Monitoring Dashboard</title>
+    <link rel="stylesheet" href="/dashboard.css">
+</head>
+<body>
+    <div class="dashboard">
+        <header class="dashboard-header">
+            <div class="header-left">
+                <h1>QueryFlux Monitoring</h1>
+                <div class="status-indicators">
+                    <div id="connection-status" class="status-indicator status-connecting">Connecting...</div>
+                    <div id="last-update" class="last-update">Never</div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="controls">
+                    <button id="pause-updates" class="btn btn-secondary">Pause</button>
+                    <button id="refresh-now" class="btn btn-primary">Refresh</button>
+                    <button id="fullscreen" class="btn btn-secondary">Fullscreen</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="dashboard-main">
+            <!-- System Overview Section -->
+            <section class="overview-section">
+                <h2>System Overview</h2>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <h3>CPU Usage</h3>
+                            <div class="metric-indicator" id="cpu-indicator"></div>
+                        </div>
+                        <div id="cpu-usage" class="metric-value">--%</div>
+                        <div class="metric-trend" id="cpu-trend"></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <h3>Memory Usage</h3>
+                            <div class="metric-indicator" id="memory-indicator"></div>
+                        </div>
+                        <div id="memory-usage" class="metric-value">--%</div>
+                        <div class="metric-trend" id="memory-trend"></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <h3>Active Connections</h3>
+                            <div class="metric-indicator" id="connections-indicator"></div>
+                        </div>
+                        <div id="connections" class="metric-value">--</div>
+                        <div class="metric-trend" id="connections-trend"></div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <h3>Queries/sec</h3>
+                            <div class="metric-indicator" id="queries-indicator"></div>
+                        </div>
+                        <div id="queries-per-sec" class="metric-value">--</div>
+                        <div class="metric-trend" id="queries-trend"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Charts Section -->
+            <section class="charts-section">
+                <div class="section-header">
+                    <h2>Performance Charts</h2>
+                    <div class="chart-controls">
+                        <select id="time-range" class="time-range-select">
+                            <option value="1h">Last Hour</option>
+                            <option value="6h">Last 6 Hours</option>
+                            <option value="24h" selected>Last 24 Hours</option>
+                            <option value="7d">Last 7 Days</option>
+                        </select>
+                        <button id="export-charts" class="btn btn-secondary">Export</button>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h3>System Metrics</h3>
+                        <div class="chart-controls-inline">
+                            <label>
+                                <input type="checkbox" id="show-cpu" checked> CPU
+                            </label>
+                            <label>
+                                <input type="checkbox" id="show-memory" checked> Memory
+                            </label>
+                        </div>
+                        <canvas id="system-chart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Database Performance</h3>
+                        <div class="chart-controls-inline">
+                            <label>
+                                <input type="checkbox" id="show-connections" checked> Connections
+                            </label>
+                            <label>
+                                <input type="checkbox" id="show-queries" checked> Queries/sec
+                            </label>
+                        </div>
+                        <canvas id="database-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Alert Section -->
+            <section class="alerts-section">
+                <div class="section-header">
+                    <h2>Active Alerts</h2>
+                    <div class="alert-controls">
+                        <span class="alert-count" id="alert-count">0 alerts</span>
+                        <button id="acknowledge-all" class="btn btn-secondary">Acknowledge All</button>
+                        <button id="silence-all" class="btn btn-secondary">Silence All</button>
+                    </div>
+                </div>
+                <div id="alerts-list" class="alerts-list">
+                    <div class="no-alerts">No active alerts</div>
+                </div>
+            </section>
+
+            <!-- Health Section -->
+            <section class="health-section">
+                <div class="section-header">
+                    <h2>System Health</h2>
+                    <div class="health-summary">
+                        <span id="overall-health" class="health-status status-healthy">All Systems Operational</span>
+                    </div>
+                </div>
+                <div id="health-checks" class="health-grid">
+                    <div class="health-item">
+                        <span class="health-label">Loading health checks...</span>
+                        <span class="health-status status-healthy">--</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/dashboard.js"></script>
+</body>
+</html>`
+}
+
+// getDashboardJS returns the complete JavaScript for the dashboard
+func (d *RealtimeDashboard) getDashboardJS() string {
+	return `class RealtimeMonitoringDashboard {
+    constructor() {
+        this.ws = null;
+        this.charts = {};
+        this.metrics = {};
+        this.alerts = [];
+        this.healthChecks = [];
+        this.isPaused = false;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.metricHistory = {};
+        this.maxHistoryPoints = 50;
+
+        this.init();
+    }
+
+    init() {
+        this.connectWebSocket();
+        this.initCharts();
+        this.setupEventListeners();
+        this.startPeriodicUpdates();
+    }
+
+    connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = ` + "`${protocol}//${window.location.host}/ws`" + `;
+
+        this.updateConnectionStatus('Connecting...');
+
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+            console.log('Connected to real-time monitoring dashboard');
+            this.updateConnectionStatus('Connected');
+            this.reconnectAttempts = 0;
+            this.subscribeToData();
+        };
+
+        this.ws.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                this.handleMessage(message);
+            } catch (error) {
+                console.error('Failed to parse WebSocket message:', error);
+            }
+        };
+
+        this.ws.onclose = () => {
+            console.log('Disconnected from monitoring dashboard');
+            this.updateConnectionStatus('Disconnected');
+            this.attemptReconnect();
+        };
+
+        this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.updateConnectionStatus('Error');
+        };
+    }
+
+    attemptReconnect() {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            this.updateConnectionStatus('Failed');
+            console.error('Max reconnection attempts reached');
+            return;
+        }
+
+        this.reconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+
+        console.log(` + "`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`" + `);
+        this.updateConnectionStatus(` + "`Reconnecting...`" + `);
+
+        setTimeout(() => this.connectWebSocket(), delay);
+    }
+
+    subscribeToData() {
+        // Subscribe to system metrics
+        this.send({
+            type: 'subscribe',
+            subscription_type: 'metrics',
+            interval: '5s',
+            filters: {
+                names: ['system_cpu_usage_percent', 'system_memory_usage_percent', 'database_connections_active', 'database_queries_per_second']
+            }
+        });
+
+        // Subscribe to alerts
+        this.send({
+            type: 'subscribe',
+            subscription_type: 'alerts',
+            filters: {
+                status: ['active']
+            }
+        });
+
+        // Get initial health checks
+        this.send({ type: 'get_health' });
+    }
+
+    handleMessage(message) {
+        switch (message.type) {
+            case 'metric':
+                this.updateMetric(message.data);
+                break;
+            case 'alert':
+                this.updateAlert(message.data);
+                break;
+            case 'initial_metrics':
+                this.setInitialMetrics(message.data.metrics);
+                break;
+            case 'initial_alerts':
+                this.setInitialAlerts(message.data.alerts);
+                break;
+            case 'initial_health':
+                this.updateHealthChecks(message.data.health_checks);
+                break;
+            case 'health_response':
+                this.updateHealthChecks(message.data.health_checks);
+                break;
+            case 'system_overview':
+                this.updateSystemOverview(message.data);
+                break;
+            case 'metrics_update':
+                this.updateMetrics(message.data.metrics);
+                break;
+            case 'subscription_confirmed':
+                console.log('Subscription confirmed:', message.data);
+                break;
+            case 'unsubscription_confirmed':
+                console.log('Unsubscription confirmed:', message.data);
+                break;
+            case 'error':
+                console.error('Dashboard error:', message.data.message);
+                this.showNotification(message.data.message, 'error');
+                break;
+        }
+
+        this.updateLastUpdateTime();
+    }
+
+    updateMetric(metric) {
+        this.metrics[metric.name] = metric.value;
+        this.addToMetricHistory(metric.name, metric.value);
+
+        switch (metric.name) {
+            case 'system_cpu_usage_percent':
+                this.updateCPUUsage(metric.value);
+                break;
+            case 'system_memory_usage_percent':
+                this.updateMemoryUsage(metric.value);
+                break;
+            case 'database_connections_active':
+                this.updateConnections(metric.value);
+                break;
+            case 'database_queries_per_second':
+                this.updateQueriesPerSecond(metric.value);
+                break;
+        }
+
+        this.updateCharts(metric);
+    }
+
+    updateAlert(alert) {
+        const existingIndex = this.alerts.findIndex(a => a.id === alert.id);
+        if (existingIndex >= 0) {
+            this.alerts[existingIndex] = alert;
+        } else {
+            this.alerts.push(alert);
+        }
+
+        this.renderAlerts();
+        this.updateAlertCount();
+    }
+
+    updateHealthChecks(healthChecks) {
+        this.healthChecks = healthChecks;
+        this.renderHealthChecks();
+        this.updateOverallHealth();
+    }
+
+    updateSystemOverview(overview) {
+        // Update system metrics from overview
+        if (overview.system) {
+            this.updateCPUUsage(overview.system.cpu_usage_percent);
+            this.updateMemoryUsage(overview.system.memory_usage_percent);
+        }
+
+        if (overview.database) {
+            this.updateConnections(overview.database.active_connections);
+            this.updateQueriesPerSecond(overview.database.queries_per_second);
+        }
+    }
+
+    updateMetrics(metrics) {
+        metrics.forEach(metric => this.updateMetric(metric));
+    }
+
+    setInitialMetrics(metrics) {
+        metrics.forEach(metric => {
+            this.metrics[metric.name] = metric.value;
+            this.addToMetricHistory(metric.name, metric.value);
+        });
+        this.updateAllMetricDisplays();
+    }
+
+    setInitialAlerts(alerts) {
+        this.alerts = alerts;
+        this.renderAlerts();
+        this.updateAlertCount();
+    }
+
+    addToMetricHistory(metricName, value) {
+        if (!this.metricHistory[metricName]) {
+            this.metricHistory[metricName] = [];
+        }
+
+        this.metricHistory[metricName].push({
+            value: value,
+            timestamp: Date.now()
+        });
+
+        // Keep only the last N points
+        if (this.metricHistory[metricName].length > this.maxHistoryPoints) {
+            this.metricHistory[metricName].shift();
+        }
+    }
+
+    // UI Update Methods
+    updateCPUUsage(value) {
+        const element = document.getElementById('cpu-usage');
+        element.textContent = value.toFixed(1) + '%';
+        this.updateMetricIndicator('cpu-indicator', value, 70, 90);
+        this.updateMetricTrend('cpu-trend', 'cpu_usage_percent');
+    }
+
+    updateMemoryUsage(value) {
+        const element = document.getElementById('memory-usage');
+        element.textContent = value.toFixed(1) + '%';
+        this.updateMetricIndicator('memory-indicator', value, 70, 90);
+        this.updateMetricTrend('memory-trend', 'memory_usage_percent');
+    }
+
+    updateConnections(value) {
+        const element = document.getElementById('connections');
+        element.textContent = Math.round(value);
+        this.updateMetricIndicator('connections-indicator', value, 80, 95);
+        this.updateMetricTrend('connections-trend', 'database_connections_active');
+    }
+
+    updateQueriesPerSecond(value) {
+        const element = document.getElementById('queries-per-sec');
+        element.textContent = value.toFixed(1);
+        this.updateMetricIndicator('queries-indicator', value, 100, 200);
+        this.updateMetricTrend('queries-trend', 'database_queries_per_second');
+    }
+
+    updateMetricIndicator(indicatorId, value, warningThreshold, criticalThreshold) {
+        const element = document.getElementById(indicatorId);
+        if (!element) return;
+
+        element.className = 'metric-indicator';
+        if (value >= criticalThreshold) {
+            element.classList.add('critical');
+        } else if (value >= warningThreshold) {
+            element.classList.add('warning');
+        } else {
+            element.classList.add('good');
+        }
+    }
+
+    updateMetricTrend(trendId, metricName) {
+        const element = document.getElementById(trendId);
+        if (!element) return;
+
+        const history = this.metricHistory[metricName];
+        if (!history || history.length < 2) {
+            element.textContent = '--';
+            return;
+        }
+
+        const recent = history.slice(-10);
+        const older = recent.slice(0, Math.floor(recent.length / 2));
+        const newer = recent.slice(Math.floor(recent.length / 2));
+
+        const olderAvg = older.reduce((sum, item) => sum + item.value, 0) / older.length;
+        const newerAvg = newer.reduce((sum, item) => sum + item.value, 0) / newer.length;
+
+        const change = ((newerAvg - olderAvg) / olderAvg) * 100;
+        const arrow = change > 0 ? '↑' : '↓';
+        const color = change > 0 ? '#e74c3c' : '#27ae60';
+
+        element.innerHTML = ` + "`<span style=\"color: ${color}\">${arrow}</span> ${Math.abs(change).toFixed(1)}%`" + `;
+    }
+
+    updateAllMetricDisplays() {
+        if (this.metrics['system_cpu_usage_percent'] !== undefined) {
+            this.updateCPUUsage(this.metrics['system_cpu_usage_percent']);
+        }
+        if (this.metrics['system_memory_usage_percent'] !== undefined) {
+            this.updateMemoryUsage(this.metrics['system_memory_usage_percent']);
+        }
+        if (this.metrics['database_connections_active'] !== undefined) {
+            this.updateConnections(this.metrics['database_connections_active']);
+        }
+        if (this.metrics['database_queries_per_second'] !== undefined) {
+            this.updateQueriesPerSecond(this.metrics['database_queries_per_second']);
+        }
+    }
+
+    renderAlerts() {
+        const container = document.getElementById('alerts-list');
+
+        if (this.alerts.length === 0) {
+            container.innerHTML = '<div class="no-alerts">No active alerts</div>';
+            return;
+        }
+
+        // Sort alerts by severity
+        const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'info': 4 };
+        const sortedAlerts = [...this.alerts].sort((a, b) =>
+            severityOrder[a.severity] - severityOrder[b.severity]
+        );
+
+        container.innerHTML = sortedAlerts.map(alert => ` + "`" + `
+            <div class="alert-item alert-` + "${alert.severity}" + `">
+                <div class="alert-header">
+                    <span class="alert-title">` + "${alert.name}" + `</span>
+                    <div class="alert-controls">
+                        <span class="alert-severity">` + "${alert.severity.toUpperCase()}" + `</span>
+                        <button class="btn btn-small" onclick="dashboard.acknowledgeAlert('` + "${alert.id}" + `')">Ack</button>
+                        <button class="btn btn-small" onclick="dashboard.silenceAlert('` + "${alert.id}" + `')">Silence</button>
+                    </div>
+                </div>
+                <div class="alert-description">` + "${alert.description}" + `</div>
+                ` + "${alert.current_value !== undefined ? `" + `
+                    <div class="alert-metric">Current: ` + "${alert.current_value}" + `</div>
+                ` + "` : ''}" + `
+                <div class="alert-time">` + "${new Date(alert.created_at || alert.createdAt).toLocaleString()}" + `</div>
+            </div>
+        ` + "`" + `).join('');
+    }
+
+    updateAlertCount() {
+        const element = document.getElementById('alert-count');
+        const count = this.alerts.length;
+        element.textContent = ` + "`${count} alert${count !== 1 ? 's' : ''}`" + `;
+
+        if (count > 0) {
+            element.classList.add('has-alerts');
+        } else {
+            element.classList.remove('has-alerts');
+        }
+    }
+
+    renderHealthChecks() {
+        const container = document.getElementById('health-checks');
+        container.innerHTML = '';
+
+        container.innerHTML = this.healthChecks.map(check => ` + "`" + `
+            <div class="health-item">
+                <span class="health-label">` + "${check.name}" + `</span>
+                <span class="health-status status-` + "${check.status}" + `">` + "${check.status.toUpperCase()}" + `</span>
+                ` + "${check.duration ? `" + `<span class="health-duration">` + "${check.duration}" + `ms</span>` + "` : ''}" + `
+            </div>
+        ` + "`" + `).join('');
+    }
+
+    updateOverallHealth() {
+        const element = document.getElementById('overall-health');
+        const hasUnhealthy = this.healthChecks.some(check => check.status === 'unhealthy');
+        const hasWarning = this.healthChecks.some(check => check.status === 'warning');
+
+        if (hasUnhealthy) {
+            element.textContent = 'System Issues Detected';
+            element.className = 'health-status status-unhealthy';
+        } else if (hasWarning) {
+            element.textContent = 'System Warnings';
+            element.className = 'health-status status-warning';
+        } else {
+            element.textContent = 'All Systems Operational';
+            element.className = 'health-status status-healthy';
+        }
+    }
+
+    updateConnectionStatus(status) {
+        const element = document.getElementById('connection-status');
+        element.textContent = status;
+        element.className = 'status-indicator';
+
+        switch (status.toLowerCase()) {
+            case 'connected':
+                element.classList.add('status-connected');
+                break;
+            case 'connecting':
+            case 'reconnecting...':
+                element.classList.add('status-connecting');
+                break;
+            case 'disconnected':
+                element.classList.add('status-disconnected');
+                break;
+            case 'error':
+            case 'failed':
+                element.classList.add('status-error');
+                break;
+        }
+    }
+
+    updateLastUpdateTime() {
+        const element = document.getElementById('last-update');
+        element.textContent = 'Last update: ' + new Date().toLocaleTimeString();
+    }
+
+    // Chart Management
+    initCharts() {
+        const systemCtx = document.getElementById('system-chart').getContext('2d');
+        this.charts.system = new Chart(systemCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'CPU Usage (%)',
+                        data: [],
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        tension: 0.4,
+                        pointRadius: 2
+                    },
+                    {
+                        label: 'Memory Usage (%)',
+                        data: [],
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        pointRadius: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    },
+                    x: {
+                        display: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            }
+        });
+
+        const databaseCtx = document.getElementById('database-chart').getContext('2d');
+        this.charts.database = new Chart(databaseCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Active Connections',
+                        data: [],
+                        borderColor: '#f39c12',
+                        backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                        tension: 0.4,
+                        pointRadius: 2
+                    },
+                    {
+                        label: 'Queries/sec',
+                        data: [],
+                        borderColor: '#27ae60',
+                        backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                        tension: 0.4,
+                        pointRadius: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    },
+                    x: {
+                        display: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
+            }
+        });
+    }
+
+    updateCharts(metric) {
+        const timestamp = new Date().toLocaleTimeString();
+
+        if (this.charts.system) {
+            let shouldUpdate = false;
+
+            if (metric.name === 'system_cpu_usage_percent' && document.getElementById('show-cpu').checked) {
+                const dataset = this.charts.system.data.datasets[0];
+                dataset.data.push(metric.value);
+                shouldUpdate = true;
+            } else if (metric.name === 'system_memory_usage_percent' && document.getElementById('show-memory').checked) {
+                const dataset = this.charts.system.data.datasets[1];
+                dataset.data.push(metric.value);
+                shouldUpdate = true;
+            }
+
+            if (shouldUpdate) {
+                this.updateChartTimeAxis(this.charts.system, timestamp);
+            }
+        }
+
+        if (this.charts.database) {
+            let shouldUpdate = false;
+
+            if (metric.name === 'database_connections_active' && document.getElementById('show-connections').checked) {
+                const dataset = this.charts.database.data.datasets[0];
+                dataset.data.push(metric.value);
+                shouldUpdate = true;
+            } else if (metric.name === 'database_queries_per_second' && document.getElementById('show-queries').checked) {
+                const dataset = this.charts.database.data.datasets[1];
+                dataset.data.push(metric.value);
+                shouldUpdate = true;
+            }
+
+            if (shouldUpdate) {
+                this.updateChartTimeAxis(this.charts.database, timestamp);
+            }
+        }
+    }
+
+    updateChartTimeAxis(chart, timestamp) {
+        chart.data.labels.push(timestamp);
+
+        // Keep only last 50 data points
+        if (chart.data.labels.length > 50) {
+            chart.data.labels.shift();
+            chart.data.datasets.forEach(dataset => dataset.data.shift());
+        }
+
+        chart.update('none');
+    }
+
+    // Event Listeners
+    setupEventListeners() {
+        // Control buttons
+        document.getElementById('pause-updates').addEventListener('click', () => this.togglePause());
+        document.getElementById('refresh-now').addEventListener('click', () => this.refreshData());
+        document.getElementById('fullscreen').addEventListener('click', () => this.toggleFullscreen());
+
+        // Chart controls
+        document.getElementById('time-range').addEventListener('change', () => this.handleTimeRangeChange());
+        document.getElementById('export-charts').addEventListener('click', () => this.exportCharts());
+
+        // Chart visibility toggles
+        document.getElementById('show-cpu').addEventListener('change', () => this.updateChartVisibility());
+        document.getElementById('show-memory').addEventListener('change', () => this.updateChartVisibility());
+        document.getElementById('show-connections').addEventListener('change', () => this.updateChartVisibility());
+        document.getElementById('show-queries').addEventListener('change', () => this.updateChartVisibility());
+
+        // Alert controls
+        document.getElementById('acknowledge-all').addEventListener('click', () => this.acknowledgeAllAlerts());
+        document.getElementById('silence-all').addEventListener('click', () => this.silenceAllAlerts());
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (event) => {
+            if (event.key === ' ' && event.ctrlKey) {
+                event.preventDefault();
+                this.togglePause();
+            } else if (event.key === 'r' && event.ctrlKey) {
+                event.preventDefault();
+                this.refreshData();
+            } else if (event.key === 'f' && event.ctrlKey) {
+                event.preventDefault();
+                this.toggleFullscreen();
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (this.charts.system) this.charts.system.resize();
+            if (this.charts.database) this.charts.database.resize();
+        });
+    }
+
+    togglePause() {
+        this.isPaused = !this.isPaused;
+        const button = document.getElementById('pause-updates');
+        button.textContent = this.isPaused ? 'Resume' : 'Pause';
+        button.className = this.isPaused ? 'btn btn-success' : 'btn btn-secondary';
+
+        if (this.isPaused) {
+            this.showNotification('Updates paused', 'info');
+        } else {
+            this.showNotification('Updates resumed', 'success');
+            this.refreshData();
+        }
+    }
+
+    refreshData() {
+        this.send({ type: 'get_health' });
+        this.send({ type: 'get_metrics', limit: 50 });
+        this.send({ type: 'get_alerts' });
+        this.showNotification('Data refreshed', 'success');
+    }
+
+    toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    }
+
+    handleTimeRangeChange() {
+        const timeRange = document.getElementById('time-range').value;
+        // This would typically trigger a different API call to get historical data
+        this.showNotification('Time range changed to ' + timeRange, 'info');
+    }
+
+    exportCharts() {
+        // Create a canvas export
+        const systemCanvas = document.getElementById('system-chart');
+        const databaseCanvas = document.getElementById('database-chart');
+
+        const systemImage = systemCanvas.toDataURL('image/png');
+        const databaseImage = databaseCanvas.toDataURL('image/png');
+
+        // Create download links
+        const systemLink = document.createElement('a');
+        systemLink.download = 'system-metrics.png';
+        systemLink.href = systemImage;
+        systemLink.click();
+
+        const databaseLink = document.createElement('a');
+        databaseLink.download = 'database-metrics.png';
+        databaseLink.href = databaseImage;
+        databaseLink.click();
+
+        this.showNotification('Charts exported successfully', 'success');
+    }
+
+    updateChartVisibility() {
+        if (this.charts.system) {
+            const showCpu = document.getElementById('show-cpu').checked;
+            const showMemory = document.getElementById('show-memory').checked;
+
+            this.charts.system.data.datasets[0].hidden = !showCpu;
+            this.charts.system.data.datasets[1].hidden = !showMemory;
+            this.charts.system.update();
+        }
+
+        if (this.charts.database) {
+            const showConnections = document.getElementById('show-connections').checked;
+            const showQueries = document.getElementById('show-queries').checked;
+
+            this.charts.database.data.datasets[0].hidden = !showConnections;
+            this.charts.database.data.datasets[1].hidden = !showQueries;
+            this.charts.database.update();
+        }
+    }
+
+    acknowledgeAllAlerts() {
+        // This would send acknowledge requests to the server
+        this.showNotification('All alerts acknowledged', 'success');
+    }
+
+    silenceAllAlerts() {
+        // This would send silence requests to the server
+        this.showNotification('All alerts silenced', 'success');
+    }
+
+    acknowledgeAlert(alertId) {
+        this.send({
+            type: 'acknowledge_alert',
+            alert_id: alertId,
+            user_id: 'dashboard_user'
+        });
+    }
+
+    silenceAlert(alertId) {
+        this.send({
+            type: 'silence_alert',
+            alert_id: alertId,
+            duration: '1h',
+            user_id: 'dashboard_user'
+        });
+    }
+
+    // Notification System
+    showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = 'notification notification-' + type;
+        notification.innerHTML = ` + "`" + `
+            <div class="notification-content">
+                <span class="notification-message">` + "${message}" + `</span>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        ` + "`" + `;
+
+        document.body.appendChild(notification);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+
+    // WebSocket Communication
+    send(message) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify(message));
+        } else {
+            console.warn('WebSocket not connected, cannot send message:', message);
+        }
+    }
+
+    // Periodic Updates
+    startPeriodicUpdates() {
+        setInterval(() => {
+            if (!this.isPaused) {
+                this.send({ type: 'get_health' });
+            }
+        }, 30000); // Check health every 30 seconds
+    }
+}
+
+// Initialize dashboard when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    window.dashboard = new RealtimeMonitoringDashboard();
+});`
+}
+
+// getDashboardCSS returns the complete CSS for the dashboard
+func (d *RealtimeDashboard) getDashboardCSS() string {
+	return `/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #333;
+    min-height: 100vh;
+}
+
+/* Dashboard Layout */
+.dashboard {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header Styles */
+.dashboard-header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dashboard-header h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #2c3e50;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.status-indicators {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.9rem;
+}
+
+.status-indicator {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    background: #f0f0f0;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.status-indicator.status-connected {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-indicator.status-connecting,
+.status-indicator.status-reconnecting {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.status-disconnected {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.status-indicator.status-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.last-update {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Button Styles */
+.btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+/* Main Content */
+.dashboard-main {
+    flex: 1;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Section Styles */
+section {
+    margin-bottom: 2rem;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.section-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+}
+
+/* Metrics Grid */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.metric-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.metric-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.metric-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.metric-header h3 {
+    font-size: 0.9rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.metric-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #6c757d;
+}
+
+.metric-indicator.good {
+    background: #28a745;
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+}
+
+.metric-indicator.warning {
+    background: #ffc107;
+    box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+}
+
+.metric-indicator.critical {
+    background: #dc3545;
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+    animation: pulse 2s infinite;
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.metric-trend {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+/* Charts Section */
+.charts-section .section-header {
+    margin-bottom: 1rem;
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 2rem;
+}
+
+.chart-container {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.chart-container h3 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.chart-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.chart-controls-inline {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.chart-controls-inline label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.time-range-select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    font-size: 0.875rem;
+}
+
+canvas {
+    max-height: 300px;
+}
+
+/* Alerts Section */
+.alert-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.alert-count {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    background: #6c757d;
+    color: white;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.alert-count.has-alerts {
+    background: #dc3545;
+}
+
+.alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.no-alerts {
+    text-align: center;
+    padding: 2rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-style: italic;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    backdrop-filter: blur(5px);
+}
+
+.alert-item {
+    padding: 1.5rem;
+    border-radius: 12px;
+    border-left: 4px solid;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.alert-item:hover {
+    transform: translateX(5px);
+}
+
+.alert-critical {
+    border-color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.alert-high {
+    border-color: #fd7e14;
+    background: rgba(253, 126, 20, 0.1);
+}
+
+.alert-medium {
+    border-color: #ffc107;
+    background: rgba(255, 193, 7, 0.1);
+}
+
+.alert-low {
+    border-color: #28a745;
+    background: rgba(40, 167, 69, 0.1);
+}
+
+.alert-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.alert-title {
+    font-weight: 600;
+    color: #2c3e50;
+    flex: 1;
+    margin-right: 1rem;
+}
+
+.alert-controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.alert-severity {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-right: 0.5rem;
+}
+
+.alert-critical .alert-severity {
+    background: #dc3545;
+    color: white;
+}
+
+.alert-high .alert-severity {
+    background: #fd7e14;
+    color: white;
+}
+
+.alert-medium .alert-severity {
+    background: #ffc107;
+    color: #212529;
+}
+
+.alert-low .alert-severity {
+    background: #28a745;
+    color: white;
+}
+
+.alert-description {
+    color: #4a5568;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.alert-metric {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.alert-time {
+    font-size: 0.8rem;
+    color: #718096;
+}
+
+/* Health Section */
+.health-summary {
+    display: flex;
+    align-items: center;
+}
+
+.health-status {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.health-status.status-healthy {
+    background: #d4edda;
+    color: #155724;
+}
+
+.health-status.status-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.health-status.status-unhealthy {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.health-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.health-label {
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.health-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.health-status.status-healthy {
+    background: #d4edda;
+    color: #155724;
+}
+
+.health-status.status-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.health-status.status-unhealthy {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.health-duration {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-left: 0.5rem;
+}
+
+/* Notifications */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    min-width: 300px;
+    z-index: 1000;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideIn 0.3s ease-out;
+}
+
+.notification-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+}
+
+.notification-message {
+    flex: 1;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    color: inherit;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.notification-close:hover {
+    opacity: 1;
+}
+
+.notification-info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border-left: 4px solid #0c5460;
+}
+
+.notification-success {
+    background: #d4edda;
+    color: #155724;
+    border-left: 4px solid #155724;
+}
+
+.notification-warning {
+    background: #fff3cd;
+    color: #856404;
+    border-left: 4px solid #856404;
+}
+
+.notification-error {
+    background: #f8d7da;
+    color: #721c24;
+    border-left: 4px solid #721c24;
+}
+
+/* Animations */
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .dashboard-main {
+        padding: 1.5rem;
+    }
+
+    .metrics-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        padding: 1rem;
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .header-left,
+    .header-right {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    .controls {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .section-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .metrics-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+
+    .metric-value {
+        font-size: 2rem;
+    }
+
+    .chart-container canvas {
+        max-height: 250px;
+    }
+
+    .alert-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .alert-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .health-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-main {
+        padding: 1rem;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-card {
+        padding: 1rem;
+    }
+
+    .metric-value {
+        font-size: 1.8rem;
+    }
+
+    .chart-container {
+        padding: 1rem;
+    }
+
+    .chart-container canvas {
+        max-height: 200px;
+    }
+
+    .alert-item {
+        padding: 1rem;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    body {
+        background: linear-gradient(135deg, #1a202c, #2d3748);
+    }
+
+    .dashboard-header {
+        background: rgba(26, 32, 44, 0.95);
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .dashboard-header h1 {
+        color: #e2e8f0;
+    }
+
+    .metric-card,
+    .chart-container,
+    .alert-item,
+    .health-item {
+        background: rgba(26, 32, 44, 0.95);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .metric-header h3 {
+        color: #a0aec0;
+    }
+
+    .metric-value {
+        color: #e2e8f0;
+    }
+
+    .chart-container h3 {
+        color: #e2e8f0;
+    }
+
+    .alert-title {
+        color: #e2e8f0;
+    }
+
+    .alert-description {
+        color: #cbd5e0;
+    }
+
+    .health-label {
+        color: #cbd5e0;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+
+    .time-range-select {
+        background: #2d3748;
+        color: #e2e8f0;
+        border-color: #4a5568;
+    }
+}
+
+/* Print styles */
+@media print {
+    .controls,
+    .alert-controls,
+    .chart-controls {
+        display: none;
+    }
+
+    .dashboard-header {
+        background: white;
+        color: black;
+    }
+
+    .metric-card,
+    .chart-container,
+    .alert-item,
+    .health-item {
+        background: white;
+        border: 1px solid #ddd;
+        break-inside: avoid;
+    }
+
+    .metric-value {
+        color: black;
+    }
+}`
+}

@@ -1,0 +1,535 @@
+# =============================================================================
+# SDLC.ai Platform - Monitoring and Observability Configuration
+# =============================================================================
+# This configuration defines monitoring, alerting, and observability setup
+# for all Cloudflare services in the SDLC.ai platform
+# =============================================================================
+
+# =============================================================================
+# MONITORING OVERVIEW
+# =============================================================================
+monitoring:
+  platform: "SDLC.ai"
+  version: "1.0.0"
+  environments:
+    - name: "development"
+      retention_days: 7
+      alerting_enabled: false
+    - name: "staging"
+      retention_days: 30
+      alerting_enabled: true
+    - name: "production"
+      retention_days: 365
+      alerting_enabled: true
+
+# =============================================================================
+# SERVICE MONITORING CONFIGURATION
+# =============================================================================
+services:
+  gateway:
+    name: "API Gateway Service"
+    description: "Authentication, rate limiting, request routing"
+    metrics:
+      - name: "request_count"
+        type: "counter"
+        description: "Total number of requests"
+        labels: ["method", "path", "status", "tenant_id"]
+      - name: "request_duration"
+        type: "histogram"
+        description: "Request processing time"
+        buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+        labels: ["method", "path", "status"]
+      - name: "authentication_failures"
+        type: "counter"
+        description: "Failed authentication attempts"
+        labels: ["failure_type", "ip_address"]
+      - name: "rate_limit_hits"
+        type: "counter"
+        description: "Rate limit violations"
+        labels: ["tenant_id", "limit_type"]
+
+    alerts:
+      - name: "high_error_rate"
+        condition: "error_rate > 0.01"
+        duration: "5m"
+        severity: "critical"
+        description: "Error rate exceeds 1%"
+      - name: "high_latency"
+        condition: "p95_latency > 2s"
+        duration: "10m"
+        severity: "warning"
+        description: "95th percentile latency exceeds 2 seconds"
+      - name: "authentication_failure_spike"
+        condition: "auth_failure_rate > 0.05"
+        duration: "2m"
+        severity: "critical"
+        description: "Authentication failure rate exceeds 5%"
+
+  rag:
+    name: "RAG Service"
+    description: "Document processing, retrieval, generation"
+    metrics:
+      - name: "document_processing_time"
+        type: "histogram"
+        description: "Time to process documents"
+        buckets: [1.0, 5.0, 10.0, 30.0, 60.0, 300.0, 600.0]
+        labels: ["document_type", "processing_stage"]
+      - name: "embedding_generation_time"
+        type: "histogram"
+        description: "Time to generate embeddings"
+        buckets: [0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+        labels: ["model", "text_length"]
+      - name: "retrieval_quality"
+        type: "gauge"
+        description: "Retrieval quality score"
+        labels: ["query_type", "embedding_model"]
+      - name: "queue_backlog"
+        type: "gauge"
+        description: "Number of items in processing queue"
+        labels: ["queue_name"]
+
+    alerts:
+      - name: "processing_backlog"
+        condition: "queue_backlog > 1000"
+        duration: "15m"
+        severity: "warning"
+        description: "Document processing queue backlog exceeds 1000 items"
+      - name: "slow_document_processing"
+        condition: "avg_processing_time > 300s"
+        duration: "10m"
+        severity: "warning"
+        description: "Average document processing time exceeds 5 minutes"
+      - name: "embedding_service_down"
+        condition: "embedding_errors > 0.1"
+        duration: "2m"
+        severity: "critical"
+        description: "Embedding service error rate exceeds 10%"
+
+  vector:
+    name: "Vector Service"
+    description: "Embeddings, semantic search, vector operations"
+    metrics:
+      - name: "vector_search_latency"
+        type: "histogram"
+        description: "Vector search query time"
+        buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0]
+        labels: ["index_name", "query_type"]
+      - name: "vector_index_size"
+        type: "gauge"
+        description: "Number of vectors in index"
+        labels: ["index_name"]
+      - name: "embedding_cache_hit_rate"
+        type: "gauge"
+        description: "Embedding cache hit rate"
+        labels: ["cache_type"]
+      - name: "similarity_search_accuracy"
+        type: "gauge"
+        description: "Accuracy of similarity search results"
+        labels: ["index_name", "search_type"]
+
+    alerts:
+      - name: "high_search_latency"
+        condition: "p95_search_latency > 1s"
+        duration: "10m"
+        severity: "warning"
+        description: "95th percentile search latency exceeds 1 second"
+      - name: "low_cache_hit_rate"
+        condition: "cache_hit_rate < 0.7"
+        duration: "30m"
+        severity: "warning"
+        description: "Cache hit rate below 70%"
+      - name: "vector_index_unavailable"
+        condition: "index_availability < 0.99"
+        duration: "2m"
+        severity: "critical"
+        description: "Vector index availability below 99%"
+
+  policy:
+    name: "Policy Service"
+    description: "DLP, compliance, policy enforcement"
+    metrics:
+      - name: "dlp_scan_duration"
+        type: "histogram"
+        description: "Time to scan content for policy violations"
+        buckets: [0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+        labels: ["content_type", "scan_type"]
+      - name: "policy_violations"
+        type: "counter"
+        description: "Number of policy violations detected"
+        labels: ["violation_type", "severity", "tenant_id"]
+      - name: "compliance_score"
+        type: "gauge"
+        description: "Overall compliance score"
+        labels: ["compliance_standard", "tenant_id"]
+
+    alerts:
+      - name: "policy_enforcement_failure"
+        condition: "policy_failure_rate > 0.05"
+        duration: "5m"
+        severity: "critical"
+        description: "Policy enforcement failure rate exceeds 5%"
+      - name: "critical_policy_violation"
+        condition: "critical_violations > 0"
+        duration: "1m"
+        severity: "critical"
+        description: "Critical policy violation detected"
+      - name: "low_compliance_score"
+        condition: "compliance_score < 0.8"
+        duration: "1h"
+        severity: "warning"
+        description: "Compliance score below 80%"
+
+# =============================================================================
+# INFRASTRUCTURE MONITORING
+# =============================================================================
+infrastructure:
+  cloudflare_workers:
+    metrics:
+      - name: "worker_invocations"
+        type: "counter"
+        description: "Number of worker invocations"
+        labels: ["worker_name", "environment"]
+      - name: "worker_cpu_time"
+        type: "histogram"
+        description: "CPU time per worker invocation"
+        buckets: [1, 5, 10, 25, 50, 100, 250, 500]
+        labels: ["worker_name"]
+      - name: "worker_memory_usage"
+        type: "gauge"
+        description: "Memory usage percentage"
+        labels: ["worker_name"]
+      - name: "worker_errors"
+        type: "counter"
+        description: "Worker invocation errors"
+        labels: ["worker_name", "error_type"]
+
+    alerts:
+      - name: "worker_high_cpu_usage"
+        condition: "cpu_usage > 80%"
+        duration: "10m"
+        severity: "warning"
+        description: "Worker CPU usage exceeds 80%"
+      - name: "worker_high_memory_usage"
+        condition: "memory_usage > 80%"
+        duration: "10m"
+        severity: "warning"
+        description: "Worker memory usage exceeds 80%"
+      - name: "worker_error_spike"
+        condition: "error_rate > 0.05"
+        duration: "5m"
+        severity: "critical"
+        description: "Worker error rate exceeds 5%"
+
+  d1_databases:
+    metrics:
+      - name: "database_query_duration"
+        type: "histogram"
+        description: "Database query execution time"
+        buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5]
+        labels: ["database_name", "query_type"]
+      - name: "database_connection_pool"
+        type: "gauge"
+        description: "Database connection pool usage"
+        labels: ["database_name"]
+      - name: "database_errors"
+        type: "counter"
+        description: "Database query errors"
+        labels: ["database_name", "error_type"]
+
+    alerts:
+      - name: "database_slow_queries"
+        condition: "p95_query_time > 100ms"
+        duration: "15m"
+        severity: "warning"
+        description: "95th percentile query time exceeds 100ms"
+      - name: "database_connection_exhaustion"
+        condition: "connection_pool_usage > 90%"
+        duration: "5m"
+        severity: "critical"
+        description: "Database connection pool nearly exhausted"
+
+  kv_namespaces:
+    metrics:
+      - name: "kv_read_latency"
+        type: "histogram"
+        description: "KV read operation latency"
+        buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1]
+        labels: ["namespace_name"]
+      - name: "kv_write_latency"
+        type: "histogram"
+        description: "KV write operation latency"
+        buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1]
+        labels: ["namespace_name"]
+      - name: "kv_cache_hit_rate"
+        type: "gauge"
+        description: "KV cache hit rate"
+        labels: ["namespace_name"]
+
+    alerts:
+      - name: "kv_high_latency"
+        condition: "p95_read_latency > 50ms"
+        duration: "10m"
+        severity: "warning"
+        description: "KV read latency exceeds 50ms"
+
+  r2_storage:
+    metrics:
+      - name: "storage_usage_bytes"
+        type: "gauge"
+        description: "Storage usage in bytes"
+        labels: ["bucket_name"]
+      - name: "storage_request_count"
+        type: "counter"
+        description: "Number of storage requests"
+        labels: ["bucket_name", "operation_type"]
+      - name: "storage_latency"
+        type: "histogram"
+        description: "Storage operation latency"
+        buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+        labels: ["bucket_name", "operation_type"]
+
+    alerts:
+      - name: "storage_usage_high"
+        condition: "storage_usage_percentage > 80%"
+        duration: "1h"
+        severity: "warning"
+        description: "Storage usage exceeds 80%"
+      - name: "storage_high_latency"
+        condition: "p95_latency > 500ms"
+        duration: "15m"
+        severity: "warning"
+        description: "Storage operation latency exceeds 500ms"
+
+# =============================================================================
+# BUSINESS METRICS
+# =============================================================================
+business_metrics:
+  user_engagement:
+    - name: "active_users"
+      type: "gauge"
+      description: "Number of active users"
+      labels: ["tenant_id", "user_role"]
+    - name: "document_uploads"
+      type: "counter"
+      description: "Number of document uploads"
+      labels: ["tenant_id", "document_type"]
+    - name: "search_queries"
+      type: "counter"
+      description: "Number of search queries"
+      labels: ["tenant_id", "query_type"]
+
+  platform_health:
+    - name: "tenant_satisfaction_score"
+      type: "gauge"
+      description: "Tenant satisfaction score"
+      labels: ["tenant_id"]
+    - name: "api_adoption_rate"
+      type: "gauge"
+      description: "API adoption rate by tenants"
+      labels: ["tenant_id", "api_endpoint"]
+
+  cost_tracking:
+    - name: "api_cost_per_request"
+      type: "gauge"
+      description: "Cost per API request"
+      labels: ["api_endpoint", "model"]
+    - name: "storage_cost_per_tenant"
+      type: "gauge"
+      description: "Storage cost per tenant"
+      labels: ["tenant_id"]
+    - name: "llm_token_usage"
+      type: "counter"
+      description: "LLM token usage"
+      labels: ["model", "tenant_id", "operation_type"]
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+logging:
+  levels:
+    development: "debug"
+    staging: "info"
+    production: "warn"
+
+  formats:
+    json:
+      enabled: true
+      fields: ["timestamp", "level", "service", "message", "trace_id", "tenant_id", "user_id"]
+    console:
+      enabled: true
+      colors: true
+
+  destinations:
+    sentry:
+      enabled: true
+      environments: ["staging", "production"]
+      dsn: "${SENTRY_DSN}"
+      environment: "${ENVIRONMENT}"
+
+    logtail:
+      enabled: true
+      environments: ["production"]
+      token: "${LOGTAIL_TOKEN}"
+
+    cloudflare_analytics:
+      enabled: true
+      environments: ["staging", "production"]
+
+  retention:
+    development: 7  # days
+    staging: 30     # days
+    production: 365 # days
+
+# =============================================================================
+# DASHBOARD CONFIGURATION
+# =============================================================================
+dashboards:
+  platform_overview:
+    title: "SDLC.ai Platform Overview"
+    description: "High-level platform metrics and health"
+    panels:
+      - title: "Request Rate"
+        metrics: ["request_count"]
+        type: "time_series"
+      - title: "Error Rate"
+        metrics: ["error_rate"]
+        type: "single_stat"
+      - title: "Active Users"
+        metrics: ["active_users"]
+        type: "time_series"
+      - title: "System Health"
+        metrics: ["service_availability"]
+        type: "status"
+
+  service_performance:
+    title: "Service Performance"
+    description: "Detailed performance metrics for each service"
+    panels:
+      - title: "Gateway Latency"
+        metrics: ["request_duration"]
+        type: "histogram"
+      - title: "Document Processing Time"
+        metrics: ["document_processing_time"]
+        type: "histogram"
+      - title: "Vector Search Latency"
+        metrics: ["vector_search_latency"]
+        type: "histogram"
+      - title: "Policy Scan Duration"
+        metrics: ["dlp_scan_duration"]
+        type: "histogram"
+
+  infrastructure_health:
+    title: "Infrastructure Health"
+    description: "Infrastructure and resource utilization"
+    panels:
+      - title: "Worker CPU Usage"
+        metrics: ["worker_cpu_time"]
+        type: "time_series"
+      - title: "Database Performance"
+        metrics: ["database_query_duration"]
+        type: "histogram"
+      - title: "Storage Usage"
+        metrics: ["storage_usage_bytes"]
+        type: "time_series"
+      - title: "Cache Performance"
+        metrics: ["kv_cache_hit_rate", "embedding_cache_hit_rate"]
+        type: "time_series"
+
+# =============================================================================
+# ALERT ROUTING CONFIGURATION
+# =============================================================================
+alert_routing:
+  channels:
+    slack:
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#alerts"
+      environments: ["staging", "production"]
+
+    email:
+      smtp_server: "${SMTP_SERVER}"
+      from: "alerts@sdlc.ai"
+      to: ["devops@sdlc.ai", "oncall@sdlc.ai"]
+      environments: ["production"]
+
+    pagerduty:
+      integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+      severity_mapping:
+        critical: "critical"
+        warning: "warning"
+        info: "info"
+      environments: ["production"]
+
+  escalation_policies:
+    critical:
+      - immediate: "pagerduty"
+      - 5min: "phone_call"
+      - 15min: "slack"
+
+    warning:
+      - immediate: "slack"
+      - 30min: "email"
+
+    info:
+      - immediate: "slack"
+
+# =============================================================================
+# MONITORING BEST PRACTICES
+# =============================================================================
+best_practices:
+  sampling:
+    development: 1.0      # 100% sampling
+    staging: 0.1          # 10% sampling
+    production: 0.01      # 1% sampling
+
+  alert_squelching:
+    maintenance_windows: true
+    business_hours_only: ["low_priority_alerts"]
+
+  metric_retention:
+    raw_metrics: "30 days"
+    aggregated_metrics: "1 year"
+
+  dashboard_refresh:
+    overview_dashboards: "30 seconds"
+    detailed_dashboards: "1 minute"
+    historical_dashboards: "5 minutes"
+
+# =============================================================================
+# COMPLIANCE AND SECURITY MONITORING
+# =============================================================================
+compliance_monitoring:
+  gdpr:
+    metrics:
+      - name: "data_access_requests"
+        type: "counter"
+        description: "GDPR data access requests"
+      - name: "data_deletion_requests"
+        type: "counter"
+        description: "GDPR data deletion requests"
+      - name: "consent_management"
+        type: "gauge"
+        description: "User consent compliance status"
+
+  security:
+    metrics:
+      - name: "failed_login_attempts"
+        type: "counter"
+        description: "Failed authentication attempts"
+      - name: "suspicious_activities"
+        type: "counter"
+        description: "Suspicious user activities"
+      - name: "data_breach_incidents"
+        type: "counter"
+        description: "Data breach incidents"
+
+    alerts:
+      - name: "brute_force_attack"
+        condition: "failed_login_rate > 10/min"
+        duration: "2m"
+        severity: "critical"
+        description: "Potential brute force attack detected"
+      - name: "unusual_data_access"
+        condition: "data_access_pattern_anomaly"
+        duration: "5m"
+        severity: "warning"
+        description: "Unusual data access pattern detected"

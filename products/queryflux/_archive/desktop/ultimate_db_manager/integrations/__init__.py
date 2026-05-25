@@ -1,0 +1,1 @@
+# Enterprise integrations for Ultimate Database Manager

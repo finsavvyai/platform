@@ -1,0 +1,215 @@
+version: '3.8'
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: queryflux-postgres-test
+    environment:
+      POSTGRES_DB: queryflux_test
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./tests/fixtures/postgres:/docker-entrypoint-initdb.d
+    networks:
+      - queryflux-test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d queryflux_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: queryflux-mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: queryflux_test
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./tests/fixtures/mysql:/docker-entrypoint-initdb.d
+    networks:
+      - queryflux-test
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "testuser", "-ptestpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB
+  mongodb:
+    image: mongo:6.0
+    container_name: queryflux-mongodb-test
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: testuser
+      MONGO_INITDB_ROOT_PASSWORD: testpass
+      MONGO_INITDB_DATABASE: queryflux_test
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./tests/fixtures/mongodb:/docker-entrypoint-initdb.d
+    networks:
+      - queryflux-test
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: queryflux-redis-test
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./tests/fixtures/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - queryflux-test
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MariaDB
+  mariadb:
+    image: mariadb:10.11
+    container_name: queryflux-mariadb-test
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: queryflux_test
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpass
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./tests/fixtures/mariadb:/docker-entrypoint-initdb.d
+    networks:
+      - queryflux-test
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "testuser", "-ptestpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # TimescaleDB
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: queryflux-timescaledb-test
+    environment:
+      POSTGRES_DB: queryflux_test
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5434:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./tests/fixtures/timescaledb:/docker-entrypoint-initdb.d
+    networks:
+      - queryflux-test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d queryflux_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: queryflux-elasticsearch-test
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - queryflux-test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # InfluxDB
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: queryflux-influxdb-test
+    environment:
+      INFLUXDB_DB: queryflux_test
+      INFLUXDB_ADMIN_USER: testuser
+      INFLUXDB_ADMIN_PASSWORD: testpass
+      INFLUXDB_USER: testuser
+      INFLUXDB_USER_PASSWORD: testpass
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - queryflux-test
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Neo4j
+  neo4j:
+    image: neo4j:5.9-community
+    container_name: queryflux-neo4j-test
+    environment:
+      NEO4J_AUTH: neo4j/testpass
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+      - neo4j_plugins:/plugins
+    networks:
+      - queryflux-test
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "testpass", "RETURN 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  mysql_data:
+  mongodb_data:
+  redis_data:
+  mariadb_data:
+  timescaledb_data:
+  elasticsearch_data:
+  influxdb_data:
+  influxdb_config:
+  neo4j_data:
+  neo4j_logs:
+  neo4j_import:
+  neo4j_plugins:
+
+networks:
+  queryflux-test:
+    driver: bridge

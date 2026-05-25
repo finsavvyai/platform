@@ -1,0 +1,36 @@
+{
+  "alerts": [
+    {
+      "name": "Service Down",
+      "condition": "up == 0",
+      "severity": "critical",
+      "notification": {
+        "type": "pagerduty",
+        "service_key": "${PAGERDUTY_SERVICE_KEY}",
+        "escalation_policy": "production"
+      }
+    },
+    {
+      "name": "High Error Rate",
+      "condition": "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) > 0.05",
+      "severity": "critical",
+      "for": "2m",
+      "notification": {
+        "type": "pagerduty",
+        "service_key": "${PAGERDUTY_SERVICE_KEY}",
+        "escalation_policy": "production"
+      }
+    },
+    {
+      "name": "High Response Time",
+      "condition": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5",
+      "severity": "warning",
+      "for": "5m",
+      "notification": {
+        "type": "pagerduty",
+        "service_key": "${PAGERDUTY_SERVICE_KEY}",
+        "escalation_policy": "standard"
+      }
+    }
+  ]
+}

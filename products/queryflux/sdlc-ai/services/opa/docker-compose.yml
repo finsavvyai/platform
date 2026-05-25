@@ -1,0 +1,166 @@
+version: '3.8'
+
+services:
+  # OPA Server
+  opa:
+    image: openpolicyagent/opa:latest-edge
+    container_name: sdlc-opa
+    ports:
+      - "8181:8181"
+    command:
+      - "run"
+      - "--server"
+      - "--log-level=info"
+      - "--log-format=json"
+      - "--set=decision_logs.console=true"
+      - "--set=services.sdlc.url=http://bundle-server:8080"
+      - "--set=bundles.sdlc.service=sdlc"
+      - "--set=bundles.sdlc.resource=bundles/sdlc.tar.gz"
+      - "--set=plugins.envoy_ext_authz_grpc.addr=:9191"
+      - "--set=plugins.envoy_ext_authz_grpc.path=envoy/authz/allow"
+      - "--set=plugins.decision_logs.console=true"
+      - "--set=plugins.decision_logs.service=decision-logs"
+      - "--set=plugins.decision_logs.resource=logs/decisions"
+      - "/policies"
+    volumes:
+      - ./policies:/policies
+      - ./bundles:/bundles
+    environment:
+      - OPA_LOG_LEVEL=info
+      - OPA_LOG_FORMAT=json
+    networks:
+      - opa-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Bundle Server for serving policy bundles
+  bundle-server:
+    image: nginx:alpine
+    container_name: sdlc-bundle-server
+    ports:
+      - "8080:80"
+    volumes:
+      - ./bundles:/usr/share/nginx/html/bundles
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    networks:
+      - opa-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for decision caching
+  redis:
+    image: redis:7-alpine
+    container_name: sdlc-redis-opa
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - opa-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Decision Logs Service
+  decision-logs:
+    build:
+      context: ./decision-logs
+      dockerfile: Dockerfile
+    container_name: sdlc-decision-logs
+    ports:
+      - "9000:9000"
+    environment:
+      - DATABASE_URL=postgresql://sdlc:password@postgres:5432/sdlc
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - opa-network
+    restart: unless-stopped
+
+  # PostgreSQL for persistent data
+  postgres:
+    image: postgres:15-alpine
+    container_name: sdlc-postgres-opa
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=sdlc
+      - POSTGRES_USER=sdlc
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - opa-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sdlc -d sdlc"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # OPA Management API
+  opa-manager:
+    build:
+      context: ./opa-manager
+      dockerfile: Dockerfile
+    container_name: sdlc-opa-manager
+    ports:
+      - "8081:8080"
+    environment:
+      - OPA_URL=http://opa:8181
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://sdlc:password@postgres:5432/sdlc
+    depends_on:
+      - opa
+      - redis
+      - postgres
+    networks:
+      - opa-network
+    restart: unless-stopped
+    volumes:
+      - ./policies:/app/policies
+      - ./bundles:/app/bundles
+
+  # Policy Testing Service
+  policy-tester:
+    build:
+      context: ./policy-tester
+      dockerfile: Dockerfile
+    container_name: sdlc-policy-tester
+    ports:
+      - "8082:8080"
+    environment:
+      - OPA_URL=http://opa:8181
+      - DATABASE_URL=postgresql://sdlc:password@postgres:5432/sdlc
+    depends_on:
+      - opa
+      - postgres
+    networks:
+      - opa-network
+    volumes:
+      - ./test-cases:/app/test-cases
+
+volumes:
+  redis-data:
+  postgres-data:
+
+networks:
+  opa-network:
+    driver: bridge

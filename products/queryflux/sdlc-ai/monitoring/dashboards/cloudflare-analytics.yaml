@@ -1,0 +1,44 @@
+# Cloudflare Analytics Dashboard Configuration
+analytics:
+  datasets:
+    - name: "http_requests"
+      query: |
+        SELECT
+          count(*) as requests,
+          histogram(response.status_code) as status_distribution
+        FROM http_requests
+        WHERE timestamp >= NOW() - 1 HOUR
+        GROUP BY endpoint
+
+    - name: "worker_performance"
+      query: |
+        SELECT
+          avg(worker.cpuTime) as avg_cpu_time,
+          max(worker.cpuTime) as max_cpu_time,
+          histogram(worker.cpuTime) as cpu_distribution
+        FROM worker_events
+        WHERE timestamp >= NOW() - 1 HOUR
+
+    - name: "edge_functions"
+      query: |
+        SELECT
+          functionName,
+          count(*) as invocations,
+          avg(duration) as avg_duration,
+          histogram(status) as status_distribution
+        FROM edge_functions
+        WHERE timestamp >= NOW() - 1 HOUR
+        GROUP BY functionName
+
+alerts:
+  - name: "high_error_rate"
+    type: "threshold"
+    metric: "error_rate"
+    condition: "> 5%"
+    duration: "5m"
+
+  - name: "high_response_time"
+    type: "threshold"
+    metric: "p95_response_time"
+    condition: "> 1000ms"
+    duration: "5m"

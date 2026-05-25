@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # Development environment
+  admin-ui-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: base
+    container_name: sdlc-admin-ui-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=dev-secret-key
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/sdlc_dev
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - postgres
+      - redis
+    command: npm run dev
+    networks:
+      - sdlc-network
+
+  # Database for development
+  postgres:
+    image: postgres:15-alpine
+    container_name: sdlc-postgres
+    environment:
+      - POSTGRES_DB=sdlc_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - sdlc-network
+
+  # Redis for sessions and caching
+  redis:
+    image: redis:7-alpine
+    container_name: sdlc-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sdlc-network
+
+  # Storybook for component development
+  storybook:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: base
+    container_name: sdlc-storybook
+    ports:
+      - "6006:6006"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run storybook
+    depends_on:
+      - admin-ui-dev
+    networks:
+      - sdlc-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  sdlc-network:
+    driver: bridge

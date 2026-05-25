@@ -1,0 +1,100 @@
+name = "sdlc-gateway"
+main = "services/gateway-worker/src/index.ts"
+compatibility_date = "2024-01-01"
+node_compat = true
+
+# Account Configuration
+account_id = "" # Add your Cloudflare account ID
+
+# Workers Configuration
+workers_dev = true
+route = ""
+zone_id = ""
+
+# D1 Database Bindings
+[[d1_databases]]
+binding = "DB"
+database_name = "sdlc-production"
+database_id = "" # Add your D1 database ID
+
+# R2 Bucket Bindings
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "sdlc-documents"
+
+[[r2_buckets]]
+binding = "EMBEDDINGS"
+bucket_name = "sdlc-embeddings"
+
+[[r2_buckets]]
+binding = "AUDIT_LOGS"
+bucket_name = "sdlc-audit-logs"
+
+# KV Namespace Bindings
+[[kv_namespaces]]
+binding = "CACHE"
+id = "" # Add your KV namespace ID
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "" # Add your KV namespace ID
+
+[[kv_namespaces]]
+binding = "RATE_LIMITS"
+id = "" # Add your KV namespace ID
+
+# Vectorize Binding
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "sdlc-embeddings"
+
+# Queue Bindings
+[[queues.producers]]
+binding = "PROCESSING_QUEUE"
+queue = "sdlc-processing-queue"
+
+[[queues.consumers]]
+queue = "sdlc-processing-queue"
+max_batch_size = 10
+max_batch_timeout = 30
+
+# Environment Variables
+[vars]
+ENVIRONMENT = "production"
+LOG_LEVEL = "info"
+
+# Secrets (set via: wrangler secret put <NAME>)
+# OPENAI_API_KEY
+# ANTHROPIC_API_KEY
+# JWT_SECRET
+
+# Build Configuration
+[build]
+command = "npm run build"
+
+[build.upload]
+format = "service-worker"
+
+# Limits
+[limits]
+cpu_ms = 50
+
+# Observability
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+# Development
+[env.development]
+name = "sdlc-gateway-dev"
+vars = { ENVIRONMENT = "development", LOG_LEVEL = "debug" }
+
+# Staging
+[env.staging]
+name = "sdlc-gateway-staging"
+vars = { ENVIRONMENT = "staging", LOG_LEVEL = "info" }
+
+# Production
+[env.production]
+name = "sdlc-gateway-prod"
+vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }

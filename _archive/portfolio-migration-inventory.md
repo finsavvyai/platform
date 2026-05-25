@@ -15,7 +15,7 @@ Buckets: **CORE** | **OSS** | **PLATFORM** | **INFRA** | **ARCHIVE** | **DOC** (
 | `_profile_export/` | INFRA | `infrastructure/sprint-tooling/profile-export/` | Sprint-loop machinery. |
 | `_reports/` | INFRA | `infrastructure/sprint-tooling/reports/` | Sprint-loop machinery. |
 | `_reviews/` | INFRA | `infrastructure/sprint-tooling/reviews/` | Sprint-loop machinery. |
-| `a2a-framework/` | OSS | `oss/a2a-framework/` | Keep if active; TODO: confirm last-commit date before migration. |
+| `a2a-framework/` | OSS | `oss/a2a-framework/` | ✅ Migrated round 4; LICENSE (MIT) added 2026-05-25 per founder decision. A2A protocol reference impl. |
 | `aegis/` | CORE | `products/amliq/` | AMLIQ backend, rename. |
 | `aegis.agent1/` | ARCHIVE | `_archive/worktrees/aegis.agent1/` | Worktree variant, snapshot+delete. |
 | `aegis.agent2/` | ARCHIVE | `_archive/worktrees/aegis.agent2/` | Worktree variant, snapshot+delete. |
@@ -23,7 +23,7 @@ Buckets: **CORE** | **OSS** | **PLATFORM** | **INFRA** | **ARCHIVE** | **DOC** (
 | `AMLIQ_PUNCH_LIST_May2026.md` | DOC | `_archive/portfolio-docs/AMLIQ_PUNCH_LIST_May2026.md` | AMLIQ planning doc. |
 | `amliq-frontend/` | CORE | `products/amliq/web/` | Merge into AMLIQ product. |
 | `apply_merge_schedule.py` | TOOLING | `infrastructure/sprint-tooling/scripts/apply_merge_schedule.py` | Merge automation script. |
-| `autoboot/` | INFRA | `infrastructure/sprint-tooling/autoboot/` | Sprint harness; FastPM product framing retired. |
+| `autoboot/` | ARCHIVE | `_archive/fastpm-2026-05/` | ⚠️ Founder correction 2026-05-25: this IS the FastPM product (not the sprint harness). Immediate takedown — see `_archive/fastpm-2026-05/TAKE_DOWN_ACTIONS.md`. Sprint harness is SEPARATE root-level scripts (`harness.sh`, `_harness/`, `sprint*.py`). |
 | `automationhub/` | OSS | `oss/automationhub/` | Workflow primitives, base for LunaOS. |
 | `automationhub-upm/` | OSS | `oss/automationhub/upm/` | TODO: confirm if Unity Package Manager variant or unrelated; merge if same project. |
 | `clawpipe/` | OSS | `oss/clawpipe/` | LunaOS runtime support. |
@@ -58,7 +58,7 @@ Buckets: **CORE** | **OSS** | **PLATFORM** | **INFRA** | **ARCHIVE** | **DOC** (
 | `jiraz-timeline/` | INFRA | `infrastructure/sprint-tooling/jiraz-timeline/` | Internal Jira tooling. |
 | `Licensing_Cost_Comparison_May2026.pdf` | DOC | `_archive/portfolio-docs/Licensing_Cost_Comparison_May2026.pdf` | Loose PDF. |
 | `logs/` | INFRA | `infrastructure/sprint-tooling/logs/` | Sprint log archive. |
-| `looma-sh/` | ARCHIVE | `_archive/looma-sh/` | V2V messaging, off-thesis. |
+| `looma-sh/` | EXTERNALIZE | `_archive/externalized/looma-sh/` | ⚠️ Founder correction 2026-05-25: NOT archive. Live prod + investor brief + paid tiers + IP work. Spin-out as sibling entity. See `_archive/externalized/looma-sh/SPIN_OUT_PLAN.md`. |
 | `luna-os/` | CORE | `products/lunaos/` | Orchestration. |
 | `luna-os.agent1/` | ARCHIVE | `_archive/worktrees/luna-os.agent1/` | Worktree variant. |
 | `luna-os.agent2/` | ARCHIVE | `_archive/worktrees/luna-os.agent2/` | Worktree variant. |
@@ -101,9 +101,9 @@ Buckets: **CORE** | **OSS** | **PLATFORM** | **INFRA** | **ARCHIVE** | **DOC** (
 | `QA_WAVE1_MASTER_REPORT.md` | DOC | `_archive/portfolio-docs/QA_WAVE1_MASTER_REPORT.md` | QA report. |
 | `qestro/` | CORE | `products/qestro/` | Runtime QA product. |
 | `QUALITY_STANDARDS.md` | DOC | `_archive/portfolio-docs/QUALITY_STANDARDS.md` | Reference superseded by `/Users/shaharsolomon/dev/projects/CLAUDE.md`. |
-| `queryflux/` | ARCHIVE | `_archive/queryflux/` | TODO: fold one of querflux/queryflux-git/querylens into a product; archive duplicates. |
-| `queryflux-git/` | ARCHIVE | `_archive/queryflux-git/` | TODO: duplicate of `queryflux`? Confirm before delete. |
-| `querylens/` | ARCHIVE | `_archive/querylens/` | TODO: same as above. |
+| `queryflux/` | CORE | `products/queryflux/` (placeholder skipped) | ⚠️ Founder correction 2026-05-25: PROMOTED to 8th CORE product. Source was 0B placeholder; skipped. |
+| `queryflux-git/` | CORE | `products/queryflux/` | ⚠️ Founder correction 2026-05-25: 8th CORE product. Active shipping (Tasks 11.x SSO+Subs+SecHard merged within 7 days). Fills data-layer gap. |
+| `querylens/` | CORE | `products/queryflux/lens/` | ⚠️ Founder correction 2026-05-25: folded under QueryFlux. |
 | `Readiness_Report_and_Marketing_Plans_May2026.html` | DOC | `_archive/portfolio-docs/Readiness_Report_and_Marketing_Plans_May2026.html` | Marketing doc. |
 | `Regulatory_Brief_EU_May2026.md` | DOC | `_archive/portfolio-docs/Regulatory_Brief_EU_May2026.md` | Regulatory brief. |
 | `Regulatory_Brief_Israel_May2026.md` | DOC | `_archive/portfolio-docs/Regulatory_Brief_Israel_May2026.md` | Regulatory brief. |
@@ -150,4 +150,14 @@ Buckets: **CORE** | **OSS** | **PLATFORM** | **INFRA** | **ARCHIVE** | **DOC** (
 
 **Counts (Round-2 inventory):** CORE 13 · OSS 12 · PLATFORM 0 (folded via fintech-suite section 1) · INFRA 16 · TOOLING 22 · DOC 39 · ARCHIVE 36 · DISSOLVE 1 (fintech-suite) = 139.
 
-TODOs flagged inline above: a2a-framework activity check, automationhub-upm merge confirmation, coderailflow/coderail-dev placement, flujo fold-or-archive, queryflux/queryflux-git/querylens dedupe, windsu-credit-manager PushCI overlap, Shachar-Solomon resumes removal.
+TODOs flagged inline above: ~~a2a-framework activity check~~ (✅ resolved 2026-05-25), automationhub-upm merge confirmation, coderailflow/coderail-dev placement, flujo fold-or-archive, ~~queryflux/queryflux-git/querylens dedupe~~ (✅ promoted to CORE per founder memo 2026-05-25), windsu-credit-manager PushCI overlap, Shachar-Solomon resumes removal.
+
+## Founder corrections summary (2026-05-25)
+
+See addendum §4 and `founder_decisions_memo.md` for full reasoning. Net changes:
+
+- **CORE count: 7 → 8** (added QueryFlux folding queryflux-git + querylens)
+- **New bucket EXTERNALIZE** (1 repo: looma-sh)
+- **autoboot reclassified**: this row IS the FastPM product (archive); sprint harness is separate root-level scripts that stay as INFRA
+- **a2a-framework**: conditional OSS → definite OSS (LICENSE MIT added)
+- **ARCHIVE bucket count**: ~22 → ~20

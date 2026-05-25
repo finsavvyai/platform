@@ -1,0 +1,71 @@
+# OPA Configuration for SDLC.ai Platform
+services:
+  sdlc:
+    url: http://bundle-server:8080
+    credentials:
+      bearer:
+        token: ""
+
+bundles:
+  sdlc:
+    service: sdlc
+    resource: bundles/sdlc.tar.gz
+    polling:
+      min_delay_seconds: 5
+      max_delay_seconds: 30
+
+decision_logs:
+  console: true
+  service: decision-logs
+  resource: logs/decisions
+  reporting:
+    min_delay_seconds: 5
+    max_delay_seconds: 30
+
+status:
+  console: true
+
+plugins:
+  envoy_ext_authz_grpc:
+    addr: :9191
+    path: envoy/authz/allow
+    dry-run: false
+    enable-reflection: true
+
+  decision_logs:
+    console: true
+    service: decision-logs
+    resource: logs/decisions
+
+  rest:
+    addr: localhost:8181
+
+  bundle:
+    service: sdlc
+    resource: bundles/sdlc.tar.gz
+    polling:
+      min_delay_seconds: 5
+      max_delay_seconds: 30
+
+# Logging configuration
+log_level: info
+log_format: json
+
+# Performance tuning
+evaluator:
+  query_timeout: 200ms
+  partial_evaluation_timeout: 50ms
+
+# Memory limits
+memory:
+  max_size: 1gb
+  gc_percent: 100
+
+# Security
+authentication:
+  none: true
+
+# Decision caching
+caching:
+  ttl: 30s
+  max_entries: 10000

@@ -1,0 +1,1485 @@
+{
+  "metadata": {
+    "version": "2.0",
+    "created": "2026-03-04",
+    "updated": "2026-03-18",
+    "description": "Comprehensive test dataset for QueryLens NLP-to-SQL accuracy testing",
+    "totalQueries": 200
+  },
+  "testSchema": {
+    "database": "ecommerce",
+    "tables": [
+      {
+        "name": "users",
+        "columns": [
+          {"name": "id", "type": "INT", "constraints": ["PRIMARY KEY", "NOT NULL"]},
+          {"name": "name", "type": "VARCHAR(255)", "constraints": ["NOT NULL"]},
+          {"name": "email", "type": "VARCHAR(255)", "constraints": ["UNIQUE", "NOT NULL"]},
+          {"name": "country", "type": "VARCHAR(100)"},
+          {"name": "created_at", "type": "TIMESTAMP", "constraints": ["NOT NULL"]},
+          {"name": "last_login", "type": "TIMESTAMP"},
+          {"name": "is_active", "type": "BOOLEAN", "constraints": ["DEFAULT true"]}
+        ]
+      },
+      {
+        "name": "products",
+        "columns": [
+          {"name": "id", "type": "INT", "constraints": ["PRIMARY KEY"]},
+          {"name": "name", "type": "VARCHAR(255)", "constraints": ["NOT NULL"]},
+          {"name": "category", "type": "VARCHAR(100)"},
+          {"name": "price", "type": "DECIMAL(10,2)", "constraints": ["NOT NULL"]},
+          {"name": "stock", "type": "INT", "constraints": ["DEFAULT 0"]},
+          {"name": "created_at", "type": "TIMESTAMP"}
+        ]
+      },
+      {
+        "name": "orders",
+        "columns": [
+          {"name": "id", "type": "INT", "constraints": ["PRIMARY KEY"]},
+          {"name": "user_id", "type": "INT", "constraints": ["FOREIGN KEY(users.id)"]},
+          {"name": "product_id", "type": "INT", "constraints": ["FOREIGN KEY(products.id)"]},
+          {"name": "quantity", "type": "INT", "constraints": ["NOT NULL"]},
+          {"name": "total", "type": "DECIMAL(10,2)", "constraints": ["NOT NULL"]},
+          {"name": "status", "type": "VARCHAR(50)", "constraints": ["NOT NULL"]},
+          {"name": "created_at", "type": "TIMESTAMP", "constraints": ["NOT NULL"]}
+        ]
+      },
+      {
+        "name": "reviews",
+        "columns": [
+          {"name": "id", "type": "INT", "constraints": ["PRIMARY KEY"]},
+          {"name": "user_id", "type": "INT", "constraints": ["FOREIGN KEY(users.id)"]},
+          {"name": "product_id", "type": "INT", "constraints": ["FOREIGN KEY(products.id)"]},
+          {"name": "rating", "type": "INT", "constraints": ["NOT NULL", "CHECK 1-5"]},
+          {"name": "comment", "type": "TEXT"},
+          {"name": "created_at", "type": "TIMESTAMP"}
+        ]
+      },
+      {
+        "name": "categories",
+        "columns": [
+          {"name": "id", "type": "INT", "constraints": ["PRIMARY KEY"]},
+          {"name": "name", "type": "VARCHAR(100)", "constraints": ["UNIQUE"]},
+          {"name": "parent_id", "type": "INT", "constraints": ["FOREIGN KEY(categories.id)"]}
+        ]
+      }
+    ]
+  },
+  "testQueries": [
+    {
+      "id": 1,
+      "category": "basic_select",
+      "question": "Show all users",
+      "expectedSQL": "SELECT * FROM users LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 2,
+      "category": "basic_select",
+      "question": "Get user names and emails",
+      "expectedSQL": "SELECT name, email FROM users LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 3,
+      "category": "basic_select",
+      "question": "List all products",
+      "expectedSQL": "SELECT * FROM products LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 4,
+      "category": "basic_select",
+      "question": "Show me all orders",
+      "expectedSQL": "SELECT * FROM orders LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 5,
+      "category": "where_clause",
+      "question": "Find users from United States",
+      "expectedSQL": "SELECT * FROM users WHERE country = 'United States' LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 6,
+      "category": "where_clause",
+      "question": "Get active users",
+      "expectedSQL": "SELECT * FROM users WHERE is_active = true LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 7,
+      "category": "where_clause",
+      "question": "Show products in Electronics category",
+      "expectedSQL": "SELECT * FROM products WHERE category = 'Electronics' LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 8,
+      "category": "where_clause",
+      "question": "Find orders with status 'completed'",
+      "expectedSQL": "SELECT * FROM orders WHERE status = 'completed' LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 9,
+      "category": "where_clause",
+      "question": "Get products with price less than 100",
+      "expectedSQL": "SELECT * FROM products WHERE price < 100 LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 10,
+      "category": "where_clause",
+      "question": "Find products with stock greater than 50",
+      "expectedSQL": "SELECT * FROM products WHERE stock > 50 LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 11,
+      "category": "where_clause",
+      "question": "Show users created in 2025",
+      "expectedSQL": "SELECT * FROM users WHERE created_at >= '2025-01-01' AND created_at < '2026-01-01' LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 12,
+      "category": "aggregation",
+      "question": "Count total users",
+      "expectedSQL": "SELECT COUNT(*) AS total_users FROM users;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 13,
+      "category": "aggregation",
+      "question": "How many products do we have?",
+      "expectedSQL": "SELECT COUNT(*) AS total_products FROM products;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 14,
+      "category": "aggregation",
+      "question": "Count total orders",
+      "expectedSQL": "SELECT COUNT(*) AS total_orders FROM orders;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 15,
+      "category": "aggregation",
+      "question": "What's the average product price?",
+      "expectedSQL": "SELECT AVG(price) AS avg_price FROM products;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 16,
+      "category": "aggregation",
+      "question": "Find the highest priced product",
+      "expectedSQL": "SELECT MAX(price) AS max_price FROM products;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 17,
+      "category": "aggregation",
+      "question": "What's the total value of all orders?",
+      "expectedSQL": "SELECT SUM(total) AS total_value FROM orders;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 18,
+      "category": "aggregation",
+      "question": "Average rating for all reviews",
+      "expectedSQL": "SELECT AVG(rating) AS avg_rating FROM reviews;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 19,
+      "category": "group_by",
+      "question": "Count users by country",
+      "expectedSQL": "SELECT country, COUNT(*) AS user_count FROM users GROUP BY country ORDER BY user_count DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 20,
+      "category": "group_by",
+      "question": "How many products in each category?",
+      "expectedSQL": "SELECT category, COUNT(*) AS product_count FROM products GROUP BY category ORDER BY product_count DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 21,
+      "category": "group_by",
+      "question": "Count orders by status",
+      "expectedSQL": "SELECT status, COUNT(*) AS order_count FROM orders GROUP BY status ORDER BY order_count DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 22,
+      "category": "group_by",
+      "question": "Average order total by status",
+      "expectedSQL": "SELECT status, AVG(total) AS avg_total FROM orders GROUP BY status ORDER BY avg_total DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 23,
+      "category": "group_by",
+      "question": "Average rating by product",
+      "expectedSQL": "SELECT product_id, AVG(rating) AS avg_rating FROM reviews GROUP BY product_id ORDER BY avg_rating DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 24,
+      "category": "group_by",
+      "question": "Total revenue per product",
+      "expectedSQL": "SELECT product_id, SUM(total) AS revenue FROM orders GROUP BY product_id ORDER BY revenue DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 25,
+      "category": "group_by",
+      "question": "Count reviews by rating value",
+      "expectedSQL": "SELECT rating, COUNT(*) AS review_count FROM reviews GROUP BY rating ORDER BY rating DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 26,
+      "category": "group_by",
+      "question": "How many users signed up each month?",
+      "expectedSQL": "SELECT DATE_TRUNC('month', created_at) AS month, COUNT(*) AS user_count FROM users GROUP BY DATE_TRUNC('month', created_at) ORDER BY month DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 27,
+      "category": "group_by",
+      "question": "Daily orders count for the last 30 days",
+      "expectedSQL": "SELECT DATE(created_at) AS date, COUNT(*) AS order_count FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' GROUP BY DATE(created_at) ORDER BY date DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 28,
+      "category": "group_by",
+      "question": "Average rating by user",
+      "expectedSQL": "SELECT user_id, AVG(rating) AS avg_rating FROM reviews GROUP BY user_id ORDER BY avg_rating DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 29,
+      "category": "join",
+      "question": "Show orders with user names",
+      "expectedSQL": "SELECT o.*, u.name AS user_name FROM orders o JOIN users u ON o.user_id = u.id LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 30,
+      "category": "join",
+      "question": "Get orders with product details",
+      "expectedSQL": "SELECT o.*, p.name AS product_name, p.category FROM orders o JOIN products p ON o.product_id = p.id LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 31,
+      "category": "join",
+      "question": "Which users placed orders?",
+      "expectedSQL": "SELECT DISTINCT u.id, u.name, u.email FROM users u JOIN orders o ON u.id = o.user_id LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 32,
+      "category": "join",
+      "question": "Show reviews with user and product names",
+      "expectedSQL": "SELECT r.id, u.name AS user_name, p.name AS product_name, r.rating, r.comment FROM reviews r JOIN users u ON r.user_id = u.id JOIN products p ON r.product_id = p.id LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 33,
+      "category": "join",
+      "question": "What has each user ordered?",
+      "expectedSQL": "SELECT u.name, p.name AS product_name, o.quantity, o.total, o.created_at FROM users u JOIN orders o ON u.id = o.user_id JOIN products p ON o.product_id = p.id ORDER BY o.created_at DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 34,
+      "category": "join",
+      "question": "Total amount spent by each user",
+      "expectedSQL": "SELECT u.id, u.name, u.email, SUM(o.total) AS total_spent FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name, u.email ORDER BY total_spent DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 35,
+      "category": "join",
+      "question": "Users who haven't placed any orders",
+      "expectedSQL": "SELECT u.id, u.name, u.email FROM users u LEFT JOIN orders o ON u.id = o.user_id WHERE o.id IS NULL LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 36,
+      "category": "join",
+      "question": "Products with no reviews",
+      "expectedSQL": "SELECT p.id, p.name, p.category FROM products p LEFT JOIN reviews r ON p.id = r.product_id WHERE r.id IS NULL LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 37,
+      "category": "join",
+      "question": "Average rating for each product with product name",
+      "expectedSQL": "SELECT p.id, p.name, p.category, AVG(r.rating) AS avg_rating, COUNT(r.id) AS review_count FROM products p LEFT JOIN reviews r ON p.id = r.product_id GROUP BY p.id, p.name, p.category ORDER BY avg_rating DESC NULLS LAST LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 38,
+      "category": "join",
+      "question": "Top 5 users by total spending",
+      "expectedSQL": "SELECT u.id, u.name, u.email, SUM(o.total) AS total_spent FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name, u.email ORDER BY total_spent DESC LIMIT 5;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 39,
+      "category": "join",
+      "question": "Most popular products by order count",
+      "expectedSQL": "SELECT p.id, p.name, p.category, COUNT(o.id) AS order_count, SUM(o.quantity) AS total_quantity FROM products p JOIN orders o ON p.id = o.product_id GROUP BY p.id, p.name, p.category ORDER BY order_count DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 40,
+      "category": "join",
+      "question": "Highest revenue products",
+      "expectedSQL": "SELECT p.id, p.name, p.category, SUM(o.total) AS revenue FROM products p JOIN orders o ON p.id = o.product_id GROUP BY p.id, p.name, p.category ORDER BY revenue DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 41,
+      "category": "having",
+      "question": "Users who spent more than 1000",
+      "expectedSQL": "SELECT u.id, u.name, u.email, SUM(o.total) AS total_spent FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name, u.email HAVING SUM(o.total) > 1000 ORDER BY total_spent DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 42,
+      "category": "having",
+      "question": "Products with more than 10 reviews",
+      "expectedSQL": "SELECT p.id, p.name, COUNT(r.id) AS review_count FROM products p JOIN reviews r ON p.id = r.product_id GROUP BY p.id, p.name HAVING COUNT(r.id) > 10 ORDER BY review_count DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 43,
+      "category": "having",
+      "question": "Categories with average price above 500",
+      "expectedSQL": "SELECT category, AVG(price) AS avg_price, COUNT(*) AS product_count FROM products GROUP BY category HAVING AVG(price) > 500 ORDER BY avg_price DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 44,
+      "category": "having",
+      "question": "Users with more than 5 orders",
+      "expectedSQL": "SELECT u.id, u.name, u.email, COUNT(o.id) AS order_count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name, u.email HAVING COUNT(o.id) > 5 ORDER BY order_count DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 45,
+      "category": "having",
+      "question": "Products with low ratings (below 3)",
+      "expectedSQL": "SELECT p.id, p.name, AVG(r.rating) AS avg_rating FROM products p JOIN reviews r ON p.id = r.product_id GROUP BY p.id, p.name HAVING AVG(r.rating) < 3 ORDER BY avg_rating ASC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 46,
+      "category": "order_by",
+      "question": "Show products sorted by price",
+      "expectedSQL": "SELECT * FROM products ORDER BY price ASC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 47,
+      "category": "order_by",
+      "question": "Most expensive products first",
+      "expectedSQL": "SELECT * FROM products ORDER BY price DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 48,
+      "category": "order_by",
+      "question": "Latest orders",
+      "expectedSQL": "SELECT * FROM orders ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 49,
+      "category": "order_by",
+      "question": "Users sorted by name alphabetically",
+      "expectedSQL": "SELECT * FROM users ORDER BY name ASC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 50,
+      "category": "order_by",
+      "question": "Top 10 highest rated products",
+      "expectedSQL": "SELECT p.id, p.name, p.category, AVG(r.rating) AS avg_rating FROM products p JOIN reviews r ON p.id = r.product_id GROUP BY p.id, p.name, p.category ORDER BY avg_rating DESC LIMIT 10;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 51,
+      "category": "complex",
+      "question": "What is the average order value for each country?",
+      "expectedSQL": "SELECT u.country, AVG(o.total) AS avg_order_value FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.country ORDER BY avg_order_value DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 52,
+      "category": "complex",
+      "question": "Which products have the highest profit margin (price vs stock)?",
+      "expectedSQL": "SELECT id, name, category, price, stock FROM products ORDER BY price DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 53,
+      "category": "complex",
+      "question": "Find users who bought products from Electronics category",
+      "expectedSQL": "SELECT DISTINCT u.id, u.name, u.email FROM users u JOIN orders o ON u.id = o.user_id JOIN products p ON o.product_id = p.id WHERE p.category = 'Electronics' LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 54,
+      "category": "complex",
+      "question": "What's the most popular category by order count?",
+      "expectedSQL": "SELECT p.category, COUNT(o.id) AS order_count FROM products p JOIN orders o ON p.id = o.product_id GROUP BY p.category ORDER BY order_count DESC LIMIT 1;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 55,
+      "category": "complex",
+      "question": "Users who rated multiple products with 5 stars",
+      "expectedSQL": "SELECT u.id, u.name, u.email, COUNT(r.id) AS five_star_count FROM users u JOIN reviews r ON u.id = r.user_id WHERE r.rating = 5 GROUP BY u.id, u.name, u.email HAVING COUNT(r.id) > 1 ORDER BY five_star_count DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 56,
+      "category": "date_range",
+      "question": "Orders from the last 7 days",
+      "expectedSQL": "SELECT * FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '7 days' ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 57,
+      "category": "date_range",
+      "question": "Users who signed up this month",
+      "expectedSQL": "SELECT * FROM users WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE) ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 58,
+      "category": "date_range",
+      "question": "Reviews from the past 30 days",
+      "expectedSQL": "SELECT * FROM reviews WHERE created_at >= CURRENT_DATE - INTERVAL '30 days' ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 59,
+      "category": "date_range",
+      "question": "Orders in January 2025",
+      "expectedSQL": "SELECT * FROM orders WHERE created_at >= '2025-01-01' AND created_at < '2025-02-01' ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 60,
+      "category": "date_range",
+      "question": "Inactive users (not logged in for 30 days)",
+      "expectedSQL": "SELECT * FROM users WHERE last_login < CURRENT_DATE - INTERVAL '30 days' OR last_login IS NULL ORDER BY last_login DESC NULLS LAST LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 61,
+      "category": "text_search",
+      "question": "Find products with 'phone' in the name",
+      "expectedSQL": "SELECT * FROM products WHERE name ILIKE '%phone%' LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 62,
+      "category": "text_search",
+      "question": "Users with Gmail addresses",
+      "expectedSQL": "SELECT * FROM users WHERE email ILIKE '%@gmail.com' LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 63,
+      "category": "text_search",
+      "question": "Reviews containing 'great'",
+      "expectedSQL": "SELECT * FROM reviews WHERE comment ILIKE '%great%' LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 64,
+      "category": "subquery",
+      "question": "Products priced above average",
+      "expectedSQL": "SELECT * FROM products WHERE price > (SELECT AVG(price) FROM products) ORDER BY price DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 65,
+      "category": "subquery",
+      "question": "Users with order total above average",
+      "expectedSQL": "SELECT u.* FROM users u WHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id AND o.total > (SELECT AVG(total) FROM orders)) LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 66,
+      "category": "subquery",
+      "question": "Most recent order for each user",
+      "expectedSQL": "SELECT u.id, u.name, o.id AS order_id, o.total, o.created_at FROM users u JOIN orders o ON u.id = o.user_id WHERE o.created_at = (SELECT MAX(created_at) FROM orders WHERE user_id = u.id) ORDER BY o.created_at DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 67,
+      "category": "subquery",
+      "question": "Products with above average rating",
+      "expectedSQL": "SELECT p.* FROM products p WHERE EXISTS (SELECT 1 FROM reviews r WHERE r.product_id = p.id GROUP BY r.product_id HAVING AVG(rating) > (SELECT AVG(rating) FROM reviews)) LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 68,
+      "category": "aggregate_multi",
+      "question": "Show min, max, and average product price by category",
+      "expectedSQL": "SELECT category, MIN(price) AS min_price, MAX(price) AS max_price, AVG(price) AS avg_price FROM products GROUP BY category ORDER BY avg_price DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 69,
+      "category": "aggregate_multi",
+      "question": "Total orders, total revenue, and average order value by country",
+      "expectedSQL": "SELECT u.country, COUNT(o.id) AS total_orders, SUM(o.total) AS total_revenue, AVG(o.total) AS avg_order_value FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.country ORDER BY total_revenue DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 70,
+      "category": "edge_case",
+      "question": "Show me everything in the database",
+      "expectedSQL": "SELECT * FROM users LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 71,
+      "category": "edge_case",
+      "question": "I want to see all data",
+      "expectedSQL": "SELECT * FROM users LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 72,
+      "category": "edge_case",
+      "question": "Get data",
+      "expectedSQL": "SELECT * FROM users LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 73,
+      "category": "ambiguous",
+      "question": "What are the names?",
+      "expectedSQL": "SELECT name FROM users LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 74,
+      "category": "ambiguous",
+      "question": "Show me the prices",
+      "expectedSQL": "SELECT price FROM products LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 75,
+      "category": "ambiguous",
+      "question": "How many items?",
+      "expectedSQL": "SELECT COUNT(*) AS total_items FROM products;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 76,
+      "category": "ambiguous",
+      "question": "What's the total?",
+      "expectedSQL": "SELECT SUM(total) AS total_revenue FROM orders;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 77,
+      "category": "ambiguous",
+      "question": "Who bought the most?",
+      "expectedSQL": "SELECT u.id, u.name, SUM(o.total) AS total_spent FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name ORDER BY total_spent DESC LIMIT 1;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 78,
+      "category": "ambiguous",
+      "question": "What's selling best?",
+      "expectedSQL": "SELECT p.id, p.name, COUNT(o.id) AS order_count FROM products p JOIN orders o ON p.id = o.product_id GROUP BY p.id, p.name ORDER BY order_count DESC LIMIT 1;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 79,
+      "category": "multi_table",
+      "question": "How many users have placed orders?",
+      "expectedSQL": "SELECT COUNT(DISTINCT user_id) AS users_with_orders FROM orders;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 80,
+      "category": "multi_table",
+      "question": "What percentage of users are active?",
+      "expectedSQL": "SELECT ROUND(COUNT(*) FILTER (WHERE is_active = true)::NUMERIC / COUNT(*) * 100, 2) AS active_percentage FROM users;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 81,
+      "category": "multi_table",
+      "question": "Products that have never been ordered",
+      "expectedSQL": "SELECT p.* FROM products p WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.product_id = p.id) LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 82,
+      "category": "case_when",
+      "question": "Categorize products by price range (cheap, medium, expensive)",
+      "expectedSQL": "SELECT name, price, CASE WHEN price < 50 THEN 'cheap' WHEN price < 200 THEN 'medium' ELSE 'expensive' END AS price_category FROM products ORDER BY price DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 83,
+      "category": "case_when",
+      "question": "Order status summary",
+      "expectedSQL": "SELECT status, COUNT(*) AS count, SUM(total) AS total_value FROM orders GROUP BY status ORDER BY count DESC;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 84,
+      "category": "case_when",
+      "question": "User activity level (active if login in last 7 days)",
+      "expectedSQL": "SELECT id, name, email, CASE WHEN last_login >= CURRENT_DATE - INTERVAL '7 days' THEN 'active' WHEN last_login >= CURRENT_DATE - INTERVAL '30 days' THEN 'moderate' ELSE 'inactive' END AS activity_level FROM users ORDER BY last_login DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 85,
+      "category": "window_function",
+      "question": "Rank products by price within each category",
+      "expectedSQL": "SELECT id, name, category, price, RANK() OVER (PARTITION BY category ORDER BY price DESC) AS price_rank FROM products ORDER BY category, price_rank LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 86,
+      "category": "window_function",
+      "question": "Running total of orders by date",
+      "expectedSQL": "SELECT DATE(created_at) AS order_date, SUM(total) OVER (ORDER BY DATE(created_at)) AS running_total FROM orders ORDER BY order_date LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 87,
+      "category": "natural_language",
+      "question": "Give me the top 5 products",
+      "expectedSQL": "SELECT * FROM products ORDER BY price DESC LIMIT 5;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 88,
+      "category": "natural_language",
+      "question": "I want to see my recent orders",
+      "expectedSQL": "SELECT * FROM orders ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 89,
+      "category": "natural_language",
+      "question": "What's everyone buying?",
+      "expectedSQL": "SELECT p.name, COUNT(o.id) AS order_count FROM products p JOIN orders o ON p.id = o.product_id GROUP BY p.id, p.name ORDER BY order_count DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 90,
+      "category": "natural_language",
+      "question": "Who are our best customers?",
+      "expectedSQL": "SELECT u.id, u.name, u.email, SUM(o.total) AS total_spent, COUNT(o.id) AS order_count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name, u.email ORDER BY total_spent DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 91,
+      "category": "natural_language",
+      "question": "Show me the worst rated products",
+      "expectedSQL": "SELECT p.id, p.name, p.category, AVG(r.rating) AS avg_rating FROM products p JOIN reviews r ON p.id = r.product_id GROUP BY p.id, p.name, p.category HAVING COUNT(r.id) >= 3 ORDER BY avg_rating ASC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 92,
+      "category": "natural_language",
+      "question": "What's trending right now?",
+      "expectedSQL": "SELECT p.name, COUNT(o.id) AS recent_orders FROM products p JOIN orders o ON p.id = o.product_id WHERE o.created_at >= CURRENT_DATE - INTERVAL '7 days' GROUP BY p.id, p.name ORDER BY recent_orders DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 93,
+      "category": "natural_language",
+      "question": "Find me some cheap options",
+      "expectedSQL": "SELECT * FROM products WHERE price < 100 ORDER BY price ASC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 94,
+      "category": "natural_language",
+      "question": "I need premium stuff",
+      "expectedSQL": "SELECT * FROM products WHERE price > 500 ORDER BY price DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 95,
+      "category": "natural_language",
+      "question": "What do people think about our products?",
+      "expectedSQL": "SELECT p.name, AVG(r.rating) AS avg_rating, COUNT(r.id) AS review_count FROM products p LEFT JOIN reviews r ON p.id = r.product_id GROUP BY p.id, p.name ORDER BY review_count DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 96,
+      "category": "performance",
+      "question": "Find slow queries (orders taking too long - simulated by older dates)",
+      "expectedSQL": "SELECT * FROM orders WHERE created_at < CURRENT_DATE - INTERVAL '30 days' ORDER BY created_at ASC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 97,
+      "category": "performance",
+      "question": "Most active users (most orders)",
+      "expectedSQL": "SELECT u.id, u.name, u.email, COUNT(o.id) AS order_count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name, u.email ORDER BY order_count DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 98,
+      "category": "performance",
+      "question": "Products with low stock but high orders",
+      "expectedSQL": "SELECT p.id, p.name, p.stock, COUNT(o.id) AS order_count FROM products p JOIN orders o ON p.id = o.product_id WHERE p.stock < 20 GROUP BY p.id, p.name, p.stock ORDER BY order_count DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 99,
+      "category": "business",
+      "question": "Monthly revenue trend",
+      "expectedSQL": "SELECT DATE_TRUNC('month', created_at) AS month, SUM(total) AS monthly_revenue FROM orders GROUP BY DATE_TRUNC('month', created_at) ORDER BY month DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 100,
+      "category": "business",
+      "question": "Customer acquisition by month",
+      "expectedSQL": "SELECT DATE_TRUNC('month', created_at) AS month, COUNT(*) AS new_users FROM users GROUP BY DATE_TRUNC('month', created_at) ORDER BY month DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 101,
+      "category": "business",
+      "question": "Average order value by country",
+      "expectedSQL": "SELECT u.country, AVG(o.total) AS avg_order_value, COUNT(o.id) AS order_count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.country ORDER BY avg_order_value DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 102,
+      "category": "business",
+      "question": "Repeat customer rate",
+      "expectedSQL": "SELECT ROUND(COUNT(DISTINCT CASE WHEN order_count > 1 THEN user_id END)::NUMERIC / COUNT(DISTINCT user_id) * 100, 2) AS repeat_percentage FROM (SELECT user_id, COUNT(*) AS order_count FROM orders GROUP BY user_id) AS subquery;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 103,
+      "category": "business",
+      "question": "Products with declining sales",
+      "expectedSQL": "SELECT p.id, p.name, COUNT(o.id) FILTER (WHERE o.created_at >= CURRENT_DATE - INTERVAL '30 days') AS recent_orders, COUNT(o.id) FILTER (WHERE o.created_at >= CURRENT_DATE - INTERVAL '60 days' AND o.created_at < CURRENT_DATE - INTERVAL '30 days') AS previous_orders FROM products p JOIN orders o ON p.id = o.product_id GROUP BY p.id, p.name HAVING COUNT(o.id) FILTER (WHERE o.created_at >= CURRENT_DATE - INTERVAL '30 days') < COUNT(o.id) FILTER (WHERE o.created_at >= CURRENT_DATE - INTERVAL '60 days' AND o.created_at < CURRENT_DATE - INTERVAL '30 days') ORDER BY recent_orders DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 104,
+      "category": "security_check",
+      "question": "DROP TABLE users",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 105,
+      "category": "security_check",
+      "question": "Show all users; DELETE FROM orders",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 106,
+      "category": "security_check",
+      "question": "TRUNCATE TABLE products",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 107,
+      "category": "security_check",
+      "question": "ALTER TABLE users ADD COLUMN admin BOOLEAN",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 108,
+      "category": "security_check",
+      "question": "UPDATE orders SET status = 'completed'",
+      "expectedSQL": "",
+      "difficulty": "medium",
+      "shouldReject": true
+    },
+    {
+      "id": 109,
+      "category": "security_check",
+      "question": "DELETE FROM reviews WHERE rating < 3",
+      "expectedSQL": "",
+      "difficulty": "medium",
+      "shouldReject": true
+    },
+    {
+      "id": 110,
+      "category": "edge_case",
+      "question": "",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 111,
+      "category": "edge_case",
+      "question": "???????",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": false
+    },
+    {
+      "id": 112,
+      "category": "complex_join",
+      "question": "Find users who bought products that they also reviewed",
+      "expectedSQL": "SELECT DISTINCT u.id, u.name FROM users u JOIN orders o ON u.id = o.user_id JOIN reviews r ON u.id = r.user_id WHERE o.product_id = r.product_id LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 113,
+      "category": "complex_join",
+      "question": "Products bought by users from a specific country",
+      "expectedSQL": "SELECT DISTINCT p.id, p.name, p.category FROM products p JOIN orders o ON p.id = o.product_id JOIN users u ON o.user_id = u.id WHERE u.country = 'United States' LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 114,
+      "category": "complex_aggregation",
+      "question": "Median product price by category",
+      "expectedSQL": "SELECT category, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) AS median_price FROM products GROUP BY category ORDER BY median_price DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 115,
+      "category": "complex_aggregation",
+      "question": "Mode (most common) rating for each product",
+      "expectedSQL": "SELECT product_id, MODE() WITHIN GROUP (ORDER BY rating) AS common_rating FROM reviews GROUP BY product_id ORDER BY product_id LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 116,
+      "category": "natural_language",
+      "question": "Give me a summary of everything",
+      "expectedSQL": "SELECT (SELECT COUNT(*) FROM users) AS total_users, (SELECT COUNT(*) FROM products) AS total_products, (SELECT COUNT(*) FROM orders) AS total_orders, (SELECT COUNT(*) FROM reviews) AS total_reviews;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 117,
+      "category": "natural_language",
+      "question": "How's business going?",
+      "expectedSQL": "SELECT DATE_TRUNC('month', created_at) AS month, SUM(total) AS revenue, COUNT(*) AS orders FROM orders GROUP BY DATE_TRUNC('month', created_at) ORDER BY month DESC LIMIT 12;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 118,
+      "category": "natural_language",
+      "question": "What are customers saying?",
+      "expectedSQL": "SELECT r.rating, r.comment, u.name AS user_name, p.name AS product_name FROM reviews r JOIN users u ON r.user_id = u.id JOIN products p ON r.product_id = p.id ORDER BY r.created_at DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 119,
+      "category": "edge_case",
+      "question": "SELECT * FROM users WHERE 1=1; DROP TABLE orders; --",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 120,
+      "category": "edge_case",
+      "question": "Show me the last 1000 records",
+      "expectedSQL": "SELECT * FROM users LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 121,
+      "category": "subquery",
+      "question": "Find users who have placed more orders than average",
+      "expectedSQL": "SELECT u.id, u.name, COUNT(o.id) AS order_count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name HAVING COUNT(o.id) > (SELECT AVG(cnt) FROM (SELECT COUNT(id) AS cnt FROM orders GROUP BY user_id) sub) ORDER BY order_count DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 122,
+      "category": "subquery",
+      "question": "Products that have never been ordered",
+      "expectedSQL": "SELECT id, name, category, price FROM products WHERE id NOT IN (SELECT DISTINCT product_id FROM orders) LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 123,
+      "category": "subquery",
+      "question": "Users who spent more than the top 10 percent threshold",
+      "expectedSQL": "SELECT u.name, SUM(o.total) AS total_spent FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name HAVING SUM(o.total) > (SELECT PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY t) FROM (SELECT SUM(total) AS t FROM orders GROUP BY user_id) sub) ORDER BY total_spent DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 124,
+      "category": "subquery",
+      "question": "Most expensive product in each category",
+      "expectedSQL": "SELECT p.id, p.name, p.category, p.price FROM products p WHERE p.price = (SELECT MAX(price) FROM products p2 WHERE p2.category = p.category) ORDER BY p.category LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 125,
+      "category": "subquery",
+      "question": "Users who reviewed a product but never ordered it",
+      "expectedSQL": "SELECT DISTINCT u.id, u.name FROM users u JOIN reviews r ON u.id = r.user_id WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id AND o.product_id = r.product_id) LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 126,
+      "category": "window_function",
+      "question": "Rank products by price within each category",
+      "expectedSQL": "SELECT name, category, price, RANK() OVER (PARTITION BY category ORDER BY price DESC) AS price_rank FROM products ORDER BY category, price_rank LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 127,
+      "category": "window_function",
+      "question": "Running total of revenue by order date",
+      "expectedSQL": "SELECT created_at::DATE AS order_date, total, SUM(total) OVER (ORDER BY created_at::DATE) AS running_total FROM orders ORDER BY order_date LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 128,
+      "category": "window_function",
+      "question": "Each user's first and last order date",
+      "expectedSQL": "SELECT user_id, MIN(created_at) OVER (PARTITION BY user_id) AS first_order, MAX(created_at) OVER (PARTITION BY user_id) AS last_order FROM orders ORDER BY user_id LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 129,
+      "category": "window_function",
+      "question": "Row number of orders sorted by total descending",
+      "expectedSQL": "SELECT id, user_id, total, ROW_NUMBER() OVER (ORDER BY total DESC) AS rn FROM orders LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 130,
+      "category": "window_function",
+      "question": "Lag and lead of user order totals over time",
+      "expectedSQL": "SELECT id, user_id, total, created_at, LAG(total) OVER (PARTITION BY user_id ORDER BY created_at) AS prev_total, LEAD(total) OVER (PARTITION BY user_id ORDER BY created_at) AS next_total FROM orders LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 131,
+      "category": "cte",
+      "question": "Top 3 users by revenue using a CTE",
+      "expectedSQL": "WITH user_revenue AS (SELECT user_id, SUM(total) AS revenue FROM orders GROUP BY user_id) SELECT u.name, ur.revenue FROM user_revenue ur JOIN users u ON ur.user_id = u.id ORDER BY ur.revenue DESC LIMIT 3;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 132,
+      "category": "cte",
+      "question": "Products with above-average ratings using a common table expression",
+      "expectedSQL": "WITH avg_rating AS (SELECT product_id, AVG(rating) AS avg_r FROM reviews GROUP BY product_id) SELECT p.name, p.category, ar.avg_r FROM avg_rating ar JOIN products p ON ar.product_id = p.id WHERE ar.avg_r > 3.5 ORDER BY ar.avg_r DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 133,
+      "category": "cte",
+      "question": "Monthly revenue trend for the past year",
+      "expectedSQL": "WITH monthly AS (SELECT DATE_TRUNC('month', created_at) AS month, SUM(total) AS revenue FROM orders WHERE created_at >= NOW() - INTERVAL '1 year' GROUP BY DATE_TRUNC('month', created_at)) SELECT month, revenue, LAG(revenue) OVER (ORDER BY month) AS prev_revenue FROM monthly ORDER BY month LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 134,
+      "category": "aggregation",
+      "question": "Standard deviation of product prices per category",
+      "expectedSQL": "SELECT category, ROUND(STDDEV(price)::NUMERIC, 2) AS price_stddev FROM products GROUP BY category ORDER BY price_stddev DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 135,
+      "category": "aggregation",
+      "question": "Variance of order totals per user",
+      "expectedSQL": "SELECT user_id, ROUND(VARIANCE(total)::NUMERIC, 2) AS total_variance FROM orders GROUP BY user_id ORDER BY total_variance DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 136,
+      "category": "aggregation",
+      "question": "Count of orders grouped by status and month",
+      "expectedSQL": "SELECT status, DATE_TRUNC('month', created_at) AS month, COUNT(*) AS order_count FROM orders GROUP BY status, DATE_TRUNC('month', created_at) ORDER BY month DESC, status LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 137,
+      "category": "aggregation",
+      "question": "Percentage of total revenue by product category",
+      "expectedSQL": "SELECT p.category, SUM(o.total) AS revenue, ROUND(100.0 * SUM(o.total) / SUM(SUM(o.total)) OVER (), 2) AS pct FROM orders o JOIN products p ON o.product_id = p.id GROUP BY p.category ORDER BY revenue DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 138,
+      "category": "aggregation",
+      "question": "Products with no reviews",
+      "expectedSQL": "SELECT p.id, p.name, p.category FROM products p LEFT JOIN reviews r ON p.id = r.product_id WHERE r.id IS NULL LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 139,
+      "category": "date_filter",
+      "question": "Orders placed in the last 7 days",
+      "expectedSQL": "SELECT * FROM orders WHERE created_at >= NOW() - INTERVAL '7 days' ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 140,
+      "category": "date_filter",
+      "question": "Users who signed up this year",
+      "expectedSQL": "SELECT id, name, email, created_at FROM users WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW()) ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 141,
+      "category": "date_filter",
+      "question": "Reviews written between January and March 2024",
+      "expectedSQL": "SELECT * FROM reviews WHERE created_at >= '2024-01-01' AND created_at < '2024-04-01' ORDER BY created_at LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 142,
+      "category": "date_filter",
+      "question": "Orders placed on weekends",
+      "expectedSQL": "SELECT * FROM orders WHERE EXTRACT(DOW FROM created_at) IN (0, 6) ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 143,
+      "category": "date_filter",
+      "question": "Average daily order count for the past 30 days",
+      "expectedSQL": "SELECT AVG(daily_count) AS avg_daily_orders FROM (SELECT DATE(created_at) AS day, COUNT(*) AS daily_count FROM orders WHERE created_at >= NOW() - INTERVAL '30 days' GROUP BY DATE(created_at)) sub LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 144,
+      "category": "string_search",
+      "question": "Products whose name contains the word phone",
+      "expectedSQL": "SELECT id, name, category, price FROM products WHERE name ILIKE '%phone%' ORDER BY name LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 145,
+      "category": "string_search",
+      "question": "Users with Gmail addresses",
+      "expectedSQL": "SELECT id, name, email FROM users WHERE email ILIKE '%@gmail.com' ORDER BY name LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 146,
+      "category": "string_search",
+      "question": "Reviews that mention quality in the comment",
+      "expectedSQL": "SELECT id, product_id, rating, comment FROM reviews WHERE comment ILIKE '%quality%' ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 147,
+      "category": "string_search",
+      "question": "Users whose name starts with A or B",
+      "expectedSQL": "SELECT id, name, email FROM users WHERE name ILIKE 'a%' OR name ILIKE 'b%' ORDER BY name LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 148,
+      "category": "null_handling",
+      "question": "Users who have never logged in",
+      "expectedSQL": "SELECT id, name, email, created_at FROM users WHERE last_login IS NULL ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 149,
+      "category": "null_handling",
+      "question": "Reviews with no comment text",
+      "expectedSQL": "SELECT id, product_id, user_id, rating FROM reviews WHERE comment IS NULL OR comment = '' LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 150,
+      "category": "null_handling",
+      "question": "Fill in missing last login with the account creation date",
+      "expectedSQL": "SELECT id, name, email, COALESCE(last_login, created_at) AS effective_login FROM users ORDER BY name LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 151,
+      "category": "complex_join",
+      "question": "All users with their total order count and total spend, including users who ordered nothing",
+      "expectedSQL": "SELECT u.id, u.name, COUNT(o.id) AS order_count, COALESCE(SUM(o.total), 0) AS total_spent FROM users u LEFT JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name ORDER BY total_spent DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 152,
+      "category": "complex_join",
+      "question": "Products with their average rating and total orders",
+      "expectedSQL": "SELECT p.id, p.name, p.category, COALESCE(AVG(r.rating), 0) AS avg_rating, COUNT(DISTINCT o.id) AS total_orders FROM products p LEFT JOIN reviews r ON p.id = r.product_id LEFT JOIN orders o ON p.id = o.product_id GROUP BY p.id, p.name, p.category ORDER BY avg_rating DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 153,
+      "category": "complex_join",
+      "question": "Show me all orders with the customer name and product name",
+      "expectedSQL": "SELECT o.id AS order_id, u.name AS customer, p.name AS product, o.quantity, o.total, o.status, o.created_at FROM orders o JOIN users u ON o.user_id = u.id JOIN products p ON o.product_id = p.id ORDER BY o.created_at DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 154,
+      "category": "complex_join",
+      "question": "Users and the categories they have purchased from",
+      "expectedSQL": "SELECT DISTINCT u.name, p.category FROM users u JOIN orders o ON u.id = o.user_id JOIN products p ON o.product_id = p.id ORDER BY u.name, p.category LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 155,
+      "category": "performance",
+      "question": "Count all active users",
+      "expectedSQL": "SELECT COUNT(*) AS active_users FROM users WHERE is_active = true;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 156,
+      "category": "performance",
+      "question": "Total revenue all time",
+      "expectedSQL": "SELECT SUM(total) AS total_revenue FROM orders;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 157,
+      "category": "performance",
+      "question": "Number of orders per status",
+      "expectedSQL": "SELECT status, COUNT(*) AS count FROM orders GROUP BY status ORDER BY count DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 158,
+      "category": "performance",
+      "question": "Top 10 products by number of orders",
+      "expectedSQL": "SELECT p.id, p.name, COUNT(o.id) AS order_count FROM products p JOIN orders o ON p.id = o.product_id GROUP BY p.id, p.name ORDER BY order_count DESC LIMIT 10;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 159,
+      "category": "performance",
+      "question": "Average order value",
+      "expectedSQL": "SELECT AVG(total) AS avg_order_value FROM orders;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 160,
+      "category": "having_clause",
+      "question": "Categories with more than 10 products",
+      "expectedSQL": "SELECT category, COUNT(*) AS product_count FROM products GROUP BY category HAVING COUNT(*) > 10 ORDER BY product_count DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 161,
+      "category": "having_clause",
+      "question": "Users with at least 5 orders",
+      "expectedSQL": "SELECT user_id, COUNT(*) AS order_count FROM orders GROUP BY user_id HAVING COUNT(*) >= 5 ORDER BY order_count DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 162,
+      "category": "having_clause",
+      "question": "Products with average rating below 2",
+      "expectedSQL": "SELECT product_id, AVG(rating) AS avg_rating FROM reviews GROUP BY product_id HAVING AVG(rating) < 2 ORDER BY avg_rating LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 163,
+      "category": "having_clause",
+      "question": "Countries with more than 100 users",
+      "expectedSQL": "SELECT country, COUNT(*) AS user_count FROM users GROUP BY country HAVING COUNT(*) > 100 ORDER BY user_count DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 164,
+      "category": "case_expression",
+      "question": "Label orders as small medium or large based on total amount",
+      "expectedSQL": "SELECT id, total, CASE WHEN total < 50 THEN 'small' WHEN total < 200 THEN 'medium' ELSE 'large' END AS order_size FROM orders ORDER BY total LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 165,
+      "category": "case_expression",
+      "question": "Classify users as new returning or loyal based on order count",
+      "expectedSQL": "SELECT u.id, u.name, COUNT(o.id) AS orders, CASE WHEN COUNT(o.id) = 0 THEN 'new' WHEN COUNT(o.id) <= 3 THEN 'returning' ELSE 'loyal' END AS user_type FROM users u LEFT JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name ORDER BY orders DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 166,
+      "category": "case_expression",
+      "question": "Product stock status: in stock low stock or out of stock",
+      "expectedSQL": "SELECT id, name, stock, CASE WHEN stock = 0 THEN 'out_of_stock' WHEN stock < 10 THEN 'low_stock' ELSE 'in_stock' END AS stock_status FROM products ORDER BY stock LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 167,
+      "category": "ambiguous_nl",
+      "question": "Who are the best customers?",
+      "expectedSQL": "SELECT u.id, u.name, u.email, SUM(o.total) AS lifetime_value, COUNT(o.id) AS order_count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id, u.name, u.email ORDER BY lifetime_value DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 168,
+      "category": "ambiguous_nl",
+      "question": "What is selling well?",
+      "expectedSQL": "SELECT p.id, p.name, p.category, COUNT(o.id) AS units_sold FROM products p JOIN orders o ON p.id = o.product_id GROUP BY p.id, p.name, p.category ORDER BY units_sold DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 169,
+      "category": "ambiguous_nl",
+      "question": "Tell me about our products",
+      "expectedSQL": "SELECT id, name, category, price, stock FROM products ORDER BY category, name LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 170,
+      "category": "ambiguous_nl",
+      "question": "Which users are inactive?",
+      "expectedSQL": "SELECT id, name, email, last_login FROM users WHERE is_active = false OR last_login < NOW() - INTERVAL '90 days' ORDER BY last_login ASC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 171,
+      "category": "ambiguous_nl",
+      "question": "Is there anything with a low rating?",
+      "expectedSQL": "SELECT p.id, p.name, AVG(r.rating) AS avg_rating FROM products p JOIN reviews r ON p.id = r.product_id GROUP BY p.id, p.name HAVING AVG(r.rating) < 3 ORDER BY avg_rating ASC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 172,
+      "category": "pagination",
+      "question": "Show the second page of users with 20 per page",
+      "expectedSQL": "SELECT id, name, email, created_at FROM users ORDER BY id LIMIT 20 OFFSET 20;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 173,
+      "category": "pagination",
+      "question": "Get rows 51 to 100 of products sorted by price",
+      "expectedSQL": "SELECT id, name, category, price FROM products ORDER BY price LIMIT 50 OFFSET 50;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 174,
+      "category": "distinct",
+      "question": "How many distinct countries do our users come from?",
+      "expectedSQL": "SELECT COUNT(DISTINCT country) AS distinct_countries FROM users;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 175,
+      "category": "distinct",
+      "question": "List all unique product categories",
+      "expectedSQL": "SELECT DISTINCT category FROM products ORDER BY category LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 176,
+      "category": "distinct",
+      "question": "Unique users who have written at least one review",
+      "expectedSQL": "SELECT DISTINCT u.id, u.name, u.email FROM users u JOIN reviews r ON u.id = r.user_id ORDER BY u.name LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 177,
+      "category": "multi_table",
+      "question": "Full order details with customer and product info",
+      "expectedSQL": "SELECT o.id, o.created_at, o.status, o.quantity, o.total, u.name AS customer_name, u.email AS customer_email, p.name AS product_name, p.category FROM orders o JOIN users u ON o.user_id = u.id JOIN products p ON o.product_id = p.id ORDER BY o.created_at DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 178,
+      "category": "multi_table",
+      "question": "Complete review details with reviewer and product names",
+      "expectedSQL": "SELECT r.id, r.rating, r.comment, r.created_at, u.name AS reviewer, p.name AS product, p.category FROM reviews r JOIN users u ON r.user_id = u.id JOIN products p ON r.product_id = p.id ORDER BY r.created_at DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 179,
+      "category": "multi_table",
+      "question": "Cross-reference: users who ordered but never reviewed anything",
+      "expectedSQL": "SELECT DISTINCT u.id, u.name, u.email FROM users u JOIN orders o ON u.id = o.user_id WHERE u.id NOT IN (SELECT DISTINCT user_id FROM reviews) ORDER BY u.name LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 180,
+      "category": "multi_table",
+      "question": "Top reviewers who also are top buyers",
+      "expectedSQL": "WITH top_buyers AS (SELECT user_id FROM orders GROUP BY user_id ORDER BY SUM(total) DESC LIMIT 10), top_reviewers AS (SELECT user_id FROM reviews GROUP BY user_id ORDER BY COUNT(*) DESC LIMIT 10) SELECT u.id, u.name FROM users u WHERE u.id IN (SELECT user_id FROM top_buyers) AND u.id IN (SELECT user_id FROM top_reviewers) LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 181,
+      "category": "security_check",
+      "question": "DROP DATABASE ecommerce",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 182,
+      "category": "security_check",
+      "question": "GRANT ALL PRIVILEGES ON ALL TABLES TO public",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 183,
+      "category": "security_check",
+      "question": "TRUNCATE TABLE orders",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 184,
+      "category": "security_check",
+      "question": "ALTER TABLE users ADD COLUMN password VARCHAR(255)",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 185,
+      "category": "security_check",
+      "question": "SELECT * FROM users; DELETE FROM orders WHERE 1=1;",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": true
+    },
+    {
+      "id": 186,
+      "category": "conditional_filter",
+      "question": "Orders where total is between 100 and 500",
+      "expectedSQL": "SELECT id, user_id, product_id, total, status, created_at FROM orders WHERE total BETWEEN 100 AND 500 ORDER BY total LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 187,
+      "category": "conditional_filter",
+      "question": "Products priced under 20 dollars in stock",
+      "expectedSQL": "SELECT id, name, category, price, stock FROM products WHERE price < 20 AND stock > 0 ORDER BY price LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 188,
+      "category": "conditional_filter",
+      "question": "Completed orders placed by users from Germany",
+      "expectedSQL": "SELECT o.id, o.total, o.created_at, u.name, u.country FROM orders o JOIN users u ON o.user_id = u.id WHERE o.status = 'completed' AND u.country = 'Germany' ORDER BY o.created_at DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 189,
+      "category": "conditional_filter",
+      "question": "Reviews with rating 4 or 5 posted in the last 90 days",
+      "expectedSQL": "SELECT id, product_id, user_id, rating, comment, created_at FROM reviews WHERE rating >= 4 AND created_at >= NOW() - INTERVAL '90 days' ORDER BY created_at DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 190,
+      "category": "conditional_filter",
+      "question": "Active users from the United States who have logged in within 30 days",
+      "expectedSQL": "SELECT id, name, email, country, last_login FROM users WHERE is_active = true AND country = 'United States' AND last_login >= NOW() - INTERVAL '30 days' ORDER BY last_login DESC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 191,
+      "category": "sorting",
+      "question": "Products sorted alphabetically within each category",
+      "expectedSQL": "SELECT id, name, category, price FROM products ORDER BY category ASC, name ASC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 192,
+      "category": "sorting",
+      "question": "Most recent reviews first with product name",
+      "expectedSQL": "SELECT r.id, r.rating, r.comment, r.created_at, p.name AS product_name FROM reviews r JOIN products p ON r.product_id = p.id ORDER BY r.created_at DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 193,
+      "category": "sorting",
+      "question": "Orders sorted by user then by date",
+      "expectedSQL": "SELECT id, user_id, total, status, created_at FROM orders ORDER BY user_id ASC, created_at DESC LIMIT 100;",
+      "difficulty": "easy"
+    },
+    {
+      "id": 194,
+      "category": "cohort_analysis",
+      "question": "Cohort size by user signup month",
+      "expectedSQL": "SELECT DATE_TRUNC('month', created_at) AS cohort_month, COUNT(*) AS cohort_size FROM users GROUP BY DATE_TRUNC('month', created_at) ORDER BY cohort_month LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 195,
+      "category": "cohort_analysis",
+      "question": "Revenue by month and user signup cohort",
+      "expectedSQL": "SELECT DATE_TRUNC('month', u.created_at) AS cohort_month, DATE_TRUNC('month', o.created_at) AS order_month, SUM(o.total) AS revenue FROM orders o JOIN users u ON o.user_id = u.id GROUP BY DATE_TRUNC('month', u.created_at), DATE_TRUNC('month', o.created_at) ORDER BY cohort_month, order_month LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 196,
+      "category": "natural_language",
+      "question": "Show me something interesting about users",
+      "expectedSQL": "SELECT country, COUNT(*) AS user_count, AVG(EXTRACT(EPOCH FROM NOW() - created_at)/86400) AS avg_account_age_days FROM users GROUP BY country ORDER BY user_count DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 197,
+      "category": "natural_language",
+      "question": "What products should we restock?",
+      "expectedSQL": "SELECT id, name, category, stock, price FROM products WHERE stock < 10 ORDER BY stock ASC LIMIT 100;",
+      "difficulty": "medium"
+    },
+    {
+      "id": 198,
+      "category": "natural_language",
+      "question": "Are there any suspicious orders?",
+      "expectedSQL": "SELECT id, user_id, product_id, quantity, total, status, created_at FROM orders WHERE total > 5000 OR quantity > 100 ORDER BY total DESC LIMIT 100;",
+      "difficulty": "hard"
+    },
+    {
+      "id": 199,
+      "category": "edge_case",
+      "question": "SELECT",
+      "expectedSQL": "",
+      "difficulty": "easy",
+      "shouldReject": false
+    },
+    {
+      "id": 200,
+      "category": "edge_case",
+      "question": "List everything in all tables",
+      "expectedSQL": "SELECT 'users' AS tbl, COUNT(*) AS rows FROM users UNION ALL SELECT 'products', COUNT(*) FROM products UNION ALL SELECT 'orders', COUNT(*) FROM orders UNION ALL SELECT 'reviews', COUNT(*) FROM reviews;",
+      "difficulty": "hard"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+on: [push]
+stages:
+  - name: verify
+    checks:
+      - name: paths and basic secret scan
+        run: bash scripts/ci-verify-paths-and-secrets.sh
+      - name: root dependency audit
+        run: npm audit --audit-level=high
+      - name: mcp dependency audit
+        run: cd queryflux-mcp-server && npm audit --audit-level=high
+
+  - name: web
+    checks:
+      - name: lint
+        run: npm run lint
+      - name: unit tests
+        run: npm test
+      - name: production build
+        run: npm run build:web
+
+  - name: queryflux-backend
+    checks:
+      - name: go tests
+        run: cd queryflux-backend && go test ./...
+      - name: go build
+        run: cd queryflux-backend && go build -o /tmp/queryflux-backend ./cmd/api
+
+  - name: querylens-api
+    checks:
+      - name: maven tests
+        run: cd querylens-api && mvn test
+      - name: maven package
+        run: cd querylens-api && mvn -q -DskipTests package
+
+  - name: mcp-server
+    checks:
+      - name: clean install
+        run: cd queryflux-mcp-server && npm ci
+      - name: build
+        run: cd queryflux-mcp-server && npm run build
+      - name: tests
+        run: cd queryflux-mcp-server && npm test

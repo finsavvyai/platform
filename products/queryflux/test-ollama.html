@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueryFlux Ollama Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        input, textarea, select, button {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #2a2a2a;
+            color: #fff;
+        }
+        button {
+            background: #007acc;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        .response {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .success { background: #10b981; }
+        .error { background: #ef4444; }
+        .testing { background: #f59e0b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>QueryFlux Ollama Integration Test</h1>
+
+        <div>
+            <h3>Test Ollama Connection</h3>
+            <div id="status" class="status">Ready to test</div>
+            <button onclick="testConnection()">Test Connection</button>
+        </div>
+
+        <div>
+            <h3>Test AI Response</h3>
+            <div class="input-group">
+                <input type="text" id="prompt" placeholder="Ask about SQL databases..." value="What is a PostgreSQL database?">
+                <select id="model">
+                    <option value="llama3:latest">Llama 3</option>
+                    <option value="mistral:latest">Mistral</option>
+                </select>
+                <button onclick="testAIResponse()">Ask AI</button>
+            </div>
+        </div>
+
+        <div>
+            <h3>Response:</h3>
+            <div id="response" class="response">Response will appear here...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Copy the AIService class for testing
+        class AIService {
+            constructor() {
+                this.config = {
+                    providers: [
+                        {
+                            id: 'ollama-local',
+                            name: 'Ollama (Local)',
+                            type: 'ollama',
+                            baseUrl: 'http://localhost:11434',
+                            model: 'llama3:latest',
+                            enabled: true
+                        }
+                    ],
+                    defaultProvider: 'ollama-local',
+                    temperature: 0.7,
+                    maxTokens: 2000
+                };
+            }
+
+            async testConnection(provider) {
+                try {
+                    const response = await fetch(`${provider.baseUrl}/api/tags`);
+                    return response.ok;
+                } catch (error) {
+                    console.error('Connection test failed:', error);
+                    return false;
+                }
+            }
+
+            async generateResponse(prompt, context = {}) {
+                const provider = this.config.providers.find(p => p.id === this.config.defaultProvider);
+                if (!provider) {
+                    throw new Error('No AI provider enabled');
+                }
+
+                const enhancedPrompt = this.buildEnhancedPrompt(prompt, context);
+
+                try {
+                    const response = await fetch(`${provider.baseUrl}/api/generate`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            model: provider.model,
+                            prompt: enhancedPrompt,
+                            stream: false,
+                            options: {
+                                temperature: this.config.temperature,
+                                num_predict: this.config.maxTokens
+                            }
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+
+                    return {
+                        content: data.response || 'No response generated',
+                        provider: provider.name,
+                        model: provider.model
+                    };
+                } catch (error) {
+                    console.error('Ollama API Error:', error);
+                    throw new Error(`Failed to generate response with Ollama: ${error.message}`);
+                }
+            }
+
+            buildEnhancedPrompt(prompt, context) {
+                let enhancedPrompt = `You are a helpful database assistant. You help users with SQL queries, database optimization, security analysis, and general database management.\n\n`;
+
+                if (context?.databaseType) {
+                    enhancedPrompt += `Database Type: ${context.databaseType}\n`;
+                }
+
+                enhancedPrompt += `User Query: ${prompt}\n\nPlease provide a helpful, concise response.`;
+
+                return enhancedPrompt;
+            }
+
+            async getOllamaModels(baseUrl = 'http://localhost:11434') {
+                try {
+                    const response = await fetch(`${baseUrl}/api/tags`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch models: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    return data.models?.map(model => model.name) || [];
+                } catch (error) {
+                    console.error('Failed to fetch Ollama models:', error);
+                    return [];
+                }
+            }
+        }
+
+        // Make functions available globally
+        window.aiService = new AIService();
+
+        window.testConnection = async function() {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Testing connection...';
+            statusEl.className = 'status testing';
+
+            try {
+                const isWorking = await window.aiService.testConnection(window.aiService.config.providers[0]);
+                if (isWorking) {
+                    statusEl.textContent = '✓ Connection successful! Ollama is running.';
+                    statusEl.className = 'status success';
+
+                    // Load available models
+                    const models = await window.aiService.getOllamaModels();
+                    const modelSelect = document.getElementById('model');
+                    modelSelect.innerHTML = '';
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.textContent = model;
+                        modelSelect.appendChild(option);
+                    });
+                } else {
+                    statusEl.textContent = '✗ Connection failed. Is Ollama running?';
+                    statusEl.className = 'status error';
+                }
+            } catch (error) {
+                statusEl.textContent = `✗ Error: ${error.message}`;
+                statusEl.className = 'status error';
+            }
+        };
+
+        window.testAIResponse = async function() {
+            const prompt = document.getElementById('prompt').value;
+            const model = document.getElementById('model').value;
+            const responseEl = document.getElementById('response');
+
+            if (!prompt.trim()) {
+                responseEl.textContent = 'Please enter a prompt.';
+                return;
+            }
+
+            responseEl.textContent = 'Generating response...';
+
+            try {
+                // Update the model in the service
+                window.aiService.config.providers[0].model = model;
+
+                const response = await window.aiService.generateResponse(prompt, {
+                    databaseType: 'PostgreSQL'
+                });
+
+                responseEl.textContent = `${response.content}\n\n---\nProvider: ${response.provider}\nModel: ${response.model}`;
+            } catch (error) {
+                responseEl.textContent = `Error: ${error.message}`;
+            }
+        };
+
+        // Test connection automatically when page loads
+        window.addEventListener('load', () => {
+            setTimeout(testConnection, 500);
+        });
+    </script>
+</body>
+</html>

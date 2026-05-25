@@ -1,0 +1,752 @@
+{
+  "info": {
+    "_postman_id": "sdlc-api-collection-v1",
+    "name": "SDLC.ai API v1",
+    "description": "Comprehensive API collection for the SDLC.ai Secure Data Learning Platform\n\n## Getting Started\n\n1. **Authentication**: Run the \"Auth - Login\" request first to obtain a JWT token\n2. **Environment Variables**: Make sure the following variables are set in your environment:\n   - `base_url`: API base URL (e.g., https://api.sdlc.ai/v1)\n   - `jwt_token`: Will be automatically set after login\n   - `tenant_id`: Your tenant ID\n3. **Test Execution**: Use the \"SDLC API Tests\" collection runner to execute all tests\n\n## Collection Structure\n\n- **Authentication**: Login, logout, token refresh\n- **Tenant Management**: CRUD operations for tenants\n- **User Management**: User operations and role management\n- **Documents**: Document upload, processing, and management\n- **RAG**: Query documents and get AI-powered responses\n- **Vector Search**: Semantic and hybrid search\n- **DLP**: Data loss prevention scanning\n- **Monitoring**: Health checks and metrics\n\n## Test Scripts\n\nEach request includes test scripts that:\n- Validate response status codes\n- Check response structure\n- Save tokens for subsequent requests\n- Measure response times\n- Log test results\n\n## Environment Variables\n\nRequired variables:\n- `base_url`: API base URL\n- `tenant_id`: Tenant identifier\n- `user_email`: User email for login\n- `user_password`: User password\n\nAutomatically set:\n- `jwt_token`: JWT access token\n- `refresh_token`: JWT refresh token\n- `user_id`: Current user ID\n\n## Notes\n\n- All requests include proper error handling\n- Rate limiting headers are automatically checked\n- Tests are designed to work with the mock server or real API\n- Some requests may require additional permissions based on user role",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "sdlc-platform"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script",
+          "// Add timestamp to all requests for tracking",
+          pm.request.headers.add({",
+          "    key: 'X-Request-ID',",
+          "    value: 'req_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)",
+          "    disabled: false",
+          "});",
+          "",
+          "// Add client version",
+          "pm.request.headers.add({",
+          "    key: 'X-Client-Version',",
+          "    value: '1.0.0',",
+          "    disabled: false",
+          "});",
+          "",
+          "// Add client name",
+          "pm.request.headers.add({",
+          "    key: 'X-Client-Name',",
+          "    value: 'Postman',",
+          "    disabled: false",
+          "});",
+          "",
+          "// Log request details",
+          "console.log('[' + pm.info.requestName + '] Sending request to:', pm.request.url.toString());",
+          "",
+          "// Check if token is expired",
+          "if (pm.collectionVariables.get('jwt_token') && pm.collectionVariables.get('token_expires_at')) {",
+          "    var expiresAt = parseInt(pm.collectionVariables.get('token_expires_at'));",
+          "    var now = Date.now();",
+          "    ",
+          "    if (now >= expiresAt) {",
+          "        console.log('Token expired, attempting refresh...');",
+          "        // Token refresh would be handled in a separate request",
+          "    }",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script",
+          "",
+          "// Check response status",
+          "pm.test('Status code is successful', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 204]);",
+          "});",
+          "",
+          "// Check response time",
+          "pm.test('Response time is less than 2 seconds', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+          "});",
+          "",
+          "// Log response details",
+          "console.log('[' + pm.info.requestName + '] Response:', {",
+          "    status: pm.response.code,",
+          "    time: pm.response.responseTime,",
+          "    size: pm.response.responseSize",
+          "});",
+          "",
+          "// Check rate limiting headers",
+          "if (pm.response.headers.get('X-RateLimit-Limit')) {",
+          "    pm.test('Rate limiting headers present', function () {",
+          "        pm.expect(pm.response.headers.get('X-RateLimit-Limit')).to.exist;",
+          "        pm.expect(pm.response.headers.get('X-RateLimit-Remaining')).to.exist;",
+          "    });",
+          "    ",
+          "    // Log rate limit info",
+          "    console.log('Rate Limit:', {",
+          "        limit: pm.response.headers.get('X-RateLimit-Limit'),",
+          "        remaining: pm.response.headers.get('X-RateLimit-Remaining'),",
+          "        reset: pm.response.headers.get('X-RateLimit-Reset')",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.sdlc.ai/v1",
+      "type": "string",
+      "description": "API base URL"
+    },
+    {
+      "key": "tenant_id",
+      "value": "123e4567-e89b-12d3-a456-426614174000",
+      "type": "string",
+      "description": "Tenant ID"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string",
+      "description": "JWT access token (auto-set)"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string",
+      "description": "JWT refresh token (auto-set)"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string",
+      "description": "Current user ID (auto-set)"
+    },
+    {
+      "key": "document_id",
+      "value": "",
+      "type": "string",
+      "description": "Document ID for testing (auto-set)"
+    },
+    {
+      "key": "query_id",
+      "value": "",
+      "type": "string",
+      "description": "Query ID for testing (auto-set)"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Parse response",
+                  "try {",
+                  "    const response = pm.response.json();",
+                  "    ",
+                  "    // Save tokens",
+                  "    if (response.success && response.data && response.data.access_token) {",
+                  "        pm.collectionVariables.set('jwt_token', response.data.access_token);",
+                  "        pm.collectionVariables.set('refresh_token', response.data.refresh_token);",
+                  "        pm.collectionVariables.set('user_id', response.data.user.id);",
+                  "        ",
+                  "        // Calculate token expiry",
+                  "        const expiresIn = response.data.expires_in || 3600;",
+                  "        const expiresAt = Date.now() + (expiresIn * 1000);",
+                  "        pm.collectionVariables.set('token_expires_at', expiresAt);",
+                  "        ",
+                  "        // Test success",
+                  "        pm.test('Login successful', function () {",
+                  "            pm.expect(response.success).to.be.true;",
+                  "            pm.expect(response.data.access_token).to.be.a('string');",
+                  "            pm.expect(response.data.user).to.be.an('object');",
+                  "        });",
+                  "        ",
+                  "        console.log('Login successful. Token saved.');",
+                  "    } else {",
+                  "        pm.test('Login failed', function () {",
+                  "            pm.fail(response.error?.message || 'Unknown error');",
+                  "        });",
+                  "    }",
+                  "} catch (e) {",
+                  "    pm.test('Invalid response format', function () {",
+                  "        pm.fail('Response is not valid JSON');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\",\n  \"tenant_id\": \"{{tenant_id}}\",\n  \"remember_me\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Authenticate with email and password to obtain JWT tokens"
+          }
+        },
+        {
+          "name": "Logout",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout successful', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.true;",
+                  "});",
+                  "",
+                  "// Clear tokens on successful logout",
+                  "pm.collectionVariables.unset('jwt_token');",
+                  "pm.collectionVariables.unset('refresh_token');",
+                  "pm.collectionVariables.unset('user_id');",
+                  "pm.collectionVariables.unset('token_expires_at');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Logout and invalidate current session"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "try {",
+                  "    const response = pm.response.json();",
+                  "    ",
+                  "    if (response.success && response.data && response.data.access_token) {",
+                  "        // Update tokens",
+                  "        pm.collectionVariables.set('jwt_token', response.data.access_token);",
+                  "        pm.collectionVariables.set('refresh_token', response.data.refresh_token);",
+                  "        ",
+                  "        // Update expiry",
+                  "        const expiresIn = response.data.expires_in || 3600;",
+                  "        const expiresAt = Date.now() + (expiresIn * 1000);",
+                  "        pm.collectionVariables.set('token_expires_at', expiresAt);",
+                  "        ",
+                  "        pm.test('Token refreshed successfully', function () {",
+                  "            pm.expect(response.data.access_token).to.be.a('string');",
+                  "        });",
+                  "    }",
+                  "} catch (e) {",
+                  "    pm.test('Token refresh failed', function () {",
+                  "        pm.fail(e.message);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Refresh JWT access token using refresh token"
+          }
+        },
+        {
+          "name": "Get Current User",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('User data retrieved', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.true;",
+                  "    pm.expect(response.data).to.be.an('object');",
+                  "    pm.expect(response.data.id).to.be.a('string');",
+                  "    pm.expect(response.data.email).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Get information about the currently authenticated user"
+          }
+        }
+      ],
+      "description": "Authentication endpoints for login, logout, and token management"
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Upload Document",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "try {",
+                  "    const response = pm.response.json();",
+                  "    ",
+                  "    if (response.success && response.data && response.data.id) {",
+                  "        // Save document ID for later tests",
+                  "        pm.collectionVariables.set('document_id', response.data.id);",
+                  "        ",
+                  "        pm.test('Document uploaded successfully', function () {",
+                  "            pm.expect(response.data.id).to.be.a('string');",
+                  "            pm.expect(response.data.status).to.be.oneOf(['processing', 'completed']);",
+                  "        });",
+                  "        ",
+                  "        // Check processing status",
+                  "        if (response.data.status === 'completed') {",
+                  "            pm.test('Document processed immediately', function () {",
+                  "                pm.expect(response.data.processing_progress).to.equal(100);",
+                  "            });",
+                  "        }",
+                  "    }",
+                  "} catch (e) {",
+                  "    pm.test('Document upload failed', function () {",
+                  "        pm.fail(e.message);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [
+                    {
+                      "key": "sample.pdf",
+                      "type": "file",
+                      "content": "sample content"
+                    }
+                  ]
+                },
+                {
+                  "key": "metadata",
+                  "value": "{\n  \"title\": \"Test Document\",\n  \"description\": \"A test document for API testing\",\n  \"tags\": [\"test\", \"api\"],\n  \"classification\": \"internal\"\n}",
+                  "type": "text"
+                },
+                {
+                  "key": "processing_options",
+                  "value": "{\n  \"extract_text\": true,\n  \"generate_embeddings\": true,\n  \"run_dlp_scan\": true\n}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/documents",
+              "host": ["{{base_url}}"],
+              "path": ["documents"]
+            },
+            "description": "Upload a document for processing"
+          }
+        },
+        {
+          "name": "List Documents",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Documents list retrieved', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.true;",
+                  "    pm.expect(response.data).to.have.property('documents');",
+                  "    pm.expect(response.data).to.have.property('pagination');",
+                  "    pm.expect(response.data.documents).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/documents?limit=20&offset=0&sort=created_at:desc",
+              "host": ["{{base_url}}"],
+              "path": ["documents"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                },
+                {
+                  "key": "sort",
+                  "value": "created_at:desc"
+                }
+              ]
+            },
+            "description": "List documents with pagination"
+          }
+        },
+        {
+          "name": "Get Document",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Document details retrieved', function () {",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.success).to.be.true;",
+                  "    pm.expect(response.data).to.be.an('object');",
+                  "    pm.expect(response.data.id).to.equal(pm.collectionVariables.get('document_id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/documents/{{document_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["documents", "{{document_id}}"]
+            },
+            "description": "Get details of a specific document"
+          }
+        },
+        {
+          "name": "Delete Document",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Document deleted', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([204, 200]);",
+                  "});",
+                  "",
+                  "// Clear document ID",
+                  "pm.collectionVariables.unset('document_id');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/documents/{{document_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["documents", "{{document_id}}"]
+            },
+            "description": "Delete a document"
+          }
+        }
+      ],
+      "description": "Document management operations"
+    },
+    {
+      "name": "RAG Query",
+      "item": [
+        {
+          "name": "Query Documents",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "try {",
+                  "    const response = pm.response.json();",
+                  "    ",
+                  "    if (response.success && response.data) {",
+                  "        // Save query ID",
+                  "        pm.collectionVariables.set('query_id', response.data.id);",
+                  "        ",
+                  "        pm.test('RAG query successful', function () {",
+                  "            pm.expect(response.data).to.have.property('answer');",
+                  "            pm.expect(response.data).to.have.property('sources');",
+                  "            pm.expect(response.data.sources).to.be.an('array');",
+                  "        });",
+                  "        ",
+                  "        // Check if sources are included",
+                  "        if (response.data.sources && response.data.sources.length > 0) {",
+                  "            pm.test('Sources included', function () {",
+                  "                const source = response.data.sources[0];",
+                  "                pm.expect(source).to.have.property('document_id');",
+                  "                pm.expect(source).to.have.property('score');",
+                  "            });",
+                  "        }",
+                  "        ",
+                  "        // Check token usage",
+                  "        if (response.data.tokens_used) {",
+                  "            pm.test('Token usage tracked', function () {",
+                  "                pm.expect(response.data.tokens_used).to.have.property('total');",
+                  "            });",
+                  "        }",
+                  "    }",
+                  "} catch (e) {",
+                  "    pm.test('RAG query failed', function () {",
+                  "        pm.fail(e.message);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What are the key points in the uploaded documents?\",\n  \"model\": \"gpt-3.5-turbo\",\n  \"max_context_length\": 4000,\n  \"temperature\": 0.1,\n  \"max_tokens\": 500,\n  \"include_sources\": true,\n  \"top_k\": 5,\n  \"rerank\": true,\n  \"citations\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rag/query",
+              "host": ["{{base_url}}"],
+              "path": ["rag", "query"]
+            },
+            "description": "Query documents using natural language"
+          }
+        },
+        {
+          "name": "Streaming Query",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "key": "token",
+                "value": "{{jwt_token}}",
+                "type": "string"
+              }
+            ]
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"Summarize the main findings\",\n  \"model\": \"gpt-3.5-turbo\",\n  \"streaming\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/rag/query/stream",
+              "host": ["{{base_url}}"],
+              "path": ["rag", "query", "stream"]
+            },
+            "description": "Query documents with streaming response"
+          }
+        }
+      ],
+      "description": "RAG (Retrieval-Augmented Generation) operations"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level pre-request script",
+          "// Ensure all required variables are set",
+          "const requiredVars = ['base_url', 'tenant_id', 'user_email', 'user_password'];",
+          "const missingVars = requiredVars.filter(varName => !pm.collectionVariables.get(varName));",
+          "",
+          "if (missingVars.length > 0) {",
+          "    console.log('Missing required environment variables:', missingVars.join(', '));",
+          "    console.log('Please set these variables in the environment.');",
+          "}",
+          "",
+          "// Log current environment",
+          "console.log('Current environment:', {",
+          "    base_url: pm.collectionVariables.get('base_url'),",
+          "    tenant_id: pm.collectionVariables.get('tenant_id'),",
+          "    has_token: !!pm.collectionVariables.get('jwt_token')",
+          "    user_id: pm.collectionVariables.get('user_id')",
+          "});"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Collection-level test script",
+          "// Log test completion",
+          "console.log('[' + pm.info.requestName + '] Test completed');",
+          "",
+          "// Check for deprecation warnings",
+          "if (pm.response.headers.get('API-Version-Deprecated')) {",
+          "    pm.test('API Version Deprecation Warning', function () {",
+          "        const warning = pm.response.headers.get('API-Version-Deprecation-Warning');",
+          "        console.warn('API VERSION DEPRECATED:', warning);",
+          "    });",
+          "}",
+          "",
+          "// Check for rate limit warnings",
+          "const remaining = parseInt(pm.response.headers.get('X-RateLimit-Remaining') || '0');",
+          "if (remaining < 10) {",
+          "    pm.test('Rate Limit Warning', function () {",
+          "        console.warn('Rate limit running low:', remaining + ' requests remaining');",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+services:
+  # QueryFlux Backend API
+  - type: web
+    name: queryflux-backend
+    env: go
+    plan: starter
+    healthCheckPath: /health
+    autoDeploy: true
+    buildCommand: go build -o bin/queryflux-backend cmd/server/main.go
+    startCommand: ./bin/queryflux-backend
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GO_VERSION
+        value: 1.24
+
+  # PostgreSQL Database
+  - type: pserv
+    name: queryflux-db
+    plan: starter
+    databaseName: queryflux
+    user: queryflux
+    ipAllowList: []  # Only allow connections from other services
+    postgresMajorVersion: 15
+
+  # Redis Cache
+  - type: redis
+    name: queryflux-redis
+    plan: starter
+    ipAllowList: []  # Only allow connections from other services
+
+# Custom domains
+domains:
+  - domain: api.queryflux.com
+    service: queryflux-backend
+    path: /

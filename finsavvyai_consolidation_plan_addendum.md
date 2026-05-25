@@ -175,4 +175,57 @@ Every directory in `portfolio/` is assigned to one of five buckets:
 
 ---
 
+## 4. Matrix Corrections (2026-05-25)
+
+Founder re-examination of four flagged repos (`founder_decisions_memo.md`). Three of the four were misclassified.
+
+### Updated bucket assignments
+
+| Repo | Old bucket | **New bucket** | Reason |
+|---|---|---|---|
+| `queryflux-git` | ARCHIVE → or fold | **CORE (8th product)** | Active shipping (Tasks 11.x SSO+Subs+SecHard merged within 7 days), 791 files, multi-surface (web/desktop/mobile/MCP/ext), fills data-layer gap |
+| `queryflux` (empty placeholder) | ARCHIVE → or fold | **CORE (fold into QueryFlux)** | Was 0B placeholder; skipped during migration |
+| `querylens` | ARCHIVE → or fold | **CORE (fold under products/queryflux/lens/)** | Sub-component of QueryFlux |
+| `autoboot` (FastPM product) | ARCHIVE | **ARCHIVE (immediate takedown)** | Unchanged classification; founder confirmed immediate decommission with site shutdown + DNS redirect. Sprint harness (root-level scripts) is a SEPARATE thing and stays as INFRA |
+| `looma-sh` | ARCHIVE | **EXTERNALIZE (spin-out)** | Live prod (relay.looma.sh), paid tiers, investor brief, IP work. Off-thesis but valuable → spin out as sibling entity |
+| `a2a-framework` | OSS (conditional: keep if active) | **OSS (definite)** + MIT LICENSE added | Standards-aligned protocol impl; strategic OSS leverage; LunaOS depends on it as wire protocol |
+
+### Updated counts
+
+- **CORE**: **8** product lines (PushCI, **QueryFlux**, Qestro, LunaOS, OpenSyber, SDLC.cc, AMLIQ, TenantIQ) consolidating ~15 repos
+- **OSS**: ~7 packages (a2a-framework now unconditional)
+- **PLATFORM**: 5 services (unchanged)
+- **INFRA**: ~9 internal-tooling repos + sprint harness explicitly enumerated separate from FastPM
+- **EXTERNALIZE**: 1 (looma-sh) — new bucket
+- **ARCHIVE**: ~20 (down by 2; queryflux + querylens promoted to CORE; looma moved to EXTERNALIZE; autoboot still archive but classified separately from harness)
+
+### Updated GTM funnel
+
+```
+Developer uses Cursor
+  → installs PushCI         (code validation)
+  → adopts QueryFlux        (safe DB layer for AI agents)        ← NEW
+  → adopts Qestro           (runtime QA)
+  → adopts OpenSyber        (runtime AI security)
+  → adopts SDLC.cc          (governance)
+```
+
+QueryFlux slots in early — every developer using AI code-gen also needs a safe DB layer for the agent.
+
+### Executed in this pass
+
+- `products/queryflux/` created (rsync from `queryflux-git`, fold `querylens` → `lens/`); MIGRATION_NOTES + README + CLAUDE.md + CONSOLIDATION_TODO.md written.
+- Archive snapshots removed: `_archive/portfolio-snapshots/{queryflux-git,queryflux,querylens}/`.
+- `_archive/fastpm-2026-05/TAKE_DOWN_ACTIONS.md` written (10-step user checklist for site shutdown + DNS redirect + extension unpublish + GitHub archive).
+- `_archive/externalized/{INDEX.md,looma-sh/SPIN_OUT_PLAN.md}` written (10-step spin-out checklist).
+- `oss/a2a-framework/LICENSE` (MIT) + new platform-aligned `README.md` written.
+
+### Still requires user action (outside repo)
+
+- Take down `fastpm.dev` site + configure DNS redirect → `finsavvyai.com`.
+- Spin out Looma as separate entity (entity + domain + Stripe + IP transfer).
+- After both: manually delete `/portfolio/autoboot/` and `/portfolio/looma-sh/`.
+
+---
+
 *End of addendum. Pair with `finsavvyai_full_extended_consolidation_plan.md`.*

@@ -1,0 +1,100 @@
+services:
+  # PostgreSQL (existing baseline)
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: queryflux-postgres-test
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=test_db
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./tests/integration/database/init-scripts/postgres:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Redis
+  redis-test:
+    image: redis:7-alpine
+    container_name: queryflux-redis-test
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass test_password
+    volumes:
+      - redis_test_data:/data
+    ports:
+      - "6380:6379"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # MongoDB
+  mongodb-test:
+    image: mongo:7.0
+    container_name: queryflux-mongodb-test
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=test_user
+      - MONGO_INITDB_ROOT_PASSWORD=test_password
+      - MONGO_INITDB_DATABASE=test_db
+    volumes:
+      - mongodb_test_data:/data/db
+      - ./tests/integration/database/init-scripts/mongodb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "27018:27017"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # MySQL
+  mysql-test:
+    image: mysql:8.0
+    container_name: queryflux-mysql-test
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=test_db
+      - MYSQL_USER=test_user
+      - MYSQL_PASSWORD=test_password
+      - MYSQL_ROOT_PASSWORD=root_password
+    volumes:
+      - mysql_test_data:/var/lib/mysql
+      - ./tests/integration/database/init-scripts/mysql:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3307:3306"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "test_user", "-ptest_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  postgres_test_data:
+    driver: local
+  mysql_test_data:
+    driver: local
+  mongodb_test_data:
+    driver: local
+  redis_test_data:
+    driver: local

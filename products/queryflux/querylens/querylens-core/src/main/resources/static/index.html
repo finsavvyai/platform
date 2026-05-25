@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QueryLens - Natural Language SQL Query Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+        
+        h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .description {
+            font-size: 1.3em;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px 10px 0 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .nav-tab {
+            flex: 1;
+            padding: 15px 20px;
+            text-align: center;
+            cursor: pointer;
+            background: #f8f9fa;
+            border: none;
+            font-size: 1.1em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-tab.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .nav-tab:hover:not(.active) {
+            background: #e9ecef;
+        }
+        
+        .tab-content {
+            background: white;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-height: 600px;
+        }
+        
+        .tab-pane {
+            display: none;
+            padding: 30px;
+        }
+        
+        .tab-pane.active {
+            display: block;
+        }
+        
+        /* Dashboard Styles */
+        .dashboard-section {
+            margin-bottom: 30px;
+        }
+        
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .dashboard-title {
+            color: #2c3e50;
+            font-size: 1.5em;
+            margin: 0;
+        }
+        
+        .search-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .search-input {
+            padding: 10px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 14px;
+            width: 250px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        
+        .search-input:focus {
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .prompt-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .prompt-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .prompt-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        }
+        
+        .prompt-header {
+            display: flex;
+            justify-content: between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        
+        .prompt-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            flex: 1;
+        }
+        
+        .prompt-category {
+            background: #667eea;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            white-space: nowrap;
+        }
+        
+        .prompt-description {
+            color: #6c757d;
+            margin-bottom: 15px;
+            font-size: 0.9em;
+        }
+        
+        .prompt-text {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #495057;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .prompt-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .prompt-stats {
+            display: flex;
+            gap: 15px;
+            color: #6c757d;
+            font-size: 0.8em;
+        }
+        
+        .favorite-btn {
+            background: none;
+            border: none;
+            font-size: 1.2em;
+            cursor: pointer;
+            color: #ccc;
+            transition: color 0.3s ease;
+        }
+        
+        .favorite-btn.active {
+            color: #ffc107;
+        }
+        
+        /* Query Interface Styles */
+        .query-interface {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .datasource-selector {
+            margin-bottom: 20px;
+        }
+        
+        .datasource-selector select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+        }
+        
+        .query-input-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .query-input {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            resize: vertical;
+            outline: none;
+            font-family: inherit;
+        }
+        
+        .query-input:focus {
+            border-color: #667eea;
+        }
+        
+        .execute-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .results-container {
+            margin-top: 20px;
+        }
+        
+        .result-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .result-sql {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            margin-bottom: 15px;
+        }
+        
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        
+        .result-table th,
+        .result-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .result-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #f5c6cb;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: black;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 5px;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        /* API Documentation Styles */
+        .endpoint {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        
+        .method {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 0.9em;
+        }
+        
+        .get { background-color: #61affe; color: white; }
+        .post { background-color: #49cc90; color: white; }
+        .put { background-color: #fca130; color: white; }
+        .delete { background-color: #f93e3e; color: white; }
+        
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .nav-tabs {
+                flex-direction: column;
+            }
+            
+            .prompt-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .search-container {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .search-input {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>QueryLens</h1>
+            <p class="description">Natural Language SQL Query Tool with Smart Prompt Dashboard</p>
+        </header>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="switchTab('dashboard')">Dashboard</button>
+            <button class="nav-tab" onclick="switchTab('query')">Query Interface</button>
+            <button class="nav-tab" onclick="switchTab('datasources')">Data Sources</button>
+            <button class="nav-tab" onclick="switchTab('api')">API Documentation</button>
+        </div>
+
+        <div class="tab-content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-pane active">
+                <div class="dashboard-section">
+                    <div class="dashboard-header">
+                        <h2 class="dashboard-title">Common Prompts</h2>
+                        <div class="search-container">
+                            <input type="text" class="search-input" id="searchInput" placeholder="Search prompts...">
+                            <select id="categoryFilter" class="btn">
+                                <option value="">All Categories</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="showCreatePromptModal()">+ New Prompt</button>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-section">
+                        <h3>Quick Access</h3>
+                        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" onclick="loadPrompts('favorites')">⭐ Favorites</button>
+                            <button class="btn btn-secondary" onclick="loadPrompts('most-used')">🔥 Most Used</button>
+                            <button class="btn btn-secondary" onclick="loadPrompts('')">📋 All Prompts</button>
+                        </div>
+                    </div>
+                    
+                    <div id="promptsGrid" class="prompt-grid">
+                        <div class="loading">Loading prompts...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Query Interface Tab -->
+            <div id="query" class="tab-pane">
+                <div class="query-interface">
+                    <div class="datasource-selector">
+                        <label for="datasourceSelect">Select Data Source:</label>
+                        <select id="datasourceSelect">
+                            <option value="">Loading datasources...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="query-input-container">
+                        <textarea id="queryInput" class="query-input" 
+                                placeholder="Enter your natural language query here...&#10;&#10;Examples:&#10;• Count all records&#10;• Show me the top 10 customers by revenue&#10;• What is the average order value?"></textarea>
+                    </div>
+                    
+                    <button id="executeBtn" class="btn btn-primary execute-btn" onclick="executeQuery()">
+                        Execute Query
+                    </button>
+                    
+                    <div id="resultsContainer" class="results-container"></div>
+                </div>
+            </div>
+
+            <!-- Data Sources Tab -->
+            <div id="datasources" class="tab-pane">
+                <div class="dashboard-section">
+                    <div class="dashboard-header">
+                        <h2 class="dashboard-title">Data Sources</h2>
+                        <div class="search-container">
+                            <button class="btn btn-primary" onclick="showOnboardingModal()">+ Add Data Source</button>
+                            <button class="btn btn-secondary" onclick="checkMcpStatus()">🔌 MCP Status</button>
+                        </div>
+                    </div>
+                    
+                    <div id="datasourcesList" class="prompt-grid">
+                        <div class="loading">Loading data sources...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Documentation Tab -->
+            <div id="api" class="tab-pane">
+                <h2>API Documentation</h2>
+                
+                <div class="endpoint">
+                    <h3><span class="method get">GET</span> /api/datasources</h3>
+                    <p>List all available data sources.</p>
+                </div>
+                
+                <div class="endpoint">
+                    <h3><span class="method post">POST</span> /api/query/execute</h3>
+                    <p>Execute a natural language query against a data source.</p>
+                    <pre><code>{
+    "text": "Show me the top 10 customers by revenue",
+    "datasourceId": 1
+}</code></pre>
+                </div>
+                
+                <div class="endpoint">
+                    <h3><span class="method get">GET</span> /api/prompts</h3>
+                    <p>Get all common prompts. Supports query parameters:</p>
+                    <ul>
+                        <li><code>category</code> - Filter by category</li>
+                        <li><code>search</code> - Search in title, description, or prompt text</li>
+                    </ul>
+                </div>
+                
+                <div class="endpoint">
+                    <h3><span class="method post">POST</span> /api/prompts</h3>
+                    <p>Create a new common prompt.</p>
+                    <pre><code>{
+    "title": "Count Records",
+    "description": "Count all records in a table",
+    "promptText": "Count all records",
+    "category": "Basic Queries"
+}</code></pre>
+                </div>
+                
+                <div class="endpoint">
+                    <h3><span class="method get">GET</span> /api/prompts/favorites</h3>
+                    <p>Get all favorite prompts.</p>
+                </div>
+                
+                <div class="endpoint">
+                    <h3><span class="method post">POST</span> /api/prompts/{id}/favorite</h3>
+                    <p>Toggle favorite status of a prompt.</p>
+                </div>
+                
+                <div class="endpoint">
+                    <h3><span class="method post">POST</span> /api/prompts/{id}/use</h3>
+                    <p>Increment usage count of a prompt.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Prompt Modal -->
+    <div id="promptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Create New Prompt</h2>
+                <span class="close" onclick="closePromptModal()">&times;</span>
+            </div>
+            <form id="promptForm">
+                <div class="form-group">
+                    <label for="promptTitleInput">Title:</label>
+                    <input type="text" id="promptTitleInput" required>
+                </div>
+                <div class="form-group">
+                    <label for="promptDescriptionInput">Description:</label>
+                    <textarea id="promptDescriptionInput"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="promptTextInput">Prompt Text:</label>
+                    <textarea id="promptTextInput" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="promptCategoryInput">Category:</label>
+                    <input type="text" id="promptCategoryInput">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closePromptModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Prompt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Datasource Onboarding Modal -->
+    <div id="onboardingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Data Source</h2>
+                <span class="close" onclick="closeOnboardingModal()">&times;</span>
+            </div>
+            <form id="onboardingForm">
+                <div class="form-group">
+                    <label for="dsName">Data Source Name:</label>
+                    <input type="text" id="dsName" required placeholder="My Database">
+                </div>
+                <div class="form-group">
+                    <label for="dsDescription">Description:</label>
+                    <textarea id="dsDescription" placeholder="Description of this data source"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="dsType">Database Type:</label>
+                    <select id="dsType" onchange="updateConnectionFields()">
+                        <option value="">Select database type...</option>
+                        <option value="h2">H2 Database</option>
+                        <option value="postgresql">PostgreSQL</option>
+                        <option value="mysql">MySQL</option>
+                        <option value="oracle">Oracle</option>
+                        <option value="sqlserver">SQL Server</option>
+                        <option value="duckdb">DuckDB</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="dsUrl">Connection URL:</label>
+                    <input type="text" id="dsUrl" required placeholder="jdbc:postgresql://localhost:5432/mydb">
+                    <small style="color: #6c757d; font-size: 0.8em;">
+                        <span id="urlExample">Example: jdbc:postgresql://localhost:5432/mydb</span>
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label for="dsUsername">Username:</label>
+                    <input type="text" id="dsUsername" placeholder="database_user">
+                </div>
+                <div class="form-group">
+                    <label for="dsPassword">Password:</label>
+                    <input type="password" id="dsPassword" placeholder="password">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeOnboardingModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add & Analyze</button>
+                </div>
+            </form>
+            <div id="connectionTestResult" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentPrompts = [];
+        let datasources = [];
+        let editingPromptId = null;
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDatasources();
+            loadPrompts();
+            loadCategories();
+            
+            // Setup search functionality
+            document.getElementById('searchInput').addEventListener('input', function() {
+                const searchTerm = this.value;
+                if (searchTerm) {
+                    searchPrompts(searchTerm);
+                } else {
+                    loadPrompts();
+                }
+            });
+            
+            // Setup category filter
+            document.getElementById('categoryFilter').addEventListener('change', function() {
+                const category = this.value;
+                loadPrompts(category ? 'category' : '', category);
+            });
+            
+            // Setup form submission
+            document.getElementById('promptForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                savePrompt();
+            });
+        });
+
+        // Tab switching functionality
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        // Load datasources
+        async function loadDatasources() {
+            try {
+                const response = await fetch('/api/datasources');
+                datasources = await response.json();
+                
+                const select = document.getElementById('datasourceSelect');
+                select.innerHTML = '<option value="">Select a datasource...</option>';
+                
+                datasources.forEach(ds => {
+                    const option = document.createElement('option');
+                    option.value = ds.id;
+                    option.textContent = `${ds.name} - ${ds.description}`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load datasources:', error);
+                document.getElementById('datasourceSelect').innerHTML = '<option value="">Failed to load datasources</option>';
+            }
+        }
+
+        // Load prompts
+        async function loadPrompts(type = '', param = '') {
+            try {
+                let url = '/api/prompts';
+                if (type === 'favorites') {
+                    url = '/api/prompts/favorites';
+                } else if (type === 'most-used') {
+                    url = '/api/prompts/most-used?limit=10';
+                } else if (type === 'category' && param) {
+                    url = `/api/prompts?category=${encodeURIComponent(param)}`;
+                }
+                
+                const response = await fetch(url);
+                currentPrompts = await response.json();
+                renderPrompts(currentPrompts);
+            } catch (error) {
+                console.error('Failed to load prompts:', error);
+                document.getElementById('promptsGrid').innerHTML = '<div class="error">Failed to load prompts</div>';
+            }
+        }
+
+        // Search prompts
+        async function searchPrompts(searchTerm) {
+            try {
+                const response = await fetch(`/api/prompts?search=${encodeURIComponent(searchTerm)}`);
+                currentPrompts = await response.json();
+                renderPrompts(currentPrompts);
+            } catch (error) {
+                console.error('Failed to search prompts:', error);
+            }
+        }
+
+        // Load categories for filter
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/prompts/categories');
+                const categories = await response.json();
+                
+                const select = document.getElementById('categoryFilter');
+                categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load categories:', error);
+            }
+        }
+
+        // Render prompts
+        function renderPrompts(prompts) {
+            const grid = document.getElementById('promptsGrid');
+            
+            if (prompts.length === 0) {
+                grid.innerHTML = '<div class="loading">No prompts found</div>';
+                return;
+            }
+            
+            grid.innerHTML = prompts.map(prompt => `
+                <div class="prompt-card" onclick="usePrompt('${prompt.promptText.replace(/'/g, "\\'")}')">
+                    <div class="prompt-header">
+                        <div class="prompt-title">${prompt.title}</div>
+                        <div class="prompt-category">${prompt.category || 'Uncategorized'}</div>
+                    </div>
+                    <div class="prompt-description">${prompt.description || ''}</div>
+                    <div class="prompt-text">${prompt.promptText}</div>
+                    <div class="prompt-actions">
+                        <div class="prompt-stats">
+                            <span>👀 ${prompt.usageCount || 0} uses</span>
+                            <span>📅 ${new Date(prompt.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <div>
+                            <button class="favorite-btn ${prompt.isFavorite ? 'active' : ''}" 
+                                    onclick="event.stopPropagation(); toggleFavorite(${prompt.id})" 
+                                    title="Toggle favorite">⭐</button>
+                            <button class="btn btn-sm btn-secondary" 
+                                    onclick="event.stopPropagation(); editPrompt(${prompt.id})" 
+                                    title="Edit prompt">✏️</button>
+                            <button class="btn btn-sm btn-danger" 
+                                    onclick="event.stopPropagation(); deletePrompt(${prompt.id})" 
+                                    title="Delete prompt">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Use prompt (copy to query interface)
+        async function usePrompt(promptText) {
+            // Switch to query tab
+            switchTab('query');
+            document.querySelector('.nav-tab[onclick="switchTab(\'query\')"]').classList.add('active');
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                if (tab.onclick.toString().includes('query')) return;
+                tab.classList.remove('active');
+            });
+            
+            // Set the prompt text
+            document.getElementById('queryInput').value = promptText;
+            
+            // Increment usage count
+            const prompt = currentPrompts.find(p => p.promptText === promptText);
+            if (prompt) {
+                await fetch(`/api/prompts/${prompt.id}/use`, { method: 'POST' });
+            }
+        }
+
+        // Toggle favorite
+        async function toggleFavorite(promptId) {
+            try {
+                const response = await fetch(`/api/prompts/${promptId}/favorite`, { method: 'POST' });
+                if (response.ok) {
+                    loadPrompts(); // Reload to update UI
+                }
+            } catch (error) {
+                console.error('Failed to toggle favorite:', error);
+            }
+        }
+
+        // Delete prompt
+        async function deletePrompt(promptId) {
+            if (confirm('Are you sure you want to delete this prompt?')) {
+                try {
+                    const response = await fetch(`/api/prompts/${promptId}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        loadPrompts(); // Reload to update UI
+                    }
+                } catch (error) {
+                    console.error('Failed to delete prompt:', error);
+                }
+            }
+        }
+
+        // Show create prompt modal
+        function showCreatePromptModal() {
+            editingPromptId = null;
+            document.getElementById('modalTitle').textContent = 'Create New Prompt';
+            document.getElementById('promptForm').reset();
+            document.getElementById('promptModal').style.display = 'block';
+        }
+
+        // Edit prompt
+        function editPrompt(promptId) {
+            const prompt = currentPrompts.find(p => p.id === promptId);
+            if (!prompt) return;
+            
+            editingPromptId = promptId;
+            document.getElementById('modalTitle').textContent = 'Edit Prompt';
+            document.getElementById('promptTitleInput').value = prompt.title;
+            document.getElementById('promptDescriptionInput').value = prompt.description || '';
+            document.getElementById('promptTextInput').value = prompt.promptText;
+            document.getElementById('promptCategoryInput').value = prompt.category || '';
+            document.getElementById('promptModal').style.display = 'block';
+        }
+
+        // Close prompt modal
+        function closePromptModal() {
+            document.getElementById('promptModal').style.display = 'none';
+            editingPromptId = null;
+        }
+
+        // Save prompt
+        async function savePrompt() {
+            const promptData = {
+                title: document.getElementById('promptTitleInput').value,
+                description: document.getElementById('promptDescriptionInput').value,
+                promptText: document.getElementById('promptTextInput').value,
+                category: document.getElementById('promptCategoryInput').value
+            };
+            
+            try {
+                const url = editingPromptId ? `/api/prompts/${editingPromptId}` : '/api/prompts';
+                const method = editingPromptId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(promptData)
+                });
+                
+                if (response.ok) {
+                    closePromptModal();
+                    loadPrompts(); // Reload to update UI
+                    loadCategories(); // Reload categories in case new one was added
+                } else {
+                    alert('Failed to save prompt');
+                }
+            } catch (error) {
+                console.error('Failed to save prompt:', error);
+                alert('Failed to save prompt');
+            }
+        }
+
+        // Execute query
+        async function executeQuery() {
+            const datasourceId = document.getElementById('datasourceSelect').value;
+            const queryText = document.getElementById('queryInput').value;
+            
+            if (!datasourceId) {
+                alert('Please select a datasource');
+                return;
+            }
+            
+            if (!queryText.trim()) {
+                alert('Please enter a query');
+                return;
+            }
+            
+            const btn = document.getElementById('executeBtn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Executing...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/query/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: queryText,
+                        datasourceId: parseInt(datasourceId)
+                    })
+                });
+                
+                const result = await response.json();
+                displayResults(result);
+            } catch (error) {
+                console.error('Failed to execute query:', error);
+                displayError('Failed to execute query');
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // Display query results
+        function displayResults(result) {
+            const container = document.getElementById('resultsContainer');
+            
+            if (result.error) {
+                container.innerHTML = `<div class="error">Error: ${result.error}</div>`;
+                return;
+            }
+            
+            let html = '<div class="result-card">';
+            
+            // Result header
+            html += `
+                <div class="result-header">
+                    <h3>Query Results</h3>
+                    <div>
+                        <span style="color: #6c757d;">Execution time: ${result.executionTimeMs}ms</span>
+                        ${result.success ? '<span style="color: #28a745; margin-left: 10px;">✓ Success</span>' : '<span style="color: #dc3545; margin-left: 10px;">✗ Failed</span>'}
+                    </div>
+                </div>
+            `;
+            
+            // Generated SQL
+            if (result.generatedSql) {
+                html += `
+                    <h4>Generated SQL:</h4>
+                    <div class="result-sql">${result.generatedSql}</div>
+                `;
+            }
+            
+            // Results table
+            if (result.data && result.data.length > 0) {
+                html += '<h4>Results:</h4>';
+                html += '<table class="result-table">';
+                
+                // Table headers
+                if (result.columns && result.columns.length > 0) {
+                    html += '<thead><tr>';
+                    result.columns.forEach(col => {
+                        html += `<th>${col}</th>`;
+                    });
+                    html += '</tr></thead>';
+                }
+                
+                // Table body
+                html += '<tbody>';
+                result.data.forEach(row => {
+                    html += '<tr>';
+                    if (result.columns) {
+                        result.columns.forEach(col => {
+                            html += `<td>${row[col] !== undefined ? row[col] : ''}</td>`;
+                        });
+                    } else {
+                        // If no columns specified, show all object properties
+                        Object.values(row).forEach(value => {
+                            html += `<td>${value !== undefined ? value : ''}</td>`;
+                        });
+                    }
+                    html += '</tr>';
+                });
+                html += '</tbody></table>';
+            } else if (result.success) {
+                html += '<p>Query executed successfully but returned no results.</p>';
+            }
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // Display error
+        function displayError(message) {
+            const container = document.getElementById('resultsContainer');
+            container.innerHTML = `<div class="error">${message}</div>`;
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const promptModal = document.getElementById('promptModal');
+            const onboardingModal = document.getElementById('onboardingModal');
+            if (event.target === promptModal) {
+                closePromptModal();
+            } else if (event.target === onboardingModal) {
+                closeOnboardingModal();
+            }
+        }
+
+        // Datasource management functions
+
+        // Load and render datasources
+        async function loadDatasourcesList() {
+            try {
+                const response = await fetch('/api/datasources');
+                const datasources = await response.json();
+                renderDatasources(datasources);
+            } catch (error) {
+                console.error('Failed to load datasources:', error);
+                document.getElementById('datasourcesList').innerHTML = '<div class="error">Failed to load datasources</div>';
+            }
+        }
+
+        // Render datasources grid
+        function renderDatasources(datasources) {
+            const grid = document.getElementById('datasourcesList');
+            
+            if (datasources.length === 0) {
+                grid.innerHTML = '<div class="loading">No data sources configured. Click "Add Data Source" to get started.</div>';
+                return;
+            }
+            
+            grid.innerHTML = datasources.map(ds => `
+                <div class="prompt-card">
+                    <div class="prompt-header">
+                        <div class="prompt-title">${ds.name}</div>
+                        <div class="prompt-category">${getDbTypeFromDriver(ds.driverClassName)}</div>
+                    </div>
+                    <div class="prompt-description">${ds.description || 'No description provided'}</div>
+                    <div class="prompt-text">${ds.url}</div>
+                    <div class="prompt-actions">
+                        <div class="prompt-stats">
+                            <span>🔗 ${ds.url.split('://')[0]}</span>
+                            <span>📊 <a href="#" onclick="analyzeDatasource(${ds.id}); return false;">Analyze Schema</a></span>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-secondary" 
+                                    onclick="testDatasourceConnection(${ds.id})" 
+                                    title="Test connection">🔌</button>
+                            <button class="btn btn-sm btn-success" 
+                                    onclick="viewDatasourceHealth(${ds.id})" 
+                                    title="Health insights">💚</button>
+                            <button class="btn btn-sm btn-danger" 
+                                    onclick="deleteDatasource(${ds.id})" 
+                                    title="Delete datasource">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Show onboarding modal
+        function showOnboardingModal() {
+            document.getElementById('onboardingForm').reset();
+            document.getElementById('connectionTestResult').innerHTML = '';
+            document.getElementById('onboardingModal').style.display = 'block';
+        }
+
+        // Close onboarding modal
+        function closeOnboardingModal() {
+            document.getElementById('onboardingModal').style.display = 'none';
+        }
+
+        // Update connection fields based on database type
+        function updateConnectionFields() {
+            const dbType = document.getElementById('dsType').value;
+            const urlField = document.getElementById('dsUrl');
+            const urlExample = document.getElementById('urlExample');
+            const usernameField = document.getElementById('dsUsername');
+            const passwordField = document.getElementById('dsPassword');
+
+            const examples = {
+                'h2': {
+                    url: 'jdbc:h2:mem:testdb',
+                    example: 'Example: jdbc:h2:mem:testdb or jdbc:h2:file:./data/mydb',
+                    username: 'sa',
+                    password: ''
+                },
+                'postgresql': {
+                    url: 'jdbc:postgresql://localhost:5432/mydb',
+                    example: 'Example: jdbc:postgresql://localhost:5432/mydb',
+                    username: 'postgres',
+                    password: 'password'
+                },
+                'mysql': {
+                    url: 'jdbc:mysql://localhost:3306/mydb',
+                    example: 'Example: jdbc:mysql://localhost:3306/mydb',
+                    username: 'root',
+                    password: 'password'
+                },
+                'oracle': {
+                    url: 'jdbc:oracle:thin:@localhost:1521:xe',
+                    example: 'Example: jdbc:oracle:thin:@localhost:1521:xe',
+                    username: 'system',
+                    password: 'password'
+                },
+                'sqlserver': {
+                    url: 'jdbc:sqlserver://localhost:1433;databaseName=mydb',
+                    example: 'Example: jdbc:sqlserver://localhost:1433;databaseName=mydb',
+                    username: 'sa',
+                    password: 'password'
+                },
+                'duckdb': {
+                    url: 'jdbc:duckdb:mydb.duckdb',
+                    example: 'Example: jdbc:duckdb:mydb.duckdb or jdbc:duckdb::memory:',
+                    username: '',
+                    password: ''
+                }
+            };
+
+            if (examples[dbType]) {
+                urlField.placeholder = examples[dbType].url;
+                urlExample.textContent = examples[dbType].example;
+                usernameField.placeholder = examples[dbType].username;
+                passwordField.placeholder = examples[dbType].password;
+                
+                // Pre-fill URL
+                if (!urlField.value) {
+                    urlField.value = examples[dbType].url;
+                }
+            }
+        }
+
+        // Test connection
+        async function testConnection() {
+            const datasource = {
+                name: document.getElementById('dsName').value,
+                description: document.getElementById('dsDescription').value,
+                url: document.getElementById('dsUrl').value,
+                username: document.getElementById('dsUsername').value,
+                password: document.getElementById('dsPassword').value,
+                driverClassName: getDriverClassName(document.getElementById('dsType').value)
+            };
+
+            const resultDiv = document.getElementById('connectionTestResult');
+            resultDiv.innerHTML = '<div class="loading">Testing connection...</div>';
+
+            try {
+                const response = await fetch('/api/datasources/test-connection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datasource)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <div style="color: #28a745; padding: 10px; background: #d4edda; border-radius: 5px;">
+                            <strong>✓ Connection successful!</strong><br>
+                            Database: ${result.databaseProduct} ${result.databaseVersion}<br>
+                            Tables found: ${result.tableCount}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <strong>✗ Connection failed</strong><br>
+                            ${result.message}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <strong>✗ Error testing connection</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Submit onboarding form
+        document.getElementById('onboardingForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const datasource = {
+                name: document.getElementById('dsName').value,
+                description: document.getElementById('dsDescription').value,
+                url: document.getElementById('dsUrl').value,
+                username: document.getElementById('dsUsername').value,
+                password: document.getElementById('dsPassword').value,
+                driverClassName: getDriverClassName(document.getElementById('dsType').value)
+            };
+
+            try {
+                const response = await fetch('/api/datasources/onboard', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ datasource: datasource })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    closeOnboardingModal();
+                    loadDatasourcesList();
+                    loadDatasources(); // Refresh dropdown
+                    
+                    alert(`Data source added successfully! 
+                           Tables found: ${result.analysis.tables?.length || 0}
+                           Recommendations: ${result.recommendations?.length || 0}`);
+                } else {
+                    alert('Failed to add data source: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error adding data source: ' + error.message);
+            }
+        });
+
+        // Analyze datasource
+        async function analyzeDatasource(datasourceId) {
+            try {
+                const response = await fetch(`/api/datasources/${datasourceId}/analyze`, {
+                    method: 'POST'
+                });
+                const analysis = await response.json();
+                
+                // Show analysis results in a modal or alert
+                alert(`Schema Analysis Complete:
+                       Tables: ${analysis.tables?.length || 0}
+                       Relationships: ${analysis.relationships?.length || 0}
+                       Indexes: ${analysis.indexes?.length || 0}
+                       
+                       Check browser console for detailed analysis.`);
+                
+                console.log('Detailed Analysis:', analysis);
+            } catch (error) {
+                alert('Failed to analyze datasource: ' + error.message);
+            }
+        }
+
+        // Test datasource connection
+        async function testDatasourceConnection(datasourceId) {
+            try {
+                const dsResponse = await fetch(`/api/datasources/${datasourceId}`);
+                const datasource = await dsResponse.json();
+                
+                const testResponse = await fetch('/api/datasources/test-connection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datasource)
+                });
+                
+                const result = await testResponse.json();
+                
+                if (result.success) {
+                    alert(`✓ Connection successful!
+                           Database: ${result.databaseProduct} ${result.databaseVersion}
+                           Tables: ${result.tableCount}`);
+                } else {
+                    alert('✗ Connection failed: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error testing connection: ' + error.message);
+            }
+        }
+
+        // View datasource health
+        async function viewDatasourceHealth(datasourceId) {
+            try {
+                const response = await fetch(`/api/datasources/${datasourceId}/health`);
+                const health = await response.json();
+                
+                alert(`Database Health Insights:
+                       Overall Health: ${health.overallHealth || 'Unknown'}
+                       Recommendations: ${health.recommendations?.length || 0}
+                       
+                       Check browser console for detailed insights.`);
+                
+                console.log('Health Insights:', health);
+            } catch (error) {
+                alert('Failed to get health insights: ' + error.message);
+            }
+        }
+
+        // Delete datasource
+        async function deleteDatasource(datasourceId) {
+            if (confirm('Are you sure you want to delete this data source?')) {
+                try {
+                    const response = await fetch(`/api/datasources/${datasourceId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        loadDatasourcesList();
+                        loadDatasources(); // Refresh dropdown
+                    } else {
+                        alert('Failed to delete data source');
+                    }
+                } catch (error) {
+                    alert('Error deleting data source: ' + error.message);
+                }
+            }
+        }
+
+        // Check MCP server status
+        async function checkMcpStatus() {
+            try {
+                const response = await fetch('/api/datasources/mcp-status');
+                const status = await response.json();
+                
+                let message = `MCP Server Status:
+                              Enabled: ${status.enabled}
+                              Available: ${status.available}
+                              URL: ${status.url}
+                              Message: ${status.message}`;
+                
+                if (status.capabilities) {
+                    message += `\nCapabilities: ${JSON.stringify(status.capabilities)}`;
+                }
+                
+                alert(message);
+            } catch (error) {
+                alert('Error checking MCP status: ' + error.message);
+            }
+        }
+
+        // Helper functions
+        function getDriverClassName(dbType) {
+            const drivers = {
+                'h2': 'org.h2.Driver',
+                'postgresql': 'org.postgresql.Driver',
+                'mysql': 'com.mysql.cj.jdbc.Driver',
+                'oracle': 'oracle.jdbc.driver.OracleDriver',
+                'sqlserver': 'com.microsoft.sqlserver.jdbc.SQLServerDriver',
+                'duckdb': 'org.duckdb.DuckDBDriver'
+            };
+            return drivers[dbType] || 'org.h2.Driver';
+        }
+
+        function getDbTypeFromDriver(driverClassName) {
+            if (driverClassName.includes('h2')) return 'H2';
+            if (driverClassName.includes('postgresql')) return 'PostgreSQL';
+            if (driverClassName.includes('mysql')) return 'MySQL';
+            if (driverClassName.includes('oracle')) return 'Oracle';
+            if (driverClassName.includes('sqlserver')) return 'SQL Server';
+            if (driverClassName.includes('duckdb')) return 'DuckDB';
+            return 'Unknown';
+        }
+
+        // Load datasources when switching to datasources tab
+        document.addEventListener('DOMContentLoaded', function() {
+            // Override switchTab to load datasources when needed
+            const originalSwitchTab = window.switchTab;
+            window.switchTab = function(tabName) {
+                originalSwitchTab(tabName);
+                if (tabName === 'datasources') {
+                    loadDatasourcesList();
+                }
+            };
+        });
+    </script>
+</body>
+</html>

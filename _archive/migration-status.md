@@ -53,9 +53,19 @@ Legend: `[x]` done · `[~]` in progress · `[ ]` planned · `[!]` blocked
 - [ ] Move Qestro and LunaOS (with lunaforge harvested) (days 31-60)
 - [ ] Move OpenSyber, SDLC.cc, TenantIQ (days 61-90)
 - [x] flujo activity check (per addendum: "ARCHIVE → or fold; if active, fold into LunaOS") — ARCHIVE-WEBSITE round 4: last commit 2025-03-14 (stale ~14mo) → **archived, not folded**. Manifest at `_archive/portfolio-snapshots/flujo/ARCHIVED.md`.
-- [x] queryflux dedupe (per addendum: "likely fold one into a product, archive duplicates") — ARCHIVE-WEBSITE round 4: queryflux (empty placeholder) → delete; querylens (predecessor) → archive; queryflux-git (substantive, on-thesis) → **escalated to founder** for fold-vs-archive call. Manifests in `_archive/portfolio-snapshots/queryflux*/`, `querylens/`.
+- [x] queryflux dedupe — ✅ **Founder decision 2026-05-25: PROMOTE to 8th CORE product.** `products/queryflux/` (rsync from queryflux-git, fold querylens → `lens/`). Snapshots removed. See addendum §4 + `products/queryflux/MIGRATION_NOTES.md`.
 - [x] windsu overlap with PushCI (per addendum: "check overlap with PushCI, otherwise archive") — ARCHIVE-WEBSITE round 4: surface overlap exists but architecture incompatible (IDE-time human-author vs PR-time AI-author). **Archive, no fold-in.** Detail in `_archive/portfolio-snapshots/windsu-credit-manager/ARCHIVED.md`.
-- [ ] Resolve remaining inventory TODOs (a2a activity, automationhub-upm, coderailflow placement, resume removal)
+- [ ] Resolve remaining inventory TODOs (~~a2a activity~~ ✅ MIT LICENSE added 2026-05-25, automationhub-upm, coderailflow placement, resume removal)
+
+## Founder corrections (2026-05-25)
+
+- [x] **QueryFlux → 8th CORE product** — `products/queryflux/`, 143M. README/CLAUDE.md/MIGRATION_NOTES/CONSOLIDATION_TODO written. Snapshots removed from `_archive/portfolio-snapshots/`.
+- [x] **a2a-framework → definite OSS** — MIT LICENSE added at `oss/a2a-framework/LICENSE`. Platform-aligned README written.
+- [x] **autoboot disentangled** — `_archive/fastpm-2026-05/` holds manifest + 10-step TAKE_DOWN_ACTIONS.md (DNS redirect, site shutdown, extension unpublish, GitHub archive). Sprint harness untouched (separate root-level scripts).
+- [x] **looma-sh → EXTERNALIZE bucket** — `_archive/externalized/looma-sh/` holds prior manifest + 10-step SPIN_OUT_PLAN.md (separate entity, domain transfer, Stripe split).
+- [ ] User executes external actions (DNS, entity stand-up, manual `/portfolio/{autoboot,looma-sh}` deletion).
+
+See `founder_decisions_memo.md` + addendum §4.
 
 ## Website rebuild
 

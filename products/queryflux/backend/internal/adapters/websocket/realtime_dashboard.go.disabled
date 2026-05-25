@@ -1,0 +1,742 @@
+package websocket
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
+	"github.com/queryflux/backend/internal/application/ports"
+	"github.com/queryflux/backend/internal/domain"
+	"go.uber.org/zap"
+)
+
+// RealtimeDashboard provides a complete real-time monitoring dashboard
+type RealtimeDashboard struct {
+	logger             *zap.Logger
+	hub                *WebSocketHub
+	metricsStorage     ports.MetricsStorage
+	alertManager       ports.AlertManager
+	dashboardManager  ports.DashboardManager
+	port               int
+	upgrader           websocket.Upgrader
+	monitoringService  MonitoringServiceInterface
+}
+
+// MonitoringServiceInterface defines the interface for monitoring service
+type MonitoringServiceInterface interface {
+	GetMetrics(ctx context.Context, query *ports.MetricsQuery) ([]*domain.Metric, error)
+	GetAlerts(ctx context.Context, filters ports.AlertFilters) ([]*domain.Alert, error)
+	GetDashboards(ctx context.Context, filters ports.DashboardFilters) ([]*domain.MonitoringDashboard, error)
+	CollectMetric(ctx context.Context, metric *domain.Metric) error
+	GetHealthChecks(ctx context.Context) ([]*domain.HealthCheck, error)
+}
+
+// NewRealtimeDashboard creates a new real-time dashboard
+func NewRealtimeDashboard(
+	logger *zap.Logger,
+	hub *WebSocketHub,
+	metricsStorage ports.MetricsStorage,
+	alertManager ports.AlertManager,
+	dashboardManager ports.DashboardManager,
+	port int,
+	monitoringService MonitoringServiceInterface,
+) *RealtimeDashboard {
+	return &RealtimeDashboard{
+		logger:            logger,
+		hub:               hub,
+		metricsStorage:    metricsStorage,
+		alertManager:      alertManager,
+		dashboardManager: dashboardManager,
+		port:              port,
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				// In production, implement proper origin checking
+				return true
+			},
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		},
+		monitoringService: monitoringService,
+	}
+}
+
+// Start starts the real-time dashboard server
+func (d *RealtimeDashboard) Start(ctx context.Context) error {
+	mux := http.NewServeMux()
+
+	// WebSocket endpoint
+	mux.HandleFunc("/ws", d.handleWebSocket)
+
+	// Serve static dashboard files
+	mux.HandleFunc("/", d.serveDashboardHTML)
+	mux.HandleFunc("/dashboard.js", d.serveDashboardJS)
+	mux.HandleFunc("/dashboard.css", d.serveDashboardCSS)
+
+	// API endpoints for dashboard
+	mux.HandleFunc("/api/metrics", d.handleMetricsAPI)
+	mux.HandleFunc("/api/alerts", d.handleAlertsAPI)
+	mux.HandleFunc("/api/health", d.handleHealthAPI)
+
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", d.port),
+		Handler: mux,
+	}
+
+	// Start hub in background
+	go d.hub.Start(ctx)
+
+	d.logger.Info("Starting real-time dashboard server", zap.Int("port", d.port))
+
+	// Start HTTP server
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			d.logger.Error("Dashboard server error", zap.Error(err))
+		}
+	}()
+
+	// Handle shutdown
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		server.Shutdown(shutdownCtx)
+	}()
+
+	return nil
+}
+
+// WebSocket handlers
+
+func (d *RealtimeDashboard) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := d.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		d.logger.Error("Failed to upgrade WebSocket connection", zap.Error(err))
+		return
+	}
+
+	clientID := fmt.Sprintf("dashboard_%d", time.Now().UnixNano())
+	client := d.hub.RegisterClient(conn, clientID)
+
+	d.logger.Info("Dashboard client connected", zap.String("client_id", clientID))
+
+	// Send initial data
+	go d.sendInitialData(client, r.Context())
+
+	// Handle client messages
+	go d.handleClientMessages(client, r.Context())
+}
+
+func (d *RealtimeDashboard) handleClientMessages(client *Client, ctx context.Context) {
+	defer client.close()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-ticker.C:
+			// Send periodic updates
+			if err := d.sendPeriodicUpdate(client, ctx); err != nil {
+				d.logger.Debug("Failed to send periodic update", zap.Error(err), zap.String("client_id", client.id))
+				return
+			}
+
+		default:
+			// Check for incoming messages
+			if err := client.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond)); err != nil {
+				return
+			}
+
+			var msg map[string]interface{}
+			if err := client.conn.ReadJSON(&msg); err != nil {
+				if !websocket.IsCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+					d.logger.Debug("WebSocket read error", zap.Error(err), zap.String("client_id", client.id))
+				}
+				return
+			}
+
+			d.handleMessage(ctx, client, msg)
+		}
+	}
+}
+
+func (d *RealtimeDashboard) handleMessage(ctx context.Context, client *Client, msg map[string]interface{}) {
+	msgType, ok := msg["type"].(string)
+	if !ok {
+		d.sendError(client, "Message type is required")
+		return
+	}
+
+	switch msgType {
+	case "subscribe":
+		d.handleSubscription(ctx, client, msg)
+	case "unsubscribe":
+		d.handleUnsubscription(ctx, client, msg)
+	case "get_metrics":
+		d.handleGetMetrics(ctx, client, msg)
+	case "get_alerts":
+		d.handleGetAlerts(ctx, client, msg)
+	case "get_health":
+		d.handleGetHealth(ctx, client, msg)
+	case "ping":
+		d.sendPong(client)
+	default:
+		d.sendError(client, fmt.Sprintf("Unknown message type: %s", msgType))
+	}
+}
+
+func (d *RealtimeDashboard) handleSubscription(ctx context.Context, client *Client, msg map[string]interface{}) {
+	subType, ok := msg["subscription_type"].(string)
+	if !ok {
+		d.sendError(client, "subscription_type is required")
+		return
+	}
+
+	switch subType {
+	case "metrics":
+		d.subscribeToMetrics(ctx, client, msg)
+	case "alerts":
+		d.subscribeToAlerts(ctx, client, msg)
+	default:
+		d.sendError(client, fmt.Sprintf("Unknown subscription type: %s", subType))
+	}
+}
+
+func (d *RealtimeDashboard) subscribeToMetrics(ctx context.Context, client *Client, msg map[string]interface{}) {
+	subscription := &ports.MetricsSubscription{
+		ID:       fmt.Sprintf("metrics_%s_%d", client.id, time.Now().UnixNano()),
+		ClientID: client.id,
+		Interval: 5 * time.Second,
+	}
+
+	// Parse interval
+	if interval, ok := msg["interval"].(string); ok {
+		if parsed, err := time.ParseDuration(interval); err == nil {
+			subscription.Interval = parsed
+		}
+	}
+
+	// Parse filters
+	if filters, ok := msg["filters"].(map[string]interface{}); ok {
+		if names, ok := filters["names"].([]interface{}); ok {
+			for _, name := range names {
+				if nameStr, ok := name.(string); ok {
+					subscription.Filters.Names = append(subscription.Filters.Names, nameStr)
+				}
+			}
+		}
+		if labels, ok := filters["labels"].(map[string]interface{}); ok {
+			subscription.Filters.Labels = make(map[string]string)
+			for k, v := range labels {
+				if vStr, ok := v.(string); ok {
+					subscription.Filters.Labels[k] = vStr
+				}
+			}
+		}
+	}
+
+	if err := d.hub.SubscribeToMetrics(ctx, subscription); err != nil {
+		d.sendError(client, fmt.Sprintf("Failed to subscribe: %v", err))
+		return
+	}
+
+	d.sendResponse(client, "subscription_confirmed", gin.H{
+		"subscription_id": subscription.ID,
+		"type":            "metrics",
+	})
+}
+
+func (d *RealtimeDashboard) subscribeToAlerts(ctx context.Context, client *Client, msg map[string]interface{}) {
+	subscription := &ports.AlertsSubscription{
+		ID:       fmt.Sprintf("alerts_%s_%d", client.id, time.Now().UnixNano()),
+		ClientID: client.id,
+	}
+
+	// Parse filters
+	if filters, ok := msg["filters"].(map[string]interface{}); ok {
+		if severities, ok := filters["severity"].([]interface{}); ok {
+			for _, severity := range severities {
+				if severityStr, ok := severity.(string); ok {
+					subscription.Filters.Severity = append(subscription.Filters.Severity, domain.AlertSeverity(severityStr))
+				}
+			}
+		}
+		if statuses, ok := filters["status"].([]interface{}); ok {
+			for _, status := range statuses {
+				if statusStr, ok := status.(string); ok {
+					subscription.Filters.Status = append(subscription.Filters.Status, domain.AlertStatus(statusStr))
+				}
+			}
+		}
+	}
+
+	if err := d.hub.SubscribeToAlerts(ctx, subscription); err != nil {
+		d.sendError(client, fmt.Sprintf("Failed to subscribe: %v", err))
+		return
+	}
+
+	d.sendResponse(client, "subscription_confirmed", gin.H{
+		"subscription_id": subscription.ID,
+		"type":            "alerts",
+	})
+}
+
+func (d *RealtimeDashboard) handleUnsubscription(ctx context.Context, client *Client, msg map[string]interface{}) {
+	subscriptionID, ok := msg["subscription_id"].(string)
+	if !ok {
+		d.sendError(client, "subscription_id is required")
+		return
+	}
+
+	if err := d.hub.UnsubscribeFromMetrics(ctx, subscriptionID); err != nil {
+		d.logger.Debug("Failed to unsubscribe from metrics", zap.Error(err))
+	}
+	if err := d.hub.UnsubscribeFromAlerts(ctx, subscriptionID); err != nil {
+		d.logger.Debug("Failed to unsubscribe from alerts", zap.Error(err))
+	}
+
+	d.sendResponse(client, "unsubscription_confirmed", gin.H{
+		"subscription_id": subscriptionID,
+	})
+}
+
+func (d *RealtimeDashboard) handleGetMetrics(ctx context.Context, client *Client, msg map[string]interface{}) {
+	query := &ports.MetricsQuery{}
+
+	// Parse query parameters
+	if name, ok := msg["name"].(string); ok {
+		query.Name = name
+	}
+
+	if from, ok := msg["from"].(string); ok {
+		if parsed, err := time.Parse(time.RFC3339, from); err == nil {
+			query.From = parsed
+		}
+	}
+	if query.From.IsZero() {
+		query.From = time.Now().Add(-1 * time.Hour)
+	}
+
+	if to, ok := msg["to"].(string); ok {
+		if parsed, err := time.Parse(time.RFC3339, to); err == nil {
+			query.To = parsed
+		}
+	}
+	if query.To.IsZero() {
+		query.To = time.Now()
+	}
+
+	if limit, ok := msg["limit"].(float64); ok {
+		query.Limit = int(limit)
+	}
+	if query.Limit == 0 {
+		query.Limit = 100
+	}
+
+	var metrics []*domain.Metric
+	var err error
+
+	if d.monitoringService != nil {
+		metrics, err = d.monitoringService.GetMetrics(ctx, query)
+	} else if d.metricsStorage != nil {
+		metrics, err = d.metricsStorage.Query(ctx, query)
+	}
+
+	if err != nil {
+		d.sendError(client, fmt.Sprintf("Failed to get metrics: %v", err))
+		return
+	}
+
+	d.sendResponse(client, "metrics_response", gin.H{
+		"metrics": metrics,
+		"count":   len(metrics),
+	})
+}
+
+func (d *RealtimeDashboard) handleGetAlerts(ctx context.Context, client *Client, msg map[string]interface{}) {
+	filters := ports.AlertFilters{}
+
+	if status, ok := msg["status"].(string); ok {
+		filters.Status = []domain.AlertStatus{domain.AlertStatus(status)}
+	}
+
+	if severity, ok := msg["severity"].(string); ok {
+		filters.Severity = []domain.AlertSeverity{domain.AlertSeverity(severity)}
+	}
+
+	if limit, ok := msg["limit"].(float64); ok {
+		filters.Limit = int(limit)
+	}
+
+	var alerts []*domain.Alert
+	var err error
+
+	if d.alertManager != nil {
+		alerts, err = d.alertManager.GetAlerts(ctx, filters)
+	}
+
+	if err != nil {
+		d.sendError(client, fmt.Sprintf("Failed to get alerts: %v", err))
+		return
+	}
+
+	d.sendResponse(client, "alerts_response", gin.H{
+		"alerts": alerts,
+		"count":   len(alerts),
+	})
+}
+
+func (d *RealtimeDashboard) handleGetHealth(ctx context.Context, client *Client, msg map[string]interface{}) {
+	var healthChecks []*domain.HealthCheck
+	var err error
+
+	if d.monitoringService != nil {
+		healthChecks, err = d.monitoringService.GetHealthChecks(ctx)
+	}
+
+	if err != nil {
+		d.sendError(client, fmt.Sprintf("Failed to get health checks: %v", err))
+		return
+	}
+
+	// Determine overall status
+	overallStatus := "healthy"
+	for _, check := range healthChecks {
+		if check.Status != "healthy" {
+			overallStatus = "unhealthy"
+			break
+		}
+	}
+
+	d.sendResponse(client, "health_response", gin.H{
+		"health_checks":  healthChecks,
+		"overall_status": overallStatus,
+		"timestamp":      time.Now(),
+	})
+}
+
+// Data sending methods
+
+func (d *RealtimeDashboard) sendInitialData(client *Client, ctx context.Context) {
+	// Send initial metrics
+	query := &ports.MetricsQuery{
+		From: time.Now().Add(-10 * time.Minute),
+		To:   time.Now(),
+		Limit: 50,
+	}
+
+	var metrics []*domain.Metric
+	var err error
+
+	if d.monitoringService != nil {
+		metrics, err = d.monitoringService.GetMetrics(ctx, query)
+	} else if d.metricsStorage != nil {
+		metrics, err = d.metricsStorage.Query(ctx, query)
+	}
+
+	if err == nil && len(metrics) > 0 {
+		d.sendResponse(client, "initial_metrics", gin.H{
+			"metrics": metrics,
+			"count":   len(metrics),
+		})
+	}
+
+	// Send initial alerts
+	if d.alertManager != nil {
+		alerts, err := d.alertManager.GetAlerts(ctx, ports.AlertFilters{})
+		if err == nil && len(alerts) > 0 {
+			d.sendResponse(client, "initial_alerts", gin.H{
+				"alerts": alerts,
+				"count":   len(alerts),
+			})
+		}
+	}
+
+	// Send initial health checks
+	if d.monitoringService != nil {
+		healthChecks, err := d.monitoringService.GetHealthChecks(ctx)
+		if err == nil && len(healthChecks) > 0 {
+			d.sendResponse(client, "initial_health", gin.H{
+				"health_checks": healthChecks,
+			})
+		}
+	}
+
+	// Send system overview
+	d.sendSystemOverview(client, ctx)
+}
+
+func (d *RealtimeDashboard) sendPeriodicUpdate(client *Client, ctx context.Context) error {
+	// Send latest metrics
+	query := &ports.MetricsQuery{
+		From: time.Now().Add(-1 * time.Minute),
+		To:   time.Now(),
+		Limit: 10,
+	}
+
+	var metrics []*domain.Metric
+	var err error
+
+	if d.monitoringService != nil {
+		metrics, err = d.monitoringService.GetMetrics(ctx, query)
+	} else if d.metricsStorage != nil {
+		metrics, err = d.metricsStorage.Query(ctx, query)
+	}
+
+	if err == nil && len(metrics) > 0 {
+		d.sendResponse(client, "metrics_update", gin.H{
+			"metrics": metrics,
+			"timestamp": time.Now(),
+		})
+	}
+
+	return nil
+}
+
+func (d *RealtimeDashboard) sendSystemOverview(client *Client, ctx context.Context) {
+	// Generate system overview data
+	overview := gin.H{
+		"timestamp": time.Now(),
+		"system": gin.H{
+			"cpu_usage_percent":    d.getSystemMetric(ctx, "system_cpu_usage_percent", 45.5),
+			"memory_usage_percent": d.getSystemMetric(ctx, "system_memory_usage_percent", 60.2),
+			"disk_usage_percent":   d.getSystemMetric(ctx, "system_disk_usage_percent", 75.8),
+			"uptime_hours":         d.getSystemMetric(ctx, "system_uptime_hours", 72.5),
+		},
+		"database": gin.H{
+			"active_connections": d.getDatabaseMetric(ctx, "database_connections_active", 15),
+			"total_connections":  d.getDatabaseMetric(ctx, "database_connections_total", 100),
+			"queries_per_second": d.getDatabaseMetric(ctx, "database_queries_per_second", 125.5),
+			"slow_queries":       d.getDatabaseMetric(ctx, "database_slow_queries_total", 3),
+			"cache_hit_ratio":    d.getDatabaseMetric(ctx, "database_cache_hit_ratio", 95.2),
+		},
+		"alerts": gin.H{
+			"active":   d.getAlertCount(ctx, "active", 2),
+			"resolved": d.getAlertCount(ctx, "resolved", 15),
+			"silenced": d.getAlertCount(ctx, "silenced", 1),
+		},
+	}
+
+	d.sendResponse(client, "system_overview", overview)
+}
+
+func (d *RealtimeDashboard) getSystemMetric(ctx context.Context, metricName string, defaultValue float64) float64 {
+	query := &ports.MetricsQuery{
+		Name:  metricName,
+		From:  time.Now().Add(-5 * time.Minute),
+		To:    time.Now(),
+		Limit: 1,
+	}
+
+	if d.monitoringService != nil {
+		if metrics, err := d.monitoringService.GetMetrics(ctx, query); err == nil && len(metrics) > 0 {
+			return metrics[0].Value
+		}
+	} else if d.metricsStorage != nil {
+		if metrics, err := d.metricsStorage.Query(ctx, query); err == nil && len(metrics) > 0 {
+			return metrics[0].Value
+		}
+	}
+
+	return defaultValue
+}
+
+func (d *RealtimeDashboard) getDatabaseMetric(ctx context.Context, metricName string, defaultValue float64) float64 {
+	return d.getSystemMetric(ctx, metricName, defaultValue)
+}
+
+func (d *RealtimeDashboard) getAlertCount(ctx context.Context, status string, defaultValue int) int {
+	filters := ports.AlertFilters{
+		Limit: 100,
+	}
+
+	switch status {
+	case "active":
+		filters.Status = []domain.AlertStatus{domain.AlertStatusActive}
+	case "resolved":
+		filters.Status = []domain.AlertStatus{domain.AlertStatusResolved}
+	case "silenced":
+		filters.Status = []domain.AlertStatus{domain.AlertStatusSilenced}
+	}
+
+	if d.alertManager != nil {
+		if alerts, err := d.alertManager.GetAlerts(ctx, filters); err == nil {
+			return len(alerts)
+		}
+	}
+
+	return defaultValue
+}
+
+// HTTP handlers for API endpoints
+
+func (d *RealtimeDashboard) handleMetricsAPI(w http.ResponseWriter, r *http.Request) {
+	query := &ports.MetricsQuery{}
+
+	if name := r.URL.Query().Get("name"); name != "" {
+		query.Name = name
+	}
+
+	if from := r.URL.Query().Get("from"); from != "" {
+		if parsed, err := time.Parse(time.RFC3339, from); err == nil {
+			query.From = parsed
+		}
+	}
+	if query.From.IsZero() {
+		query.From = time.Now().Add(-1 * time.Hour)
+	}
+
+	if to := r.URL.Query().Get("to"); to != "" {
+		if parsed, err := time.Parse(time.RFC3339, to); err == nil {
+			query.To = parsed
+		}
+	}
+	if query.To.IsZero() {
+		query.To = time.Now()
+	}
+
+	if limit := r.URL.Query().Get("limit"); limit != "" {
+		if parsed, err := strconv.Atoi(limit); err == nil {
+			query.Limit = parsed
+		}
+	}
+	if query.Limit == 0 {
+		query.Limit = 100
+	}
+
+	var metrics []*domain.Metric
+	var err error
+
+	if d.monitoringService != nil {
+		metrics, err = d.monitoringService.GetMetrics(r.Context(), query)
+	} else if d.metricsStorage != nil {
+		metrics, err = d.metricsStorage.Query(r.Context(), query)
+	}
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(gin.H{
+		"metrics": metrics,
+		"count":   len(metrics),
+	})
+}
+
+func (d *RealtimeDashboard) handleAlertsAPI(w http.ResponseWriter, r *http.Request) {
+	filters := ports.AlertFilters{}
+
+	if status := r.URL.Query().Get("status"); status != "" {
+		filters.Status = []domain.AlertStatus{domain.AlertStatus(status)}
+	}
+
+	if severity := r.URL.Query().Get("severity"); severity != "" {
+		filters.Severity = []domain.AlertSeverity{domain.AlertSeverity(severity)}
+	}
+
+	if limit := r.URL.Query().Get("limit"); limit != "" {
+		if parsed, err := strconv.Atoi(limit); err == nil {
+			filters.Limit = parsed
+		}
+	}
+
+	var alerts []*domain.Alert
+	var err error
+
+	if d.alertManager != nil {
+		alerts, err = d.alertManager.GetAlerts(r.Context(), filters)
+	}
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(gin.H{
+		"alerts": alerts,
+		"count":   len(alerts),
+	})
+}
+
+func (d *RealtimeDashboard) handleHealthAPI(w http.ResponseWriter, r *http.Request) {
+	var healthChecks []*domain.HealthCheck
+	var err error
+
+	if d.monitoringService != nil {
+		healthChecks, err = d.monitoringService.GetHealthChecks(r.Context())
+	}
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Determine overall status
+	overallStatus := "healthy"
+	for _, check := range healthChecks {
+		if check.Status != "healthy" {
+			overallStatus = "unhealthy"
+			break
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(gin.H{
+		"health_checks":  healthChecks,
+		"overall_status": overallStatus,
+		"timestamp":      time.Now(),
+	})
+}
+
+// WebSocket message helpers
+
+func (d *RealtimeDashboard) sendResponse(client *Client, msgType string, data interface{}) {
+	response := gin.H{
+		"type":      msgType,
+		"data":      data,
+		"timestamp": time.Now(),
+	}
+
+	if err := client.conn.WriteJSON(response); err != nil {
+		d.logger.Error("Failed to send WebSocket response", zap.Error(err), zap.String("client_id", client.id))
+	}
+}
+
+func (d *RealtimeDashboard) sendError(client *Client, message string) {
+	d.sendResponse(client, "error", gin.H{"message": message})
+}
+
+func (d *RealtimeDashboard) sendPong(client *Client) {
+	d.sendResponse(client, "pong", gin.H{"timestamp": time.Now()})
+}
+
+// Static file serving methods
+
+func (d *RealtimeDashboard) serveDashboardHTML(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprint(w, d.getDashboardHTML())
+}
+
+func (d *RealtimeDashboard) serveDashboardJS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/javascript")
+	fmt.Fprint(w, d.getDashboardJS())
+}
+
+func (d *RealtimeDashboard) serveDashboardCSS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/css")
+	fmt.Fprint(w, d.getDashboardCSS())
+}
+
+// Import gin for gin.H type
+import "github.com/gin-gonic/gin"

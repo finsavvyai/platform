@@ -1,0 +1,2120 @@
+openapi: 3.0.3
+info:
+  title: QueryFlux API
+  description: |
+    QueryFlux provides a comprehensive REST API for database management, query execution, real-time monitoring, and team collaboration.
+
+    ## Authentication
+
+    All API endpoints (except authentication endpoints) require a valid JWT token in the Authorization header:
+
+    ```
+    Authorization: Bearer <jwt_token>
+    ```
+
+    ## Rate Limiting
+
+    - Default: 1000 requests per hour per user
+    - Professional: 5000 requests per hour per user
+    - Enterprise: Unlimited requests
+
+    ## Error Handling
+
+    The API uses standard HTTP status codes and returns detailed error information in the response body.
+  version: 1.0.0
+  contact:
+    name: QueryFlux API Support
+    email: api-support@queryflux.com
+    url: https://queryflux.com/support
+  license:
+    name: Commercial License
+    url: https://queryflux.com/terms
+servers:
+  - url: https://api.queryflux.com/v1
+    description: Production server
+  - url: https://staging-api.queryflux.com/v1
+    description: Staging server
+  - url: http://localhost:8080/v1
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: User authentication and token management
+  - name: Connections
+    description: Database connection management
+  - name: Queries
+    description: Query execution and management
+  - name: Schema
+    description: Database schema and metadata
+  - name: Monitoring
+    description: Real-time monitoring and metrics
+  - name: Teams
+    description: Team collaboration and management
+  - name: Alerts
+    description: Alert configuration and management
+  - name: Users
+    description: User profile and preferences
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Create a new user account with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              user_registration:
+                summary: Example user registration
+                value:
+                  email: "user@example.com"
+                  password: "securePassword123"
+                  name: "John Doe"
+                  company: "Acme Corp"
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              examples:
+                success_response:
+                  summary: Successful registration
+                  value:
+                    success: true
+                    data:
+                      user:
+                        id: "usr_12345"
+                        email: "user@example.com"
+                        name: "John Doe"
+                        role: "user"
+                        subscription_tier: "free"
+                        created_at: "2024-01-15T10:30:00Z"
+                      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      expires_in: 86400
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and return JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              user_login:
+                summary: Example user login
+                value:
+                  email: "user@example.com"
+                  password: "securePassword123"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              examples:
+                success_response:
+                  summary: Successful login
+                  value:
+                    success: true
+                    data:
+                      user:
+                        id: "usr_12345"
+                        email: "user@example.com"
+                        name: "John Doe"
+                        role: "user"
+                        subscription_tier: "professional"
+                      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      expires_in: 86400
+                      refresh_token: "refresh_abc123"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh JWT token
+      description: Refresh an expired JWT token using a refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: Invalidate JWT token and logout user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /connections:
+    get:
+      tags:
+        - Connections
+      summary: Get all database connections
+      description: Retrieve a list of all database connections for the authenticated user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - in: query
+          name: type
+          schema:
+            type: string
+          description: Filter by database type
+          example: "postgresql"
+      responses:
+        '200':
+          description: Connections retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionsResponse'
+              examples:
+                connections_list:
+                  summary: Example connections list
+                  value:
+                    success: true
+                    data:
+                      - id: "conn_12345"
+                        name: "Production PostgreSQL"
+                        type: "postgresql"
+                        host: "prod-db.example.com"
+                        port: 5432
+                        database: "production"
+                        username: "app_user"
+                        created_at: "2024-01-15T10:30:00Z"
+                        last_used: "2024-01-15T14:22:00Z"
+                        status: "connected"
+                        connection_pool_size: 10
+                    pagination:
+                      page: 1
+                      per_page: 20
+                      total: 1
+                      total_pages: 1
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Connections
+      summary: Create a new database connection
+      description: Add a new database connection configuration
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateConnectionRequest'
+            examples:
+              postgresql_connection:
+                summary: PostgreSQL connection
+                value:
+                  name: "Production PostgreSQL"
+                  type: "postgresql"
+                  host: "prod-db.example.com"
+                  port: 5432
+                  database: "production"
+                  username: "app_user"
+                  password: "secure_password"
+                  ssl_mode: "require"
+                  connection_pool_size: 10
+                  timeout: 30
+      responses:
+        '201':
+          description: Connection created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /connections/{connection_id}:
+    get:
+      tags:
+        - Connections
+      summary: Get connection details
+      description: Retrieve detailed information about a specific database connection
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdParam'
+      responses:
+        '200':
+          description: Connection details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags:
+        - Connections
+      summary: Update connection
+      description: Update an existing database connection configuration
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConnectionRequest'
+      responses:
+        '200':
+          description: Connection updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Connections
+      summary: Delete connection
+      description: Remove a database connection
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdParam'
+      responses:
+        '200':
+          description: Connection deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /connections/{connection_id}/test:
+    post:
+      tags:
+        - Connections
+      summary: Test database connection
+      description: Test connectivity to a database connection
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdParam'
+      responses:
+        '200':
+          description: Connection test successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionTestResponse'
+              examples:
+                test_success:
+                  summary: Successful connection test
+                  value:
+                    success: true
+                    data:
+                      status: "connected"
+                      latency_ms: 45
+                      version: "PostgreSQL 14.5"
+                      max_connections: 100
+                      active_connections: 25
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /queries/execute:
+    post:
+      tags:
+        - Queries
+      summary: Execute SQL query
+      description: Execute a SQL query against a database connection
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteQueryRequest'
+            examples:
+              simple_select:
+                summary: Simple SELECT query
+                value:
+                  connection_id: "conn_12345"
+                  query: "SELECT * FROM users WHERE created_at >= '2024-01-01' LIMIT 100"
+                  parameters: []
+                  timeout: 30000
+                  explain: false
+      responses:
+        '200':
+          description: Query executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryExecutionResponse'
+              examples:
+                query_success:
+                  summary: Successful query execution
+                  value:
+                    success: true
+                    data:
+                      query_id: "qry_12345"
+                      status: "completed"
+                      execution_time_ms: 245
+                      rows_returned: 87
+                      rows_affected: 0
+                      columns:
+                        - name: "id"
+                          type: "integer"
+                          nullable: false
+                        - name: "name"
+                          type: "varchar"
+                          nullable: false
+                        - name: "email"
+                          type: "varchar"
+                          nullable: false
+                      rows:
+                        - [1, "John Doe", "john@example.com"]
+                        - [2, "Jane Smith", "jane@example.com"]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '408':
+          $ref: '#/components/responses/RequestTimeout'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /queries/history:
+    get:
+      tags:
+        - Queries
+      summary: Get query history
+      description: Retrieve query execution history
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - $ref: '#/components/parameters/ConnectionIdParam'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Maximum number of results to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of results to skip
+      responses:
+        '200':
+          description: Query history retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryHistoryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /queries/save:
+    post:
+      tags:
+        - Queries
+      summary: Save query
+      description: Save a query for later use
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveQueryRequest'
+      responses:
+        '201':
+          description: Query saved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedQueryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /queries/saved:
+    get:
+      tags:
+        - Queries
+      summary: Get saved queries
+      description: Retrieve a list of saved queries
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - in: query
+          name: tags
+          schema:
+            type: string
+          description: Filter by tags (comma-separated)
+          example: "users,reporting"
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Filter by category
+          example: "reports"
+      responses:
+        '200':
+          description: Saved queries retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedQueriesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /queries/explain:
+    post:
+      tags:
+        - Queries
+      summary: Explain query execution plan
+      description: Get the execution plan for a SQL query
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExplainQueryRequest'
+      responses:
+        '200':
+          description: Query plan generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExplainQueryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /connections/{connection_id}/schema:
+    get:
+      tags:
+        - Schema
+      summary: Get database schema
+      description: Retrieve the database schema including tables, columns, and relationships
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdParam'
+        - in: query
+          name: include_system_tables
+          schema:
+            type: boolean
+            default: false
+          description: Include system tables in schema
+      responses:
+        '200':
+          description: Schema retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseSchemaResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /connections/{connection_id}/tables/{table_name}/data:
+    get:
+      tags:
+        - Schema
+      summary: Get table data
+      description: Retrieve data from a specific table
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdParam'
+        - in: path
+          name: table_name
+          required: true
+          schema:
+            type: string
+          description: Name of the table
+          example: "users"
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: Maximum number of rows to return
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Number of rows to skip
+        - in: query
+          name: order_by
+          schema:
+            type: string
+          description: Column to order by
+          example: "id"
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: "asc"
+          description: Sort order
+      responses:
+        '200':
+          description: Table data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableDataResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /monitoring/metrics:
+    get:
+      tags:
+        - Monitoring
+      summary: Get monitoring metrics
+      description: Retrieve real-time and historical monitoring metrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ConnectionIdParam'
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: [1m, 5m, 15m, 1h, 6h, 24h, 7d, 30d]
+            default: "1h"
+          description: Time period for metrics
+        - in: query
+          name: metrics
+          schema:
+            type: string
+            description: Comma-separated list of metrics to retrieve
+            example: "queries_per_second,response_time_ms,error_rate"
+      responses:
+        '200':
+          description: Metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /team/members:
+    get:
+      tags:
+        - Teams
+      summary: Get team members
+      description: Retrieve a list of team members
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Team members retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMembersResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /team/invite:
+    post:
+      tags:
+        - Teams
+      summary: Invite team member
+      description: Send an invitation to join the team
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteTeamMemberRequest'
+      responses:
+        '201':
+          description: Invitation sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteTeamMemberResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /alerts/configurations:
+    get:
+      tags:
+        - Alerts
+      summary: Get alert configurations
+      description: Retrieve a list of alert configurations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Alert configurations retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertConfigurationsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Alerts
+      summary: Create alert configuration
+      description: Create a new alert configuration
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAlertRequest'
+      responses:
+        '201':
+          description: Alert configuration created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertConfigurationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Check if the API service is healthy
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+              examples:
+                healthy:
+                  summary: Healthy response
+                  value:
+                    status: "healthy"
+                    timestamp: "2024-01-15T14:30:00Z"
+                    version: "1.0.0"
+                    uptime: 86400
+
+  /ready:
+    get:
+      tags:
+        - System
+      summary: Readiness check
+      description: Check if the service is ready to handle requests
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessCheckResponse'
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessCheckResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from authentication endpoints
+
+  parameters:
+    ConnectionIdParam:
+      in: path
+      name: connection_id
+      required: true
+      schema:
+        type: string
+        pattern: '^conn_[a-zA-Z0-9_]+$'
+      description: Database connection ID
+      example: "conn_12345"
+
+    PageParam:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+      example: 1
+
+    PerPageParam:
+      in: query
+      name: per_page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page
+      example: 20
+
+    SearchParam:
+      in: query
+      name: search
+      schema:
+        type: string
+        maxLength: 255
+      description: Search term for filtering results
+      example: "production"
+
+  schemas:
+    # Request Schemas
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 8
+          description: User password (minimum 8 characters)
+          example: "securePassword123"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: User full name
+          example: "John Doe"
+        company:
+          type: string
+          maxLength: 100
+          description: User company name
+          example: "Acme Corp"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "user@example.com"
+        password:
+          type: string
+          description: User password
+          example: "securePassword123"
+
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: Refresh token obtained from login
+          example: "refresh_abc123"
+
+    CreateConnectionRequest:
+      type: object
+      required:
+        - name
+        - type
+        - host
+        - database
+        - username
+        - password
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Connection name
+          example: "Production PostgreSQL"
+        type:
+          type: string
+          enum: [postgresql, mysql, mongodb, redis, sqlite, oracle, sqlserver, cassandra, influxdb, neo4j]
+          description: Database type
+          example: "postgresql"
+        host:
+          type: string
+          description: Database host
+          example: "prod-db.example.com"
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          description: Database port
+          example: 5432
+        database:
+          type: string
+          description: Database name
+          example: "production"
+        username:
+          type: string
+          description: Database username
+          example: "app_user"
+        password:
+          type: string
+          description: Database password
+          example: "secure_password"
+        ssl_mode:
+          type: string
+          enum: [disable, allow, prefer, require, verify-ca, verify-full]
+          default: "prefer"
+          description: SSL connection mode
+        connection_pool_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+          description: Connection pool size
+        timeout:
+          type: integer
+          minimum: 1
+          maximum: 300
+          default: 30
+          description: Connection timeout in seconds
+        ssh_tunnel:
+          $ref: '#/components/schemas/SSHTunnelConfig'
+
+    SSHTunnelConfig:
+      type: object
+      required:
+        - enabled
+        - host
+        - port
+        - username
+      properties:
+        enabled:
+          type: boolean
+          description: Enable SSH tunneling
+          example: true
+        host:
+          type: string
+          description: SSH host
+          example: "bastion.example.com"
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          default: 22
+          description: SSH port
+          example: 22
+        username:
+          type: string
+          description: SSH username
+          example: "ec2-user"
+        key_path:
+          type: string
+          description: Path to SSH private key
+          example: "/path/to/key"
+        password:
+          type: string
+          description: SSH password (alternative to key)
+          example: "ssh_password"
+
+    UpdateConnectionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Connection name
+        connection_pool_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Connection pool size
+        timeout:
+          type: integer
+          minimum: 1
+          maximum: 300
+          description: Connection timeout in seconds
+        ssl_mode:
+          type: string
+          enum: [disable, allow, prefer, require, verify-ca, verify-full]
+          description: SSL connection mode
+
+    ExecuteQueryRequest:
+      type: object
+      required:
+        - connection_id
+        - query
+      properties:
+        connection_id:
+          type: string
+          pattern: '^conn_[a-zA-Z0-9_]+$'
+          description: Database connection ID
+          example: "conn_12345"
+        query:
+          type: string
+          minLength: 1
+          maxLength: 100000
+          description: SQL query to execute
+          example: "SELECT * FROM users WHERE created_at >= '2024-01-01' LIMIT 100"
+        parameters:
+          type: array
+          items:
+            type: string
+          description: Query parameters for parameterized queries
+          example: ["user@example.com", "2024-01-01"]
+        timeout:
+          type: integer
+          minimum: 1000
+          maximum: 300000
+          default: 30000
+          description: Query timeout in milliseconds
+          example: 30000
+        explain:
+          type: boolean
+          default: false
+          description: Include query execution plan
+
+    SaveQueryRequest:
+      type: object
+      required:
+        - name
+        - query
+        - connection_id
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Query name
+          example: "Active Users Query"
+        description:
+          type: string
+          maxLength: 500
+          description: Query description
+          example: "Returns all active users from the last 30 days"
+        query:
+          type: string
+          minLength: 1
+          maxLength: 100000
+          description: SQL query
+          example: "SELECT * FROM users WHERE last_login >= NOW() - INTERVAL '30 days'"
+        connection_id:
+          type: string
+          pattern: '^conn_[a-zA-Z0-9_]+$'
+          description: Default connection ID
+          example: "conn_12345"
+        tags:
+          type: array
+          items:
+            type: string
+            maxLength: 50
+          description: Query tags
+          example: ["users", "reporting", "monthly"]
+        is_public:
+          type: boolean
+          default: false
+          description: Whether query is visible to team
+
+    ExplainQueryRequest:
+      type: object
+      required:
+        - connection_id
+        - query
+      properties:
+        connection_id:
+          type: string
+          pattern: '^conn_[a-zA-Z0-9_]+$'
+          description: Database connection ID
+          example: "conn_12345"
+        query:
+          type: string
+          minLength: 1
+          description: SQL query to explain
+          example: "SELECT u.*, COUNT(o.id) as order_count FROM users u JOIN orders o ON u.id = o.user_id GROUP BY u.id"
+
+    InviteTeamMemberRequest:
+      type: object
+      required:
+        - email
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address of team member to invite
+          example: "colleague@example.com"
+        role:
+          type: string
+          enum: [admin, developer, viewer]
+          description: Team role
+          example: "developer"
+        message:
+          type: string
+          maxLength: 500
+          description: Custom invitation message
+          example: "Join our team on QueryFlux!"
+
+    CreateAlertRequest:
+      type: object
+      required:
+        - name
+        - metric
+        - operator
+        - threshold
+        - severity
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Alert name
+          example: "High Query Latency"
+        description:
+          type: string
+          maxLength: 500
+          description: Alert description
+          example: "Alert when query response time exceeds threshold"
+        metric:
+          type: string
+          enum: [response_time_ms, queries_per_second, error_rate, cpu_usage, memory_usage, active_connections]
+          description: Metric to monitor
+          example: "response_time_ms"
+        operator:
+          type: string
+          enum: [>, <, >=, <=, ==, !=]
+          description: Comparison operator
+          example: ">"
+        threshold:
+          type: number
+          description: Alert threshold
+          example: 1000
+        connection_id:
+          type: string
+          pattern: '^conn_[a-zA-Z0-9_]+$'
+          description: Connection to monitor (optional)
+        severity:
+          type: string
+          enum: [info, warning, error, critical]
+          description: Alert severity
+          example: "warning"
+        enabled:
+          type: boolean
+          default: true
+          description: Whether alert is enabled
+        notification_channels:
+          type: array
+          items:
+            type: string
+          description: Notification channels
+          example: ["email", "slack"]
+        evaluation_interval:
+          type: string
+          pattern: '^\d+[smhd]$'
+          default: "5m"
+          description: How often to evaluate the alert
+          example: "5m"
+
+    # Response Schemas
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            token:
+              type: string
+              description: JWT authentication token
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            expires_in:
+              type: integer
+              description: Token expiration time in seconds
+              example: 86400
+            refresh_token:
+              type: string
+              description: Refresh token for obtaining new JWT
+              example: "refresh_abc123"
+
+    RefreshTokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: New JWT authentication token
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            expires_in:
+              type: integer
+              description: Token expiration time in seconds
+              example: 86400
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: '^usr_[a-zA-Z0-9_]+$'
+          example: "usr_12345"
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        name:
+          type: string
+          example: "John Doe"
+        role:
+          type: string
+          enum: [user, admin, owner]
+          example: "user"
+        subscription_tier:
+          type: string
+          enum: [free, professional, enterprise]
+          example: "professional"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+
+    Connection:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: '^conn_[a-zA-Z0-9_]+$'
+          example: "conn_12345"
+        name:
+          type: string
+          example: "Production PostgreSQL"
+        type:
+          type: string
+          example: "postgresql"
+        host:
+          type: string
+          example: "prod-db.example.com"
+        port:
+          type: integer
+          example: 5432
+        database:
+          type: string
+          example: "production"
+        username:
+          type: string
+          example: "app_user"
+        ssl_mode:
+          type: string
+          example: "require"
+        connection_pool_size:
+          type: integer
+          example: 10
+        status:
+          type: string
+          enum: [connected, disconnected, error, connecting]
+          example: "connected"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        last_used:
+          type: string
+          format: date-time
+          example: "2024-01-15T14:22:00Z"
+
+    ConnectionTestResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [connected, error]
+              example: "connected"
+            latency_ms:
+              type: integer
+              description: Connection latency in milliseconds
+              example: 45
+            version:
+              type: string
+              description: Database version
+              example: "PostgreSQL 14.5"
+            max_connections:
+              type: integer
+              description: Maximum allowed connections
+              example: 100
+            active_connections:
+              type: integer
+              description: Currently active connections
+              example: 25
+
+    QueryExecutionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            query_id:
+              type: string
+              pattern: '^qry_[a-zA-Z0-9_]+$'
+              example: "qry_12345"
+            status:
+              type: string
+              enum: [executing, completed, error, cancelled]
+              example: "completed"
+            execution_time_ms:
+              type: integer
+              description: Query execution time in milliseconds
+              example: 245
+            rows_returned:
+              type: integer
+              description: Number of rows returned
+              example: 87
+            rows_affected:
+              type: integer
+              description: Number of rows affected
+              example: 0
+            columns:
+              type: array
+              items:
+                $ref: '#/components/schemas/Column'
+            rows:
+              type: array
+              items:
+                type: array
+                items:
+                  type: string
+              description: Query result rows
+              example: [[1, "John Doe", "john@example.com"], [2, "Jane Smith", "jane@example.com"]]
+            explain_plan:
+              type: array
+              description: Query execution plan (if requested)
+              items:
+                type: object
+
+    Column:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "id"
+        type:
+          type: string
+          example: "integer"
+        nullable:
+          type: boolean
+          example: false
+        primary_key:
+          type: boolean
+          example: true
+        default_value:
+          type: string
+          example: "nextval('users_id_seq'::regclass)"
+
+    SavedQuery:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: '^sqry_[a-zA-Z0-9_]+$'
+          example: "sqry_12345"
+        name:
+          type: string
+          example: "Active Users Query"
+        description:
+          type: string
+          example: "Returns all active users from the last 30 days"
+        query:
+          type: string
+          example: "SELECT * FROM users WHERE last_login >= NOW() - INTERVAL '30 days'"
+        connection_id:
+          type: string
+          example: "conn_12345"
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["users", "reporting", "monthly"]
+        is_public:
+          type: boolean
+          example: false
+        created_by:
+          type: string
+          example: "usr_12345"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T14:30:00Z"
+
+    DatabaseSchema:
+      type: object
+      properties:
+        database_name:
+          type: string
+          example: "production"
+        schema_version:
+          type: string
+          example: "14.5"
+        tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/Table'
+
+    Table:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "users"
+        schema:
+          type: string
+          example: "public"
+        type:
+          type: string
+          example: "table"
+        row_count:
+          type: integer
+          format: int64
+          example: 15420
+        size_bytes:
+          type: integer
+          format: int64
+          example: 2048576
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/Column'
+        indexes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Index'
+        foreign_keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/ForeignKey'
+
+    Index:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "users_email_idx"
+        columns:
+          type: array
+          items:
+            type: string
+          example: ["email"]
+        type:
+          type: string
+          example: "btree"
+        unique:
+          type: boolean
+          example: true
+
+    ForeignKey:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "users_company_id_fkey"
+        column:
+          type: string
+          example: "company_id"
+        references_table:
+          type: string
+          example: "companies"
+        references_column:
+          type: string
+          example: "id"
+
+    AlertConfiguration:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: '^alert_[a-zA-Z0-9_]+$'
+          example: "alert_12345"
+        name:
+          type: string
+          example: "High Query Latency"
+        description:
+          type: string
+          example: "Alert when query response time exceeds threshold"
+        metric:
+          type: string
+          example: "response_time_ms"
+        operator:
+          type: string
+          example: ">"
+        threshold:
+          type: number
+          example: 1000
+        connection_id:
+          type: string
+          example: "conn_12345"
+        severity:
+          type: string
+          example: "warning"
+        enabled:
+          type: boolean
+          example: true
+        notification_channels:
+          type: array
+          items:
+            type: string
+          example: ["email", "slack"]
+        evaluation_interval:
+          type: string
+          example: "5m"
+        created_by:
+          type: string
+          example: "usr_12345"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+
+    TeamMember:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: '^usr_[a-zA-Z0-9_]+$'
+          example: "usr_12345"
+        email:
+          type: string
+          format: email
+          example: "colleague@example.com"
+        name:
+          type: string
+          example: "Jane Smith"
+        role:
+          type: string
+          enum: [owner, admin, developer, viewer]
+          example: "developer"
+        status:
+          type: string
+          enum: [active, pending, inactive]
+          example: "active"
+        invited_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00Z"
+        last_login:
+          type: string
+          format: date-time
+          example: "2024-01-15T14:30:00Z"
+
+    Metrics:
+      type: object
+      properties:
+        period:
+          type: string
+          example: "1h"
+        metrics:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/MetricData'
+        timestamps:
+          type: array
+          items:
+            type: string
+            format: date-time
+          example: ["2024-01-15T13:30:00Z", "2024-01-15T13:31:00Z"]
+
+    MetricData:
+      type: object
+      properties:
+        current:
+          type: number
+          example: 12.5
+        average:
+          type: number
+          example: 10.2
+        max:
+          type: number
+          example: 25.8
+        min:
+          type: number
+          example: 2.1
+
+    HealthCheckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T14:30:00Z"
+        version:
+          type: string
+          example: "1.0.0"
+        uptime:
+          type: integer
+          description: Service uptime in seconds
+          example: 86400
+        dependencies:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [healthy, unhealthy]
+          description: Health status of dependencies
+          example:
+            database: "healthy"
+            redis: "healthy"
+
+    ReadinessCheckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+          example: "ready"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T14:30:00Z"
+        checks:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: Individual readiness checks
+          example:
+            database: true
+            redis: true
+            migrations_applied: true
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "INVALID_PARAMETER"
+            message:
+              type: string
+              example: "The 'connection_id' parameter is required"
+            details:
+              type: object
+              additionalProperties: true
+              example:
+                parameter: "connection_id"
+                expected_type: "string"
+
+    # Paginated Response Wrappers
+    ConnectionsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Connection'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    QueryHistoryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueryHistoryItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    QueryHistoryItem:
+      type: object
+      properties:
+        id:
+          type: string
+          pattern: '^qry_[a-zA-Z0-9_]+$'
+          example: "qry_12345"
+        connection_id:
+          type: string
+          example: "conn_12345"
+        query:
+          type: string
+          example: "SELECT * FROM users WHERE created_at >= '2024-01-01' LIMIT 100"
+        execution_time_ms:
+          type: integer
+          example: 245
+        rows_returned:
+          type: integer
+          example: 87
+        status:
+          type: string
+          example: "completed"
+        executed_at:
+          type: string
+          format: date-time
+          example: "2024-01-15T14:30:00Z"
+        executed_by:
+          type: string
+          example: "usr_12345"
+
+    SavedQueriesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SavedQuery'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    TeamMembersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMember'
+
+    AlertConfigurationsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertConfiguration'
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 1
+        total_pages:
+          type: integer
+          example: 1
+
+    # Individual Response Schemas
+    ConnectionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Connection'
+
+    SavedQueryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/SavedQuery'
+
+    DatabaseSchemaResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/DatabaseSchema'
+
+    TableDataResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            columns:
+              type: array
+              items:
+                $ref: '#/components/schemas/Column'
+            rows:
+              type: array
+              items:
+                type: array
+                items:
+                  type: string
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+
+    MetricsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Metrics'
+
+    AlertConfigurationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/AlertConfiguration'
+
+    InviteTeamMemberResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            invitation_id:
+              type: string
+              example: "inv_12345"
+            email:
+              type: string
+              example: "colleague@example.com"
+            role:
+              type: string
+              example: "developer"
+            expires_at:
+              type: string
+              format: date-time
+              example: "2024-01-22T10:30:00Z"
+
+    ExplainQueryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            plan:
+              type: array
+              items:
+                type: object
+              description: Query execution plan
+            total_cost:
+              type: number
+              example: 125.34
+            execution_time_estimate_ms:
+              type: integer
+              example: 15
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid parameters or data
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalid_parameter:
+              summary: Invalid parameter
+              value:
+                success: false
+                error:
+                  code: "INVALID_PARAMETER"
+                  message: "The 'connection_id' parameter is required"
+                  details:
+                    parameter: "connection_id"
+                    expected_type: "string"
+
+    Unauthorized:
+      description: Unauthorized - invalid or missing authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missing_token:
+              summary: Missing authentication token
+              value:
+                success: false
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Authentication token is required"
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            insufficient_permissions:
+              summary: Insufficient permissions
+              value:
+                success: false
+                error:
+                  code: "FORBIDDEN"
+                  message: "Insufficient permissions to perform this action"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            resource_not_found:
+              summary: Resource not found
+              value:
+                success: false
+                error:
+                  code: "NOT_FOUND"
+                  message: "The requested resource was not found"
+
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            resource_exists:
+              summary: Resource already exists
+              value:
+                success: false
+                error:
+                  code: "CONFLICT"
+                  message: "A resource with this identifier already exists"
+
+    RequestTimeout:
+      description: Request timeout
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            query_timeout:
+              summary: Query execution timeout
+              value:
+                success: false
+                error:
+                  code: "TIMEOUT"
+                  message: "Query execution timed out"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            internal_error:
+              summary: Internal server error
+              value:
+                success: false
+                error:
+                  code: "INTERNAL_ERROR"
+                  message: "An internal server error occurred"
+
+# Extension for WebSocket support
+webhooks: []

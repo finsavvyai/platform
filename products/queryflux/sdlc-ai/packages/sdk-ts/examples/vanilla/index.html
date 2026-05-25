@@ -1,0 +1,349 @@
+<!-- Vanilla JavaScript example -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDLC.ai SDK - Vanilla JS Example</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      display: grid;
+      gap: 20px;
+    }
+    .card {
+      border: 1px solid #e1e5e9;
+      border-radius: 8px;
+      padding: 20px;
+      background: #f8f9fa;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .hidden {
+      display: none;
+    }
+    .error {
+      color: #dc3545;
+      margin-top: 10px;
+    }
+    .success {
+      color: #28a745;
+      margin-top: 10px;
+    }
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #007bff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .documents-list {
+      list-style: none;
+      padding: 0;
+    }
+    .documents-list li {
+      padding: 10px;
+      border-bottom: 1px solid #e1e5e9;
+    }
+    .drop-zone {
+      border: 2px dashed #007bff;
+      border-radius: 8px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .drop-zone:hover {
+      background: #e3f2fd;
+    }
+    .drop-zone.dragover {
+      background: #bbdefb;
+      border-color: #1976d2;
+    }
+  </style>
+</head>
+<body>
+  <h1>SDLC.ai JavaScript SDK - Vanilla JS Example</h1>
+
+  <div class="container">
+    <!-- Authentication Card -->
+    <div class="card" id="auth-card">
+      <h2>Authentication</h2>
+      <form id="login-form">
+        <input type="email" id="email" placeholder="Email" required style="margin-bottom: 10px;">
+        <input type="password" id="password" placeholder="Password" required style="margin-bottom: 10px;">
+        <button type="submit" id="login-btn">Login</button>
+      </form>
+      <div id="auth-status"></div>
+    </div>
+
+    <!-- User Info Card -->
+    <div class="card hidden" id="user-card">
+      <h2>Welcome, <span id="user-name"></span>!</h2>
+      <button id="logout-btn">Logout</button>
+    </div>
+
+    <!-- Document Upload Card -->
+    <div class="card hidden" id="upload-card">
+      <h2>Upload Document</h2>
+      <div class="drop-zone" id="drop-zone">
+        <p>Drop a file here or click to select</p>
+        <input type="file" id="file-input" style="display: none;">
+      </div>
+      <div id="upload-status"></div>
+    </div>
+
+    <!-- Documents List Card -->
+    <div class="card hidden" id="documents-card">
+      <h2>Documents</h2>
+      <button id="refresh-docs">Refresh</button>
+      <ul class="documents-list" id="documents-list"></ul>
+    </div>
+
+    <!-- RAG Query Card -->
+    <div class="card hidden" id="rag-card">
+      <h2>Ask a Question</h2>
+      <textarea id="query-input" rows="3" placeholder="Ask about your documents..."></textarea>
+      <button id="query-btn" style="margin-top: 10px;">Ask</button>
+      <div id="query-status"></div>
+      <div id="query-answer" style="margin-top: 20px; padding: 15px; background: white; border-radius: 4px;"></div>
+    </div>
+  </div>
+
+  <!-- Load the SDK -->
+  <script type="module">
+    import { BrowserClient } from 'https://unpkg.com/@sdlc/sdln-js/dist/browser/index.js';
+
+    // Initialize client
+    const client = new BrowserClient({
+      baseURL: 'https://api.sdlc.ai',
+      apiKey: 'your-api-key', // Replace with your API key
+      environment: 'development'
+    });
+
+    // DOM elements
+    const authCard = document.getElementById('auth-card');
+    const userCard = document.getElementById('user-card');
+    const uploadCard = document.getElementById('upload-card');
+    const documentsCard = document.getElementById('documents-card');
+    const ragCard = document.getElementById('rag-card');
+
+    const loginForm = document.getElementById('login-form');
+    const loginBtn = document.getElementById('login-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+    const userName = document.getElementById('user-name');
+    const authStatus = document.getElementById('auth-status');
+
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const uploadStatus = document.getElementById('upload-status');
+
+    const refreshDocs = document.getElementById('refresh-docs');
+    const documentsList = document.getElementById('documents-list');
+
+    const queryInput = document.getElementById('query-input');
+    const queryBtn = document.getElementById('query-btn');
+    const queryStatus = document.getElementById('query-status');
+    const queryAnswer = document.getElementById('query-answer');
+
+    // Login handler
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = '<span class="loading"></span>Logging in...';
+
+      try {
+        const { user } = await client.auth.login({ email, password });
+        authStatus.innerHTML = `<span class="success">Logged in as ${user.firstName} ${user.lastName}</span>`;
+
+        // Show user info
+        userName.textContent = user.firstName;
+        authCard.classList.add('hidden');
+        userCard.classList.remove('hidden');
+        uploadCard.classList.remove('hidden');
+        documentsCard.classList.remove('hidden');
+        ragCard.classList.remove('hidden');
+
+        // Load documents
+        loadDocuments();
+      } catch (error) {
+        authStatus.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+      }
+
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Login';
+    });
+
+    // Logout handler
+    logoutBtn.addEventListener('click', async () => {
+      await client.auth.logout();
+      authCard.classList.remove('hidden');
+      userCard.classList.add('hidden');
+      uploadCard.classList.add('hidden');
+      documentsCard.classList.add('hidden');
+      ragCard.classList.add('hidden');
+      authStatus.innerHTML = '';
+    });
+
+    // File upload handlers
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        await uploadFile(files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', async (e) => {
+      if (e.target.files.length > 0) {
+        await uploadFile(e.target.files[0]);
+      }
+    });
+
+    // Upload function
+    async function uploadFile(file) {
+      uploadStatus.innerHTML = '<span class="loading"></span>Uploading...';
+
+      try {
+        const document = await client.documents.upload(file, {
+          onProgress: (progress) => {
+            uploadStatus.innerHTML = `Uploading... ${progress.percentage}%`;
+          }
+        });
+
+        uploadStatus.innerHTML = `<span class="success">Document uploaded: ${document.name}</span>`;
+        loadDocuments(); // Refresh documents list
+      } catch (error) {
+        uploadStatus.innerHTML = `<span class="error">Upload failed: ${error.message}</span>`;
+      }
+    }
+
+    // Load documents
+    async function loadDocuments() {
+      try {
+        const response = await client.documents.list({ pageSize: 10 });
+        documentsList.innerHTML = '';
+
+        if (response.items.length === 0) {
+          documentsList.innerHTML = '<li>No documents found</li>';
+        } else {
+          response.items.forEach(doc => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <strong>${doc.name}</strong>
+              <small>(${doc.type}, ${(doc.size / 1024).toFixed(1)} KB)</small>
+              <br>
+              <small>Created: ${new Date(doc.createdAt).toLocaleDateString()}</small>
+            `;
+            documentsList.appendChild(li);
+          });
+        }
+      } catch (error) {
+        documentsList.innerHTML = `<li class="error">Error loading documents: ${error.message}</li>`;
+      }
+    }
+
+    refreshDocs.addEventListener('click', loadDocuments);
+
+    // RAG Query
+    queryBtn.addEventListener('click', async () => {
+      const query = queryInput.value.trim();
+      if (!query) return;
+
+      queryBtn.disabled = true;
+      queryBtn.innerHTML = '<span class="loading"></span>Thinking...';
+      queryAnswer.innerHTML = '';
+
+      try {
+        const response = await client.rag.query({
+          query: query,
+          context: {
+            maxDocuments: 5,
+            includeCitations: true
+          }
+        });
+
+        queryAnswer.innerHTML = `
+          <h4>Answer:</h4>
+          <p>${response.answer}</p>
+          ${response.sources.length > 0 ? `
+            <h4>Sources:</h4>
+            <ul>
+              ${response.sources.map(s => `<li>${s.documentName} (score: ${s.score.toFixed(2)})</li>`).join('')}
+            </ul>
+          ` : ''}
+        `;
+      } catch (error) {
+        queryAnswer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+      }
+
+      queryBtn.disabled = false;
+      queryBtn.textContent = 'Ask';
+    });
+
+    // Check if already authenticated
+    if (client.auth.isAuthenticated()) {
+      const user = await client.auth.getCurrentUser();
+      userName.textContent = user.firstName;
+      authCard.classList.add('hidden');
+      userCard.classList.remove('hidden');
+      uploadCard.classList.remove('hidden');
+      documentsCard.classList.remove('hidden');
+      ragCard.classList.remove('hidden');
+      loadDocuments();
+    }
+  </script>
+</body>
+</html>

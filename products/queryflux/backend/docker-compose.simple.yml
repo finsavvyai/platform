@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # QueryFlux Backend API
+  queryflux-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+      - JWT_SECRET=your-production-jwt-secret-change-this
+    networks:
+      - queryflux-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database (Optional - for production use external DB)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: queryflux
+      POSTGRES_USER: queryflux
+      POSTGRES_PASSWORD: secure-password-change-this
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - queryflux-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U queryflux"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache (Optional)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - queryflux-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  queryflux-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

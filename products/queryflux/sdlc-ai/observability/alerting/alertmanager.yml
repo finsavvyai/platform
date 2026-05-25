@@ -1,0 +1,272 @@
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@sdlc-platform.com'
+  smtp_require_tls: true
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+# Route configuration
+route:
+  # Default receiver
+  receiver: 'default'
+
+  # Group alerts by these labels
+  group_by: ['alertname', 'cluster', 'service']
+
+  # Wait this long for more alerts to be grouped together
+  group_wait: 10s
+
+  # Wait this long between sending notifications about new alerts
+  group_interval: 10s
+
+  # Wait this long before resending an alert after it has been successfully sent
+  repeat_interval: 1h
+
+  # Routes for different alert types
+  routes:
+    # Critical alerts (immediate notification)
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 5s
+      repeat_interval: 15m
+      routes:
+        - match:
+            service: database
+          receiver: 'database-critical'
+        - match:
+            service: auth
+          receiver: 'auth-critical'
+
+    # Warning alerts
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      repeat_interval: 4h
+
+    # System alerts
+    - match:
+        type: system
+      receiver: 'system-alerts'
+      group_wait: 20s
+      repeat_interval: 30m
+
+    # Application alerts
+    - match:
+        type: application
+      receiver: 'application-alerts'
+      group_wait: 15s
+      repeat_interval: 2h
+
+    # Security alerts
+    - match:
+        type: security
+      receiver: 'security-alerts'
+      group_wait: 5s
+      repeat_interval: 30m
+
+    # Business metrics alerts
+    - match:
+        type: business
+      receiver: 'business-alerts'
+      group_wait: 1m
+      repeat_interval: 6h
+
+# Inhibition rules
+inhibit_rules:
+  # Inhibit warning alerts if critical alert is firing for same instance
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['instance', 'service']
+
+  # Inhibit node alerts if entire cluster is down
+  - source_match:
+      alertname: 'ClusterDown'
+    target_match:
+      service: 'node-exporter'
+    equal: ['cluster']
+
+  # Inhibit application alerts if database is down
+  - source_match:
+      alertname: 'DatabaseDown'
+    target_match:
+      type: 'application'
+    equal: ['database']
+
+# Receivers configuration
+receivers:
+  # Default receiver
+  - name: 'default'
+    email_configs:
+      - to: 'ops@sdlc-platform.com'
+        subject: '[SDLC Platform] {{ .GroupLabels.alertname }} Alert'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Labels: {{ range .Labels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+          {{ end }}
+    slack_configs:
+      - channel: '#alerts'
+        title: 'SDLC Platform Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Service:* {{ .Labels.service }}
+          {{ end }}
+
+  # Critical alerts receiver
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@sdlc-platform.com'
+        subject: '[CRITICAL] SDLC Platform Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          🚨 CRITICAL ALERT 🚨
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+    slack_configs:
+      - channel: '#critical-alerts'
+        title: '🚨 CRITICAL ALERT - SDLC Platform'
+        color: 'danger'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+    webhook_configs:
+      - url: 'http://localhost:8080/webhooks/critical-alerts'
+        send_resolved: true
+
+  # Database critical alerts
+  - name: 'database-critical'
+    email_configs:
+      - to: 'dba-team@sdlc-platform.com,oncall@sdlc-platform.com'
+        subject: '[DATABASE CRITICAL] {{ .GroupLabels.alertname }}'
+        body: |
+          🗄️ DATABASE CRITICAL ALERT 🗄️
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Database: {{ .Labels.database }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    slack_configs:
+      - channel: '#database-alerts'
+        title: '🗄️ DATABASE CRITICAL ALERT'
+        color: 'danger'
+
+  # Auth critical alerts
+  - name: 'auth-critical'
+    email_configs:
+      - to: 'security-team@sdlc-platform.com,oncall@sdlc-platform.com'
+        subject: '[AUTH CRITICAL] {{ .GroupLabels.alertname }}'
+        body: |
+          🔐 AUTHENTICATION CRITICAL ALERT 🔐
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+    slack_configs:
+      - channel: '#security-alerts'
+        title: '🔐 AUTHENTICATION CRITICAL ALERT'
+        color: 'danger'
+
+  # Warning alerts receiver
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'ops@sdlc-platform.com'
+        subject: '[WARNING] SDLC Platform Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          ⚠️ WARNING ALERT ⚠️
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          {{ end }}
+    slack_configs:
+      - channel: '#alerts'
+        title: '⚠️ WARNING - SDLC Platform'
+        color: 'warning'
+
+  # System alerts receiver
+  - name: 'system-alerts'
+    email_configs:
+      - to: 'ops@sdlc-platform.com,devops@sdlc-platform.com'
+        subject: '[SYSTEM] {{ .GroupLabels.alertname }}'
+        body: |
+          💻 SYSTEM ALERT 💻
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Host: {{ .Labels.instance }}
+          Metric: {{ .Labels.metric }}
+          {{ end }}
+
+  # Application alerts receiver
+  - name: 'application-alerts'
+    email_configs:
+      - to: 'dev-team@sdlc-platform.com,ops@sdlc-platform.com'
+        subject: '[APPLICATION] {{ .GroupLabels.alertname }}'
+        body: |
+          🚀 APPLICATION ALERT 🚀
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Service: {{ .Labels.service }}
+          Version: {{ .Labels.version }}
+          Environment: {{ .Labels.environment }}
+          {{ end }}
+
+  # Security alerts receiver
+  - name: 'security-alerts'
+    email_configs:
+      - to: 'security-team@sdlc-platform.com,oncall@sdlc-platform.com'
+        subject: '[SECURITY] {{ .GroupLabels.alertname }}'
+        body: |
+          🔒 SECURITY ALERT 🔒
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Type: {{ .Labels.security_type }}
+          Source: {{ .Labels.source_ip }}
+          {{ end }}
+    slack_configs:
+      - channel: '#security-alerts'
+        title: '🔒 SECURITY ALERT'
+        color: 'danger'
+
+  # Business alerts receiver
+  - name: 'business-alerts'
+    email_configs:
+      - to: 'product-team@sdlc-platform.com,biz-team@sdlc-platform.com'
+        subject: '[BUSINESS] {{ .GroupLabels.alertname }}'
+        body: |
+          📊 BUSINESS METRICS ALERT 📊
+
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Metric: {{ .Labels.business_metric }}
+          Current Value: {{ .Labels.current_value }}
+          Threshold: {{ .Labels.threshold }}
+          {{ end }}
+
+# Templates for alert formatting
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
