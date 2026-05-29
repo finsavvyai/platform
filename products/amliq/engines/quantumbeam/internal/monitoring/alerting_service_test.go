@@ -1,3 +1,11 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
+// This test file depends on symbols in alerting_service.go which is tagged
+// legacy_migrated. Tagging the test file together keeps both in sync until
+// the migration lands. TODO: remove the build tag when alerting_service.go
+// is untagged.
+
 package monitoring
 
 import (

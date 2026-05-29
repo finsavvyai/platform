@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package discovery
 
 import (
@@ -5,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"

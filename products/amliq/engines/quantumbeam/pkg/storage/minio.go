@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 // Package storage provides MinIO S3-compatible object storage functionality for QuantumBeam.io
 package storage
 

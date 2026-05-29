@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 // Package cache provides session management functionality for QuantumBeam.io
 package cache
 

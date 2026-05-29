@@ -1,5 +1,5 @@
-//go:build terraform
-// +build terraform
+//go:build legacy_migrated && terraform
+// +build legacy_migrated,terraform
 
 package infrastructure
 

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -41,8 +42,18 @@ func (m *MockRateLimitService) ResetRateLimit(ctx context.Context, key string) e
 }
 
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	// Use a per-test shared-cache DSN so every pooled connection sees the
+	// same schema. With plain ":memory:" each connection gets its own
+	// ephemeral DB and "no such table" errors appear non-deterministically.
+	dsn := fmt.Sprintf("file:auth-%s-%d?mode=memory&cache=shared", t.Name(), time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
+
+	// Pin to a single connection — shared-cache is enough but pinning makes
+	// the table visible to every async goroutine the service may spawn.
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
 
 	// Auto-migrate the schema
 	err = db.AutoMigrate(&models.User{}, &models.APIKey{})

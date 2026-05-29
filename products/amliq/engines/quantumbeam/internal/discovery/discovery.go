@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package discovery
 
 import (

@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package handlers
 
 import (
@@ -8,9 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
-	"quantumbeam.io/internal/billing/models"
-	"quantumbeam.io/internal/billing/services"
-	"quantumbeam.io/internal/middleware"
+	"quantumbeam/internal/billing/models"
+	"quantumbeam/internal/billing/services"
+	"quantumbeam/internal/middleware"
 )
 
 // BillingHandlers handles billing HTTP endpoints

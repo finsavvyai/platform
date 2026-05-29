@@ -272,7 +272,7 @@ func TestSSOHandlers_GetSSOProviders(t *testing.T) {
 		}
 
 		mockService.On("GetSSOProviders", mock.Anything).
-			Return(expectedProviders, nil)
+			Return(expectedProviders, nil).Once()
 
 		req := httptest.NewRequest("GET", "/auth/sso/providers", nil)
 		w := httptest.NewRecorder()
@@ -462,7 +462,9 @@ func TestSSOHandlers_HandleSSOCallback(t *testing.T) {
 
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusNotFound, w.Code) // Gin returns 404 for empty param
+		// Gin matches the route with an empty `:provider` param; the handler
+		// then returns 400 MISSING_PROVIDER (verified against gin v1.9.x).
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("missing assertion", func(t *testing.T) {
@@ -598,7 +600,7 @@ func TestSSOHandlers_ConfigureSSO(t *testing.T) {
 
 	t.Run("successful configuration", func(t *testing.T) {
 		mockService.On("ConfigureSSO", mock.Anything, mock.AnythingOfType("*interfaces.SSOConfig")).
-			Return(nil)
+			Return(nil).Once()
 
 		config := interfaces.SSOConfig{
 			Provider:        "new-provider",

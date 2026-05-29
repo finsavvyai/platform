@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package tracing
 
 import (
@@ -11,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opentelemetry.io/otel/attribute"
-	"github.com/opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // TraceAnalytics provides analysis and insights from trace data

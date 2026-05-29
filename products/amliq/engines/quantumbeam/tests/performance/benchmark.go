@@ -1,16 +1,15 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package performance
 
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"

@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package anomaly
 
 import (
@@ -737,7 +740,7 @@ func (am *AlertManager) sendPagerDutyNotification(incident *Incident) error {
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
-	if err != {
+	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()

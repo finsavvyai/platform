@@ -1,5 +1,5 @@
-//go:build k8s
-// +build k8s
+//go:build legacy_migrated && k8s
+// +build legacy_migrated,k8s
 
 package infrastructure
 

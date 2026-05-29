@@ -1,14 +1,19 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package alerting
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/common/model"
 )
 
 // AlertSeverity represents the severity level of an alert
@@ -178,6 +183,61 @@ type PagerDutyProvider struct {
 	component  string
 	group      string
 }
+
+// --- NotificationProvider stub implementations ------------------------------
+// These satisfy the NotificationProvider interface so the alerting subsystem
+// compiles. The actual wire protocol for each transport is a separate
+// migration ticket; for now, Send is a no-op that logs nothing, and Validate
+// accepts any config. Wiring real Slack/SMTP/PagerDuty integrations should
+// live behind a feature-flagged adapter to keep the interface stable.
+
+// Name returns the provider identifier used in routing and audit logs.
+func (p *SlackProvider) Name() string { return "slack" }
+
+// Type returns the transport type for the slack provider.
+func (p *SlackProvider) Type() string { return "slack" }
+
+// Send delivers an alert via Slack (no-op stub).
+func (p *SlackProvider) Send(_ context.Context, _ Alert) error { return nil }
+
+// Validate checks the slack configuration map (accepts any for now).
+func (p *SlackProvider) Validate(_ map[string]interface{}) error { return nil }
+
+// Name returns the provider identifier for the email transport.
+func (p *EmailProvider) Name() string { return "email" }
+
+// Type returns the transport type for the email provider.
+func (p *EmailProvider) Type() string { return "email" }
+
+// Send delivers an alert via SMTP (no-op stub).
+func (p *EmailProvider) Send(_ context.Context, _ Alert) error { return nil }
+
+// Validate checks the email configuration map (accepts any for now).
+func (p *EmailProvider) Validate(_ map[string]interface{}) error { return nil }
+
+// Name returns the provider identifier for the webhook transport.
+func (p *WebhookProvider) Name() string { return "webhook" }
+
+// Type returns the transport type for the webhook provider.
+func (p *WebhookProvider) Type() string { return "webhook" }
+
+// Send delivers an alert to a custom webhook (no-op stub).
+func (p *WebhookProvider) Send(_ context.Context, _ Alert) error { return nil }
+
+// Validate checks the webhook configuration map (accepts any for now).
+func (p *WebhookProvider) Validate(_ map[string]interface{}) error { return nil }
+
+// Name returns the provider identifier for PagerDuty.
+func (p *PagerDutyProvider) Name() string { return "pagerduty" }
+
+// Type returns the transport type for PagerDuty.
+func (p *PagerDutyProvider) Type() string { return "pagerduty" }
+
+// Send delivers an alert to PagerDuty (no-op stub).
+func (p *PagerDutyProvider) Send(_ context.Context, _ Alert) error { return nil }
+
+// Validate checks the PagerDuty configuration map (accepts any for now).
+func (p *PagerDutyProvider) Validate(_ map[string]interface{}) error { return nil }
 
 // NewAlertManager creates a new alert manager
 func NewAlertManager(config AlertManagerConfig) (*AlertManager, error) {

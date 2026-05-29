@@ -31,6 +31,11 @@ require (
 )
 
 require (
+	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
+	github.com/rogpeppe/go-internal v1.8.1 // indirect
+)
+
+require (
 	github.com/beevik/etree v1.5.0 // indirect
 	github.com/bits-and-blooms/bitset v1.24.2 // indirect
 	github.com/chromedp/cdproto v0.0.0-20260321001828-e3e3800016bc // indirect

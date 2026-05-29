@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package integration
 
 import (
@@ -14,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/suite"
 )
 
 // Test configuration

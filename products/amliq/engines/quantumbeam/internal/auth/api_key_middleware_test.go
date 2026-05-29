@@ -77,8 +77,6 @@ func createTestAPIKey() *models.APIKey {
 }
 
 func TestAPIKeyMiddleware_ValidateAPIKey(t *testing.T) {
-	router := setupGinTest()
-
 	tests := []struct {
 		name           string
 		apiKey         string
@@ -106,6 +104,7 @@ func TestAPIKeyMiddleware_ValidateAPIKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			router := setupGinTest()
 			// Create a test route
 			router.GET("/test", func(c *gin.Context) {
 				// Mock the validation directly in the middleware
@@ -159,7 +158,6 @@ func TestAPIKeyMiddleware_ValidateAPIKey(t *testing.T) {
 
 func TestAPIKeyMiddleware_RequireTier(t *testing.T) {
 	middleware := NewAPIKeyMiddleware(&APIKeyService{})
-	router := setupGinTest()
 
 	tests := []struct {
 		name           string
@@ -191,6 +189,7 @@ func TestAPIKeyMiddleware_RequireTier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			router := setupGinTest()
 			// Create test route with tier requirement
 			router.GET("/test-tier", func(c *gin.Context) {
 				// Set usage tier in context
@@ -235,8 +234,6 @@ func TestAPIKeyMiddleware_RateLimitByTier(t *testing.T) {
 	}
 	middleware := NewAPIKeyMiddleware(service)
 
-	router := setupGinTest()
-
 	tests := []struct {
 		name           string
 		setupMock      func()
@@ -275,6 +272,7 @@ func TestAPIKeyMiddleware_RateLimitByTier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			router := setupGinTest()
 			// Setup mock
 			tt.setupMock()
 
@@ -332,6 +330,12 @@ func TestAPIKeyMiddleware_RateLimitByTier(t *testing.T) {
 				assert.Contains(t, w.Body.String(), tt.expectedError)
 			}
 
+			// IncrementCounter is fired in a goroutine for the
+			// "Rate_limit_allowed" case; give it a moment to complete
+			// before asserting mock expectations.
+			assert.Eventually(t, func() bool {
+				return mockRateLimit.AssertExpectations(&testing.T{})
+			}, time.Second, 10*time.Millisecond)
 			mockRateLimit.AssertExpectations(t)
 		})
 	}

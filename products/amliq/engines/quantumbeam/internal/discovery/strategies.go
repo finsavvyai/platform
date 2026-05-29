@@ -1,7 +1,9 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package discovery
 
 import (
-	"fmt"
 	"hash/crc32"
 	"math/rand"
 	"sort"

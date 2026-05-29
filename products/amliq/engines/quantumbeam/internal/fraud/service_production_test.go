@@ -31,11 +31,6 @@ type MockQuantumBackendService struct {
 	mock.Mock
 }
 
-// MockIntelligentRouter mocks the intelligent router
-type MockIntelligentRouter struct {
-	mock.Mock
-}
-
 // SetupSuite runs once before all tests
 func (suite *ProductionTestSuite) SetupSuite() {
 	suite.ctx, suite.cancelFunc = context.WithTimeout(context.Background(), 30*time.Second)
@@ -72,7 +67,6 @@ func (suite *ProductionTestSuite) TestQuantumAnalysisUnderLoad() {
 		UserID:        "user_123",
 		MerchantID:    "merchant_456",
 		Amount:        decimal.NewFromFloat(1500.00),
-		Currency:      "USD",
 		PaymentMethod: "credit_card",
 		Timestamp:     time.Now(),
 	}
@@ -120,7 +114,7 @@ func (suite *ProductionTestSuite) TestQuantumAnalysisUnderLoad() {
 	assert.NotNil(suite.T(), result.QuantumAdvantage)
 	assert.NotEmpty(suite.T(), result.Explanation)
 	assert.NotEmpty(suite.T(), result.RiskLevel)
-	assert.Contains(suite.T(), []string{"low", "medium", "high", "critical"}, result.RiskLevel)
+	assert.Contains(suite.T(), []string{"low", "medium", "high", "critical"}, string(result.RiskLevel))
 }
 
 // Test error handling and recovery
@@ -130,7 +124,6 @@ func (suite *ProductionTestSuite) TestQuantumErrorHandling() {
 		UserID:        "user_123",
 		MerchantID:    "merchant_456",
 		Amount:        decimal.NewFromFloat(2500.00),
-		Currency:      "USD",
 		PaymentMethod: "debit_card",
 		Timestamp:     time.Now(),
 	}
@@ -154,7 +147,6 @@ func (suite *ProductionTestSuite) TestCircuitExecutionFailure() {
 		UserID:        "user_123",
 		MerchantID:    "merchant_456",
 		Amount:        decimal.NewFromFloat(3500.00),
-		Currency:      "USD",
 		PaymentMethod: "credit_card",
 		Timestamp:     time.Now(),
 	}
@@ -188,7 +180,6 @@ func (suite *ProductionTestSuite) TestContextTimeout() {
 		UserID:        "user_123",
 		MerchantID:    "merchant_456",
 		Amount:        decimal.NewFromFloat(4500.00),
-		Currency:      "USD",
 		PaymentMethod: "credit_card",
 		Timestamp:     time.Now(),
 	}
@@ -204,6 +195,13 @@ func (suite *ProductionTestSuite) TestContextTimeout() {
 		}).
 		Return(&interfaces.QuantumBackend{
 			Name: "ibm_quantum_simulator",
+		}, nil).Maybe()
+	// Mock ExecuteQuantumCircuit as Maybe — if the timeout doesn't catch
+	// before SelectOptimalBackend returns, the service may still invoke it.
+	suite.mockQuantum.On("ExecuteQuantumCircuit", mock.Anything, mock.AnythingOfType("*interfaces.QuantumCircuit"), mock.AnythingOfType("*interfaces.QuantumBackend")).
+		Return(&interfaces.QuantumResult{
+			Measurements:  map[string]int{"0000": 1024},
+			Probabilities: map[string]float64{"0000": 1.0},
 		}, nil).Maybe()
 
 	// Execute quantum analysis - should timeout
@@ -228,8 +226,7 @@ func (suite *ProductionTestSuite) TestBatchQuantumAnalysis() {
 			UserID:        "user_123",
 			MerchantID:    "merchant_456",
 			Amount:        decimal.NewFromFloat(float64(100 + i*100)),
-			Currency:      "USD",
-			PaymentMethod: "credit_card",
+				PaymentMethod: "credit_card",
 			Timestamp:     time.Now(),
 		}
 	}
@@ -314,7 +311,6 @@ func (suite *ProductionTestSuite) TestQuantumClassicalComparison() {
 		UserID:        "user_123",
 		MerchantID:    "merchant_456",
 		Amount:        decimal.NewFromFloat(5500.00),
-		Currency:      "USD",
 		PaymentMethod: "credit_card",
 		Timestamp:     time.Now(),
 	}
@@ -383,7 +379,6 @@ func (suite *ProductionTestSuite) TestHighValueTransaction() {
 		UserID:        "user_vip_123",
 		MerchantID:    "merchant_premium_456",
 		Amount:        decimal.NewFromFloat(50000.00), // Very high value
-		Currency:      "USD",
 		PaymentMethod: "wire_transfer",
 		Timestamp:     time.Now(),
 	}
@@ -438,8 +433,7 @@ func (suite *ProductionTestSuite) TestConcurrentQuantumAnalysis() {
 			UserID:        fmt.Sprintf("user_%d", i),
 			MerchantID:    "merchant_456",
 			Amount:        decimal.NewFromFloat(float64(1000 + i*500)),
-			Currency:      "USD",
-			PaymentMethod: "credit_card",
+				PaymentMethod: "credit_card",
 			Timestamp:     time.Now(),
 		}
 	}
@@ -539,7 +533,3 @@ func (m *MockQuantumBackendService) HandleQuantumErrors(ctx context.Context, qua
 	return args.Get(0).(*interfaces.ErrorRecovery), args.Error(1)
 }
 
-func (m *MockIntelligentRouter) RouteTransaction(ctx context.Context, transaction *models.TransactionData) (string, error) {
-	args := m.Called(ctx, transaction)
-	return args.String(0), args.Error(1)
-}

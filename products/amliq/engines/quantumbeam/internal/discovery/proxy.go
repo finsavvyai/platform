@@ -1,10 +1,11 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package discovery
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"

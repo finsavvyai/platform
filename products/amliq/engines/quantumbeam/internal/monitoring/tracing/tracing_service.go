@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package tracing
 
 import (
@@ -10,23 +13,23 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/opentelemetry.io/otel"
-	"github.com/opentelemetry.io/otel/attribute"
-	"github.com/opentelemetry.io/otel/baggage"
-	"github.com/opentelemetry.io/otel/exporters/jaeger"
-	"github.com/opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
-	"github.com/opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"github.com/opentelemetry.io/otel/exporters/prometheus"
-	"github.com/opentelemetry.io/otel/propagation"
-	"github.com/opentelemetry.io/otel/sdk/instrumentation"
-	"github.com/opentelemetry.io/otel/sdk/metric"
-	"github.com/opentelemetry.io/otel/sdk/metric/aggregator/histogram"
-	controller "github.com/opentelemetry.io/otel/sdk/metric/controller/basic"
-	processor "github.com/opentelemetry.io/otel/sdk/metric/processor/basic"
-	"github.com/opentelemetry.io/otel/sdk/resource"
-	sdktrace "github.com/opentelemetry.io/otel/sdk/trace"
-	semconv "github.com/opentelemetry.io/otel/semconv/v1.4.0"
-	"github.com/opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/instrumentation"
+	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/aggregator/histogram"
+	controller "go.opentelemetry.io/otel/sdk/metric/controller/basic"
+	processor "go.opentelemetry.io/otel/sdk/metric/processor/basic"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // TracingConfig contains configuration for the tracing service

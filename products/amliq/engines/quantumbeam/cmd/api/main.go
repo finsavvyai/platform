@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package main
 
 import (
@@ -14,11 +17,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/go-chi/chi/v5/chihttp"
 
-	"quantumbeam.io/internal/monitoring/anomaly"
-	"quantumbeam.io/internal/monitoring/dashboards"
-	"quantumbeam.io/internal/monitoring/integration"
+	"quantumbeam/internal/monitoring/anomaly"
+	"quantumbeam/internal/monitoring/dashboards"
+	"quantumbeam/internal/monitoring/integration"
 )
 
 func main() {
@@ -115,8 +117,9 @@ func setupRouter(monitoring *integration.MonitoringIntegration, fdMiddleware *in
 	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(middleware.AllowContentType("application/json", "text/plain"))
 
-	// OpenTelemetry middleware
-	r.Use(chihttp.Middleware("quantumbeam-api"))
+	// OpenTelemetry middleware: chi-specific contrib (chihttp) does not exist in
+	// upstream go.opentelemetry.io/contrib. If tracing for HTTP routes is needed,
+	// wrap the chi handler with otelhttp.NewHandler at the server boundary.
 
 	// Monitoring middleware
 	r.Use(monitoring.Middleware())

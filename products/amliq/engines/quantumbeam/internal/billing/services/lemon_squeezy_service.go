@@ -1,8 +1,14 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package services
 
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,9 +18,9 @@ import (
 	"strings"
 	"time"
 
-	"quantumbeam.io/internal/billing/models"
-	"quantumbeam.io/internal/config"
-	"quantumbeam.io/internal/logger"
+	"quantumbeam/internal/billing/models"
+	"quantumbeam/internal/config"
+	"quantumbeam/internal/logger"
 )
 
 // LemonSqueezyService handles integration with Lemon Squeezy API
@@ -560,25 +566,35 @@ func (s *LemonSqueezyService) CreateCheckoutURL(ctx context.Context, variantID s
 	return checkoutURL, nil
 }
 
-// VerifyWebhookSignature verifies a webhook signature
+// VerifyWebhookSignature verifies a webhook signature using HMAC-SHA256.
+// Lemon Squeezy signs webhooks with the configured webhook secret; the
+// signature is provided either as a raw hex digest or prefixed with
+// "sha256=". Comparison uses constant-time equality (hmac.Equal) per the
+// portfolio security rule on pre-shared-key comparisons.
 func (s *LemonSqueezyService) VerifyWebhookSignature(payload []byte, signature string) bool {
 	if s.webhookSecret == "" {
 		s.log.Warn("Webhook secret not configured, skipping signature verification")
 		return true
 	}
 
-	// Lemon Squeezy uses HMAC-SHA256 for webhook signatures
-	// The signature is in the format: "sha256=<signature>"
-	expectedPrefix := "sha256="
-	if !strings.HasPrefix(signature, expectedPrefix) {
+	// Strip the optional "sha256=" prefix Lemon Squeezy uses on some
+	// envelopes; fall back to the raw signature if absent.
+	const expectedPrefix = "sha256="
+	sig := signature
+	if strings.HasPrefix(sig, expectedPrefix) {
+		sig = sig[len(expectedPrefix):]
+	}
+
+	signatureBytes, err := hex.DecodeString(sig)
+	if err != nil {
 		return false
 	}
 
-	signatureBytes := []byte(signature[len(expectedPrefix):])
+	mac := hmac.New(sha256.New, []byte(s.webhookSecret))
+	mac.Write(payload)
+	expectedMAC := mac.Sum(nil)
 
-	// TODO: Implement actual HMAC verification
-	// For now, we'll skip verification in development
-	return true
+	return hmac.Equal(signatureBytes, expectedMAC)
 }
 
 // GetStoreInfo retrieves store information

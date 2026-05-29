@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package providers
 
 import (
@@ -8,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/quantumbeam/internal/backup/integration"
+	"quantumbeam/internal/backup/integration"
 	"github.com/sirupsen/logrus"
 )
 

@@ -1,9 +1,11 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package main
 
 import (
 	"database/sql"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"

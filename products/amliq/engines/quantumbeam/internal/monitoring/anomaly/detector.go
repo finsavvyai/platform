@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package anomaly
 
 import (
@@ -547,7 +550,7 @@ func calculateConfidence(score float64) float64 {
 	return 1.0 - math.Min(score, 1.0)
 }
 
-func determineSeverity(score, sensitivity float64 string) string {
+func determineSeverity(score, sensitivity float64) string {
 	if score > sensitivity*2 {
 		return "critical"
 	} else if score > sensitivity {

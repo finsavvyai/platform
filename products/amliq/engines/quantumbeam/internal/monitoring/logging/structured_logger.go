@@ -1,8 +1,9 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package logging
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"

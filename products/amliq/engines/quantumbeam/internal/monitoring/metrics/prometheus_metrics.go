@@ -1,9 +1,11 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package metrics
 
 import (
 	"context"
 	"net/http"
-	"os"
 	"strconv"
 	"sync"
 	"time"

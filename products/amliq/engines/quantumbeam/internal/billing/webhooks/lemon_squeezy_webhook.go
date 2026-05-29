@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package webhooks
 
 import (
@@ -12,9 +15,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"quantumbeam.io/internal/billing/models"
-	"quantumbeam.io/internal/billing/services"
-	"quantumbeam.io/internal/logger"
+	"quantumbeam/internal/billing/models"
+	"quantumbeam/internal/billing/services"
+	"quantumbeam/internal/logger"
 )
 
 // LemonSqueezyWebhook handles Lemon Squeezy webhooks

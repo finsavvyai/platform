@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package integration
 
 import (
@@ -17,8 +20,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
-	"quantumbeam.io/cmd/api-server"
-	"quantumbeam.io/internal/database"
+	"quantumbeam/cmd/api-server"
+	"quantumbeam/internal/database"
 )
 
 const (

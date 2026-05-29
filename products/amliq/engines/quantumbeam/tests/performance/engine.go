@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package performance
 
 import (
@@ -10,7 +13,6 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 

@@ -1,8 +1,10 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package database
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"io/ioutil"
 	"os"

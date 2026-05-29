@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package integration
 
 import (
@@ -18,9 +21,9 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 
-	"quantumbeam.io/internal/monitoring/anomaly"
-	"quantumbeam.io/internal/monitoring/dashboards"
-	"quantumbeam.io/internal/monitoring/tracing"
+	"quantumbeam/internal/monitoring/anomaly"
+	"quantumbeam/internal/monitoring/dashboards"
+	"quantumbeam/internal/monitoring/tracing"
 )
 
 // MonitoringConfig holds configuration for monitoring integration

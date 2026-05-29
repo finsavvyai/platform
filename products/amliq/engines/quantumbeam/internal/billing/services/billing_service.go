@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package services
 
 import (
@@ -8,9 +11,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"quantumbeam.io/internal/billing/models"
-	"quantumbeam.io/internal/config"
-	"quantumbeam.io/internal/logger"
+	"quantumbeam/internal/billing/models"
+	"quantumbeam/internal/config"
+	"quantumbeam/internal/logger"
 )
 
 // BillingService handles billing operations

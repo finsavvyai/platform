@@ -128,8 +128,10 @@ func TestLatencyUnderLoad(t *testing.T) {
   pt := NewPerformanceTest()
   workers := 20
   duration := 3 * time.Second
-  ticker := time.NewTicker(duration)
-  defer ticker.Stop()
+  // Use a stop channel; the previous implementation used a ticker with the
+  // same period as the test duration, so worker goroutines blocked on the
+  // ticker channel forever and wg.Wait deadlocked.
+  stop := make(chan struct{})
   var wg sync.WaitGroup
   var latencySum int64
   var count int64
@@ -137,7 +139,12 @@ func TestLatencyUnderLoad(t *testing.T) {
     wg.Add(1)
     go func() {
       defer wg.Done()
-      for range ticker.C {
+      for {
+        select {
+        case <-stop:
+          return
+        default:
+        }
         txn := pt.generateTransaction()
         start := time.Now()
         _ = pt.engine.scoreTransaction(txn)
@@ -148,7 +155,7 @@ func TestLatencyUnderLoad(t *testing.T) {
     }()
   }
   time.Sleep(duration)
-  ticker.Stop()
+  close(stop)
   wg.Wait()
   if count > 0 {
     avgLatency := latencySum / count
@@ -156,7 +163,7 @@ func TestLatencyUnderLoad(t *testing.T) {
   }
 }
 
-func TestConsistency(t *testing.T) {
+func TestPerformanceConsistency(t *testing.T) {
   pt := NewPerformanceTest()
   txn := pt.generateTransaction()
   scores := make([]float64, 100)

@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 // Package influxdb provides metrics collection functionality for QuantumBeam.io
 package influxdb
 

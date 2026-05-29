@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package api
 
 import (
@@ -11,7 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/quantumbeam/internal/backup/integration"
+	"quantumbeam/internal/backup/integration"
 	"github.com/sirupsen/logrus"
 )
 

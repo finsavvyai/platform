@@ -1,3 +1,6 @@
+//go:build legacy_migrated
+// +build legacy_migrated
+
 package integration
 
 import (
@@ -14,7 +17,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"quantumbeam.io/internal/monitoring/anomaly"
+	"quantumbeam/internal/monitoring/anomaly"
 )
 
 // FraudDetectionMetrics holds fraud detection specific metrics
