@@ -9,7 +9,7 @@ Use this table for release promotion. Each gate should be enforced in CI where n
 | `querylens-api/` | `mvn -q -DskipTests package` | `mvn test` | same | Dockerfile, `application.yml` | Optional `QUERYLENS_API_KEY` protects HTTP API |
 | `queryflux-mcp-server/` | `npm ci && npm run build` | `npm test` (if present) | same | package scripts | MCP stdio server |
 | `querylens-vectorize-worker/` | `npm ci` | — | same | `wrangler.toml` | Optional `VECTORIZE_INGRESS_SECRET` for caller auth |
-| `sdlc-ai/` | per-package | workflows in `sdlc-ai/.github/workflows` | fix broken path refs separately | — | Some workflows reference missing paths; gate blocks promotion until fixed |
+<!-- sdlc-ai/ row removed 2026-05-29: moved out of queryflux to sibling product at products/sdlc-ai/ — see products/sdlc-ai/CONSOLIDATION_TODO.md -->
 
 ## Required environment (production)
 

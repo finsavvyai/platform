@@ -1,0 +1,446 @@
+name: Blue-Green Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version to deploy'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      traffic_percentage:
+        description: 'Initial traffic percentage (0-100)'
+        required: false
+        default: '10'
+        type: string
+      auto_promote:
+        description: 'Auto-promote after verification (minutes)'
+        required: false
+        default: '30'
+        type: string
+      skip_health_check:
+        description: 'Skip health check (not recommended)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: sdlc-platform
+  KUBECONFIG_PATH: ${{ github.workspace }}/kubeconfig
+
+jobs:
+  prepare:
+    name: Prepare Deployment
+    runs-on: ubuntu-latest
+    outputs:
+      blue_deployment: ${{ steps.prepare.outputs.blue_deployment }}
+      green_deployment: ${{ steps.prepare.outputs.green_deployment }}
+      active_deployment: ${{ steps.prepare.outputs.active_deployment }}
+      service_name: ${{ steps.prepare.outputs.service_name }}
+      version: ${{ github.event.inputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region us-west-1 --name sdlc-platform-${{ github.event.inputs.environment }}
+          mkdir -p $HOME/.kube
+          cp $HOME/.kube/config ${{ env.KUBECONFIG_PATH }}
+
+      - name: Determine Active Deployment
+        id: prepare
+        run: |
+          # Get current active deployment
+          ACTIVE=$(kubectl get service sdlc-platform-api -n sdlc-platform -o jsonpath='{.spec.selector.version}' || echo "blue")
+          if [[ -z "$ACTIVE" ]]; then
+            ACTIVE="blue"
+          fi
+
+          # Set deployments
+          if [[ "$ACTIVE" == "blue" ]]; then
+            BLUE_DEPLOYMENT="blue"
+            GREEN_DEPLOYMENT="green"
+          else
+            BLUE_DEPLOYMENT="green"
+            GREEN_DEPLOYMENT="blue"
+          fi
+
+          echo "blue_deployment=$BLUE_DEPLOYMENT" >> $GITHUB_OUTPUT
+          echo "green_deployment=$GREEN_DEPLOYMENT" >> $GITHUB_OUTPUT
+          echo "active_deployment=$ACTIVE" >> $GITHUB_OUTPUT
+          echo "service_name=sdlc-platform-api" >> $GITHUB_OUTPUT
+
+          echo "Current active deployment: $ACTIVE"
+          echo "Will deploy to: $GREEN_DEPLOYMENT"
+
+  deploy-green:
+    name: Deploy to Green Environment
+    runs-on: ubuntu-latest
+    needs: prepare
+    environment:
+      name: ${{ github.event.inputs.environment }}-green
+      url: https://green.sdlc.ai
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region us-west-1 --name sdlc-platform-${{ github.event.inputs.environment }}
+
+      - name: Pull Images
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ needs.prepare.outputs.version }}
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-worker:${{ needs.prepare.outputs.version }}
+
+      - name: Tag and Push to Internal Registry
+        run: |
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ needs.prepare.outputs.version }} \
+            internal-registry.sdlc.ai/${{ env.IMAGE_NAME }}-api:${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.green_deployment }}
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-worker:${{ needs.prepare.outputs.version }} \
+            internal-registry.sdlc.ai/${{ env.IMAGE_NAME }}-worker:${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.green_deployment }}
+
+          docker push internal-registry.sdlc.ai/${{ env.IMAGE_NAME }}-api:${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.green_deployment }}
+          docker push internal-registry.sdlc.ai/${{ env.IMAGE_NAME }}-worker:${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.green_deployment }}
+
+      - name: Deploy Green Environment
+        run: |
+          # Create green namespace if doesn't exist
+          kubectl create namespace sdlc-platform-${{ needs.prepare.outputs.green_deployment }} --dry-run=client -o yaml | kubectl apply -f -
+
+          # Deploy to green
+          helm upgrade --install sdlc-platform-${{ needs.prepare.outputs.green_deployment }} \
+            ./infra/helm/sdlc-platform \
+            --namespace sdlc-platform-${{ needs.prepare.outputs.green_deployment }} \
+            --create-namespace \
+            --set version=${{ needs.prepare.outputs.version }} \
+            --set deployment.color=${{ needs.prepare.outputs.green_deployment }} \
+            --set image.tag=${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.green_deployment }} \
+            --set ingress.host=green.sdlc.ai \
+            --set service.name=sdlc-platform-api-${{ needs.prepare.outputs.green_deployment }} \
+            --values infra/helm/environments/${{ github.event.inputs.environment }}-values.yaml \
+            --wait \
+            --timeout 10m
+
+      - name: Run Database Migrations
+        run: |
+          kubectl run migration-job-${{ needs.prepare.outputs.green_deployment }} \
+            --image=internal-registry.sdlc.ai/${{ env.IMAGE_NAME }}-api:${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.green_deployment }} \
+            --rm -i --restart=Never \
+            --namespace sdlc-platform-${{ needs.prepare.outputs.green_deployment }} \
+            --env="DB_HOST=${{ secrets.DB_HOST }}" \
+            --env="DB_PASSWORD=${{ secrets.DATABASE_PASSWORD }}" \
+            --command -- python manage.py migrate
+
+      - name: Health Check Green Environment
+        if: github.event.inputs.skip_health_check != 'true'
+        run: |
+          # Wait for pods to be ready
+          kubectl wait --for=condition=Ready pods \
+            -l app=sdlc-platform,color=${{ needs.prepare.outputs.green_deployment }} \
+            -n sdlc-platform-${{ needs.prepare.outputs.green_deployment }} \
+            --timeout=300s
+
+          # Health check
+          for i in {1..30}; do
+            if curl -f https://green.sdlc.ai/health; then
+              echo "Green environment is healthy"
+              break
+            fi
+            echo "Health check attempt $i/30 failed, retrying..."
+            sleep 10
+          done
+
+  test-green:
+    name: Test Green Environment
+    runs-on: ubuntu-latest
+    needs: [prepare, deploy-green]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Smoke Tests
+        run: |
+          cd tests/e2e
+          npm ci
+          npm run test:smoke -- --baseUrl=https://green.sdlc.ai
+
+      - name: Run Integration Tests
+        run: |
+          cd tests/integration
+          npm ci
+          npm run test -- --baseUrl=https://green.sdlc.ai
+
+      - name: Run Performance Tests
+        run: |
+          cd tests/performance
+          npm ci
+          npm run test:load -- --baseUrl=https://green.sdlc.ai \
+            --thresholds=latency_p95<500ms,error_rate<0.1%
+
+      - name: Run Security Tests
+        run: |
+          # Check security headers
+          curl -I https://green.sdlc.ai | grep -E "X-Frame-Options|X-Content-Type-Options|Strict-Transport-Security" || exit 1
+
+          # Run OWASP ZAP baseline scan
+          docker run -t owasp/zap2docker-stable zap-baseline.py \
+            -t https://green.sdlc.ai \
+            -J zap-green-report.json || true
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: green-test-results
+          path: tests/**/test-results/
+          retention-days: 7
+
+  route-traffic:
+    name: Route Traffic
+    runs-on: ubuntu-latest
+    needs: [prepare, test-green]
+    environment:
+      name: ${{ github.event.inputs.environment }}
+      url: https://sdlc.ai
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region us-west-1 --name sdlc-platform-${{ github.event.inputs.environment }}
+
+      - name: Set Up Traffic Splitting
+        run: |
+          # Create traffic split service
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ${{ needs.prepare.outputs.service_name }}
+            namespace: sdlc-platform
+            labels:
+              app: sdlc-platform
+              component: api
+          spec:
+            selector:
+              app: sdlc-platform
+              component: api
+              version: ${{ needs.prepare.outputs.active_deployment }}
+            ports:
+            - name: http
+              port: 80
+              targetPort: 8080
+          ---
+          apiVersion: networking.istio.io/v1beta1
+          kind: VirtualService
+          metadata:
+            name: ${{ needs.prepare.outputs.service_name }}
+            namespace: sdlc-platform
+          spec:
+            hosts:
+            - api.sdlc.ai
+            gateways:
+            - sdlc-gateway
+            http:
+            - route:
+              - destination:
+                  host: ${{ needs.prepare.outputs.service_name }}
+                  port:
+                    number: 80
+                  subset: ${{ needs.prepare.outputs.active_deployment }}
+                weight: ${{ 100 - github.event.inputs.traffic_percentage }}
+              - destination:
+                  host: ${{ needs.prepare.outputs.service_name }}
+                  port:
+                    number: 80
+                  subset: ${{ needs.prepare.outputs.green_deployment }}
+                weight: ${{ github.event.inputs.traffic_percentage }}
+          ---
+          apiVersion: networking.istio.io/v1beta1
+          kind: DestinationRule
+          metadata:
+            name: ${{ needs.prepare.outputs.service_name }}
+            namespace: sdlc-platform
+          spec:
+            host: ${{ needs.prepare.outputs.service_name }}
+            subsets:
+            - name: ${{ needs.prepare.outputs.active_deployment }}
+              labels:
+                version: ${{ needs.prepare.outputs.active_deployment }}
+            - name: ${{ needs.prepare.outputs.green_deployment }}
+              labels:
+                version: ${{ needs.prepare.outputs.green_deployment }}
+          EOF
+
+      - name: Monitor Initial Traffic
+        run: |
+          # Wait for traffic routing to take effect
+          sleep 30
+
+          # Monitor for 5 minutes
+          for i in {1..30}; do
+            # Check error rates
+            ERROR_RATE=$(curl -s https://api.sdlc.ai/metrics | \
+              grep 'http_requests_total{status!~"2.."}' | \
+              awk '{sum+=$2} END {print sum+0}')
+
+            if [[ $ERROR_RATE -gt 5 ]]; then
+              echo "High error rate detected: $ERROR_RATE"
+              echo "Considering rollback..."
+
+              # Optional: Auto rollback on high error rate
+              if [[ "${{ github.event.inputs.auto_rollback }}" == "true" ]]; then
+                kubectl patch virtualservice ${{ needs.prepare.outputs.service_name }} \
+                  -n sdlc-platform \
+                  --type='json' \
+                  -p='[{"op": "replace", "path": "/spec/http/0/route/0/weight", "value":100},
+                       {"op": "replace", "path": "/spec/http/0/route/1/weight", "value":0}]'
+                exit 1
+              fi
+            fi
+
+            echo "Traffic check $i/30 - Error rate: $ERROR_RATE"
+            sleep 10
+          done
+
+  promote-or-rollback:
+    name: Promote or Rollback
+    runs-on: ubuntu-latest
+    needs: [prepare, test-green, route-traffic]
+    if: always() && needs.route-traffic.result == 'success'
+    environment:
+      name: ${{ github.event.inputs.environment }}
+      url: https://sdlc.ai
+    steps:
+      - name: Wait for Verification Period
+        run: |
+          echo "Waiting ${{ github.event.inputs.auto_promote }} minutes for verification..."
+          sleep ${{ github.event.inputs.auto_promote }}m
+
+      - name: Check Deployment Health
+        id: health
+        run: |
+          # Collect metrics
+          LATENCY_P95=$(curl -s https://api.sdlc.ai/metrics | \
+            grep 'http_request_duration_seconds_bucket{le="0.5"}' | \
+            awk '{print $NF}' || echo "0")
+
+          ERROR_RATE=$(curl -s https://api.sdlc.ai/metrics | \
+            grep 'http_requests_total{status!~"2.."}' | \
+            awk '{sum+=$2} END {print sum+0}' || echo "0")
+
+          THROUGHPUT=$(curl -s https://api.sdlc.ai/metrics | \
+            grep 'http_requests_total' | \
+            awk '{sum+=$2} END {print sum+0}' || echo "0")
+
+          echo "latency_p95=$LATENCY_P95" >> $GITHUB_OUTPUT
+          echo "error_rate=$ERROR_RATE" >> $GITHUB_OUTPUT
+          echo "throughput=$THROUGHPUT" >> $GITHUB_OUTPUT
+
+          echo "Metrics collected:"
+          echo "  - Latency P95: ${LATENCY_P95}s"
+          echo "  - Error Rate: ${ERROR_RATE}"
+          echo "  - Throughput: ${THROUGHPUT} req/s"
+
+          # Determine if promotion should proceed
+          if [[ $LATENCY_P95 -lt 1 && $ERROR_RATE -lt 5 && $THROUGHPUT -gt 100 ]]; then
+            echo "Metrics look good - proceeding with promotion"
+            echo "should_promote=true" >> $GITHUB_OUTPUT
+          else
+            echo "Metrics do not meet thresholds - initiating rollback"
+            echo "should_promote=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Promote to Full Traffic
+        if: steps.health.outputs.should_promote == 'true'
+        run: |
+          echo "Promoting green environment to 100% traffic"
+
+          kubectl patch virtualservice ${{ needs.prepare.outputs.service_name }} \
+            -n sdlc-platform \
+            --type='json' \
+            -p='[{"op": "replace", "path": "/spec/http/0/route/0/weight", "value":0},
+                 {"op": "replace", "path": "/spec/http/0/route/1/weight", "value":100}]'
+
+          # Update labels to mark green as active
+          kubectl label deployments -n sdlc-platform-${{ needs.prepare.outputs.green_deployment }} \
+            app=sdlc-platform --overwrite
+
+          echo "Traffic fully routed to green environment"
+
+      - name: Rollback to Blue
+        if: steps.health.outputs.should_promote == 'false'
+        run: |
+          echo "Rolling back to blue environment"
+
+          kubectl patch virtualservice ${{ needs.prepare.outputs.service_name }} \
+            -n sdlc-platform \
+            --type='json' \
+            -p='[{"op": "replace", "path": "/spec/http/0/route/0/weight", "value":100},
+                 {"op": "replace", "path": "/spec/http/0/route/1/weight", "value":0}]'
+
+          echo "Traffic restored to blue environment"
+
+      - name: Clean Up Blue Environment
+        if: steps.health.outputs.should_promote == 'true'
+        run: |
+          echo "Waiting 10 minutes before cleaning up blue environment..."
+          sleep 600
+
+          # Delete blue deployment
+          helm uninstall sdlc-platform-${{ needs.prepare.outputs.active_deployment }} \
+            -n sdlc-platform-${{ needs.prepare.outputs.active_deployment }} || true
+
+          # Delete namespace
+          kubectl delete namespace sdlc-platform-${{ needs.prepare.outputs.active_deployment }} || true
+
+          echo "Blue environment cleaned up"
+
+      - name: Update Deployment Status
+        run: |
+          STATUS="${{ steps.health.outputs.should_promote == 'true' && 'success' || 'rollback' }}"
+
+          curl -X POST "https://api.sdlc.ai/internal/deployment/status" \
+            -H "Authorization: Bearer ${{ secrets.INTERNAL_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"version\": \"${{ needs.prepare.outputs.version }}\",
+              \"status\": \"$STATUS\",
+              \"environment\": \"${{ github.event.inputs.environment }}\",
+              \"deployment_type\": \"blue-green\",
+              \"metrics\": {
+                \"latency_p95\": \"${{ steps.health.outputs.latency_p95 }}\",
+                \"error_rate\": \"${{ steps.health.outputs.error_rate }}\",
+                \"throughput\": \"${{ steps.health.outputs.throughput }}\"
+              },
+              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+            }" || true
+
+      - name: Notify Team
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          text: |
+            Blue-Green Deployment Complete! ${{ steps.health.outputs.should_promote == 'true' && '✅ Promoted' || '🔄 Rolled back' }}
+
+            Version: ${{ needs.prepare.outputs.version }}
+            Environment: ${{ github.event.inputs.environment }}
+
+            Metrics:
+            - Latency P95: ${{ steps.health.outputs.latency_p95 }}s
+            - Error Rate: ${{ steps.health.outputs.error_rate }}%
+            - Throughput: ${{ steps.health.outputs.throughput }} req/s
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

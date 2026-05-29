@@ -1,0 +1,237 @@
+# Static Analysis Tools Configuration
+# Comprehensive configuration for all static analysis tools
+
+# ESLint Configuration (JavaScript/TypeScript)
+eslint:
+  version: "8.50.0"
+  configFiles:
+    - .eslintrc.json
+    - .eslintignore
+  rules:
+    # Error prevention
+    - error: no-unused-vars
+    - error: no-undef
+    - error: no-unreachable
+    - error: no-console: warn
+    - error: no-debugger: error
+
+    # Best practices
+    - error: eqeqeq
+    - error: no-eval
+    - error: no-implied-eval
+    - error: no-new-func
+    - error: no-script-url
+
+    # Security
+    - error: no-new-require
+    - error: no-process-exit
+    - error: no-path-concat
+    - error: no-sync
+
+    # Code style
+    - warn: indent: ["error", 2]
+    - warn: quotes: ["error", "single"]
+    - warn: semi: ["error", "always"]
+    - warn: comma-dangle: ["error", "never"]
+
+# Prettier Configuration
+prettier:
+  version: "3.0.0"
+  config:
+    semi: true
+    trailingComma: "none"
+    singleQuote: true
+    printWidth: 80
+    tabWidth: 2
+    useTabs: false
+
+# Go Vet Configuration
+go_vet:
+  enabled: true
+  checks:
+    - composites
+    - copylocks
+    - httpresponse
+    - loopclosure
+    - lostcancel
+    - nilfunc
+    - printf
+    - shift
+    - stdmethods
+    - structural
+    - tests
+    - unmarshal
+    - unreachable
+    - unsafeptr
+    - unusedresult
+
+# Go Staticcheck
+staticcheck:
+  version: "2023.1.6"
+  enabled: true
+  checks:
+    # All checks enabled by default
+    # Custom exclusions:
+    exclude:
+      - "SA1019" # Deprecated warnings
+      - "SA2002" # Empty branch
+
+# Python Black Configuration
+black:
+  version: "23.9.1"
+  config:
+    line-length: 88
+    target-version: ["py311"]
+    include: '\.pyi?$'
+    extend-exclude: '/(\.eggs|\.git|\.hg|\.mypy_cache|\.tox|\.venv|_build|buck-out|build|dist|venv|env)/'
+
+# Python isort Configuration
+isort:
+  version: "5.12.0"
+  config:
+    profile: "black"
+    multi_line_output: 3
+    line_length: 88
+    known_first_party: ["app", "services", "packages"]
+    known_third_party: ["fastapi", "pydantic", "sqlalchemy"]
+
+# Python Ruff Configuration
+ruff:
+  version: "0.1.0"
+  config:
+    line-length: 88
+    select:
+      # Error codes
+      - E
+      - W
+      - F
+      - I
+      # Security
+      - S
+      # Complexity
+      - C
+      - C90
+      # Bugbear
+      - B
+      # Pylint
+      - P
+    ignore:
+      - "E501" # Line too long (handled by black)
+      - "S311" # Random generator (allowed in test)
+      - "B008" # Function call in default args (allowed for FastAPI)
+    per-file-ignores:
+      "tests/*":
+        - S101 # assert allowed in tests
+        - S105 # hardcoded passwords allowed in tests
+
+# Rust Clippy Configuration
+clippy:
+  version: "latest"
+  enabled: true
+  deny:
+    - clippy::all
+    - clippy::pedantic
+    - clippy::cargo
+  allow:
+    - clippy::multiple_crate_versions # Allow for dependencies
+  warn:
+    - clippy::nursery
+    - clippy::complexity
+    - clippy::perf
+
+# Security Linters
+bandit:
+  version: "1.7.5"
+  config:
+    tests: true
+    severity: medium
+    confidence: medium
+    exclude_dirs: ["/tests", "/venv", "/env"]
+    exclude:
+      - B101 # assert_used
+      - B601 # shell_injection_process
+
+gosec:
+  version: "2.17.0"
+  config:
+    includes:
+      - G101 # Look for hardcoded credentials
+      - G102 # Bind to all interfaces
+      - G103 # Audit unsafe block
+      - G104 # Audit errors not checked
+      - G106 # Audit ssh hostkey
+      - G107 # Url provided to SSRF
+      - G108 # Profiling endpoint automatically exposed
+      - G109 # Potential Integer overflow
+      - G201 # SQL query string building
+      - G202 # SQL query string building with string formatting
+      - G203 # Use of unescaped data in HTML templates
+      - G204 # Audit use of command execution
+      - G301 # Poor file permissions
+      - G302 # Poor file permissions
+      - G303 # Creating tempfile using a predictable path
+      - G304 # File path provided as taint input
+      - G305 # File traversal when extracting zip archive
+      - G306 # Poor file permissions
+      - G307 # Defanging file path
+    exclude:
+      - G204 # Subprocess launching with variable
+    config:
+      G101: "password|secret|key|token"
+      G201: "fmt.Sprintf.*SELECT|INSERT|UPDATE|DELETE"
+
+# Dependency Scanning
+safety:
+  version: "2.3.5"
+  config:
+    ignore: [] # Don't ignore any vulnerabilities
+    full-report: true
+    short-report: false
+
+npm-audit:
+  level: high
+  production: true
+  development: false
+
+cargo-audit:
+  version: "0.17.0"
+  config:
+    ignore: [] # Don't ignore any advisories
+
+# Quality Gate Configuration
+quality_gates:
+  coverage_threshold: 95
+  duplication_threshold: 3
+  maintainability_threshold: 8.0
+  reliability_threshold: 9.0
+  security_threshold: 9.0
+
+  # Fail conditions
+  fail_on:
+    - new_bugs: 1
+    - new_vulnerabilities: 1
+    - new_code_smells: 10
+    - coverage_drop: 5
+
+  # Warning conditions
+  warn_on:
+    - new_code_smells: 5
+    - coverage_drop: 2
+
+# Integration Settings
+ci_integration:
+  # GitHub Actions
+  github:
+    auto_merge_on_success: false
+    require_status_checks:
+      - "SonarCloud Code Analysis"
+      - "Security Scan"
+      - "Code Quality Check"
+      - "Test Coverage"
+
+  # PR Comments
+  pr_comments:
+    enabled: true
+    include_metrics: true
+    include_recommendations: true
+    coverage_widget: true

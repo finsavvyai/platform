@@ -47,3 +47,7 @@ Devs shipping production apps where AI agents need read/write DB access. Seconda
 ## Consolidation TODOs
 
 See `CONSOLIDATION_TODO.md`. Top: restructure subdirs, wire to platform auth/billing/telemetry/policy.
+
+## Desktop runtime
+
+Desktop runtime: Tauri (Electron archived 2026-05-29).

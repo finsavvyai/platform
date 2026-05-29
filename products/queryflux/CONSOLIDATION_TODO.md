@@ -8,7 +8,7 @@ After round-4 migration, these are the open items before QueryFlux is fully inte
   ```
   products/queryflux/
   ├── web/          (from src + website)
-  ├── desktop/      (from queryflux-desktop, queryflux-electron)
+  ├── desktop/      (from queryflux-desktop — Tauri; queryflux-electron archived 2026-05-29)
   ├── mobile/       (from mobile/)
   ├── mcp-server/   (from queryflux-mcp-server)
   ├── lens/         (already folded from querylens, querylens-api)

@@ -6,14 +6,15 @@
 - Total source files: 1,737 (excluding _archive, venv, dist, node_modules)
 - Files over 200 lines: 892
 - **FAIL**: SYSTEMIC VIOLATIONS - 51% of codebase exceeds limit
-  - sdlc-ai/packages/sdk-go/pkg/sdln/test_comprehensive.go: 3,551 lines (17.8x limit)
-  - sdlc-ai/packages/sdk-go/pkg/sdln/sdln_test.go: 2,555 lines (12.8x limit)
-  - sdlc-ai/packages/sdk-go/pkg/sdln/qa_types.go: 2,341 lines (11.7x limit)
-  - sdlc-ai/services/gateway/internal/sdk/generate.go: 2,186 lines (10.9x limit)
-  - sdlc-ai/packages/sdk-go/pkg/sdln/monitoring_service_test.go: 1,983 lines (9.9x limit)
-  - sdlc-ai/services/rag/app/services/context_assembly_service.py: 1,943 lines (9.7x limit)
-  - sdlc-ai/services/rag/app/services/context_quality_monitor.py: 1,925 lines (9.6x limit)
-  - (885 more files over 200 lines)
+- NOTE 2026-05-29: The largest violators listed below were inside `sdlc-ai/`, which has since been moved out of queryflux to its own sibling product at `products/sdlc-ai/`. The numbers below are HISTORIC (pre-move) and should be re-measured against the slimmer queryflux tree.
+  - ~~sdlc-ai/packages/sdk-go/pkg/sdln/test_comprehensive.go: 3,551 lines (17.8x limit)~~ (moved)
+  - ~~sdlc-ai/packages/sdk-go/pkg/sdln/sdln_test.go: 2,555 lines (12.8x limit)~~ (moved)
+  - ~~sdlc-ai/packages/sdk-go/pkg/sdln/qa_types.go: 2,341 lines (11.7x limit)~~ (moved)
+  - ~~sdlc-ai/services/gateway/internal/sdk/generate.go: 2,186 lines (10.9x limit)~~ (moved)
+  - ~~sdlc-ai/packages/sdk-go/pkg/sdln/monitoring_service_test.go: 1,983 lines (9.9x limit)~~ (moved)
+  - ~~sdlc-ai/services/rag/app/services/context_assembly_service.py: 1,943 lines (9.7x limit)~~ (moved)
+  - ~~sdlc-ai/services/rag/app/services/context_quality_monitor.py: 1,925 lines (9.6x limit)~~ (moved)
+  - (885 more files over 200 lines — recount needed after sdlc-ai extraction)
 
 ## Test Results
 - Test framework: Go + Python (pytest/unittest)

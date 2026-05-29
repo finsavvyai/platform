@@ -23,7 +23,9 @@ Sits early in the dev adoption funnel: Cursor → PushCI → **QueryFlux** → Q
 
 ## Surface
 
-Web, Desktop (Electron), Mobile, MCP server, VSCode extension, Browser extension, OpenAI App, Cloudflare Worker + D1 backend, QueryLens (under `lens/`).
+Web, Desktop, Mobile, MCP server, VSCode extension, Browser extension, OpenAI App, Cloudflare Worker + D1 backend, QueryLens (under `lens/`).
+
+Desktop runtime: Tauri (Electron archived 2026-05-29).
 
 ## Status
 

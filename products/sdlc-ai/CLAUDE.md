@@ -1,5 +1,7 @@
 # SDLC.ai - Claude Code Instructions
 
+Extends `/Users/shaharsolomon/dev/projects/CLAUDE.md` (portfolio rules). Extracted from `products/queryflux/sdlc-ai/` on 2026-05-29.
+
 ## Product Vision
 Enterprise-grade Secure Data Learning Platform with AI/ML capabilities, zero-trust security, and full compliance (GDPR, HIPAA, PCI-DSS). Multi-tenant architecture with Go API gateway, Python RAG service, Rust vector search, and Cloudflare edge deployment.
 

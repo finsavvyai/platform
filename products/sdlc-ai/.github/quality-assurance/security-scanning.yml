@@ -1,0 +1,555 @@
+# Security Scanning Configuration
+# Comprehensive security scanning setup for SDLC.ai platform
+
+# SAST (Static Application Security Testing)
+sast:
+  # CodeQL Analysis
+  codeql:
+    enabled: true
+    languages:
+      - go
+      - python
+      - javascript
+      - typescript
+    queries:
+      - security
+      - security-and-quality
+    paths:
+      - services/gateway
+      - services/rag
+      - services/admin-ui
+      - packages/sdk-py
+      - packages/sdk-ts
+      - packages/sdk-go
+
+    # Custom query packs
+    query_packs:
+      - security-extended
+      - security-and-quality
+
+    # Build configuration
+    build_mode: manual
+
+  # Semgrep
+  semgrep:
+    enabled: true
+    version: "latest"
+    config:
+      - p/security-audit
+      - p/owasp-top-ten
+      - p/cwe-top-25
+      - p/secrets
+      - p/golang
+      - p/python
+      - p/javascript
+      - p/typescript
+
+    # Custom rules
+    custom_rules:
+      - path: .semgrep/rules/
+
+    # Suppressions
+    suppressions:
+      - id: "generic-no-log-injection"
+        reason: "Logging is properly sanitized"
+
+    # Output format
+    output_format: "sarif"
+    output_file: "semgrep-results.sarif"
+
+  # Bandit (Python)
+  bandit:
+    enabled: true
+    config_file: .bandit
+    severity_level: medium
+    confidence_level: medium
+
+    # Test directories
+    include_tests: true
+
+    # Aggressive checks
+    aggressive: true
+
+    # Output formats
+    output:
+      - format: sarif
+        file: bandit-results.sarif
+      - format: json
+        file: bandit-results.json
+
+  # Gosec (Go)
+  gosec:
+    enabled: true
+    version: "2.17.0"
+
+    # Configuration
+    config_file: .gosec.json
+
+    # Include rules
+    include:
+      - G101 # Hardcoded credentials
+      - G102 # Binding to all interfaces
+      - G103 # Audit unsafe blocks
+      - G104 # Audit errors not checked
+      - G107 # SSRF
+      - G108 # Profiling endpoint exposed
+      - G109 # Integer overflow
+      - G110 # Decompression bomb
+      - G201 # SQL string building
+      - G202 # SQL string formatting
+      - G203 # Template injection
+      - G204 # Command execution
+      - G301 # File permissions
+      - G304 # File path traversal
+      - G305 # Zip extraction
+      - G306 # File permissions
+
+    # Output
+    output:
+      format: sarif
+      file: gosec-results.sarif
+      no_fail: false
+      sort_by: severity
+
+# DAST (Dynamic Application Security Testing)
+dast:
+  # OWASP ZAP
+  zap:
+    enabled: true
+    version: "latest"
+
+    # Target configuration
+    targets:
+      - url: https://api.staging.sdlc.ai
+        context: staging-api
+        user: admin@staging.sdlc.ai
+        auth_method: form_based
+      - url: https://admin.staging.sdlc.ai
+        context: staging-admin
+        user: admin@staging.sdlc.ai
+        auth_method: oauth2
+
+    # Scan configuration
+    scan_type: baseline
+    scan_policy: zap-policy.xml
+
+    # Authentication
+    authentication:
+      login_url: https://api.staging.sdlc.ai/auth/login
+      username: ${{ZAP_USERNAME}}
+      password: ${{ZAP_PASSWORD}}
+      username_field: email
+      password_field: password
+
+    # Active scan configuration
+    active_scan:
+      enabled: true
+      strength: HIGH
+      thread_count: 5
+
+    # Passive scan configuration
+    passive_scan:
+      enabled: true
+      timeout_in_minutes: 10
+
+    # Alerts configuration
+    alerts:
+      base_directory: /zap/wrk/
+      max_alerts: 1000
+
+    # Output
+    output:
+      - format: sarif
+        file: zap-results.sarif
+      - format: html
+        file: zap-report.html
+      - format: json
+        file: zap-results.json
+
+  # Nuclei
+  nuclei:
+    enabled: true
+    version: "latest"
+
+    # Templates
+    templates:
+      - cves
+      - vulnerabilities
+      - exposures
+      - workflows
+      - misconfiguration
+
+    # Target list
+    targets:
+      - https://api.staging.sdlc.ai
+      - https://admin.staging.sdlc.ai
+      - https://sdlc.ai
+
+    # Rate limiting
+    rate_limit: 100
+    bulk_size: 25
+
+    # Output
+    output:
+      - format: sarif
+        file: nuclei-results.sarif
+      - format: json
+        file: nuclei-results.json
+
+    # Severity filter
+    severity: [critical, high, medium]
+
+# Dependency Scanning
+dependency_scanning:
+  # Snyk
+  snyk:
+    enabled: true
+    severity_threshold: high
+
+    # Organization
+    org: sdlc-platform
+
+    # Monitor dependencies
+    monitor: true
+
+    # All projects
+    all_projects: true
+
+    # Languages
+    languages:
+      - go
+      - python
+      - javascript
+      - typescript
+      - rust
+
+    # Output
+    output: snyk-results.json
+
+  # OWASP Dependency-Check
+  dependency_check:
+    enabled: true
+    version: "latest"
+
+    # Suppression file
+    suppression_file: dependency-check-suppressions.xml
+
+    # Analyzers
+    analyzers:
+      - CentralAnalyzer
+      - NuspecAnalyzer
+      - AssemblyAnalyzer
+      - PythonDistributionAnalyzer
+      - PythonPackageAnalyzer
+      - RubyGemsAnalyzer
+      - NpmAnalyzer
+      - GoAnalyzer
+      - OssIndexAnalyzer
+
+    # Skip configuration
+    skip:
+      - .git
+      - .github
+      - node_modules
+      - vendor
+      - build
+      - dist
+      - coverage
+
+    # Output
+    output:
+      format: ALL
+      file: dependency-check-report
+
+    # Fail build on CVSS
+    fail_build_on_cvss: 7
+
+  # Safety (Python)
+  safety:
+    enabled: true
+    version: "2.3.5"
+
+    # Full report
+    full_report: true
+
+    # Ignore (empty means no ignores)
+    ignore: []
+
+    # Output
+    output: safety-results.json
+
+  # npm-audit
+  npm_audit:
+    enabled: true
+    production_only: true
+    audit_level: high
+
+    # Fix automatically
+    auto_fix: false
+
+    # Output
+    output: npm-audit-results.json
+
+  # Cargo-audit
+  cargo_audit:
+    enabled: true
+    version: "0.17.0"
+
+    # Database fetch
+    fetch_database: true
+
+    # Ignore advisories (empty means no ignores)
+    ignore: []
+
+    # Output
+    output: cargo-audit-results.json
+
+# Container Scanning
+container_scanning:
+  # Trivy
+  trivy:
+    enabled: true
+    version: "latest"
+
+    # Scan types
+    scan_types:
+      - os
+      - library
+      - misconfig
+
+    # Severities
+    severity:
+      - CRITICAL
+      - HIGH
+      - MEDIUM
+
+    # Ignore unfixed
+    ignore_unfixed: false
+
+    # Skip files/dirs
+    skip_files:
+      - /usr/local/bin/docker*
+    skip_dirs:
+      - /usr/local/share
+
+    # Output
+    output:
+      - format: sarif
+        file: trivy-results.sarif
+      - format: json
+        file: trivy-results.json
+      - format: template
+        template: "@/contrib/sarif.tpl"
+        file: trivy-sarif.json
+
+  # Grype
+  grype:
+    enabled: true
+    version: "latest"
+
+    # Registry configuration
+    registry:
+      auth: ${{REGISTRY_AUTH}}
+
+    # Severity
+    severity: [critical, high, medium]
+
+    # Output
+    output:
+      - format: sarif
+        file: grype-results.sarif
+      - format: json
+        file: grype-results.json
+
+# Secrets Scanning
+secrets_scanning:
+  # Gitleaks
+  gitleaks:
+    enabled: true
+    version: "latest"
+    config_file: .gitleaks.toml
+
+    # Scan options
+    verbose: true
+    redact: true
+
+    # Output
+    output:
+      - format: sarif
+        file: gitleaks-results.sarif
+      - format: json
+        file: gitleaks-results.json
+
+  # TruffleHog
+  trufflehog:
+    enabled: true
+    version: "latest"
+
+    # Source
+    source: .
+
+    # Entropy
+    entropy_threshold: 4.5
+
+    # Regex patterns
+    regex: true
+
+    # Output
+    output: trufflehog-results.json
+
+# IAST (Interactive Application Security Testing)
+iast:
+  # Contrast Security
+  contrast:
+    enabled: false  # Enable in staging environment
+    api_key: ${{CONTRAST_API_KEY}}
+
+    # Application configuration
+    application:
+      name: SDLC-Platform
+      language: multi
+
+    # Agent configuration
+    agent:
+      java:
+        enabled: false
+      node:
+        enabled: true
+      python:
+        enabled: true
+      go:
+        enabled: false
+
+# Security Testing
+security_testing:
+  # OWASP Security Shepherd
+  security_shepherd:
+    enabled: false  # Enable for dedicated security testing
+
+  # Custom security tests
+  custom_tests:
+    - name: Authentication Bypass Test
+      path: tests/security/auth_bypass_test.py
+      type: integration
+
+    - name: SQL Injection Test
+      path: tests/security/sqli_test.py
+      type: integration
+
+    - name: XSS Prevention Test
+      path: tests/security/xss_test.py
+      type: integration
+
+    - name: CSRF Token Test
+      path: tests/security/csrf_test.py
+      type: integration
+
+    - name: Rate Limiting Test
+      path: tests/security/rate_limit_test.py
+      type: integration
+
+# Security Monitoring
+security_monitoring:
+  # Falco (Runtime security)
+  falco:
+    enabled: false  # Enable in production
+    rules_file: /etc/falco/falco_rules.yaml
+    custom_rules:
+      - /etc/falco/rules.d/sdlc_rules.yaml
+
+  # Wazuh (SIEM)
+  wazuh:
+    enabled: false  # Enable in production
+    server: ${{WAZUH_SERVER}}
+    agent_name: sdlc-agent
+
+# Compliance Checking
+compliance:
+  # OWASP Top 10
+  owasp_top_10:
+    - A01_2021-Broken_Access_Control
+    - A02_2021-Cryptographic_Failures
+    - A03_2021-Injection
+    - A04_2021-Insecure_Design
+    - A05_2021-Security_Misconfiguration
+    - A06_2021-Vulnerable_and_Outdated_Components
+    - A07_2021-Identification_and_Authentication_Failures
+    - A08_2021-Software_and_Data_Integrity_Failures
+    - A09_2021-Security_Logging_and_Monitoring_Failures
+    - A10_2021-Server-Side_Request_Forgery
+
+  # CWE
+  cwe:
+    - CWE-79 # XSS
+    - CWE-89 # SQL Injection
+    - CWE-119 # Buffer Overflow
+    - CWE-20 # Input Validation
+    - CWE-200 # Information Exposure
+    - CWE-125 # Out-of-bounds Read
+    - CWE-78 # OS Command Injection
+    - CWE-287 # Improper Authentication
+    - CWE-306 # Missing Authentication
+    - CWE-352 # CSRF
+
+# Reporting
+reporting:
+  # Generate consolidated security report
+  consolidated_report:
+    enabled: true
+    template: security-report-template.md
+    output: security-report.md
+
+    # Include sections
+    sections:
+      - executive_summary
+      - sast_findings
+      - dast_findings
+      - dependency_vulnerabilities
+      - container_vulnerabilities
+      - secrets_found
+      - compliance_status
+      - recommendations
+
+  # Notifications
+  notifications:
+    slack:
+      webhook: ${{SLACK_SECURITY_WEBHOOK}}
+      channel: "#security-alerts"
+      notify_on:
+        - critical_vulnerability
+        - high_vulnerability
+        - secrets_found
+
+    email:
+      smtp_server: ${{SMTP_SERVER}}
+      recipients:
+        - security-team@sdlc.ai
+        - dev-ops@sdlc.ai
+      notify_on:
+        - critical_vulnerability
+        - high_vulnerability
+
+# Quality Gates
+security_quality_gates:
+  # Fail conditions
+  fail_on:
+    critical_vulnerabilities: 0
+    high_vulnerabilities: 0
+    secrets_found: 0
+    owasp_violations: 0
+
+  # Warning conditions
+  warn_on:
+    medium_vulnerabilities: 5
+    low_vulnerabilities: 10
+    dependency_age: 365 # days
+
+  # Exceptions
+  exceptions:
+    - vulnerability_id: "CVE-2023-1234"
+      reason: "False positive, not exploitable"
+      expires: "2024-01-01"
+
+    - dependency: "lodash@4.17.15"
+      reason: "Under review, mitigation in place"
+      expires: "2024-02-01"

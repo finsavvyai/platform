@@ -1,0 +1,521 @@
+# Quality Gates Configuration
+# Comprehensive quality gates for SDLC.ai platform
+
+version: "1.0"
+name: "SDLC Platform Quality Gates"
+
+# Overall project settings
+project:
+  name: "SDLC.ai Secure Data Learning Platform"
+  version: "3.0.0"
+
+  # New code period (for new code analysis)
+  new_code_period: 30
+
+  # Default quality gate
+  default_quality_gate: "Production Ready"
+
+# Quality Gates Definitions
+quality_gates:
+  # Production Ready Gate - Strictest requirements
+  Production_Ready:
+    description: "Requirements for production deployment"
+    conditions:
+      # Coverage requirements
+      coverage:
+        overall_coverage:
+          operator: "GT"
+          threshold: 95
+        new_coverage:
+          operator: "GT"
+          threshold: 90
+        test_success_rate:
+          operator: "EQ"
+          threshold: 100
+
+      # Code quality
+      maintainability:
+        rating:
+          operator: "GTE"
+          threshold: 8.0
+        new_tech_debt_ratio:
+          operator: "LT"
+          threshold: 5.0
+
+      # Reliability
+      reliability:
+        rating:
+          operator: "GTE"
+          threshold: 9.0
+        new_bugs:
+          operator: "EQ"
+          threshold: 0
+
+      # Security
+      security:
+        rating:
+          operator: "GTE"
+          threshold: 9.0
+        new_vulnerabilities:
+          operator: "EQ"
+          threshold: 0
+        hotspots_reviewed:
+          operator: "EQ"
+          threshold: 100
+
+      # Duplications
+      duplications:
+        overall:
+          operator: "LT"
+          threshold: 3
+        new:
+          operator: "LT"
+          threshold: 5
+
+      # Size metrics
+      size:
+        new_lines:
+          operator: "LT"
+          threshold: 500
+        pr_size:
+          operator: "LT"
+          threshold: 1000
+
+    # Required checks
+    required_checks:
+      - "security-scan"
+      - "code-quality-check"
+      - "test-coverage"
+      - "performance-check"
+      - "documentation-check"
+      - "dependency-scan"
+
+    # Auto-actions
+    auto_actions:
+      on_failure:
+        - block_pr
+        - notify_team
+        - create_ticket
+      on_success:
+        - auto_merge_if_all_approved
+        - update_metrics
+
+  # Staging Gate - Less strict
+  Staging_Ready:
+    description: "Requirements for staging deployment"
+    conditions:
+      coverage:
+        overall_coverage:
+          operator: "GT"
+          threshold: 90
+        new_coverage:
+          operator: "GT"
+          threshold: 85
+        test_success_rate:
+          operator: "GTE"
+          threshold: 99
+
+      maintainability:
+        rating:
+          operator: "GTE"
+          threshold: 7.0
+        new_tech_debt_ratio:
+          operator: "LT"
+          threshold: 10.0
+
+      reliability:
+        rating:
+          operator: "GTE"
+          threshold: 8.0
+        new_bugs:
+          operator: "LTE"
+          threshold: 2
+
+      security:
+        rating:
+          operator: "GTE"
+          threshold: 8.0
+        new_vulnerabilities:
+          operator: "LTE"
+          threshold: 1
+        hotspots_reviewed:
+          operator: "GTE"
+          threshold: 95
+
+      duplications:
+        overall:
+          operator: "LT"
+          threshold: 5
+        new:
+          operator: "LT"
+          threshold: 10
+
+    required_checks:
+      - "security-scan"
+      - "code-quality-check"
+      - "test-coverage"
+      - "dependency-scan"
+
+  # Development Gate - Minimum requirements
+  Development:
+    description: "Minimum requirements for development branches"
+    conditions:
+      coverage:
+        new_coverage:
+          operator: "GT"
+          threshold: 80
+        test_success_rate:
+          operator: "GTE"
+          threshold: 95
+
+      maintainability:
+        rating:
+          operator: "GTE"
+          threshold: 6.0
+
+      reliability:
+        new_bugs:
+          operator: "LTE"
+          threshold: 5
+
+      security:
+        new_vulnerabilities:
+          operator: "LTE"
+          threshold: 3
+        hotspots_reviewed:
+          operator: "GTE"
+          threshold: 90
+
+    required_checks:
+      - "code-quality-check"
+      - "test-coverage"
+
+# Service-specific overrides
+service_overrides:
+  services/gateway:
+    coverage:
+      overall_coverage:
+        operator: "GT"
+        threshold: 98
+    security:
+      new_vulnerabilities:
+        operator: "EQ"
+        threshold: 0
+
+  services/rag:
+    coverage:
+      overall_coverage:
+        operator: "GT"
+        threshold: 95
+    performance:
+      new_performance_issues:
+        operator: "EQ"
+        threshold: 0
+
+  services/vector-core:
+    coverage:
+      overall_coverage:
+        operator: "GT"
+        threshold: 95
+    reliability:
+      rating:
+        operator: "GTE"
+        threshold: 9.5
+
+  services/admin-ui:
+    coverage:
+      overall_coverage:
+        operator: "GT"
+        threshold: 90
+    accessibility:
+      new_accessibility_issues:
+        operator: "EQ"
+        threshold: 0
+
+# Check Definitions
+checks:
+  security-scan:
+    tool: "multiple"
+    tools:
+      - semgrep
+      - bandit
+      - gosec
+      - trivy
+    threshold:
+      critical: 0
+      high: 0
+      medium: 5
+      low: 10
+    fail_on_critical: true
+    fail_on_high: true
+
+  code-quality-check:
+    tool: "sonarqube"
+    metrics:
+      - maintainability_rating
+      - duplicated_lines_density
+      - code_smells
+    threshold:
+      maintainability_rating: 8.0
+      duplicated_lines_density: 3
+      new_code_smells: 10
+
+  test-coverage:
+    tool: "coverage"
+    tools:
+      - go test
+      - pytest
+      - jest
+      - cargo test
+    threshold:
+      overall: 95
+      new: 90
+    exclude_patterns:
+      - "*/mock/*"
+      - "*/test/*"
+
+  performance-check:
+    tool: "k6"
+    metrics:
+      - http_req_duration
+      - http_req_failed
+      - vus
+    threshold:
+      p95_response_time: 500
+      error_rate: 0.1
+      throughput: 1000
+
+  documentation-check:
+    tool: "custom"
+    checks:
+      - api_docs_updated
+      - readme_updated
+      - changelog_updated
+    required_for_production: true
+
+  dependency-scan:
+    tool: "multiple"
+    tools:
+      - snyk
+      - safety
+      - npm-audit
+      - cargo-audit
+    threshold:
+      critical: 0
+      high: 0
+    auto_fix_minor: true
+
+# Gate Rules
+gate_rules:
+  # Branch-based rules
+  branch_rules:
+    main:
+      gate: "Production_Ready"
+      required_approvals: 3
+      require_security_review: true
+      require_performance_review: true
+
+    develop:
+      gate: "Staging_Ready"
+      required_approvals: 2
+      require_security_review: true
+
+    feature/*:
+      gate: "Development"
+      required_approvals: 1
+
+    hotfix/*:
+      gate: "Production_Ready"
+      required_approvals: 3
+      require_security_review: true
+      emergency_bypass: true
+
+  # File-based rules
+  file_rules:
+    "*.go":
+      extra_checks:
+        - go_vet
+        - gosec
+        - staticcheck
+      coverage_threshold: 98
+
+    "*.py":
+      extra_checks:
+        - bandit
+        - safety
+        - black
+        - isort
+      coverage_threshold: 95
+
+    "*.ts":
+      extra_checks:
+        - eslint
+        - prettier
+        - typescript-compiler
+      coverage_threshold: 90
+
+    "Dockerfile*":
+      extra_checks:
+        - hadolint
+        - trivy
+
+    "requirements.txt":
+      extra_checks:
+        - safety
+        - pip-audit
+
+# Notifications
+notifications:
+  slack:
+    webhook_url: "${SLACK_WEBHOOK}"
+    channels:
+      general: "#quality-gates"
+      failures: "#quality-alerts"
+      successes: "#deployments"
+
+  email:
+    recipients:
+      - "dev-team@sdlc.ai"
+      - "qa-team@sdlc.ai"
+
+  github:
+    status_checks: true
+    check_runs: true
+    pull_request_comments: true
+
+# Metrics Collection
+metrics:
+  collection:
+    enabled: true
+    retention_days: 365
+    aggregation: daily
+
+  dashboard:
+    enabled: true
+    url: "https://quality.sdlc.ai"
+
+  alerts:
+    coverage_drop:
+      threshold: 5
+      action: "notify"
+
+    vulnerability_found:
+      threshold: 1
+      action: "block"
+
+    test_failure:
+      threshold: 1
+      action: "notify"
+
+# Integration Settings
+integrations:
+  github:
+    auto_merge_enabled: true
+    required_status_checks: true
+    branch_protection: true
+
+    check_suite:
+      auto_trigger: true
+      timeout: 30
+
+    pull_request:
+      auto_dismiss_stale_reviews: true
+      require_up_to_date: true
+
+  jira:
+    auto_create_tickets: true
+    project_key: "QG"
+
+  sonarqube:
+    url: "https://sonarqube.sdlc.ai"
+    organization: "sdlc-platform"
+
+  snyk:
+    url: "https://snyk.io"
+    organization: "sdlc-platform"
+
+# Custom Scripts
+custom_scripts:
+  pre_commit:
+    - path: "scripts/pre-commit-check.sh"
+      description: "Pre-commit quality checks"
+
+  pre_push:
+    - path: "scripts/pre-push-check.sh"
+      description: "Pre-push validation"
+
+  pre_merge:
+    - path: "scripts/pre-merge-validation.sh"
+      description: "Pre-merge full validation"
+
+  post_merge:
+    - path: "scripts/update-metrics.sh"
+      description: "Update quality metrics"
+
+# Exception Handling
+exceptions:
+  # Temporary exceptions
+  temporary:
+    - id: "TEMP_001"
+      description: "Temporarily allowing 85% coverage for legacy module"
+      expires: "2024-02-01"
+      criteria:
+        file_pattern: "services/legacy/*"
+        metric: "coverage"
+        threshold: 85
+
+    - id: "TEMP_002"
+      description: "Allowing minor security warnings during migration"
+      expires: "2024-01-15"
+      criteria:
+        tool: "bandit"
+        severity: "low"
+        count: 5
+
+  # Permanent exceptions with justification
+  permanent:
+    - id: "PERM_001"
+      description: "Test mocks excluded from coverage"
+      justification: "Test mocks are not production code"
+      criteria:
+        file_pattern: "*/mock/*"
+        metric: "coverage"
+        action: "exclude"
+
+    - id: "PERM_002"
+      description: "Generated code excluded from quality checks"
+      justification: "Auto-generated code should not be manually modified"
+      criteria:
+        file_pattern: "*/generated/*"
+        metrics: ["coverage", "maintainability"]
+        action: "exclude"
+
+# Reporting
+reporting:
+  daily_report:
+    enabled: true
+    time: "08:00"
+    recipients: ["dev-team@sdlc.ai"]
+
+  weekly_report:
+    enabled: true
+    day: "monday"
+    time: "09:00"
+    recipients: ["management@sdlc.ai", "dev-team@sdlc.ai"]
+    include_metrics: true
+    include_trends: true
+
+  monthly_report:
+    enabled: true
+    day: "1"
+    time: "10:00"
+    recipients: ["all@sdlc.ai"]
+    include_metrics: true
+    include_trends: true
+    include_recommendations: true
+
+  release_report:
+    enabled: true
+    trigger: "on_release"
+    recipients: ["release-team@sdlc.ai"]
+    include_all_metrics: true
