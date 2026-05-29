@@ -51,3 +51,17 @@ See `CONSOLIDATION_TODO.md`. Top: restructure subdirs, wire to platform auth/bil
 ## Desktop runtime
 
 Desktop runtime: Tauri (Electron archived 2026-05-29).
+
+## Tree shape (post P0-1, 2026-05-29)
+
+8 product dirs + `extensions/`, `_archive/`, `scripts/`, plus inherited infra (`docs/`, `tests/`, `e2e/`, `supabase/`, `netlify/`, `cloudflare-d1/`):
+
+- `web/` — Vite + React 19 SPA (was `src/` + root vite/tailwind/postcss configs + `public/`).
+- `website/` — Next.js 15 marketing + billing site (unchanged).
+- `desktop/` — Tauri desktop (was `queryflux-desktop/`).
+- `mobile/` — React Native (unchanged).
+- `mcp-server/` — MCP SDK stdio server (was `queryflux-mcp-server/`).
+- `lens/` — QueryLens family: `lens/core/` (sqlite + scripts), `lens/api-java/` (Spring Boot NLP-to-SQL), `lens/vectorize-worker/` (CF Worker + Vectorize binding), plus the existing `lens/src/`.
+- `backend/` — Go monolith (canonical); TS Express layer parked at `backend/server-ts/`.
+- `workers/` — Cloudflare workers: `workers/api/` (was `queryflux-worker/`), `workers/edge/` (was `worker/`), `workers/api-js/` (was `cloudflare-workers/`), `workers/legacy/` (was top-level `workers/`).
+- `extensions/` — sibling parking dir for editor + AI app extensions: `vscode-queryflux/`, `vscode-pgdesktop/`, `openai-app-full/`, `openai-app-lite/`, `gemini-functions/`.

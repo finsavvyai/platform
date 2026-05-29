@@ -4,15 +4,17 @@ After round-4 migration, these are the open items before QueryFlux is fully inte
 
 ## P0 — structural
 
-- [ ] Restructure source tree per memo layout:
+- [x] Restructure source tree per memo layout (P0-1 landed 2026-05-29):
   ```
   products/queryflux/
-  ├── web/          (from src + website)
+  ├── web/          (from src + website root configs)
+  ├── website/      (Next.js marketing — kept separate from web SPA)
   ├── desktop/      (from queryflux-desktop — Tauri; queryflux-electron archived 2026-05-29)
-  ├── mobile/       (from mobile/)
+  ├── mobile/       (unchanged)
   ├── mcp-server/   (from queryflux-mcp-server)
-  ├── lens/         (already folded from querylens, querylens-api)
-  └── backend/      (from queryflux-backend, queryflux-worker)
+  ├── lens/         (folded: querylens-core, querylens-api → lens/api-java, querylens-vectorize-worker)
+  ├── backend/      (Go; server/ folded into backend/server-ts/)
+  └── workers/      (consolidated: queryflux-worker → api, worker → edge, cloudflare-workers → api-js, workers → legacy)
   ```
 - [ ] Resolve any duplicate package.json names across subdirs.
 - [ ] Decide: single root package.json with workspaces, OR keep each subdir self-contained?

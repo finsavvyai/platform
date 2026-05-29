@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BACKEND_DIR="$ROOT/backend"
-QUERYLENS_DIR="$ROOT/querylens-api"
+QUERYLENS_DIR="$ROOT/lens/api-java"
 APP_DIR="$ROOT/queryflux"
 LOG_DIR="$ROOT/.logs"
 
