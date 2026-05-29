@@ -165,9 +165,9 @@ async function setupD1Database() {
     }
 
     // Run database migrations
-    if (fs.existsSync('cloudflare-d1/schema.sql')) {
+    if (fs.existsSync('backend/cloudflare-d1/schema.sql')) {
       log('info', '🔄 Running database migrations...');
-      execSync('wrangler d1 execute queryflux-db --file=cloudflare-d1/schema.sql', { stdio: 'inherit' });
+      execSync('wrangler d1 execute queryflux-db --file=backend/cloudflare-d1/schema.sql', { stdio: 'inherit' });
     }
 
     log('success', '✅ D1 database setup completed');

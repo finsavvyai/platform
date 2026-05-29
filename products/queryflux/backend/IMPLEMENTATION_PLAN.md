@@ -30,7 +30,7 @@
 Instead of fixing the complex Go backend immediately, let's create a **simple working backend**:
 
 **Option A: Enhanced Netlify Functions**
-- Extend existing `netlify/functions/api.mjs`
+- Extend existing `infra/netlify/functions/api.mjs`
 - Add real database drivers (pg, mysql2, mongodb)
 - Implement connection management
 - Use Neon/PlanetScale databases
@@ -64,7 +64,7 @@ Backend API (Go) → Database Adapters → Databases
 ### 1. Quick Win: Enhanced Netlify Functions (1-2 days)
 
 ```javascript
-// netlify/functions/database.mjs
+// infra/netlify/functions/database.mjs
 import { Client } from 'pg'
 import { createClient } from '@supabase/supabase-js'
 

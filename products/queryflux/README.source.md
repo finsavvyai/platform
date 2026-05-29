@@ -196,7 +196,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 4. **Run database migrations**
 
-All migrations are in `supabase/migrations/`. Apply them via Supabase dashboard or CLI.
+All migrations are in `backend/supabase/migrations/`. Apply them via Supabase dashboard or CLI.
 
 5. **Start development server**
 ```bash

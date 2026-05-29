@@ -52,9 +52,9 @@ See `CONSOLIDATION_TODO.md`. Top: restructure subdirs, wire to platform auth/bil
 
 Desktop runtime: Tauri (Electron archived 2026-05-29).
 
-## Tree shape (post P0-1, 2026-05-29)
+## Tree shape (post P0-1 + infra fold, 2026-05-29)
 
-8 product dirs + `extensions/`, `_archive/`, `scripts/`, plus inherited infra (`docs/`, `tests/`, `e2e/`, `supabase/`, `netlify/`, `cloudflare-d1/`):
+8 product dirs + `extensions/`, `_archive/`, `scripts/`, `infra/`, `docs/`, `tests/`:
 
 - `web/` — Vite + React 19 SPA (was `src/` + root vite/tailwind/postcss configs + `public/`).
 - `website/` — Next.js 15 marketing + billing site (unchanged).
@@ -62,6 +62,9 @@ Desktop runtime: Tauri (Electron archived 2026-05-29).
 - `mobile/` — React Native (unchanged).
 - `mcp-server/` — MCP SDK stdio server (was `queryflux-mcp-server/`).
 - `lens/` — QueryLens family: `lens/core/` (sqlite + scripts), `lens/api-java/` (Spring Boot NLP-to-SQL), `lens/vectorize-worker/` (CF Worker + Vectorize binding), plus the existing `lens/src/`.
-- `backend/` — Go monolith (canonical); TS Express layer parked at `backend/server-ts/`.
+- `backend/` — Go monolith (canonical); TS Express layer parked at `backend/server-ts/`. Now also holds the data layer: `backend/cloudflare-d1/` (D1 schemas, folded from root), `backend/supabase/` (Supabase migrations, folded from root), and `backend/migrations/init-db.sql` (folded from root).
 - `workers/` — Cloudflare workers: `workers/api/` (was `queryflux-worker/`), `workers/edge/` (was `worker/`), `workers/api-js/` (was `cloudflare-workers/`), `workers/legacy/` (was top-level `workers/`).
 - `extensions/` — sibling parking dir for editor + AI app extensions: `vscode-queryflux/`, `vscode-pgdesktop/`, `openai-app-full/`, `openai-app-lite/`, `gemini-functions/`.
+- `infra/` — deploy-target configs: `infra/netlify/functions/` (folded from root `netlify/`), `infra/nginx/` (folded `nginx.conf` + `nginx.prod.conf` from root).
+- `tests/` — consolidated test tree: `tests/e2e-playwright/` (folded from root `e2e/`), plus existing `tests/{__tests__,e2e,fixtures,integration,standalone}`.
+- `docs/` — product docs (kept at top level per portfolio rule).

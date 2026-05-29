@@ -40,7 +40,7 @@ FROM nginx:alpine
 RUN apk add --no-cache curl
 
 # Copy custom nginx config
-COPY nginx.conf /etc/nginx/nginx.conf
+COPY infra/nginx/nginx.conf /etc/nginx/nginx.conf
 
 # Copy built application
 COPY --from=builder /app/dist /usr/share/nginx/html

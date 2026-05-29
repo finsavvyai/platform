@@ -76,7 +76,7 @@ cd ..
 wrangler d1 create queryflux-db
 
 # Apply database schema
-wrangler d1 execute queryflux-db --file=../cloudflare-d1/schema.sql --remote
+wrangler d1 execute queryflux-db --file=../backend/cloudflare-d1/schema.sql --remote
 ```
 
 ### Step 7: Verify Deployment

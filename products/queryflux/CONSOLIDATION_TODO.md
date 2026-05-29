@@ -13,9 +13,12 @@ After round-4 migration, these are the open items before QueryFlux is fully inte
   ├── mobile/       (unchanged)
   ├── mcp-server/   (from queryflux-mcp-server)
   ├── lens/         (folded: querylens-core, querylens-api → lens/api-java, querylens-vectorize-worker)
-  ├── backend/      (Go; server/ folded into backend/server-ts/)
-  └── workers/      (consolidated: queryflux-worker → api, worker → edge, cloudflare-workers → api-js, workers → legacy)
+  ├── backend/      (Go; server/ folded into backend/server-ts/; cloudflare-d1, supabase, init-db.sql folded in 2026-05-29)
+  ├── workers/      (consolidated: queryflux-worker → api, worker → edge, cloudflare-workers → api-js, workers → legacy)
+  ├── infra/        (added 2026-05-29: netlify/functions folded from root, nginx configs folded from root)
+  └── tests/        (e2e/ folded as tests/e2e-playwright/, 2026-05-29)
   ```
+- [x] Fold infra dirs (cloudflare-d1, supabase, e2e, netlify, nginx*.conf, init-db.sql) into product subdirs (2026-05-29).
 - [ ] Resolve any duplicate package.json names across subdirs.
 - [ ] Decide: single root package.json with workspaces, OR keep each subdir self-contained?
 
