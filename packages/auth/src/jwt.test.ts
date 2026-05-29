@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryJtiStore } from "./adapters/jti-revocation.js";
-import { importHs256Secret } from "./jwt-keys.js";
-import { signToken, verifyToken } from "./jwt.js";
+import { importHs256Secret, type VerificationKey } from "./jwt-keys.js";
+import { rotateTokenIfNeeded, signToken, verifyToken } from "./jwt.js";
 
 const key = importHs256Secret("supersecretvalue-32chars-minimum-1234");
 const otherKey = importHs256Secret("DIFFERENT-secret-32chars-minimum-9876");
@@ -91,10 +91,12 @@ describe("jwt sign/verify", () => {
 
   it("rejects tampered signature", async () => {
     const { token } = await signToken(key, opts);
-    // Flip the last char of the signature segment.
+    // Flip the first char of the signature segment so the decoded signature
+    // bytes definitely change. Mutating the final base64url char can affect
+    // only padding bits for fixed-length HMAC signatures.
     const parts = token.split(".");
     const sig = parts[2]!;
-    const flipped = sig.slice(0, -1) + (sig.endsWith("A") ? "B" : "A");
+    const flipped = (sig.startsWith("A") ? "B" : "A") + sig.slice(1);
     const tampered = `${parts[0]}.${parts[1]}.${flipped}`;
     const res = await verifyToken(key, tampered, {
       issuer: opts.issuer,
@@ -177,5 +179,81 @@ describe("jwt sign/verify", () => {
       revocations,
     });
     expect(res.ok).toBe(true);
+  });
+
+  it("maps thrown errors without a `code` property to invalid_token", async () => {
+    // jose throws a plain TypeError (no `code`) when the verification key is
+    // not a valid key type. Exercises the `?? ""` fallback in the catch arm.
+    const { token } = await signToken(key, opts);
+    // Strings are not accepted by jose -> TypeError without a `code`.
+    const bogus: VerificationKey = {
+      alg: "HS256",
+      // @ts-expect-error — deliberately bogus runtime value
+      key: "not-a-valid-key",
+    };
+    const res = await verifyToken(bogus, token, {
+      issuer: opts.issuer,
+      audience: opts.audience,
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toBe("invalid_token");
+  });
+
+  it("does not rotate tokens outside the renewal window", async () => {
+    const { token } = await signToken(key, {
+      ...opts,
+      ttlSeconds: 3600,
+      claims: { roles: ["admin"] },
+      includeJti: true,
+    });
+
+    const res = await rotateTokenIfNeeded(key, key, token, {
+      issuer: opts.issuer,
+      audience: opts.audience,
+      ttlSeconds: 3600,
+      rotateWithinSeconds: 60,
+    });
+
+    expect(res).toMatchObject({ ok: true, rotated: false });
+    if (res.ok) expect(res.claims.roles).toEqual(["admin"]);
+  });
+
+  it("rotates near-expiry tokens and preserves custom claims", async () => {
+    const revocations = new InMemoryJtiStore();
+    const { token, jti: oldJti } = await signToken(key, {
+      ...opts,
+      ttlSeconds: 120,
+      claims: { roles: ["admin"], orgId: "o1", tenantIds: ["t1"] },
+      includeJti: true,
+    });
+
+    const res = await rotateTokenIfNeeded(key, key, token, {
+      issuer: opts.issuer,
+      audience: opts.audience,
+      ttlSeconds: 3600,
+      rotateWithinSeconds: 300,
+      revocations,
+    });
+
+    expect(res).toMatchObject({ ok: true, rotated: true });
+    if (res.ok && res.rotated) {
+      expect(res.token).not.toBe(token);
+      expect(res.jti).toBeTruthy();
+      expect(res.jti).not.toBe(oldJti);
+      expect(res.claims.roles).toEqual(["admin"]);
+      expect(res.claims.orgId).toBe("o1");
+      expect(res.claims.tenantIds).toEqual(["t1"]);
+      expect(await revocations.isRevoked(oldJti!)).toBe(true);
+    }
+  });
+
+  it("returns verification errors instead of rotating invalid tokens", async () => {
+    const res = await rotateTokenIfNeeded(key, key, "not-a-jwt", {
+      issuer: opts.issuer,
+      audience: opts.audience,
+      ttlSeconds: 3600,
+      rotateWithinSeconds: 300,
+    });
+    expect(res).toStrictEqual({ ok: false, error: "invalid_token" });
   });
 });

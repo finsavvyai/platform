@@ -74,4 +74,16 @@ describe("jwt-keys", () => {
     expect(algorithmsForVerify("HS256")).toEqual(["HS256", "RS256"]);
     expect(algorithmsForVerify("RS256")).toEqual(["RS256", "HS256"]);
   });
+
+  it("rejects symmetric JWK passed as RS256 public key", async () => {
+    // An `oct` JWK resolves to a Uint8Array (no `type` property) via importJWK.
+    // Defense-in-depth: refuse to wrap it as an RS256 KeyLike.
+    const octJwk = {
+      kty: "oct",
+      k: "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow",
+    };
+    await expect(importRs256PublicJwk(octJwk as never)).rejects.toThrow(
+      "Invalid RS256 JWK",
+    );
+  });
 });

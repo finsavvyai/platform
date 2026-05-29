@@ -98,6 +98,7 @@ async function handleComplete(
 
   const actor = auth.claims.sub;
   const ip = clientIpOf(request);
+  /* v8 ignore next -- verifyJwt enforces non-empty sub; `|| ip` is dead */
   const rlKey = defaultKeyFor(actor || ip, COMPLETE_PATH);
   const decision = await limiter.check(rlKey);
   const rlHeaders = rateLimitHeaders(decision);

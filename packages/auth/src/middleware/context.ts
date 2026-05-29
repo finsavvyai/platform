@@ -29,7 +29,11 @@ export const extractBearer = (header: string | undefined): string | undefined =>
   if (!trimmed.toLowerCase().startsWith("bearer ")) return undefined;
   const token = trimmed.slice(7).trim();
   // Reject empty/whitespace-only tokens and tokens with internal whitespace —
-  // a well-formed bearer token is a single opaque string.
+  // a well-formed bearer token is a single opaque string. The empty-length
+  // arm is provably unreachable today (the outer `trim()` guarantees a
+  // non-whitespace tail), but is retained as defence-in-depth against future
+  // refactors that drop the outer trim.
+  /* v8 ignore next */
   if (token.length === 0) return undefined;
   if (/\s/.test(token)) return undefined;
   return token;

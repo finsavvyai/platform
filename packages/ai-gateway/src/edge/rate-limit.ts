@@ -59,6 +59,10 @@ export class RateLimiter {
     });
 
     const oldest = next.timestamps[0];
+    // `next.timestamps` is always non-empty here: the allow branch pushes
+    // `now`, and the deny branch keeps `kept` (length >= maxRequests >= 1).
+    // The `oldest === undefined` arm is defensive only and unreachable.
+    /* v8 ignore next 2 */
     const resetEpochMs =
       oldest === undefined ? now + this.config.windowMs : oldest + this.config.windowMs;
     return {

@@ -129,4 +129,22 @@ describe("AuditEmitter — shape & redaction", () => {
     const e = createAuditEmitter();
     expect(e).toBeInstanceOf(AuditEmitter);
   });
+
+  it("defaults clock to new Date() when none provided", () => {
+    // Exercises the `options.clock ?? (() => new Date())` default branch.
+    const sink = vi.fn();
+    const before = Date.now();
+    const emitter = new AuditEmitter({ sink });
+    const out = emitter.emit({
+      actorId: "u",
+      event: "e",
+      resource: "r",
+      decision: "allow",
+    });
+    const after = Date.now();
+    const ts = Date.parse(out.ts);
+    expect(Number.isNaN(ts)).toBe(false);
+    expect(ts).toBeGreaterThanOrEqual(before);
+    expect(ts).toBeLessThanOrEqual(after);
+  });
 });

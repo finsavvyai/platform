@@ -100,6 +100,36 @@ describe("verifyStripeWebhook — reject paths", () => {
     ).toThrow(WebhookSignatureError);
   });
 
+  it("rejects odd-length v1 hex (hexToBuf length%2!==0 branch)", () => {
+    // "abc" is valid hex chars but odd-length => hexToBuf returns null
+    // exercising the `hex.length % 2 !== 0` branch in constantTimeEqualHex.
+    const hdrs: WebhookHeaders = {
+      "stripe-signature": `t=${now()},v1=abc`,
+    };
+    expect(() =>
+      verifyStripeWebhook(body, hdrs, {
+        secret: SECRET,
+        allowedEvents: [],
+        now,
+      }),
+    ).toThrow(WebhookSignatureError);
+  });
+
+  it("rejects v1 hex with valid chars but wrong byte length (ab.length!==bb.length branch)", () => {
+    // "00" is a valid 1-byte hex string but expected sig is 32 bytes.
+    // Both decode successfully, then the length-mismatch guard fires.
+    const hdrs: WebhookHeaders = {
+      "stripe-signature": `t=${now()},v1=00`,
+    };
+    expect(() =>
+      verifyStripeWebhook(body, hdrs, {
+        secret: SECRET,
+        allowedEvents: [],
+        now,
+      }),
+    ).toThrow(WebhookSignatureError);
+  });
+
   it("rejects when body is tampered after signing", () => {
     const tampered = Buffer.from(
       JSON.stringify({ type: "invoice.paid", id: "evt_X" }),
