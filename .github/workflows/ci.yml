@@ -133,3 +133,62 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  amliq-go:
+    name: amliq-go
+    # Gate on amliq paths to keep CI fast; full Go matrix only runs when
+    # AMLIQ Go source, modules, or this workflow changes.
+    runs-on: ubuntu-latest
+    # paths-filter at job level: re-evaluate per PR/push using changed files.
+    # GitHub Actions doesn't support job-level paths, so we filter via a
+    # quick dorny/paths-filter step and skip the rest when irrelevant.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect AMLIQ Go changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            amliq:
+              - 'products/amliq/api/**'
+              - 'products/amliq/engines/quantumbeam/**'
+              - 'products/amliq/internal/**'
+              - 'products/amliq/go.work'
+              - 'products/amliq/go.work.sum'
+              - '.github/workflows/ci.yml'
+      - name: Set up Go
+        if: steps.changes.outputs.amliq == 'true'
+        uses: actions/setup-go@v5
+        with:
+          # Highest version across api (1.26) and quantumbeam (1.25.0).
+          go-version: "1.26"
+          cache: true
+          cache-dependency-path: |
+            products/amliq/api/go.sum
+            products/amliq/engines/quantumbeam/go.sum
+      # The api module depends on github.com/finsavvyai/sdlc-core via a
+      # local `replace` directive (../sdlc-core). On dev workstations this
+      # is a symlink to /Users/.../portfolio/sdlc-core. In CI we shallow-clone
+      # the public sdlc-core repo to the same relative path so the replace
+      # resolves and `go build ./...` works without any go.mod edits.
+      - name: Clone sdlc-core sibling repo (resolves api's local replace)
+        if: steps.changes.outputs.amliq == 'true'
+        run: |
+          git clone --depth=1 https://github.com/finsavvyai/sdlc-core.git \
+            products/amliq/sdlc-core
+      - name: Build quantumbeam engine
+        if: steps.changes.outputs.amliq == 'true'
+        working-directory: products/amliq/engines/quantumbeam
+        run: go build ./...
+      - name: Test quantumbeam engine
+        if: steps.changes.outputs.amliq == 'true'
+        working-directory: products/amliq/engines/quantumbeam
+        run: go test ./... -count=1 -short -timeout 5m
+      - name: Build AMLIQ api
+        if: steps.changes.outputs.amliq == 'true'
+        working-directory: products/amliq/api
+        run: go build ./...
+      - name: Test AMLIQ api
+        if: steps.changes.outputs.amliq == 'true'
+        working-directory: products/amliq/api
+        run: go test ./... -count=1 -short -timeout 5m
