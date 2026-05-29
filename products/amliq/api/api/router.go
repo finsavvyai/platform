@@ -48,8 +48,12 @@ func SetupRoutes(
 
 	mux.Handle("POST /api/v1/screen/demo",
 		authChain(usageCheck(http.HandlerFunc(screenDemoHandler.Screen))))
+	// Public-demo: fixture-backed handler in internal/screening/publicdemo
+	// is the canonical implementation. It falls back to the legacy
+	// DB-backed PublicScreenDemo only if samples/screen/ fails to load.
 	mux.HandleFunc("POST /api/v1/screen/public-demo",
-		PublicScreenDemo(deps.Entities, deps.Engine))
+		NewPublicDemoHandler(deps.Engine,
+			PublicScreenDemo(deps.Entities, deps.Engine)))
 	// Free-text screening is unauthenticated: gate per-IP through the
 	// shared public-demo limiter so it cannot be used as a free
 	// uncapped search bypass for the auth'd /screen/freetext route.

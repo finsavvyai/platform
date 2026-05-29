@@ -14,7 +14,7 @@ type Engine struct {
 	fuzzyMatcher      *FuzzyMatcher
 	phoneticMatcher   *PhoneticMatcher
 	tokenMatcher      *TokenMatcher
-	embeddingMatcher  *PgvectorMatcher
+	embeddingMatcher  EmbeddingLayer
 	graphMatcher      *GraphMatcher
 	secondaryMatcher  *SecondaryMatcher
 	scorer            *WeightedScorer

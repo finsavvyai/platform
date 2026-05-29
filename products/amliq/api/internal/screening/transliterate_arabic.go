@@ -13,6 +13,15 @@ var arabicToLatin = map[rune]string{
 	'ي': "y", 'ى': "a", 'ة': "a", 'ء': "",
 }
 
+// TransliterateArabic is the exported wrapper around the package-private
+// transliterateArabic. It is intended for callers outside the screening
+// package (e.g. publicdemo) that need an Arabic-script → Latin
+// transliteration for query-side expansion. Pure-Latin input is returned
+// unchanged.
+func TransliterateArabic(s string) string {
+	return transliterateArabic(s)
+}
+
 // transliterateArabic converts Arabic script to approximate Latin.
 func transliterateArabic(s string) string {
 	s = stripArabicDiacritics(s)

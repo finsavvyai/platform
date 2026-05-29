@@ -7,8 +7,12 @@ import (
 // EngineOption configures optional engine layers.
 type EngineOption func(*Engine)
 
-// WithEmbeddingMatcher enables the embedding (layer 5) matcher.
-func WithEmbeddingMatcher(m *PgvectorMatcher) EngineOption {
+// WithEmbeddingMatcher enables the embedding (layer 5) matcher. The
+// argument is an EmbeddingLayer so the engine can be wired with either
+// PgvectorMatcher (production, DB-backed) or InMemoryEmbeddingMatcher
+// (offline / public-demo). nil here keeps the cascade unwired and the
+// engine identical to today's NewEngine(nil) baseline.
+func WithEmbeddingMatcher(m EmbeddingLayer) EngineOption {
 	return func(e *Engine) { e.embeddingMatcher = m }
 }
 

@@ -1,0 +1,318 @@
+{
+  "$schema_note": "Each entry drives one integration test against POST /api/v1/screen/public-demo. expected.min_top_confidence sets the floor for the highest-confidence match (engine output is deterministic for fixture data, ±0.05). expected.risk_level matches the bucket derived from confidence. expected.list_ids is the set of source lists that MUST appear among matches.",
+  "queries": [
+    {
+      "id": "Q1",
+      "name": "Vladimir Putin",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.80,
+        "risk_level": "high",
+        "list_ids": ["ofac", "eu_fsf", "uk_ofsi"],
+        "layers_present": ["Exact", "Fuzzy", "Phonetic", "Token"]
+      }
+    },
+    {
+      "id": "Q2",
+      "name": "Vladmir Putin",
+      "comment": "Typo: Vladmir not Vladimir. Should still match via fuzzy/phonetic.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.85,
+        "risk_level": "high",
+        "list_ids": ["ofac"],
+        "layers_present": ["Fuzzy", "Phonetic"]
+      }
+    },
+    {
+      "id": "Q3",
+      "name": "Sberbank of Russia",
+      "lists": ["ofac", "eu_fsf"],
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.80,
+        "risk_level_in": ["medium", "high"],
+        "list_ids": ["ofac", "eu_fsf"],
+        "layers_present": ["Exact", "Fuzzy", "Token"]
+      }
+    },
+    {
+      "id": "Q4",
+      "name": "Kim Jong-un",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.90,
+        "risk_level": "high",
+        "list_ids": ["ofac", "un"],
+        "layers_present": ["Exact", "Fuzzy", "Phonetic", "Token"]
+      }
+    },
+    {
+      "id": "Q5",
+      "name": "Sergei Lavrov",
+      "comment": "Transliteration variant of Sergey Lavrov.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.85,
+        "risk_level": "high",
+        "list_ids": ["ofac"],
+        "layers_present": ["Exact", "Fuzzy", "Phonetic"]
+      }
+    },
+    {
+      "id": "Q6",
+      "name": "Bashar Assad",
+      "comment": "Without al- prefix.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.85,
+        "risk_level": "high",
+        "list_ids": ["ofac"]
+      }
+    },
+    {
+      "id": "Q7",
+      "name": "Bank Sepah",
+      "lists": ["ofac"],
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.90,
+        "risk_level": "high",
+        "list_ids": ["ofac"],
+        "layers_present": ["Exact", "Fuzzy", "Phonetic", "Token"]
+      }
+    },
+    {
+      "id": "Q8",
+      "name": "VTB",
+      "lists": ["ofac", "uk_ofsi"],
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.80,
+        "risk_level": "high",
+        "list_ids": ["ofac", "uk_ofsi"]
+      }
+    },
+    {
+      "id": "Q9",
+      "name": "Roman Abramovich",
+      "lists": ["uk_ofsi"],
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.85,
+        "risk_level": "high",
+        "list_ids": ["uk_ofsi"]
+      }
+    },
+    {
+      "id": "Q10",
+      "name": "Recep Tayyip Erdogan",
+      "pep": true,
+      "comment": "PEP query: Erdogan should be flagged as PEP. The engine emits some low-confidence phonetic noise vs the sanctions corpus; that is acceptable so long as risk stays out of medium/high.",
+      "expected": {
+        "max_top_confidence": 0.80,
+        "risk_level_in": ["clear", "low"],
+        "pep_status_required": true,
+        "pep_position_contains": "President"
+      }
+    },
+    {
+      "id": "Q11",
+      "name": "Benjamin Netanyahu",
+      "pep": true,
+      "expected": {
+        "max_top_confidence": 0.80,
+        "risk_level_in": ["clear", "low"],
+        "pep_status_required": true,
+        "pep_position_contains": "Prime Minister"
+      }
+    },
+    {
+      "id": "Q12",
+      "name": "Bibi Netanyahu",
+      "pep": true,
+      "comment": "Alias form of Benjamin Netanyahu.",
+      "expected": {
+        "max_top_confidence": 0.80,
+        "risk_level_in": ["clear", "low"],
+        "pep_status_required": true
+      }
+    },
+    {
+      "id": "Q13",
+      "name": "Xi Jinping",
+      "pep": true,
+      "expected": {
+        "pep_status_required": true,
+        "pep_position_contains": "General Secretary"
+      }
+    },
+    {
+      "id": "Q14",
+      "name": "John Smith",
+      "comment": "Common name with no sanctions or PEP hits. The engine still emits phonetic noise against unrelated entities; risk must not reach high.",
+      "expected": {
+        "max_top_confidence": 0.80,
+        "risk_level_in": ["clear", "low", "medium"]
+      }
+    },
+    {
+      "id": "Q15",
+      "name": "Acme Corp Ltd",
+      "expected": {
+        "min_matches": 0,
+        "max_top_confidence": 0.70,
+        "risk_level_in": ["clear", "low", "medium"]
+      }
+    },
+    {
+      "id": "Q16",
+      "name": "Lukashenka",
+      "lists": ["eu_fsf"],
+      "comment": "Alternate spelling of Lukashenko.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.65,
+        "risk_level_in": ["medium", "high"],
+        "list_ids": ["eu_fsf"]
+      }
+    },
+    {
+      "id": "Q17",
+      "name": "ISIS",
+      "lists": ["un"],
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.85,
+        "risk_level": "high",
+        "list_ids": ["un"]
+      }
+    },
+    {
+      "id": "Q18",
+      "name": "Nicolas Maduro",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.80,
+        "risk_level": "high",
+        "list_ids": ["ofac"]
+      }
+    },
+    {
+      "id": "Q19",
+      "name": "Vladimir Putin",
+      "threshold": 0.99,
+      "comment": "High threshold should drop most matches; only exact-equivalent survive.",
+      "expected": {
+        "max_matches": 1,
+        "risk_level_in": ["clear", "high"]
+      }
+    },
+    {
+      "id": "Q20",
+      "name": "Putin",
+      "comment": "Single-token query; should still match Putin entities via token/fuzzy.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.40,
+        "risk_level_in": ["low", "medium", "high"],
+        "list_ids": ["ofac"]
+      }
+    },
+    {
+      "id": "Q21",
+      "name": "Kim Jung-un",
+      "comment": "Embedding-tier transliteration drift of Kim Jong Un. The in-memory trigram-cosine embedding matcher now binds this to the OFAC alias 'Kim Jung Un'. Phonetic still fires too; both layers are pinned to keep the test honest about which layers carry the drift signal.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.85,
+        "risk_level_in": ["medium", "high"],
+        "list_ids": ["ofac"],
+        "layers_present": ["Embedding", "Phonetic"]
+      }
+    },
+    {
+      "id": "Q22",
+      "name": "Bashar al-Asad",
+      "comment": "Embedding-tier Arabic transliteration drift (single-s) of Bashar al-Assad. The trigram-cosine embedding matcher catches the dropped 's'; Phonetic also fires. Both layers are pinned.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.80,
+        "risk_level_in": ["medium", "high"],
+        "list_ids": ["ofac"],
+        "layers_present": ["Embedding", "Phonetic"]
+      }
+    },
+    {
+      "id": "Q23",
+      "name": "Volodymyr Putin",
+      "comment": "Embedding-tier semantic drift: Ukrainian-style transliteration of Vladimir Putin. Both the embedding layer and Phonetic surface the OFAC alias 'Vladimir Vladimirovich Putin'.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.70,
+        "risk_level_in": ["low", "medium", "high"],
+        "list_ids": ["ofac"],
+        "layers_present": ["Embedding", "Phonetic"]
+      }
+    },
+    {
+      "id": "Q24",
+      "name": "Pootin",
+      "threshold": 0.75,
+      "comment": "Embedding-near miss (negative control): phonetic-only spelling of Putin under a 0.75 threshold. The trigram-cosine matcher does not bind 'pootin' to the Putin cluster; the high threshold prunes the noise and the query resolves to clear/low.",
+      "expected": {
+        "max_matches": 1,
+        "max_top_confidence": 0.75,
+        "risk_level_in": ["clear", "low"]
+      }
+    },
+    {
+      "id": "Q25",
+      "name": "Владимир Путин",
+      "comment": "Cyrillic-script query for Vladimir Putin. The public-demo handler transliterates to 'vladimir putin' via expandQuery before the engine runs, then the full cascade (Exact/Fuzzy/Phonetic/Token/Embedding) fires against the OFAC/EU/UK Putin entries.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.80,
+        "risk_level": "high",
+        "list_ids": ["ofac", "eu_fsf", "uk_ofsi"],
+        "layers_present": ["Embedding"]
+      }
+    },
+    {
+      "id": "Q26",
+      "name": "بشار الأسد",
+      "comment": "Arabic-script query for Bashar al-Assad. TransliterateArabic produces an approximate Latin form ('bshar al-asd'); the embedding + phonetic layers catch the drift against the OFAC entry.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.70,
+        "risk_level_in": ["medium", "high"],
+        "list_ids": ["ofac"],
+        "layers_present": ["Embedding"]
+      }
+    },
+    {
+      "id": "Q27",
+      "name": "Сергей Лавров",
+      "comment": "Cyrillic-script transliteration variant of Sergey Lavrov. expandQuery yields 'sergey lavrov', and the cascade surfaces the OFAC entry.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.80,
+        "risk_level": "high",
+        "list_ids": ["ofac"],
+        "layers_present": ["Embedding"]
+      }
+    },
+    {
+      "id": "Q28",
+      "name": "Volodymyr Putyn",
+      "comment": "Mixed-script-style cross-transliteration: Ukrainian first name plus a non-standard Latin 'Putyn' spelling. Embedding (trigram-cosine) surfaces the Putin cluster despite no clean Phonetic/Exact bind.",
+      "expected": {
+        "min_matches": 1,
+        "min_top_confidence": 0.60,
+        "risk_level_in": ["low", "medium", "high"],
+        "list_ids": ["ofac"],
+        "layers_present": ["Embedding"]
+      }
+    }
+  ]
+}
