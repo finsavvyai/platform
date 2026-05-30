@@ -2,13 +2,57 @@ package services
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/queryflux/backend/internal/application/services/query"
+	"github.com/queryflux/backend/internal/infrastructure/database/adapters/types"
 )
+
+// stubStreamAdapter is a minimal query.StreamAdapter for tests in this
+// package. It pushes the supplied rows onto the channel and (optionally)
+// blocks before completion so cancellation paths can be exercised.
+type stubStreamAdapter struct {
+	rows      int
+	perRow    time.Duration
+	terminate error
+}
+
+func (s *stubStreamAdapter) Stream(ctx context.Context, _ string, _ ...interface{}) (<-chan query.StreamRow, <-chan error) {
+	rowCh := make(chan query.StreamRow)
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(rowCh)
+		defer close(errCh)
+		for i := 0; i < s.rows; i++ {
+			if s.perRow > 0 {
+				select {
+				case <-ctx.Done():
+					errCh <- ctx.Err()
+					return
+				case <-time.After(s.perRow):
+				}
+			}
+			select {
+			case <-ctx.Done():
+				errCh <- ctx.Err()
+				return
+			case rowCh <- query.StreamRow{
+				Columns: []string{"id"},
+				Values:  []interface{}{i},
+				Index:   int64(i),
+			}:
+			}
+		}
+		errCh <- s.terminate
+	}()
+	return rowCh, errCh
+}
 
 func TestNewEnhancedQueryExecutor(t *testing.T) {
 	executor := NewEnhancedQueryExecutor()
@@ -102,86 +146,107 @@ func TestExecuteWithParams_WithExplain(t *testing.T) {
 	assert.NotEmpty(t, result.QueryPlan.Plan)
 }
 
+// The three tests below replace legacy EnhancedQueryExecutor cases that
+// were stubbed by `ErrNotImplemented` in commit 29b038232. The production
+// streaming + cancellation surface is now `query.SafeQueryRunner.Stream`
+// (internal/application/services/query). These rewrites assert the same
+// intent against that surface so coverage of the streaming contract is
+// preserved without invoking dead code.
+
 func TestExecuteStreaming_Success(t *testing.T) {
-	executor := NewEnhancedQueryExecutor()
-	ctx := context.Background()
-	
-	opts := DefaultQueryOptions()
-	opts.MaxRows = 100
-	opts.StreamBatch = 25
-	
-	var batches [][]map[string]interface{}
-	var batchNums []int
-	var completedCount int
-	
-	callback := func(batch []map[string]interface{}, batchNum int, complete bool) error {
-		batches = append(batches, batch)
-		batchNums = append(batchNums, batchNum)
-		if complete {
-			completedCount++
+	adapter := &stubStreamAdapter{rows: 50}
+	runner := query.NewSafeQueryRunner(query.NewInMemoryAuditLogger())
+
+	chunks, errs := runner.Stream(
+		context.Background(),
+		adapter,
+		"SELECT id FROM users",
+		nil,
+		query.QueryOptions{BatchSize: 10, MaxRows: 100},
+	)
+
+	var (
+		totalRows int
+		sawFinal  bool
+		pages     int
+	)
+	for c := range chunks {
+		totalRows += len(c.Rows)
+		pages++
+		if c.Final {
+			sawFinal = true
 		}
-		return nil
 	}
-	
-	err := executor.ExecuteStreaming(ctx, "query-5", "user-1", "conn-1",
-		"SELECT * FROM users", opts, callback)
-	
-	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(batches), 1)
-	assert.Equal(t, 1, completedCount)
+	require.NoError(t, <-errs)
+	assert.Equal(t, 50, totalRows, "all 50 rows should reach the consumer")
+	assert.GreaterOrEqual(t, pages, 5, "expected paging across BatchSize=10")
+	assert.True(t, sawFinal, "must emit a terminal Final=true chunk")
 }
 
 func TestExecuteStreaming_Cancellation(t *testing.T) {
-	executor := NewEnhancedQueryExecutor()
+	// 50ms per row × 100 rows guarantees the consumer can cancel mid-stream.
+	adapter := &stubStreamAdapter{rows: 100, perRow: 50 * time.Millisecond}
+	runner := query.NewSafeQueryRunner(query.NewInMemoryAuditLogger())
+
 	ctx, cancel := context.WithCancel(context.Background())
-	
-	opts := DefaultQueryOptions()
-	opts.MaxRows = 10000
-	opts.StreamBatch = 10
-	
-	callbackCount := 0
-	callback := func(batch []map[string]interface{}, batchNum int, complete bool) error {
-		callbackCount++
-		if callbackCount >= 2 {
-			cancel() // Cancel after 2 batches
+	chunks, errs := runner.Stream(
+		ctx,
+		adapter,
+		"SELECT id FROM users",
+		nil,
+		query.QueryOptions{BatchSize: 5, MaxRows: 10000, Timeout: 30 * time.Second},
+	)
+
+	pagesSeen := 0
+	for c := range chunks {
+		pagesSeen++
+		if pagesSeen >= 2 {
+			cancel()
 		}
-		return nil
+		_ = c
 	}
-	
-	err := executor.ExecuteStreaming(ctx, "query-6", "user-1", "conn-1",
-		"SELECT * FROM users", opts, callback)
-	
-	assert.Error(t, err)
-	assert.GreaterOrEqual(t, callbackCount, 2)
+	err := <-errs
+	assert.Error(t, err, "cancellation must surface a terminal error")
+	assert.True(t, errors.Is(err, types.ErrTimeout) || errors.Is(err, context.Canceled),
+		"expected ErrTimeout or context.Canceled, got %v", err)
+	assert.GreaterOrEqual(t, pagesSeen, 2, "consumer should receive at least 2 chunks before cancel")
 }
 
 func TestCancelQuery_Success(t *testing.T) {
-	executor := NewEnhancedQueryExecutor()
-	ctx := context.Background()
-	
-	// Start a long-running streaming query
-	opts := DefaultQueryOptions()
-	opts.MaxRows = 100000
-	opts.StreamBatch = 100
-	
+	// Legacy intent: a started query is registered and can be cancelled by
+	// id. SafeQueryRunner has no registry — cancellation flows via the
+	// caller's context. This rewrite asserts the equivalent property:
+	// cancelling the parent context terminates the stream, closes both
+	// channels and propagates a cancellation/timeout error.
+	adapter := &stubStreamAdapter{rows: 1000, perRow: 20 * time.Millisecond}
+	runner := query.NewSafeQueryRunner(query.NewInMemoryAuditLogger())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	chunks, errs := runner.Stream(
+		ctx,
+		adapter,
+		"SELECT id FROM big",
+		nil,
+		query.QueryOptions{BatchSize: 50, MaxRows: 100000, Timeout: 30 * time.Second},
+	)
+
+	// Drain in a goroutine so we can `cancel()` from the outside.
 	var wg sync.WaitGroup
 	wg.Add(1)
-	
 	go func() {
 		defer wg.Done()
-		_ = executor.ExecuteStreaming(ctx, "query-7", "user-1", "conn-1",
-			"SELECT * FROM users", opts, func(batch []map[string]interface{}, batchNum int, complete bool) error {
-				time.Sleep(50 * time.Millisecond)
-				return nil
-			})
+		for range chunks {
+		}
 	}()
-	
-	// Wait a bit then cancel
-	time.Sleep(100 * time.Millisecond)
-	err := executor.CancelQuery("query-7")
-	
-	assert.NoError(t, err)
+
+	time.Sleep(60 * time.Millisecond)
+	cancel()
 	wg.Wait()
+
+	err := <-errs
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, types.ErrTimeout) || errors.Is(err, context.Canceled),
+		"expected cancellation-class error, got %v", err)
 }
 
 func TestCancelQuery_NotFound(t *testing.T) {
