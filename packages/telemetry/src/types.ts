@@ -37,3 +37,50 @@ export interface Tracer {
 export interface AiExecutionLogger {
   record(event: AiExecutionEvent): void;
 }
+
+export type AuditOutcome = "success" | "failure" | "denied";
+
+/**
+ * Canonical audit record for auth events, admin actions, and sensitive
+ * mutations. `traceId` correlates an audit entry to a telemetry trace; it is
+ * explicitly `string | undefined` rather than optional so callers always make
+ * the correlation decision.
+ */
+export type AuditEvent = {
+  readonly id: string;
+  readonly timestamp: number;
+  readonly actor: string;
+  readonly action: string;
+  readonly resource: string;
+  readonly outcome: AuditOutcome;
+  readonly traceId: string | undefined;
+  readonly metadata: Readonly<Record<string, string>>;
+};
+
+export type AuditEventInput = {
+  readonly actor: string;
+  readonly action: string;
+  readonly resource: string;
+  readonly outcome: AuditOutcome;
+  readonly traceId?: string;
+  readonly metadata?: Readonly<Record<string, string>>;
+};
+
+export type AuditQuery = {
+  readonly actor?: string;
+  readonly action?: string;
+  readonly outcome?: AuditOutcome;
+  readonly since?: number;
+  readonly until?: number;
+};
+
+/**
+ * Append-only audit sink. `record` is async because production
+ * implementations write to durable, tamper-evident storage. Consumers in
+ * other packages should depend on their own minimal local sink interface and
+ * have the application inject an implementation of this port.
+ */
+export interface AuditLog {
+  record(event: AuditEvent): Promise<void>;
+  query(filter?: AuditQuery): readonly AuditEvent[];
+}
