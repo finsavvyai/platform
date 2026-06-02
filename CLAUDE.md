@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `finsavvyai-platform` is a **pnpm workspace monorepo** of pure, framework-agnostic TypeScript library packages. There is no application, server, or runtime entrypoint here — every package builds to `dist/` and is published (restricted access) for consumption by downstream FinsavvyAI products (PushCI, Qestro, LunaOS, OpenSyber, SDLC.cc, AMLIQ).
 
+## Why it exists (read first)
+
+The platform is the shared **control plane for autonomous AI software systems**: every AI action flows authenticated → authorized → policy-checked → logged/replayable → routed → metered. Strategically, **governance and audit are the moat** — `policy-engine` (governing AI-generated code/PRs) and `telemetry` (auditable, replayable AI-execution logs) are the defensible layer, while `ai-gateway` is treated as a neutral cost/control surface and `auth`/`billing` as enablers. This is why the conventions below (errors-as-values, replayable decisions, 100% coverage on critical paths, mandatory audit logs, vendor-neutral ports-and-adapters) matter: **the product is trust.** Full context in [`VISION.md`](VISION.md) and [`docs/MARKET_RESEARCH.md`](docs/MARKET_RESEARCH.md).
+
 The five packages and their roles:
 
 | Package | Role |
