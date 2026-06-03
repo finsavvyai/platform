@@ -11,15 +11,15 @@ import (
 
 // Env represents the Cloudflare Workers environment
 type Env struct {
-	DB_PRIMARY       *cloudflare.D1Database     `cf:"d1_database"`
-	DB_SECONDARY     *cloudflare.D1Database     `cf:"d1_database"`
-	DB_COMPLIANCE    *cloudflare.D1Database     `cf:"d1_database"`
-	R2_STORAGE       *cloudflare.R2Bucket       `cf:"r2_bucket"`
-	KV_CACHE         *cloudflare.KVNamespace    `cf:"kv_namespace"`
-	QUEUE_BILLING    *cloudflare.Queue          `cf:"queue"`
-	QUEUE_RISK       *cloudflare.Queue          `cf:"queue"`
-	QUEUE_COMPLIANCE *cloudflare.Queue          `cf:"queue"`
-	VECTORIZE_RAG    *cloudflare.VectorizeIndex `cf:"vectorize_index"`
+	DB_PRIMARY       *cloudflare.D1Database `cf:"d1_database"`
+	DB_SECONDARY     *cloudflare.D1Database `cf:"d1_database"`
+	DB_COMPLIANCE    *cloudflare.D1Database `cf:"d1_database"`
+	R2_STORAGE       *cloudflare.R2Bucket   `cf:"r2_bucket"`
+	KV_CACHE         any                    `cf:"kv_namespace"`
+	QUEUE_BILLING    *cloudflare.Queue      `cf:"queue"`
+	QUEUE_RISK       *cloudflare.Queue      `cf:"queue"`
+	QUEUE_COMPLIANCE *cloudflare.Queue      `cf:"queue"`
+	VECTORIZE_RAG    any                    `cf:"vectorize_index"`
 }
 
 // Service represents a base service interface
