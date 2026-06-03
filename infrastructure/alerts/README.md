@@ -42,11 +42,11 @@ Three trigger types, all defined in `rules.yaml`:
 
 ## Importing into Datadog
 
-Prerequisites (placeholder env vars; wire from a secrets manager):
+Prerequisites. Values come from the production secrets manager:
 
 ```bash
-export DD_API_KEY=<DD_API_KEY_PLACEHOLDER>
-export DD_APP_KEY=<DD_APP_KEY_PLACEHOLDER>
+export DD_API_KEY=<from secrets manager>
+export DD_APP_KEY=<from secrets manager>
 export DD_SITE=datadoghq.com  # or datadoghq.eu
 ```
 
@@ -107,16 +107,17 @@ that flag lands) — same mute pattern.
 agent) should fail if `id`, `severity`, or threshold differ between the
 two files. Until that check lands, reviewer is responsible for parity.
 
-## Channel placeholders
+## Channel Routing
 
 `channels` values in `rules.yaml` are abstract. Mapping table:
 
 | YAML channel | Datadog handle | Notes |
 |---|---|---|
-| `pagerduty` | `@pagerduty-<DD_PD_SERVICE>` | PD service key — set in Datadog integration UI. |
-| `slack-oncall` | `@slack-<SLACK_ONCALL>` | Slack workspace + channel. |
-| `slack-security` | `@slack-<SLACK_SECURITY>` | Private security channel. |
-| `slack-status` | `@slack-<SLACK_STATUS>` | Customer-visible-impact updates. |
-| `slack-finance` | `@slack-<SLACK_FINANCE>` | Cost/spend alerts. |
+| `pagerduty` | Datadog PagerDuty integration service | PD service key is set in Datadog integration UI. |
+| `slack-oncall` | On-call Slack channel | Slack workspace and channel are configured in Datadog. |
+| `slack-security` | Private security Slack channel | Security incident channel. |
+| `slack-status` | Internal status Slack channel | Customer-visible-impact updates. |
+| `slack-finance` | Finance Slack channel | Cost/spend alerts. |
 
-Replace placeholders only via secrets manager — never commit real handles.
+Do not commit real integration handles, service keys, or private channel
+IDs. Configure them in the provider UI or secrets manager.

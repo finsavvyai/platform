@@ -14,7 +14,7 @@
 #                 audit_code:  <stable error code + count threshold + window>
 #   for         Duration the condition must persist before firing (e.g., "5m").
 #   runbook     Path (repo-relative) to the runbook markdown.
-#   channels    Notification channels — placeholders. See infrastructure/alerts/README.md.
+#   channels    Abstract notification routes. See infrastructure/alerts/README.md.
 #   notes       Optional. Operational context for the on-call.
 #
 # Metric naming convention (must match OBSERVABILITY emitter):
@@ -138,12 +138,12 @@ rules:
     name: "Per-tenant token spend over hourly budget"
     severity: high
     trigger:
-      # Threshold below is a PLACEHOLDER until finance signs off.
+      # Pre-revenue guardrail; replace with per-plan budgets after finance review.
       prom_expr: 'sum by (tenant_id) (rate(finsavvy.gateway.token_cost_usd_total{env="production"}[1h])) > 50'
     for: 5m
     runbook: docs/runbooks/TOKEN_SPEND_BUDGET.md
     channels: [slack-oncall, slack-finance]
-    notes: "Threshold $50/h/tenant is placeholder. Update once usage baselines exist."
+    notes: "Initial $50/h/tenant guardrail. Review against per-plan budgets once usage baselines exist."
 
   - id: POLICY_DENY_SPIKE
     name: "Policy engine denial / error spike"

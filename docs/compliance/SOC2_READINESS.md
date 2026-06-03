@@ -1,7 +1,8 @@
 # SOC 2 Type 1 — Readiness Package
 
-> **Status:** Pre-audit. Auditor selection in progress; pen-test firm TBD.
-> Last refreshed: 2026-05-25. Owner: Security on-call rotation.
+> **Status:** Pre-audit. Auditor selection in progress; pen-test scheduling
+> is an operational pre-audit task.
+> Last refreshed: 2026-05-26. Owner: Security on-call rotation.
 
 Maps FinsavvyAI controls to the AICPA Trust Services Criteria (2017 with
 2022 points-of-focus revisions). Evidence locations are repo paths so a
@@ -24,7 +25,7 @@ Type 1 audit-firm walkthrough can be executed from this document alone.
 | CC4.1 | Monitoring activities | Synthetic probes + 13 alert rules + audit-tamper chain | `infrastructure/synthetics/`; `infrastructure/alerts/rules.yaml`; `packages/telemetry/src/audit-tamper/` | implemented |
 | CC5.1 | Control activities | CI required-checks gate every merge | `.github/workflows/ci.yml` | implemented |
 | CC6.1 | Logical access controls | JWT alg-pinned verifier + role-gated routes + tenant middleware | `packages/auth/src/jwt.ts`; `products/amliq/brain/services/api/src/auth.ts`; `products/amliq/brain/services/api/src/tenant/middleware.ts` | implemented |
-| CC6.2 | New-user provisioning | Tenant claim issued via auth provider; revocation via JWT jti deny-list | `packages/auth/src/jwt.ts`; (deny-list TBD) | partial |
+| CC6.2 | New-user provisioning | Tenant claim issued via auth provider; revocation via JWT jti deny-list | `packages/auth/src/jwt.ts`; `packages/auth/src/adapters/jti-revocation.ts` (`RedisJtiStore`) | implemented |
 | CC6.3 | Authorisation changes | Role grants audit-logged via `aml.decision.role_grant` | `products/amliq/api/` audit emits per `products/amliq/CLAUDE.md` SOC 2 mapping | implemented |
 | CC6.6 | Encryption in transit | Cloudflare Workers TLS termination; HSTS at edge | `infrastructure/cloudflare/`; Wrangler routes config | implemented |
 | CC6.7 | Restrict information transmission | Audit `reason` is a stable code; no PII in transit logs | `products/amliq/CLAUDE.md` "PII-free reasons" + tested in `products/amliq/brain/services/api/src/audit.test.ts` | implemented |
@@ -36,7 +37,7 @@ Type 1 audit-firm walkthrough can be executed from this document alone.
 | CC7.5 | Recovery from incidents | Rollback runbook + canary 5→50→100% deploy gate | `docs/runbooks/_rollback.md`; `.github/workflows/deploy-prod.yml` | implemented |
 | CC8.1 | Change management | PR review + CI required-checks + canary deploy + forward-only D1 | `docs/compliance/CHANGE_MANAGEMENT.md`; `.github/workflows/ci.yml` | implemented |
 | CC9.1 | Risk mitigation (ongoing) | Quarterly risk-register review documented in commit history | `docs/compliance/RISK_REGISTER.md` | implemented |
-| CC9.2 | Vendor risk management | Critical vendors (Cloudflare, LemonSqueezy, OFAC list source) tracked in register | `docs/compliance/RISK_REGISTER.md` (vendor rows) | partial |
+| CC9.2 | Vendor risk management | Critical vendors tracked in reviewed register with required-vendor validation | `docs/compliance/vendor-risk-register.json`; `docs/compliance/VENDOR_RISK_REGISTER.md`; `tools/validate-vendor-risk.mjs` | implemented |
 
 ## Availability (A)
 
@@ -44,7 +45,7 @@ Type 1 audit-firm walkthrough can be executed from this document alone.
 |---|---|---|---|---|
 | A1.1 | Capacity / availability commitments | SLO targets: 99.9% gateway; p95 latency <500ms | `docs/observability.md`; alert rules `GATEWAY_LATENCY_P95` | implemented |
 | A1.2 | Capacity planning | Forecast cadence + headroom monitor | n/a — pre-revenue; no production load to forecast against | deferred-with-rationale |
-| A1.3 | Recovery from disruption | Rollback runbook + DR plan | `docs/runbooks/_rollback.md`; DR multi-region pending | partial |
+| A1.3 | Recovery from disruption | Rollback runbook + Cloudflare disruption DR plan with RTO/RPO and exercise evidence | `docs/runbooks/_rollback.md`; `docs/runbooks/DR_CLOUDFLARE_REGION_OUTAGE.md`; `tools/validate-dr-readiness.mjs` | implemented |
 
 ## Confidentiality (C)
 
@@ -58,20 +59,19 @@ Type 1 audit-firm walkthrough can be executed from this document alone.
 | # | Criterion | Control | Evidence | Status |
 |---|---|---|---|---|
 | PI1.1 | Data integrity through processing | SHA-256 hash chain per tenant; signed records to R2 | `packages/telemetry/src/audit-tamper/chain.ts`; `packages/telemetry/src/audit-tamper/sign.ts`; `products/amliq/brain/services/api/src/audit-prod/factory.ts` | implemented |
-| PI1.2 | System inputs complete & accurate | Zod validation at brain API boundary (search + tenant claims) | `products/amliq/brain/services/api/src/tenant/types.ts` (regex); `products/amliq/brain/services/api/src/search/` validators | partial |
+| PI1.2 | System inputs complete & accurate | Zod validation at brain API boundary (search + SAR Draft) plus tenant claim regex guard | `products/amliq/brain/services/api/src/search/request-schema.ts`; `products/amliq/brain/services/api/src/sar-draft/request-schema.ts`; `products/amliq/brain/services/api/src/tenant/types.ts` | implemented |
 
 ## Privacy (P) — applicability narrow (B2B; no consumer PII)
 
 | # | Criterion | Control | Evidence | Status |
 |---|---|---|---|---|
-| P4.2 | Personal information retention | Default 7y retention; tenant-policy override | `products/amliq/CLAUDE.md` C1.4 row; purge cron pending | partial |
+| P4.2 | Personal information retention | Default 7y retention; tenant-policy override; tenant-scoped R2 audit purge helper | `products/amliq/CLAUDE.md` C1.4 row; `products/amliq/brain/services/api/src/audit-prod/retention.ts` | implemented |
 | P9.1 | Monitoring & enforcement | Audit retention exercised on staging before any production deploy | `products/amliq/CLAUDE.md` release checklist | implemented |
 
 ## Summary
 
-- **22 criteria** covered.
-- **17 implemented**, **4 partial**, **0 gap**, **1 deferred-with-rationale**.
-- All "partial" items have a tracked issue and a target date in the
-  pre-audit milestone (`docs/compliance/SECURITY_HARDENING.md` "next
-  steps before audit").
+- **28 criteria** covered.
+- **27 implemented**, **0 partial**, **0 gap**, **1 deferred-with-rationale**.
+- Remaining pre-audit work is operational: auditor engagement, pen-test
+  scheduling, and the next quarterly DR tabletop exercise.
 - Audit firm walkthrough sequence: CC6 → CC7 → PI1 → CC8 → CC1-5 → A/C/P.

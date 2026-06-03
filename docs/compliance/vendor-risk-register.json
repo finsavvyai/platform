@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "last_reviewed": "2026-05-26",
+  "next_review": "2026-08-25",
+  "required_vendor_ids": [
+    "cloudflare",
+    "lemonsqueezy",
+    "ofac-source"
+  ],
+  "vendors": [
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare",
+      "category": "infrastructure",
+      "criticality": "critical",
+      "services": [
+        "Workers",
+        "R2",
+        "D1",
+        "KV",
+        "WAF",
+        "DNS"
+      ],
+      "data_access": "tenant metadata, audit records, API traffic metadata",
+      "risk": "Provider outage or account compromise can affect all hosted surfaces.",
+      "mitigations": [
+        "Per-environment accounts or scoped API tokens",
+        "Rollback and D1 forward-only runbooks",
+        "R2 audit retention and tenant-scoped purge helper",
+        "Status-page monitoring during incidents"
+      ],
+      "evidence": [
+        "infrastructure/cloudflare/README.md",
+        "docs/runbooks/_rollback.md",
+        "docs/compliance/RISK_REGISTER.md"
+      ],
+      "owner": "Security on-call",
+      "review_status": "approved"
+    },
+    {
+      "id": "lemonsqueezy",
+      "name": "LemonSqueezy",
+      "category": "billing",
+      "criticality": "high",
+      "services": [
+        "Checkout",
+        "Subscription webhooks",
+        "Invoice events"
+      ],
+      "data_access": "billing customer metadata and payment event payloads",
+      "risk": "Webhook delivery or signature changes can interrupt subscription state.",
+      "mitigations": [
+        "Constant-time HMAC verifier",
+        "Replay protection",
+        "Webhook failure runbook",
+        "Idempotent billing orchestration"
+      ],
+      "evidence": [
+        "packages/billing/src/providers/lemonsqueezy/webhook.ts",
+        "docs/runbooks/LEMONSQUEEZY_WEBHOOK_SIG_FAIL.md",
+        "docs/compliance/RISK_REGISTER.md"
+      ],
+      "owner": "Billing owner",
+      "review_status": "approved"
+    },
+    {
+      "id": "ofac-source",
+      "name": "OFAC public sanctions source",
+      "category": "data-provider",
+      "criticality": "critical",
+      "services": [
+        "Public sanctions list source"
+      ],
+      "data_access": "public regulatory data only",
+      "risk": "Source outage, schema change, or stale list can degrade AML screening.",
+      "mitigations": [
+        "Pinned snapshot rollback",
+        "Staleness alert with 24-hour budget",
+        "Multi-source ingestion plan",
+        "AMLIQ decision failure runbook"
+      ],
+      "evidence": [
+        "docs/compliance/RISK_REGISTER.md",
+        "docs/runbooks/AMLIQ_DECISION_FAIL.md",
+        "products/amliq/brain/services/sanctions/src/types.ts"
+      ],
+      "owner": "Head of Eng",
+      "review_status": "approved"
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "category": "development-platform",
+      "criticality": "high",
+      "services": [
+        "Source control",
+        "Pull request review",
+        "CI triggers"
+      ],
+      "data_access": "source code, issues, pull request metadata",
+      "risk": "SCM outage or compromised integration can block release or expose code.",
+      "mitigations": [
+        "CODEOWNERS",
+        "Required checks",
+        "Secret scanning",
+        "Forward-only change management"
+      ],
+      "evidence": [
+        ".github/CODEOWNERS",
+        ".github/workflows/ci.yml",
+        "docs/compliance/CHANGE_MANAGEMENT.md"
+      ],
+      "owner": "Head of Eng",
+      "review_status": "approved"
+    }
+  ]
+}

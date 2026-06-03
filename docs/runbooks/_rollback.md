@@ -99,7 +99,7 @@ wrangler pages deployment list --project-name finsavvy-app
 wrangler pages deployment retry <DEPLOYMENT_ID>  # promotes prior build
 
 # Force-purge CDN cache after rollback.
-# (Use dashboard API or `wrangler cf-api` once available; placeholder.)
+# Use dashboard API or `wrangler cf-api` when the Pages project is live.
 ```
 
 ## 6. Dependency outages — when nothing local works

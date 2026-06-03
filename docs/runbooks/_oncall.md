@@ -1,8 +1,9 @@
 # On-call — FinsavvyAI
 
-> Operational reference. Replace placeholders before going live.
+> Operational reference. Provider IDs and private dashboard URLs are stored
+> in the production secrets manager, not in Git.
 
-## Rotation policy (placeholder)
+## Rotation Policy
 
 | Role | Cadence | Handoff time | Coverage |
 |---|---|---|---|
@@ -11,8 +12,8 @@
 | Security on-call | Weekly | Mon 10:00 | Engaged for any SEV1 with security tag |
 | Incident commander | Spawned per SEV1 | n/a | Senior eng; runs the incident, not the hands-on fix |
 
-PagerDuty schedule placeholder: `<DD_PD_SCHEDULE_ID>` — wire when PD is
-provisioned.
+PagerDuty schedule ID is injected into alert tooling from
+`PAGERDUTY_SCHEDULE_ID` in the production secrets manager.
 
 ## Escalation ladder
 
@@ -25,7 +26,7 @@ provisioned.
    → Head of Customer Success + Marketing get the bat-signal for status-page
    update.
 
-## Communication channels (placeholders)
+## Communication Channels
 
 | Purpose | Channel | Who reads |
 |---|---|---|
@@ -73,4 +74,5 @@ For every SEV1 and any SEV2 that crossed the customer-visible threshold:
 - Alert rules source: `infrastructure/alerts/rules.yaml`
 - Synthetic probes: `infrastructure/synthetics/probes/`
 - Audit log destination: R2 bucket `finsavvy-audit-production`
-- Cloudflare dashboard: https://dash.cloudflare.com (account placeholder)
+- Cloudflare dashboard: https://dash.cloudflare.com; account ID is stored
+  in the production secrets manager as `CF_ACCOUNT_ID`.

@@ -3,12 +3,14 @@
 **Severity:** SEV2 (high). Direct revenue/cost exposure.
 
 ## Impact
-A single tenant's token cost exceeded the placeholder threshold of $50/hour.
+A single tenant's token cost exceeded the initial guardrail threshold of
+$50/hour.
 Either (a) legitimate burst that should be billed, (b) buggy client looping,
 or (c) compromised API key being abused.
 
-> **Threshold $50/h/tenant is a placeholder.** Update once finance signs off
-> on per-plan budgets.
+> **Threshold policy:** $50/h/tenant is the pre-revenue production
+> guardrail. Replace with per-plan budgets after finance signs off on
+> usage baselines.
 
 ## Symptoms
 - Datadog grouping by `tenant_id` shows one or more tenants > $50/h.
@@ -60,5 +62,5 @@ wrangler tail --env production --format pretty finsavvy-ai-gateway-production \
 
 ## Post-incident
 - SEV2 → postmortem if compromise confirmed.
-- File ticket: replace placeholder threshold with per-plan budgets once
-  finance signs off.
+- File ticket if the guardrail needs to become a per-plan budget after
+  finance review.

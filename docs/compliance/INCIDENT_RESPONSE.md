@@ -3,7 +3,7 @@
 > **Authoritative.** Mirrors the SEV ladder + escalation in
 > `docs/runbooks/_oncall.md`. Where the two disagree, this file wins
 > for SOC 2 audit purposes and the runbook is updated. Last refreshed:
-> 2026-05-25.
+> 2026-05-26.
 >
 > AICPA mapping: CC7.3 (evaluation of security events), CC7.4 (incident
 > response), CC7.5 (recovery from incidents).
@@ -58,7 +58,7 @@ levels by the incident commander.
 | Engineering leadership (CTO, Head of Eng) | Slack DM + war-room channel | Within 15 min of declaration | If escalated by IC |
 | Customer Success | `#cs-incidents` | Within 30 min of declaration | If customer-visible |
 | Affected customers | Email + status-page | Within **24h** of declaration (regulator-aligned) | Status-page update only if customer-visible |
-| Regulators (FinCEN, OFAC contact, EU DPA when EU live) | Per-jurisdiction template in `docs/compliance/regulator-templates/` (TBD before EU launch) | Within the regulator's mandated window (typically 72h GDPR; 24h some FI regulators) | n/a |
+| Regulators (FinCEN, OFAC contact, EU DPA when EU live) | Per-jurisdiction template in `docs/compliance/regulator-templates/` | Within the regulator's mandated window (typically 72h GDPR; 24h some FI regulators) | n/a |
 | Public (status page, blog post) | https://status.finsavvy.ai | Within 24h for confirmed customer-visible SEV1 | n/a |
 
 ## Postmortem requirements
@@ -66,10 +66,7 @@ levels by the incident commander.
 - **Authored within 48h** of SEV1 resolution; SEV2 if customer-visible
   >15 min.
 - **Blameless** tone — critique systems, not humans.
-- **Template:** copy `docs/compliance/POSTMORTEM_TEMPLATE.md` (TBD;
-  follows Google SRE structure: timeline / impact / detection /
-  response / contributing factors / what worked / what didn't / action
-  items with owners + due dates).
+- **Template:** copy `docs/compliance/POSTMORTEM_TEMPLATE.md`.
 - **Action items** tracked in the engineering backlog; status reviewed
   weekly in the on-call sync until closed.
 
@@ -104,6 +101,9 @@ For Type 2 (post-Type 1) every SEV1 produces:
 
 - On-call escalation ladder: `docs/runbooks/_oncall.md`
 - Rollback procedures: `docs/runbooks/_rollback.md`
+- Cloudflare disruption DR plan: `docs/runbooks/DR_CLOUDFLARE_REGION_OUTAGE.md`
+- Audit-chain divergence: `docs/runbooks/AUDIT_CHAIN_HEAD_DIVERGENCE.md`
 - Per-alert runbooks: `docs/runbooks/<ALERT_ID>.md`
+- Regulator notification templates: `docs/compliance/regulator-templates/`
 - Risk register: `docs/compliance/RISK_REGISTER.md`
 - SOC 2 control mapping: `docs/compliance/SOC2_READINESS.md`
