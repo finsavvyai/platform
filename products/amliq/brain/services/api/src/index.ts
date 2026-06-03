@@ -37,6 +37,18 @@ export type {
 export { BrainAuditEmitter } from "./audit.js";
 export type { AuditEmitterOptions, EmitResult } from "./audit.js";
 
+export {
+  auditRetentionPrefix,
+  purgeExpiredAuditObjects,
+} from "./audit-prod/retention.js";
+export type {
+  AuditRetentionPurgeOptions,
+  AuditRetentionPurgeResult,
+  R2AuditBucket,
+  R2AuditListResult,
+  R2AuditObject,
+} from "./audit-prod/retention.js";
+
 export { HealthBuilder } from "./health.js";
 export type { HealthBuilderOptions } from "./health.js";
 

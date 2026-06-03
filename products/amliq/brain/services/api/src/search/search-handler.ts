@@ -20,10 +20,10 @@ import type { Context, Handler } from "hono";
 import type { BrainAuditEmitter } from "../audit.js";
 import { getBrainAuth } from "../auth.js";
 import { linkCitations } from "./citation-linker.js";
+import { parseSearchRequest } from "./request-schema.js";
 import type {
   SearchAdapter,
   SearchErrorCode,
-  SearchRequest,
   SearchResponse,
 } from "./types.js";
 
@@ -46,11 +46,10 @@ const denyJson = (
 
 const parseBody = async (
   c: Context,
-): Promise<Partial<SearchRequest> | null> => {
+): Promise<ReturnType<typeof parseSearchRequest>> => {
   try {
     const j = await c.req.json();
-    if (!j || typeof j !== "object") return null;
-    return j as Partial<SearchRequest>;
+    return parseSearchRequest(j);
   } catch {
     return null;
   }

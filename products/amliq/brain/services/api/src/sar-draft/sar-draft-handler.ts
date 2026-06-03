@@ -1,8 +1,8 @@
 import type { Context, Handler } from "hono";
 import type { BrainAuditEmitter } from "../audit.js";
 import { getBrainAuth } from "../auth.js";
+import { parseSarDraftRequest } from "./request-schema.js";
 import type {
-  SarAlertInput,
   SarDraft,
   SarDraftErrorCode,
   SarDraftGenerator,
@@ -14,89 +14,12 @@ export interface SarDraftHandlerOptions {
   readonly audit: BrainAuditEmitter;
 }
 
-interface ParsedAlert {
-  readonly ok: true;
-  readonly alert: SarAlertInput;
-}
-
-interface ParseErr {
-  readonly ok: false;
-  readonly code: SarDraftErrorCode;
-  readonly status: 400 | 403;
-  readonly tenantId: string;
-  readonly alertId: string;
-}
-
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
-
-const readBody = async (c: Context): Promise<Record<string, unknown> | null> => {
+const readBody = async (c: Context): Promise<unknown> => {
   try {
-    const j = await c.req.json();
-    return isRecord(j) ? j : null;
+    return await c.req.json();
   } catch {
     return null;
   }
-};
-
-const stringValue = (v: unknown): string =>
-  typeof v === "string" ? v.trim() : "";
-
-const stringList = (v: unknown): readonly string[] =>
-  Array.isArray(v)
-    ? v.filter((x): x is string => typeof x === "string").map((x) => x.trim())
-      .filter((x) => x.length > 0)
-    : [];
-
-const parseAlert = (body: Record<string, unknown> | null): ParsedAlert | ParseErr => {
-  if (body === null) {
-    return { ok: false, code: "missing_alert", status: 400, tenantId: "unknown", alertId: "unknown" };
-  }
-
-  const rawAlert = isRecord(body.alert) ? body.alert : body;
-  if (!isRecord(rawAlert)) {
-    return { ok: false, code: "missing_alert", status: 400, tenantId: "unknown", alertId: "unknown" };
-  }
-
-  const topTenant = stringValue(body.tenant_id);
-  const alertTenant = stringValue(rawAlert.tenant_id);
-  const tenantId = topTenant || alertTenant;
-  const alertId = stringValue(rawAlert.alert_id) || "unknown";
-
-  if (tenantId.length === 0) {
-    return { ok: false, code: "missing_tenant", status: 403, tenantId: "unknown", alertId };
-  }
-  if (topTenant.length > 0 && alertTenant.length > 0 && topTenant !== alertTenant) {
-    return { ok: false, code: "tenant_mismatch", status: 403, tenantId, alertId };
-  }
-  if (alertId === "unknown") {
-    return { ok: false, code: "missing_alert_id", status: 400, tenantId, alertId };
-  }
-
-  const alertType = stringValue(rawAlert.alert_type);
-  if (alertType.length === 0) {
-    return { ok: false, code: "missing_alert_type", status: 400, tenantId, alertId };
-  }
-
-  const amount = rawAlert.amount;
-  const raw = rawAlert.raw;
-  return {
-    ok: true,
-    alert: {
-      alert_id: alertId,
-      tenant_id: tenantId,
-      alert_type: alertType,
-      transaction_ids: stringList(rawAlert.transaction_ids),
-      parties: stringList(rawAlert.parties),
-      timestamps: stringList(rawAlert.timestamps),
-      jurisdiction: stringValue(rawAlert.jurisdiction) || "US",
-      ...(typeof amount === "number" && Number.isFinite(amount) ? { amount } : {}),
-      ...(stringValue(rawAlert.currency).length > 0
-        ? { currency: stringValue(rawAlert.currency) }
-        : {}),
-      ...(isRecord(raw) ? { raw } : {}),
-    },
-  };
 };
 
 const denyJson = (
@@ -131,7 +54,7 @@ const auditOrFail = async (
 export const buildSarDraftHandler = (opts: SarDraftHandlerOptions): Handler =>
   async (c: Context): Promise<Response> => {
     const { claims } = getBrainAuth(c);
-    const parsed = parseAlert(await readBody(c));
+    const parsed = parseSarDraftRequest(await readBody(c));
     if (!parsed.ok) {
       const audited = await auditOrFail(
         opts.audit,
