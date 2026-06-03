@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { InMemoryJtiStore, NullJtiStore } from "./jti-revocation.js";
+import {
+  InMemoryJtiStore,
+  NullJtiStore,
+  RedisJtiStore,
+  type RedisJtiClient,
+} from "./jti-revocation.js";
 import { InMemorySessionStore } from "./session-store.js";
 import { ClaimsOnlyResolver, subjectFromClaims } from "./user-resolver.js";
 import type { TokenClaims } from "../types.js";
@@ -31,6 +36,48 @@ describe("JtiRevocationStore", () => {
     const store = new InMemoryJtiStore();
     await store.revoke("j1", -1);
     expect(await store.isRevoked("j1")).toBe(false);
+  });
+
+  it("RedisJtiStore stores revocations with a hashed key and TTL", async () => {
+    const calls: { key: string; ttl: number; value: string }[] = [];
+    const backing = new Map<string, string>();
+    const client: RedisJtiClient = {
+      setEx: (key, ttl, value) => {
+        calls.push({ key, ttl, value });
+        backing.set(key, value);
+      },
+      get: (key) => backing.get(key) ?? null,
+    };
+
+    const store = new RedisJtiStore({ client, keyPrefix: "test:jti:" });
+    await store.revoke("j1", 60.9);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.key).toMatch(/^test:jti:[a-f0-9]{64}$/);
+    expect(calls[0]).toMatchObject({ ttl: 60, value: "1" });
+    expect(await store.isRevoked("j1")).toBe(true);
+    expect(await store.isRevoked("j2")).toBe(false);
+  });
+
+  it("RedisJtiStore deletes or ignores unusable revocations", async () => {
+    const deleted: string[] = [];
+    const client: RedisJtiClient = {
+      setEx: () => {
+        throw new Error("setEx should not be called");
+      },
+      get: () => null,
+      del: (key) => {
+        deleted.push(key);
+      },
+    };
+    const store = new RedisJtiStore({ client });
+
+    await store.revoke("expired", 0);
+    await store.revoke("   ", 60);
+
+    expect(deleted).toHaveLength(1);
+    expect(deleted[0]).toMatch(/^auth:jti:[a-f0-9]{64}$/);
+    expect(await store.isRevoked("   ")).toBe(false);
   });
 });
 

@@ -19,7 +19,10 @@ export {
 } from "./jwt-keys.js";
 export {
   signToken,
+  rotateTokenIfNeeded,
   verifyToken,
+  type RotateOptions,
+  type RotateResult,
   type SignOptions,
   type SignResult,
   type VerifyOptions,
@@ -27,8 +30,11 @@ export {
 } from "./jwt.js";
 export {
   type JtiRevocationStore,
+  type RedisJtiClient,
+  type RedisJtiStoreOptions,
   NullJtiStore,
   InMemoryJtiStore,
+  RedisJtiStore,
 } from "./adapters/jti-revocation.js";
 export {
   type UserResolver,

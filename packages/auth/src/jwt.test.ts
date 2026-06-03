@@ -247,6 +247,26 @@ describe("jwt sign/verify", () => {
     }
   });
 
+  it("does not revoke the old token when the replacement fails verification", async () => {
+    const revocations = new InMemoryJtiStore();
+    const { token, jti: oldJti } = await signToken(key, {
+      ...opts,
+      ttlSeconds: 120,
+      includeJti: true,
+    });
+
+    const res = await rotateTokenIfNeeded(otherKey, key, token, {
+      issuer: opts.issuer,
+      audience: opts.audience,
+      ttlSeconds: 3600,
+      rotateWithinSeconds: 300,
+      revocations,
+    });
+
+    expect(res).toStrictEqual({ ok: false, error: "invalid_token" });
+    expect(await revocations.isRevoked(oldJti!)).toBe(false);
+  });
+
   it("returns verification errors instead of rotating invalid tokens", async () => {
     const res = await rotateTokenIfNeeded(key, key, "not-a-jwt", {
       issuer: opts.issuer,
