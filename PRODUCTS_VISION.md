@@ -68,6 +68,8 @@ Adoption funnel: `Cursor → PushCI → QueryFlux → Qestro → OpenSyber → S
 
 **2026 wedge**: false-positive triage + investigation evidence overlay on existing screening. NOT "replace World-Check" first — land as an overlay, expand to secondary-screening API. Human-in-loop with explainable, validated models (per Wolfsberg AI/ML Principles + SR 11-7 / SR 26-02); regulators set explainability + validation + human-oversight expectations, they do not "approve" autonomous AI decisions.
 
+**Investigation fabric** (per `RESEARCH_AI_GOV_2026-06.md`): agentic AML — (1) automated evidence collection + case prep (KYC/CDD pull, prior screening, counter-party review, preliminary summary before the file opens); (2) graph-based transaction/network analysis (structuring detection, high-risk-jurisdiction flags, network viz); (3) SAR/STR drafting (already scaffolded — `sar-draft-handler.ts`); (4) cross-border corridor-risk + multi-jurisdiction watchlist ingestion (FATF-informed). Every agent action logged, human-in-loop. Secondary-source claims (case time −60%, L2 analysis 17→5min) NOT used in public copy until primary-verified.
+
 **Mission**: reduce AML investigation cost and false positives without sacrificing auditability — overlay on World-Check / LexisNexis / Refinitiv screening, then displace.
 
 **Problem**: Legacy AML stacks push analysts through fragmented sanctions lists, manual case files, per-record fees ($100K-$500K/seat/year). Workflow is the textbook "humans copy-pasting between four tabs" automation target.
@@ -100,6 +102,8 @@ Adoption funnel: `Cursor → PushCI → QueryFlux → Qestro → OpenSyber → S
 ## 2. OpenSyber — Runtime AI security ⭐ FLAGSHIP
 
 **2026 wedge**: **OpenSyber MCP Firewall** — approve, block, replay, and audit every agent tool call. Position as "runtime policy boundary for MCP and autonomous agents" (drop "AI cyber SaaS" framing). The WAF + IAM + audit layer for AI agents and MCP tool calls.
+
+**Runtime identity governance** (per `RESEARCH_AI_GOV_2026-06.md`): the identity layer is the enforcement chokepoint — every agent action starts with authn/authz. Defend the four agent risks static IAM can't: **privilege drift**, **shadow agents**, **MCP bypass**, **broken delegation chains**. Governance runs at runtime (agents make thousands of access decisions/min), not periodic audit. Align policy engine to **FIDO** pillars: agent authentication, verifiable user instructions, trusted delegation. Regulatory coverage to advertise: EU AI Act, NIST AI RMF, ISO 42001.
 
 **Mission**: WAF equivalent for MCP servers and AI agents in production.
 
@@ -384,6 +388,24 @@ Adoption funnel: `Cursor → PushCI → QueryFlux → Qestro → OpenSyber → S
 - Booster (deterministic prompt skip) — measurable cost reduction by task type
 - Per-call vs per-token pricing
 - Open-source distribution → paid tier conversion
+
+---
+
+## 12. Beacon — Agent-payments trust layer (PROPOSED, unconfirmed)
+
+**Status**: NOT yet a confirmed product. Surfaced by `RESEARCH_AI_GOV_2026-06.md`. **Open: standalone 12th product vs AMLIQ module vs naming collision with the existing AMLIQ "BEACON perf baseline".** Resolve before adding to the stack map / ranking.
+
+**Proposed mission**: cryptographic trust layer for agent-initiated payments — the "Verifiable Intent" equivalent for the FinsavvyAI stack.
+
+**2026 wedge**: as autonomous agents transact, intent becomes invisible — trust must be explicit + verifiable. Beacon issues **verifiable-intent tokens** (tamper-resistant record linking identity ↔ intent ↔ action), authenticates agents, and models delegated authority. **AP2-compatible** (Google Agent Payments Protocol) and aligned to **FIDO** + Mastercard Verifiable Intent rather than a bespoke scheme.
+
+**AMLIQ tie-in**: AMLIQ ingests + verifies Beacon intent tokens during investigations — agent-initiated transactions carry cryptographic proof of authorization into the audit trail.
+
+**Differentiator (if pursued)**: open-standard alignment (FIDO/AP2/EMVCo/IETF) = interoperable + future-proof; native bridge to AML investigation evidence (no other trust layer feeds a screening fabric).
+
+**Caveat**: FIDO agentic-payments WGs + AP2 + Verifiable Intent are recent consortium efforts — confirm spec maturity + reference-implementation availability before committing build effort.
+
+**Bundle fit**: Regulated AI Kit (with AMLIQ + TenantIQ) and/or AI Security Kit.
 
 ---
 
