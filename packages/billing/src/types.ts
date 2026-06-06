@@ -37,7 +37,37 @@ export type Subscription = {
   readonly currentPeriodEnd: number;
 };
 
+export type SubscriptionAuditEvent = {
+  readonly subscriptionId: SubscriptionId;
+  readonly customerId: CustomerId;
+  readonly fromStatus: SubscriptionStatus | null;
+  readonly toStatus: SubscriptionStatus;
+  readonly occurredAt: number;
+  readonly reason: string;
+};
+
+export type SubscriptionMutation = {
+  readonly subscription: Subscription;
+  readonly auditEvent: SubscriptionAuditEvent;
+};
+
+export type SubscriptionTransitionInput = {
+  readonly status: SubscriptionStatus;
+  readonly currentPeriodEnd?: number;
+  readonly occurredAt?: number;
+  readonly reason?: string;
+};
+
 export interface EntitlementChecker {
   has(subscription: Subscription, plan: Plan, key: string): boolean;
   remaining(subscription: Subscription, plan: Plan, key: string, used: number): number | "unlimited";
+}
+
+export interface SubscriptionStore {
+  get(id: SubscriptionId): Promise<Subscription | null>;
+  upsert(subscription: Subscription, reason?: string): Promise<SubscriptionMutation>;
+  transition(
+    id: SubscriptionId,
+    input: SubscriptionTransitionInput,
+  ): Promise<SubscriptionMutation>;
 }
