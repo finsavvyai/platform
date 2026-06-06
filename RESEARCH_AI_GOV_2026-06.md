@@ -9,7 +9,7 @@ Status: raw research input. Deltas distilled into `PRODUCTS_VISION.md`.
 
 **Regulatory drivers**
 - AI governance shifting from best-practice → compliance requirement: EU AI Act, NIST AI RMF, ISO 42001, GDPR mandate documentation, monitoring, control. _(Netwrix, Jun 2026)_
-- "63% of orgs lack AI governance policies; 97% of those with AI-related incidents had inadequate access controls." _(IBM 2025 Cost of a Data Breach, via Netwrix — attributed)_
+- IBM 2025 Cost of a Data Breach (Ponemon, 600 orgs) — **precise scoping** (see Verification): "**63% of breached organizations** either don't have an AI governance policy **or are still developing one**"; "of the 13% that suffered AI model/app breaches, **97% lacked AI access controls**." Do NOT loosen to "63% of organizations lack governance" — that's an overreach secondary outlets repeat.
 - Four governance layers: model governance · data-access governance · compliance mapping · runtime monitoring. Pick highest-risk layer before selecting a platform.
 - Platform-selection dimensions: governance-layer focus · regulatory coverage · integration depth · team fit (eng vs compliance) · **agentic-AI readiness** (multi-agent, scope-violation detection).
 
@@ -46,8 +46,25 @@ Status: raw research input. Deltas distilled into `PRODUCTS_VISION.md`.
 | **AMLIQ** | Expand investigation fabric: automated evidence collection + case prep, graph-based transaction/network analysis, SAR/STR drafting (already scaffolded — `sar-draft-handler.ts`), cross-border corridor-risk + multi-jurisdiction watchlist ingestion. Reinforces existing human-in-loop + PII-free audit posture. |
 | **Beacon** *(new / undefined)* | Proposed as **trust layer for agent-initiated payments**: verifiable-intent tokens, AP2-compatible workflows, agent authentication, delegated authority. Ingestible/verifiable by AMLIQ during investigations. **Open: new 12th product vs AMLIQ feature vs rename of the existing "BEACON perf baseline".** |
 
+## Verification (deep-research, 2026-06-06)
+
+Run: 5 angles → 19 sources → 70 claims → 25 adversarially verified (3-vote) → **25 confirmed, 0 killed**. 101 agents. Primary-sourced. **Every figure CONFIRMED, but 3 of 4 needed scoping fixes.**
+
+| # | Claim | Verdict | Correction / caveat | Primary source |
+|---|---|---|---|---|
+| 1a | IBM "63% lack AI governance" | **CONFIRMED, scoped** | Real: "63% of **breached** orgs lack **or are developing** a policy." Not "all orgs", not "lack outright". | [IBM newsroom 2025-07-30](https://newsroom.ibm.com/2025-07-30-ibm-report-13-of-organizations-reported-breaches-of-ai-models-or-applications,-97-of-which-reported-lacking-proper-ai-access-controls) |
+| 1b | IBM "97% lacked AI access controls" | **CONFIRMED** | Accurate — denominator = the 13% AI-breached subset. Vendor (Ponemon) survey, not independent benchmark. | IBM newsroom 2025-07-30 |
+| 2 | Gartner "40% of apps embed agents by 2026" | **CONFIRMED verbatim** | From <5% in 2025. **Forecast, not measured** — cite as prediction. | [Gartner PR 2025-08-26](https://www.gartner.com/en/newsroom/press-releases/2025-08-26-gartner-predicts-40-percent-of-enterprise-apps-will-feature-task-specific-ai-agents-by-2026-up-from-less-than-5-percent-in-2025) |
+| 3a | SymphonyAI "−60% case time" | **CONFIRMED, vendor-pilot** | Vendor blog, unnamed pilots, no third-party audit. Attribute, don't call it a benchmark. | [SymphonyAI blog 2026-04-29](https://www.symphonyai.com/resources/blog/financial-services/how-ai-agents-reduce-aml-investigation-time/) |
+| 3b | SymphonyAI "17min→5min L2" | **PARTIAL / weak** | Only in SymphonyAI's own blog; no independent corroboration. **Weakest item — keep out of public copy.** | SymphonyAI blog (only) |
+| 4a | FIDO agentic TWGs (Apr 2026) | **CONFIRMED** | Auth TWG chairs CVS/Google/OpenAI; Payments TWG chairs Mastercard/Visa. **Newly formed — no ratified specs yet.** | [FIDO PR 2026-04-28](https://fidoalliance.org/fido-alliance-to-develop-standards-for-trusted-ai-agent-interactions/) |
+| 4b | Google AP2 donated to FIDO | **CONFIRMED** | Spec at **v0.2** (GitHub, early draft) — not finalized. | [Google blog](https://blog.google/products-and-platforms/platforms/google-pay/agent-payments-protocol-fido-alliance/) |
+| 4c | Mastercard Verifiable Intent on FIDO/EMVCo/IETF | **CONFIRMED, nuanced** | "Built on FIDO/EMVCo/IETF" is from **Mastercard's** Mar-2026 launch, not the FIDO announcement. No public reference impl yet. | [Mastercard 2026-03-05](https://www.mastercard.com/global/en/news-and-trends/stories/2026/verifiable-intent.html) |
+
+**Bottom line:** all real, all primary-sourced. IBM = scope to breached orgs. Gartner = label "forecast". SymphonyAI = "vendor-reported pilot" and drop 17→5min. FIDO/AP2/VI = "announced standards efforts / draft inputs (AP2 v0.2)", NOT "established standards." → Beacon targets AP2/VI as **emerging draft alignment**, accept spec churn.
+
 ## Open questions
 
-- Beacon's status: standalone product, AMLIQ module, or naming collision with the AMLIQ BEACON perf baseline? (blocks adding it cleanly to the stack map / ranking)
-- None of the numeric claims are primary-sourced. A `deep-research` verification pass (like the market-scan addendum) would confirm/kill the 60% / 17→5min / 40%-by-2026 figures before they inform pricing or public copy.
-- FIDO/AP2/Verifiable Intent are real consortium efforts — confirm current spec maturity + whether reference implementations exist before committing OpenSyber/Beacon to them.
+- **Beacon's status**: standalone product, AMLIQ module, or naming collision with the AMLIQ BEACON perf baseline? (blocks stack-map / ranking placement) — *still needs founder call.*
+- AP2 / FIDO Payments TWG roadmap to a ratified spec + reference impls beyond AP2 v0.2 — track before committing build effort.
+- Whether Mastercard Verifiable Intent gets a public technical spec vs staying a contributed credential model under FIDO review.
