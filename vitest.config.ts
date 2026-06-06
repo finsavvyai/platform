@@ -14,7 +14,11 @@ export default defineConfig({
         statements: 90,
       },
       include: ["packages/*/src/**/*.ts"],
-      exclude: ["packages/*/src/**/*.test.ts", "packages/*/src/index.ts"],
+      exclude: [
+        "packages/*/src/**/*.test.ts",
+        "packages/*/src/index.ts",
+        "packages/*/src/types.ts",
+      ],
     },
     include: ["packages/*/src/**/*.test.ts"],
   },
