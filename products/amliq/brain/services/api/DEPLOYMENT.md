@@ -1,8 +1,13 @@
 # AMLIQ Brain API Deployment
 
-The core API is runtime-agnostic. Deployable hosts should import
-`createBrainWorkerFetch()` from `@finsavvyai/amliq-brain/api` or the built
-`services/api/dist/worker.js` entrypoint.
+The core API is runtime-agnostic. Deployable hosts can use either:
+
+- Cloudflare Worker: import `createBrainWorkerFetch()` from
+  `@finsavvyai/amliq-brain/api` or use the built
+  `dist/services/api/src/worker.js` entrypoint.
+- Node/self-hosted: build the package and run
+  `pnpm start` from `products/amliq/brain`, or import
+  `startBrainNodeServer()` from `@finsavvyai/amliq-brain/api/node`.
 
 ## Required bindings / env
 
@@ -22,7 +27,34 @@ The core API is runtime-agnostic. Deployable hosts should import
 | `BRAIN_SAR_DRAFT_ENDPOINT` | no | If set, mounts `POST /v1/brain/sar-draft` through the HTTP SAR runtime adapter. |
 | `BRAIN_SAR_DRAFT_AUTHORIZATION` | no | Authorization header forwarded to the SAR runtime. |
 | `BRAIN_SAR_DRAFT_TIMEOUT_MS` | no | SAR runtime timeout. Defaults to 15000ms. |
-| `AUDIT_LOG_BUCKET` | no | R2-like binding. If present, API audit records are written as JSON. |
+| `AUDIT_LOG_BUCKET` | no | Worker-only R2-like binding. If present, API audit records are written as JSON. |
+| `BRAIN_AUDIT_LOG_PATH` | Node only | JSONL file path for self-hosted audit records. Defaults to stdout when unset. |
+| `HOST` | Node only | Bind host for `pnpm start`. Defaults to `127.0.0.1`. |
+| `PORT` | Node only | Bind port for `pnpm start`. Defaults to `8787`. |
+
+## Node / self-hosted smoke start
+
+```bash
+cd products/amliq/brain
+pnpm build
+BRAIN_AUTH_TOKEN=local-smoke \
+BRAIN_AUDIT_LOG_PATH=.local/audit/brain.jsonl \
+pnpm start
+```
+
+Then probe:
+
+```bash
+curl http://127.0.0.1:8787/health
+
+curl -X POST http://127.0.0.1:8787/v1/brain/ping \
+  -H 'Authorization: Bearer local-smoke'
+```
+
+When `BRAIN_SEARCH_ENDPOINT` or `BRAIN_SAR_DRAFT_ENDPOINT` is configured,
+the Node host mounts the same `/v1/search` and `/v1/brain/sar-draft` routes
+as the Worker host. Audit records are written as JSONL lines containing the
+audit object key and record payload.
 
 ## Routes
 

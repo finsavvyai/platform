@@ -1,6 +1,6 @@
 # FinsavvyAI Portfolio — Product Vision & Descriptions
 
-Last updated: 2026-06-03 (May-2026 market-scan deltas applied; see `MARKET_SCAN_2026-05.md`)
+Last updated: 2026-06-09 (May-2026 market-scan deltas applied — pricing, stack-map, cross-cutting bets; see `MARKET_SCAN_2026-05.md`)
 Audience: founder research, market validation, GTM positioning, investor briefs.
 
 ## Portfolio thesis
@@ -57,7 +57,7 @@ Tagline: **"Secure the AI software factory — from generated code to agent runt
 | Runtime security | **OpenSyber** | WAF equivalent for MCP/AI agents. |
 | Governance | **SDLC.cc** | Privacy layer. PII scrub across AI surfaces. |
 | Enterprise AI | **SDLC.ai** | Zero-trust AI/ML platform (GDPR/HIPAA/PCI). |
-| AML | **AMLIQ** | Replace World-Check at 1/10 cost. |
+| AML | **AMLIQ** | FP triage + investigation evidence overlay on existing screening. |
 | M365 | **TenantIQ** | AI governance + remediation for Microsoft 365. |
 
 Adoption funnel: `Cursor → PushCI → QueryFlux → Qestro → OpenSyber → SDLC.cc`. AMLIQ + TenantIQ + SDLC.ai are enterprise verticals consuming the same shared platform.
@@ -143,6 +143,8 @@ Adoption funnel: `Cursor → PushCI → QueryFlux → Qestro → OpenSyber → S
 
 **Differentiator**: MSP-first (multi-tenant operator UX), blast-radius simulation before remediation applies, 33-table account-deletion cascade contract, signed consent snapshots detect drift vs Microsoft's view.
 
+**Suggested pricing**: MSP starter $49/mo (10 tenants) · Growth $199/mo (50 tenants) · Scale $499+ · per-tenant remediation add-on.
+
 **Target user**: MSP operators (9-250+ tenants); security/compliance leads in single-tenant enterprises needing defensible posture evidence.
 
 **Stack**: Cloudflare Workers + Hono (api), SvelteKit 5 (desktop console), Capacitor 8 + SvelteKit (mobile), Drizzle ORM + D1, JWT (jose HS256/RS256).
@@ -170,6 +172,8 @@ Adoption funnel: `Cursor → PushCI → QueryFlux → Qestro → OpenSyber → S
 **Solution**: Paste URL or API endpoint, describe in plain English. AI generates Playwright/Maestro test code with smart assertions. Self-healing engine fixes selectors when UI changes.
 
 **Differentiator**: One platform → three targets (browser, mobile, API). Self-healing means tests don't break on UI change. AI-native generation removes boilerplate. Sits at the runtime gate post-PushCI merge.
+
+**Suggested pricing**: Free local · Pro $19/dev/mo · Team $99-$299 · usage add-on for hosted browsers.
 
 **Target user**: tech leads at 20-200 dev orgs with active LLM-assisted commits hitting main daily.
 
@@ -199,6 +203,8 @@ Adoption funnel: `Cursor → PushCI → QueryFlux → Qestro → OpenSyber → S
 
 **Differentiator**: Zero config (only auto-detect-and-just-work). Free compute (runs on dev machine, not cloud). Multi-platform (one tool for GitHub + GitLab + Bitbucket + Gitea). AI-native (error explanation, auto-fix, smart caching). 95% margins (no compute costs).
 
+**Suggested pricing**: Free local CLI · Pro dashboard $9/mo · Team $29/seat · Enterprise policy/fleet/SSO.
+
 **Target user**: solo devs and small teams adopting AI coding agents. Entry-point to the FinsavvyAI portfolio (upgrade path: Qestro → OpenSyber → SDLC.cc).
 
 **Stack**: Go binary CLI (signed via cosign), Cloudflare Worker API, React dashboard, Tailscale mesh for distributed jobs, Expo/React Native mobile control surface.
@@ -226,6 +232,8 @@ Adoption funnel: `Cursor → PushCI → QueryFlux → Qestro → OpenSyber → S
 **Solution**: All agent queries pass through a policy gate (allow/deny by table, column, row predicate). All emit audit events. No agent gets raw DB credentials; auth via connection broker. Multi-tenant by default.
 
 **Differentiator**: Per-agent rate limits, scoped API keys, default-deny on schema introspection. p95 query proxy overhead <50ms. Editor + AI extensions (VSCode, OpenAI app, Gemini functions, MCP server). Tauri desktop.
+
+**Suggested pricing**: Free local proxy · Pro $29/mo · Team $199/mo · Enterprise private deployment.
 
 **Target user**: devs shipping production apps where AI agents need DB read/write; data engineers granting agents query access without raw credentials.
 
@@ -280,6 +288,8 @@ Adoption funnel: `Cursor → PushCI → QueryFlux → Qestro → OpenSyber → S
 **Solution**: One backend (`api.sdlc.cc/v1/dlp/scrub`), N front-doors (web scrub.sdlc.cc, Chrome/Edge/Firefox extensions, Outlook/Excel/Word/PowerPoint/Teams add-ins, Cloudflare AI Gateway plugin). Every surface POSTs to one endpoint with one bearer key.
 
 **Differentiator**: append-only audit (Postgres no UPDATE/DELETE grants), Ed25519 evidence signing, deterministic exports (byte-identical re-runs for chain-of-custody), 8 deployment surfaces (no single integration point).
+
+**Suggested pricing**: Free web scrubber · Pro browser ext $9/user · Team admin $99-$299 · Enterprise Office add-ins + SIEM.
 
 **Target user**: CTO/CISO/CCO at regulated enterprises (FS, healthcare, public sector, defense supply chain); DevSecOps leads answering auditor questions about AI-generated code.
 
@@ -422,9 +432,8 @@ These are platform layers consumed by all products via `packages/*`:
 | `@finsavvyai/ai-gateway` | Shared LLM proxy via Cloudflare Worker |
 | `packages/shared-types` | Cross-product TS types (AML decisions, agent contracts) |
 | `packages/aml-screen-client` | AMLIQ /screen TS client |
-| `packages/audit-go` | Go audit emit |
 | `sdlc-core` | Private Go DLP/MaskAML library shared by AMLIQ + TenantIQ + SDLC.cc |
-| `apps/brain/` | Cross-product Brain (reg-change, alert triage, Jira/Teams) |
+| `products/amliq/brain/` | AMLIQ Brain (reg-change, alert triage, SAR draft) — lives under the AMLIQ product tree, not a top-level `apps/` |
 
 ## Cross-cutting bets
 
@@ -433,6 +442,11 @@ These are platform layers consumed by all products via `packages/*`:
 - **Cryptographic identities**: agents have keypairs (OpenSyber), evidence is signed (SDLC.cc, AMLIQ), tool calls carry signatures.
 - **Edge-first**: Cloudflare Workers is the default runtime where possible. D1 + KV + R2 for state.
 - **Apple HIG**: all customer-facing UI passes contrast, keyboard nav, screen reader. Lighthouse CI ≥90 Perf + A11y on web surfaces.
+- **Policy packs as monetizable assets**: MCP OWASP Top 10, NIST AI RMF, ISO 42001, EU AI Act, PCI AI-usage, AML investigation, M365 Copilot readiness — sold + versioned, not bundled features.
+- **Replay everywhere**: failed AI PR, blocked tool call, AML decision, scrub event, DB query, LLM route — every decision is reconstructable from the audit trail.
+- **Export Evidence button**: every product ships PDF + JSON + CSV + SIEM + signed hash + verification endpoint. Sell the compliance output, not the feature.
+- **Local-first trust**: PushCI / Qestro / QueryFlux / SDLC.cc / OpenSyber run locally; cloud stores policy + metrics + audit only — raw data never leaves the box.
+- **One demo repo** (`finsavvyai/ai-generated-saas-demo`): Cursor → PushCI → Qestro → QueryFlux → ClawPipe → OpenSyber → SDLC.cc → signed audit export, as the single end-to-end proof.
 
 ## Research starting points
 
@@ -460,4 +474,4 @@ These are platform layers consumed by all products via `packages/*`:
 | FinSavvy Cluster | — | monorepo-only | last commit 2026-05-13 |
 | LunaOS | — | monorepo-only | active |
 
-See `PRODUCTS_KEEP_ALIVE.md` for the dual-presence submodule plan that resolves the stale-snapshot drift.
+See `PRODUCTS_KEEP_ALIVE.md` for the **proposed** dual-presence submodule plan that would resolve the stale-snapshot drift (not yet executed — products are still plain tracked directories, no `.gitmodules`).

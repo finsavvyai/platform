@@ -19,6 +19,22 @@ export {
 export type { BrainWorkerDeps, BrainWorkerEnv } from "./worker.js";
 
 export {
+  createBrainNodeAuditBucket,
+  createBrainNodeFetch,
+} from "./node-host.js";
+export type {
+  AuditLogWriter,
+  BrainNodeDeps,
+  BrainNodeEnv,
+} from "./node-host.js";
+
+export {
+  createBrainNodeHttpServer,
+  startBrainNodeServer,
+} from "./node-server.js";
+export type { BrainNodeServerOptions } from "./node-server.js";
+
+export {
   createWorkerAuthVerifier,
   workerRequiredRole,
 } from "./worker-auth.js";

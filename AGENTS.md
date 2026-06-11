@@ -1,13 +1,13 @@
 <claude-mem-context>
 # Memory Context
 
-# [finsavvyai-platform] recent context, 2026-05-26 2:03am GMT+3
+# [finsavvyai-platform] recent context, 2026-06-09 2:01pm GMT+3
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 32 obs (12,969t read) | 690,591t work | 98% savings
+Stats: 46 obs (18,532t read) | 1,956,589t work | 99% savings
 
 ### May 26, 2026
 5375 12:01a 🔵 finsavvyai-platform decisive_plan_90day.html — full 6-month execution plan read
@@ -42,6 +42,21 @@ Stats: 32 obs (12,969t read) | 690,591t work | 98% savings
 5456 12:54a 🟣 Search runtime integration tests added to runtime.test.ts and worker.test.ts
 5457 " 🔴 HttpSearchAdapter — ComplianceSource and Jurisdiction string literals fixed to branded union types
 5458 12:57a 🟣 AMLIQ Brain HTTP search adapter — full implementation shipped, all checks green
+5550 2:04a 🔵 packages/auth jwt.ts — full verifyToken implementation confirmed
+5551 " 🔵 amliq brain worker uses static bearer token auth, not JWT verifier from @auth package
+5552 2:06a 🟣 amliq brain worker-auth.ts — zero-dependency HS256 JWT verifier created
+5553 " 🟣 amliq brain worker.ts refactored to use createWorkerAuthVerifier — JWT env vars added to BrainWorkerEnv
+5554 " 🟣 amliq brain worker-auth.test.ts and worker.test.ts — JWT verifier tests added
+5555 " 🔵 amliq brain DEPLOYMENT.md confirms BRAIN_AUTH_TOKEN still documented as primary — JWT upgrade planned but not yet documented
+5556 2:08a ✅ amliq brain worker-auth — typecheck, build, git diff all pass after worker-auth.ts addition
+### Jun 8, 2026
+7927 11:22p 🔵 finsavvyai-platform — full portfolio vision and 6-month execution plan confirmed
+7928 " 🔵 AMLIQ Brain — TS API skeleton + Python agents shipped, deployment wiring pending
+7929 " 🔵 SOC 2 Type 1 readiness — 27/28 controls implemented, pre-audit operational tasks remain
+7930 " 🔵 AMLIQ Investigate consolidation — Go module collision and engine adapter are P0 blockers
+7931 " 🔵 finsavvyai-platform TS coverage — 1100+ tests green, critical-path gaps remain in 4 files
+7932 " 🔵 OpenSyber — GTM_30DAY_PLAN.md added as flagship 30-day MCP Firewall launch plan
+7933 " 🔵 Working branch codex/readiness-hardening-split — 6 commits ahead of main with compliance + Brain hardening
 
-Access 691k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 1957k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

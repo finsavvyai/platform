@@ -53,7 +53,10 @@ The **TS API skeleton** for AMLIQ Brain. Specifically:
 
 ## What this package is NOT (yet)
 
-- Not a runnable service binary. The host-process boot (`node services/api/dist/index.js`) and concrete wiring of `AuthVerifier` / `AuditSink` / `AuditChain` live in a future deploy ticket.
+- Not yet a fully production-configured deployment. The package now includes
+  a Cloudflare Worker boundary and a Node/self-hosted HTTP boundary, but real
+  runtime URLs, secrets, audit storage, DNS, and staging smoke config still
+  live in deployment work.
 - Not in `pnpm-workspace.yaml`. Per round-4 rule, `products/*` packages with no `@finsavvyai/*` imports stay out of the workspace glob to avoid vitest version conflicts.
 - Not yet embedding `oss/finsavvy-rag/` in-process. The API now exposes an
   optional HTTP search adapter for a separately hosted RAG runtime.
@@ -94,6 +97,16 @@ pnpm test
 pnpm typecheck
 pnpm build
 ```
+
+Self-hosted smoke start after build:
+
+```bash
+BRAIN_AUTH_TOKEN=local-smoke \
+BRAIN_AUDIT_LOG_PATH=.local/audit/brain.jsonl \
+pnpm start
+```
+
+See `services/api/DEPLOYMENT.md` for the full Worker and Node env matrix.
 
 ## SOC 2 / audit traceability
 
