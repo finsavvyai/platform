@@ -233,7 +233,7 @@ EOF
 create_validation_script() {
     print_status "Creating secrets validation script..."
 
-    cat > validate-secrets.sh << 'EOF
+    cat > validate-secrets.sh << EOF
 #!/bin/bash
 
 # Secrets Validation Script
@@ -305,7 +305,7 @@ EOF
 create_backup_rotation_script() {
     print_status "Creating backup and rotation script..."
 
-    cat > rotate-secrets.sh << 'EOF
+    cat > rotate-secrets.sh << EOF
 #!/bin/bash
 
 # Secrets Rotation Script
@@ -338,7 +338,7 @@ print_secure "Creating secrets backup..."
 mkdir -p "\$BACKUP_DIR"
 
 # Backup current secrets
-wrangler secret list | jq -r '.[] | "\(.key)" | while read -r secret; do
+wrangler secret list | jq -r '.[] | "\(.key)"' | while read -r secret; do
     if [ -n "\$secret" ]; then
         print_status "Backing up: \$secret"
         wrangler secret get "\$secret" > "\$BACKUP_DIR/\$secret.bak"
@@ -409,7 +409,7 @@ EOF
 create_gitignore() {
     print_status "Creating .gitignore for secrets..."
 
-    cat > .gitignore << 'EOF
+    cat > .gitignore << 'EOF'
 # Secret files
 .secrets.env
 secrets-*.env
@@ -510,7 +510,7 @@ create_zshrc_integration() {
     fi
 
     # Add SDLC SDK shortcuts to zshrc
-    cat >> ~/.zshrc << 'EOF
+    cat >> ~/.zshrc << 'EOF'
 
 # =================================================================
 # 🔒 SDLC Go SDK - Security Shortcuts

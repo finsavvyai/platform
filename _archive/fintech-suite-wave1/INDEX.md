@@ -2,6 +2,8 @@
 
 Snapshot of the 11 status documents from `portfolio/fintech-suite/` (March 2026 Wave 1 sprint). Originals remain in the source repo; deletion is a manual Week-8 step per `../../finsavvyai_consolidation_plan_addendum.md` section 1.
 
+> **2026-06-12:** The `api-gateway` skeleton source was archived out of `portfolio/fintech-suite/` to `portfolio/_archive_fintech_suite/api-gateway` (see its `MANIFEST.md`); superseded by `packages/ai-gateway` in this monorepo.
+
 | File | One-line summary |
 |---|---|
 | `AGENTS.md` | Learned user/workspace preferences for Luna agent flows. |
