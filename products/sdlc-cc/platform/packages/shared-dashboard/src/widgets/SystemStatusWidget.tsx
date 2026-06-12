@@ -24,6 +24,9 @@ export const SystemStatusWidget: React.FC<SystemStatusWidgetProps> = ({
   dashboardService: _dashboardService,
   className = '',
 }) => {
+  // PLACEHOLDER / DEMO DATA: these statuses, uptime percentages (e.g. 99.7)
+  // and response times are hardcoded mock values, not live measurements.
+  // dashboardService is not wired up yet; replace with real health-check data.
   const [services, setServices] = useState<ServiceStatus[]>([
     {
       name: 'API Gateway',
@@ -136,6 +139,9 @@ export const SystemStatusWidget: React.FC<SystemStatusWidgetProps> = ({
       <div className="card-header">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-gray-900 dark:text-white">System Status</h3>
+          <span className="text-xs px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+            Demo data
+          </span>
           <div className="flex items-center space-x-2">
             <div className={`w-2 h-2 rounded-full ${getStatusDot(overallStatus)} ${overallStatus === 'operational' ? 'animate-pulse' : ''}`}></div>
             <span className={`text-sm font-medium capitalize ${getStatusColor(overallStatus)}`}>

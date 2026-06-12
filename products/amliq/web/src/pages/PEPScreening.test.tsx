@@ -38,7 +38,7 @@ vi.mock('../components/screening/ScreeningProgress', () => ({
   ScreeningProgress: () => <div>Screening in progress</div>,
 }))
 
-const mockQuota = { limit: 100, remaining: 50, used: 50 }
+const mockQuota = { limit: 100, remaining: 50, used: 50, plan_name: 'Free', has_subscription: false }
 const mockScreenResponse = { matches: [], total: 2 }
 const mockPepResponse = {
   results: [
@@ -115,7 +115,7 @@ describe('PEPScreening', () => {
   })
 
   it('shows quota exhausted state when remaining is 0', async () => {
-    vi.mocked(screeningApiModule.screeningApi.getQuota).mockResolvedValue({ limit: 100, remaining: 0, used: 100 })
+    vi.mocked(screeningApiModule.screeningApi.getQuota).mockResolvedValue({ limit: 100, remaining: 0, used: 100, plan_name: 'Free', has_subscription: false })
     renderPage()
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /quota exhausted/i })).toBeDisabled()

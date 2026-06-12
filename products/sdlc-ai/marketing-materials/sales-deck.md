@@ -5,7 +5,7 @@
 **SDLC.ai**
 Secure Data Intelligence Fabric for Enterprise AI
 
-*Zero-trust RAG pipeline with quantum-ready encryption*
+*Zero-trust RAG pipeline with end-to-end encryption*
 
 ---
 
@@ -30,7 +30,7 @@ Secure Data Intelligence Fabric for Enterprise AI
 
 **Zero-Trust Architecture + Enterprise Performance**
 - Process 100K+ RPS with <50ms latency
-- Quantum-ready encryption for future-proofing
+- AES-256 + ChaCha20-Poly1305 encryption throughout
 - Unified platform for all AI data needs
 - Enterprise compliance built-in
 
@@ -46,7 +46,7 @@ Secure Data Intelligence Fabric for Enterprise AI
 4. **Audit Trail**: Immutable logging for compliance
 5. **Processing**: Sub-50ms response at scale
 
-*110/100 security score - Quantum-ready architecture*
+*Defense-in-depth, zero-trust security architecture*
 
 ---
 
@@ -73,7 +73,7 @@ Processing Engine
 **Military-Grade Security**
 
 - **Zero-Trust Network**: Never trust, always verify
-- **End-to-End Encryption**: AES-256 + quantum algorithms
+- **End-to-End Encryption**: AES-256 + ChaCha20-Poly1305
 - **Advanced Threat Detection**: AI-powered security monitoring
 - **Data Loss Prevention**: Comprehensive DLP controls
 - **Identity & Access Management**: RBAC with SSO integration
@@ -135,11 +135,10 @@ Processing Engine
 
 **Challenge**: Maximum security for sensitive government data
 
-**Solution**: Quantum-ready encryption with air-gapped deployment options
+**Solution**: Strong encryption (AES-256) with air-gapped deployment options
 
 **Results**:
 - FedRAMP authorization pathway
-- Quantum-resistant cryptography
 - Complete data sovereignty
 - Advanced threat protection
 
@@ -233,7 +232,7 @@ Processing Engine
 ### Technical Specifications
 - **Architecture**: Cloudflare Workers + Supabase + PostgreSQL
 - **Languages**: TypeScript, Go, Python, Rust
-- **Security**: mTLS, AES-256, quantum algorithms
+- **Security**: mTLS, AES-256, ChaCha20-Poly1305
 - **Compliance**: SOC 2, GDPR, HIPAA, PCI DSS
 - **Performance**: <50ms latency, 100K+ RPS
 

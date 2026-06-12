@@ -133,7 +133,7 @@ npm run test:coverage
 ### Homepage (`/`)
 
 - Hero section with quantum animations
-- Feature showcase with quantum advantages
+- Quantum-themed feature showcase
 - Technology explanation
 - Call-to-action sections
 

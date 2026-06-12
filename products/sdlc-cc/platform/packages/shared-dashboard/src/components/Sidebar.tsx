@@ -52,7 +52,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [expandedSections, setExpandedSections] = useState<string[]>(['products']);
   const { unreadCount } = useNotifications();
 
-  // Mock product data - this would come from DashboardService
+  // PLACEHOLDER / DEMO DATA — this would come from DashboardService.
+  // All healthStatus values (uptime e.g. 99.7, responseTime, status) are
+  // hardcoded mock numbers, not live measurements. Do not present as real SLA data.
   const products: SidebarProduct[] = [
     {
       id: 'sdlc',

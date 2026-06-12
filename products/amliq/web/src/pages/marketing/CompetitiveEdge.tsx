@@ -8,7 +8,7 @@ const edges = [
   { icon: Globe, stat: '2.2M+', label: 'Entity profiles', detail: 'Growing to 5M+ from 328 sources' },
   { icon: Eye, stat: '6', label: 'Matching layers', detail: 'Fully explainable scoring' },
   { icon: DollarSign, stat: '100x', label: 'Cheaper', detail: '$299/mo vs $30K+ for legacy' },
-  { icon: Shield, stat: '30+', label: 'Country lists', detail: 'OFAC, UN, EU, UK + regional' },
+  { icon: Shield, stat: '26+', label: 'Country lists', detail: 'OFAC, UN, EU, UK + regional' },
 ]
 
 export default function CompetitiveEdge() {

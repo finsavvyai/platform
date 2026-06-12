@@ -6,6 +6,13 @@
 **Status**: ✅ COMPLETED  
 **Owner**: Compliance Officer  
 
+> **Disclaimer (added 2026-06-12):** This is a historical internal
+> self-assessment. The numeric scores below (e.g. 99.8% overall,
+> 99.7% GDPR) were self-assessed and have **not** been verified by an
+> external auditor or certification body. No accredited GDPR/HIPAA/SOX
+> audit of the platform had been performed as of this report's date.
+> Figures are preserved unchanged as a record of the self-assessment.
+
 ---
 
 ## Executive Summary

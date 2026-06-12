@@ -1,10 +1,11 @@
+// Illustrative demo data only — not live telemetry. Uptime is a target, not a measured SLA.
 const services = [
-  { name: 'Screening API', status: 'operational', uptime: '99.99%' },
-  { name: 'PEP Database', status: 'operational', uptime: '100%' },
-  { name: 'Adverse Media', status: 'operational', uptime: '99.97%' },
-  { name: 'Sanctions List Sync', status: 'operational', uptime: '99.99%' },
-  { name: 'Dashboard & UI', status: 'operational', uptime: '100%' },
-  { name: 'Webhooks', status: 'operational', uptime: '99.95%' },
+  { name: 'Screening API', status: 'operational', uptime: '99.9%' },
+  { name: 'PEP Database', status: 'operational', uptime: '99.9%' },
+  { name: 'Adverse Media', status: 'operational', uptime: '99.9%' },
+  { name: 'Sanctions List Sync', status: 'operational', uptime: '99.9%' },
+  { name: 'Dashboard & UI', status: 'operational', uptime: '99.9%' },
+  { name: 'Webhooks', status: 'operational', uptime: '99.9%' },
 ]
 
 export default function StatusPage() {
@@ -18,8 +19,12 @@ export default function StatusPage() {
             All systems operational
           </h1>
         </div>
-        <p className="text-base mb-12" style={{ color: '#5C5852' }}>
+        <p className="text-base mb-4" style={{ color: '#5C5852' }}>
           Last checked: {new Date().toLocaleString()}
+        </p>
+        <p className="inline-block text-xs font-semibold px-3 py-1.5 rounded-full mb-12"
+          style={{ background: 'rgba(158,154,148,0.15)', color: '#5C5852' }}>
+          Sample data — illustrative values, not live telemetry
         </p>
         <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #E8E5DF' }}>
           {services.map((svc, i) => (
@@ -31,7 +36,7 @@ export default function StatusPage() {
               }}>
               <span className="text-sm font-medium" style={{ color: 'var(--bg-elevated)' }}>{svc.name}</span>
               <div className="flex items-center gap-4">
-                <span className="text-xs" style={{ color: '#9E9A94' }}>{svc.uptime} uptime</span>
+                <span className="text-xs" style={{ color: '#9E9A94' }}>{svc.uptime} uptime target</span>
                 <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
                   style={{ background: 'rgba(45,122,79,0.1)', color: '#2D7A4F' }}>
                   <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#2D7A4F' }} />

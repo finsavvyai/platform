@@ -16,7 +16,9 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-// QuantumSecurity provides quantum-resistant cryptographic operations
+// QuantumSecurity provides classical cryptographic operations (ChaCha20-Poly1305,
+// HKDF-SHA256, BLAKE2b). NOTE: the "Quantum" naming is legacy/aspirational —
+// no post-quantum algorithms (ML-KEM/Kyber, Dilithium) are implemented.
 type QuantumSecurity struct {
 	mu              sync.RWMutex
 	encryptionKey   []byte
@@ -41,7 +43,8 @@ type BehavioralProfile struct {
 	LastUpdated        time.Time
 }
 
-// QuantumSafeKEM represents a quantum-safe Key Encapsulation Mechanism
+// QuantumSafeKEM is a legacy-named struct holding an HKDF-derived shared secret.
+// It is NOT a post-quantum key encapsulation mechanism.
 type QuantumSafeKEM struct {
 	PublicKey    []byte
 	PrivateKey   []byte
@@ -163,15 +166,15 @@ type Prediction struct {
 	Mitigation  []string
 }
 
-// NewQuantumSecurity creates a new quantum-resistant security manager
+// NewQuantumSecurity creates a new security manager (classical cryptography)
 func NewQuantumSecurity() (*QuantumSecurity, error) {
-	// Generate quantum-resistant encryption key
+	// Generate random 256-bit encryption key
 	encryptionKey := make([]byte, 32)
 	if _, err := rand.Read(encryptionKey); err != nil {
 		return nil, fmt.Errorf("failed to generate encryption key: %w", err)
 	}
 
-	// Generate quantum-resistant signature key
+	// Generate random signature key
 	signatureKey := make([]byte, 64)
 	if _, err := rand.Read(signatureKey); err != nil {
 		return nil, fmt.Errorf("failed to generate signature key: %w", err)
@@ -200,12 +203,12 @@ func NewQuantumSecurity() (*QuantumSecurity, error) {
 	}, nil
 }
 
-// QuantumEncrypt implements quantum-resistant encryption
+// QuantumEncrypt encrypts with ChaCha20-Poly1305 (classical AEAD; legacy name)
 func (qs *QuantumSecurity) QuantumEncrypt(plaintext []byte) ([]byte, error) {
 	qs.mu.RLock()
 	defer qs.mu.RUnlock()
 
-	// Use ChaCha20-Poly1305 (quantum-resistant symmetric cipher)
+	// Use ChaCha20-Poly1305 (classical AEAD cipher)
 	aead, err := chacha20poly1305.New(qs.encryptionKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
@@ -226,7 +229,7 @@ func (qs *QuantumSecurity) QuantumEncrypt(plaintext []byte) ([]byte, error) {
 	return result, nil
 }
 
-// QuantumDecrypt implements quantum-resistant decryption
+// QuantumDecrypt decrypts ChaCha20-Poly1305 ciphertext (legacy name)
 func (qs *QuantumSecurity) QuantumDecrypt(ciphertext []byte) ([]byte, error) {
 	qs.mu.RLock()
 	defer qs.mu.RUnlock()
@@ -255,7 +258,8 @@ func (qs *QuantumSecurity) QuantumDecrypt(ciphertext []byte) ([]byte, error) {
 	return plaintext, nil
 }
 
-// GenerateQuantumKEM implements quantum-safe key encapsulation
+// GenerateQuantumKEM derives a shared secret via HKDF (legacy name; not a real
+// KEM and not post-quantum)
 func (qs *QuantumSecurity) GenerateQuantumKEM() (*QuantumSafeKEM, error) {
 	// Generate key pair
 	publicKey := make([]byte, 32)
@@ -329,9 +333,9 @@ func (qs *QuantumSecurity) VerifyZKProof(statement string, proof string) bool {
 	return valid
 }
 
-// QuantumResistantHash implements quantum-resistant hashing
+// QuantumResistantHash hashes with BLAKE2b (classical hash; legacy name)
 func (qs *QuantumSecurity) QuantumResistantHash(data []byte) []byte {
-	// Use BLAKE2b (quantum-resistant hash function)
+	// Use BLAKE2b
 	hasher, err := blake2b.New512(qs.quantumSalt)
 	if err != nil {
 		// Fallback to SHA-512 if BLAKE2b fails
@@ -601,7 +605,7 @@ type AdvancedSecurityMetrics struct {
 // CalculateAdvancedSecurityScore calculates comprehensive security score (up to 110)
 func CalculateAdvancedSecurityScore() *AdvancedSecurityMetrics {
 	metrics := &AdvancedSecurityMetrics{
-		QuantumSecurityScore: 20.0, // Quantum-resistant crypto (+20 points)
+		QuantumSecurityScore: 20.0, // Self-assigned component score (classical crypto; no external rubric)
 		AIDetectionScore:     25.0, // AI-powered detection (+25 points)
 		ZeroTrustScore:       20.0, // Zero-trust architecture (+20 points)
 		PredictiveScore:      15.0, // Predictive analytics (+15 points)

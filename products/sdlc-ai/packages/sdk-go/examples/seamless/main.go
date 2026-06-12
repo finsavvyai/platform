@@ -53,7 +53,7 @@ func main() {
 
 	// ✅ All monitoring is automatic - just check the health!
 	if client.IsHealthy() {
-		fmt.Printf("✅ System is healthy with 110/100 security score!\n")
+		fmt.Printf("✅ System is healthy!\n")
 	}
 
 	// ✅ Background operations happen automatically

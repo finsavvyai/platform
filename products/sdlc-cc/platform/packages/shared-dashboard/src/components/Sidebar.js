@@ -9,7 +9,7 @@ export const Sidebar = ({ collapsed, onToggle, layout, className = '', }) => {
     const [activeItem, setActiveItem] = useState('overview');
     const [expandedSections, setExpandedSections] = useState(['products']);
     const { unreadCount } = useNotifications();
-    // Mock product data - this would come from DashboardService
+    // PLACEHOLDER / DEMO DATA — hardcoded mock healthStatus values (uptime e.g. 99.7), not live measurements.
     const products = [
         {
             id: 'sdlc',

@@ -4,6 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 export const SystemStatusWidget = ({ dashboardService, className = '', }) => {
+    // PLACEHOLDER / DEMO DATA: hardcoded mock statuses and uptime values (e.g. 99.7), not live measurements.
     const [services, setServices] = useState([
         {
             name: 'API Gateway',

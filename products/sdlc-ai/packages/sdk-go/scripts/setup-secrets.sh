@@ -2,7 +2,7 @@
 
 # =================================================================
 # 🔒 SDLC Go SDK - Secure Secrets Management Setup
-# Security Score: 110/100 (Quantum-Ready)
+# Generates and configures Cloudflare worker secrets
 # =================================================================
 
 set -e
@@ -26,7 +26,7 @@ print_banner() {
     echo ""
     echo -e "${CYAN}╔══════════════════════════════════════════════════════════╗${NC}"
     echo -e "${CYAN}║  ${PURPLE}🔒 SDLC Go SDK - Secure Secrets Setup${CYAN}                ║${NC}"
-    echo -e "${CYAN}║  ${GREEN}Security Score: 110/100 (Quantum-Ready)${CYAN}                ║${NC}"
+    echo -e "${CYAN}║  ${GREEN}Cloudflare Secret Provisioning      ${CYAN}                ║${NC}"
     echo -e "${CYAN}║                                                              ║${NC}"
     echo -e "${CYAN}╚══════════════════════════════════════════════════════════╝${NC}"
     echo ""
@@ -63,9 +63,9 @@ check_authentication() {
     print_success "Authenticated as: $USER"
 }
 
-# Generate quantum-grade secrets
+# Generate high-entropy secrets (openssl rand; "quantum" names are legacy labels)
 generate_quantum_secrets() {
-    print_secure "Generating quantum-grade secrets..."
+    print_secure "Generating high-entropy secrets..."
 
     # JWT Secret (HS512)
     JWT_SECRET=$(openssl rand -base64 64)
@@ -111,7 +111,7 @@ generate_quantum_secrets() {
     QUANTUM_SIGNATURE_KEY=$(openssl rand -base64 64)
     echo "QUANTUM_SIGNATURE_KEY=$QUANTUM_SIGNATURE_KEY" >> .secrets.env
 
-    print_success "Quantum-grade secrets generated"
+    print_success "High-entropy secrets generated"
 }
 
 # Set secrets in Cloudflare
@@ -214,17 +214,17 @@ $AI_TRAINING_KEY
 EOF
     print_success "AI_TRAINING_KEY configured"
 
-    # Set quantum-resistant key rotation schedule
+    # Set key rotation schedule
     print_status "Setting KEY_ROTATION_SCHEDULE..."
     wrangler secret put KEY_ROTATION_SCHEDULE <<EOF
-{"interval": "1h", "algorithm": "quantum-resistant", "backup_count": 3}
+{"interval": "1h", "algorithm": "chacha20-poly1305", "backup_count": 3}
 EOF
     print_success "KEY_ROTATION_SCHEDULE configured"
 
-    # Set quantum-safe parameters
+    # Set crypto parameters (classical algorithms)
     print_status "Setting QUANTUM_SAFE_PARAMS..."
     wrangler secret put QUANTUM_SAFE_PARAMS <<EOF
-{"post_quantum_ready": true, "algorithm": "CRYSTALS-Kyber", "key_size": 1024}
+{"post_quantum_ready": false, "algorithm": "ChaCha20-Poly1305 + HKDF-SHA256", "key_size": 256}
 EOF
     print_success "QUANTUM_SAFE_PARAMS configured"
 }
@@ -266,22 +266,22 @@ else
     print_error "API health check failed"
 fi
 
-# Test security score
-echo "Testing security score..."
-SECURITY_SCORE=\$(curl -s https://security.fastpm.dev/security/metrics)
-if echo "\$SECURITY_SCORE" | grep -q "110"; then
-    print_success "Security score verified: 110/100"
+# Test security metrics endpoint
+echo "Testing security metrics endpoint..."
+SECURITY_METRICS=\$(curl -s https://security.fastpm.dev/security/metrics)
+if echo "\$SECURITY_METRICS" | grep -q "breakdown"; then
+    print_success "Security metrics endpoint responding"
 else
-    print_error "Security score verification failed"
+    print_error "Security metrics endpoint verification failed"
 fi
 
 # Test quantum security
 echo "Testing quantum security..."
 QUANTUM_STATUS=\$(curl -s https://quantum.fastpm.dev/health)
-if echo "\$QUANTUM_STATUS" | grep -q "quantum.*ready"; then
-    print_success "Quantum security verified"
+if echo "\$QUANTUM_STATUS" | grep -q "healthy"; then
+    print_success "Security worker verified"
 else
-    print_error "Quantum security verification failed"
+    print_error "Security worker verification failed"
 fi
 
 # Test AI protection
@@ -308,7 +308,7 @@ create_backup_rotation_script() {
     cat > rotate-secrets.sh << 'EOF
 #!/bin/bash
 
-# Quantum-Safe Secrets Rotation Script
+# Secrets Rotation Script
 
 set -e
 
@@ -328,7 +328,7 @@ print_status() {
     echo -e "\${GREEN}\${INFO}\${NC} \$1"
 }
 
-echo "🔒 Starting quantum-safe secrets rotation..."
+echo "🔒 Starting secrets rotation..."
 
 # Create timestamp for backup
 TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
@@ -345,8 +345,8 @@ wrangler secret list | jq -r '.[] | "\(.key)" | while read -r secret; do
     fi
 done
 
-# Generate new quantum-grade secrets
-print_secure "Generating new quantum-grade secrets..."
+# Generate new high-entropy secrets
+print_secure "Generating new high-entropy secrets..."
 NEW_JWT_SECRET=\$(openssl rand -base64 64)
 NEW_ENCRYPTION_KEY=\$(openssl rand -hex 64)
 NEW_QUANTUM_ENTROPY=\$(openssl rand -hex 128)
@@ -397,7 +397,7 @@ else
 fi
 
 echo ""
-echo "🔒 Quantum-safe secrets rotation complete!"
+echo "🔒 Secrets rotation complete!"
 echo "Backup stored in: \$BACKUP_DIR"
 EOF
 
@@ -460,12 +460,12 @@ add_security_reminder() {
     SECURITY_REMINDER="
 ## 🔒 Security Secrets Management
 
-This project uses quantum-grade security secrets. All secrets are:
+This project uses high-entropy secrets (generated via openssl rand). All secrets are:
 
 1. **Generated** with cryptographically secure random number generators
 2. **Stored** in Cloudflare Workers secrets (not in code)
-3. **Rotated** automatically on quantum-safe schedules
-4. **Validated** for quantum resistance
+3. **Rotated** automatically on a schedule
+4. **Validated** for length and entropy
 5. **Backed up** securely with encryption
 
 ### Important Security Notes
@@ -479,22 +479,21 @@ This project uses quantum-grade security secrets. All secrets are:
 ### Security Scripts
 
 - \`setup-secrets.sh\` - Initial secrets setup (this script)
-- \`rotate-secrets.sh\` - Quantum-safe secret rotation
+- \`rotate-secrets.sh\` - Scheduled secret rotation
 - \`validate-secrets.sh\` - Secrets validation and health checks
 - \`deploy.sh\` - Secure deployment with secret validation
 
-### Quantum Security Features
+### Security Properties
 
 All secrets are:
-- **Quantum-resistant** - Ready for post-quantum computing era
+- **Classical cryptography** - ChaCha20-Poly1305; post-quantum algorithms are a roadmap item, not implemented
 - **256-512 bit** - Cryptographically secure key lengths
-- **AI-protected** - Additional AI-powered threat detection
-- **Zero-trust validated** - Continuous security verification
+- **Stored as Cloudflare secrets** - never committed to the repository
 
 ---
 
 *Remember: Security is not a one-time setup—it's a continuous process.*
-*Your 110/100 security score depends on maintaining these standards.*
+*Your security posture depends on maintaining these standards.*
 "
 
     echo "$SECURITY_REMINDER" >> SECURITY_SECRETS.md
@@ -514,8 +513,7 @@ create_zshrc_integration() {
     cat >> ~/.zshrc << 'EOF
 
 # =================================================================
-# 🔒 SDLC Go SDK - Quantum-Ready Security Shortcuts
-# Security Score: 110/100
+# 🔒 SDLC Go SDK - Security Shortcuts
 # =================================================================
 
 # Quick deployment
@@ -528,14 +526,14 @@ function sdeploy() {
 # Rotate secrets
 function srotate() {
     cd $(pwd)
-    echo "🔒 Rotating quantum-safe secrets..."
+    echo "🔒 Rotating secrets..."
     ./rotate-secrets.sh
 }
 
 # Validate secrets
 function svalidate() {
     cd $(pwd)
-    echo "🔒 Validating quantum-grade secrets..."
+    echo "🔒 Validating high-entropy secrets..."
     ./validate-secrets.sh
 }
 
@@ -591,7 +589,7 @@ function sstatus() {
 
 # Quick security update
 function supdate() {
-    echo "🔒 Performing quantum-safe security update..."
+    echo "🔒 Performing security update..."
     npm run security:scan && npm run security:fix
     svalidate
 }
@@ -650,10 +648,10 @@ main() {
     # Success message
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║  ${LOCK} SECRETS SETUP COMPLETE! ${CHECK} 110/100${GREEN}             ║${NC}"
+    echo -e "${GREEN}║  ${LOCK} SECRETS SETUP COMPLETE! ${CHECK}        ${GREEN}             ║${NC}"
     echo -e "${GREEN}║                                                              ║${NC}"
-    echo -e "${GREEN}║  ${INFO} All quantum-grade secrets generated and secured${GREEN}         ║${NC}"
-    echo -e "${GREEN}║  ${INFO} Cloudflare Workers configured with 110/100${GREEN}       ║${NC}"
+    echo -e "${GREEN}║  ${INFO} All high-entropy secrets generated and secured${GREEN}         ║${NC}"
+    echo -e "${GREEN}║  ${INFO} Cloudflare Workers secrets configured    ${GREEN}       ║${NC}"
     echo -e "${GREEN}║  ${INFO} Ready for deployment to fastpm.dev${GREEN}           ║${NC}"
     echo -e "${GREEN}║                                                              ║${NC}"
     echo -e "${GREEN}║  ${WARNING} Next steps:${GREEN}                                  ║${NC}"
@@ -663,11 +661,11 @@ main() {
     echo -e "${GREEN}║                                                              ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
     echo ""
-    echo -e "${PURPLE}🔒 Your quantum-grade secrets are ready for 110/100 security!${NC}"
+    echo -e "${PURPLE}🔒 Your high-entropy secrets are configured.${NC}"
     echo ""
     echo -e "${CYAN}🌐 Zshrc integration added. Run 'source ~/.zshrc' to use:${NC}"
     echo -e "${CYAN}   sdeploy - Quick deployment"
-    echo -e "${CYAN}   srotate - Quantum-safe rotation"
+    echo -e "${CYAN}   srotate - Secret rotation"
     echo -e "${CYAN}   svalidate - Secret validation"
     echo -e "${CYAN}   sdashboard - Security dashboard${NC}"
     echo ""

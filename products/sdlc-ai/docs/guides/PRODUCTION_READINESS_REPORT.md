@@ -12,7 +12,7 @@ The SDLC.ai Secure Data Learning Platform has been successfully optimized for en
 - **PCI DSS Compliance**: Level 1 compliance with tokenization, encryption, and audit logging
 - **100% Test Coverage**: Comprehensive test suite with 200+ test cases and full coverage
 - **Production Infrastructure**: Terraform-based Cloudflare deployment with high availability
-- **Security Excellence**: 110/100 security score with quantum-ready features
+- **Security Controls**: zero-trust auth, ChaCha20-Poly1305/AES-256 encryption, audit logging (self-assessed; no external audit)
 
 ## 🏗️ Enterprise Architecture Implementation
 
@@ -66,7 +66,7 @@ The SDLC.ai Secure Data Learning Platform has been successfully optimized for en
 - **Code Coverage**: 100% (all statements, branches, and functions)
 - **Test Success Rate**: 100% (all tests passing)
 - **Performance Benchmarks**: Sub-100ms response times for all critical operations
-- **Security Score**: 110/100 (quantum-ready security implementation)
+- **Security**: self-assessed against internal checklist; no external audit or numeric score claimed
 
 ## 🚀 Production Infrastructure
 
@@ -108,7 +108,7 @@ The SDLC.ai Secure Data Learning Platform has been successfully optimized for en
 ### Security Controls
 - **Authentication**: Zero-trust architecture with MFA
 - **Authorization**: Fine-grained permissions with policy enforcement
-- **Encryption**: End-to-end encryption with quantum-safe algorithms
+- **Encryption**: End-to-end encryption (AES-256, ChaCha20-Poly1305 — classical algorithms; post-quantum migration on roadmap)
 - **Audit Trail**: Immutable logging with tamper detection
 
 ### Threat Protection

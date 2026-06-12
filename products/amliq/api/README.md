@@ -32,7 +32,7 @@ Cascade matching architecture with multiple algorithms:
 - **Explainer**: Human-readable match explanations
 
 ### Ingestion Layer (`internal/ingestion/`)
-25+ sanctions lists with generic parser framework:
+26+ sanctions lists with generic parser framework:
 - OFAC SDN, EU FSF, UN Consolidated, UK OFSI, Swiss SECO
 - DFAT (Australia), Canada OSFI, Japan MOF, MAS (Singapore), HKMA
 - France Tresor, Interpol Red Notices, World Bank Debarment, FBI Most Wanted

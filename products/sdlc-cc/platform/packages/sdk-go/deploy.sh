@@ -2,7 +2,7 @@
 
 # =================================================================
 # 🚀 SDLC Go SDK - Automated Cloudflare Deployment Script
-# Security Score: 110/100 (Quantum-Ready)
+# Deploys the SDK workers to Cloudflare
 # Target: api.fastpm.dev
 # =================================================================
 
@@ -43,8 +43,8 @@ print_banner() {
     echo ""
     echo -e "${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${CYAN}║                                                              ║${NC}"
-    echo -e "${CYAN}║  ${PURPLE}🏆 SDLC Go SDK - Quantum-Ready Deployment${CYAN}                 ║${NC}"
-    echo -e "${CYAN}║  ${GREEN}Security Score: 110/100 (Beyond Perfect)${CYAN}                ║${NC}"
+    echo -e "${CYAN}║  ${PURPLE}SDLC Go SDK - Cloudflare Deployment${CYAN}                 ║${NC}"
+    echo -e "${CYAN}║  ${GREEN}Hardened edge deployment${CYAN}                ║${NC}"
     echo -e "${CYAN}║  ${BLUE}Target: ${API_SUBDOMAIN}${CYAN}                                   ║${NC}"
     echo -e "${CYAN}║                                                              ║${NC}"
     echo -e "${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
@@ -110,7 +110,7 @@ check_prerequisites() {
 
 # Build Go SDK
 build_sdk() {
-    print_status "Building Go SDK with quantum security features..."
+    print_status "Building Go SDK..."
 
     # Clean previous builds
     if [ -d "dist" ]; then
@@ -283,20 +283,20 @@ verify_deployment() {
     SECURITY_URL="https://security.fastpm.dev/security/metrics"
     echo "Testing security: $SECURITY_URL"
 
-    if curl -s "$SECURITY_URL" | jq '.overallScore' | grep -q "110"; then
-        print_success "✅ Security score verified: 110/100"
+    if curl -s "$SECURITY_URL" | jq -e '.demoData' > /dev/null; then
+        print_success "✅ Security metrics endpoint responding"
     else
-        print_warning "⚠️ Security score verification inconclusive"
+        print_warning "⚠️ Security metrics endpoint verification inconclusive"
     fi
 
     # Test quantum security endpoint
     QUANTUM_URL="https://quantum.fastpm.dev/health"
     echo "Testing quantum security: $QUANTUM_URL"
 
-    if curl -s "$QUANTUM_URL" | grep -q "quantum.*ready"; then
-        print_success "✅ Quantum security is active"
+    if curl -s "$QUANTUM_URL" | grep -q "healthy"; then
+        print_success "✅ Security worker is responding"
     else
-        print_warning "⚠️ Quantum security verification inconclusive"
+        print_warning "⚠️ Security worker verification inconclusive"
     fi
 
     # Test threat intelligence
@@ -318,7 +318,7 @@ run_security_tests() {
     echo "Testing security headers..."
     SECURITY_HEADERS=$(curl -s -I "https://api.fastpm.dev/health")
 
-    if echo "$SECURITY_HEADERS" | grep -q "x-security-score: 110"; then
+    if echo "$SECURITY_HEADERS" | grep -q "strict-transport-security"; then
         print_success "✅ Security headers correct"
     else
         print_warning "⚠️ Security headers not fully configured"
@@ -365,7 +365,7 @@ generate_deployment_report() {
 **Date:** $(date)
 **Environment:** Production
 **Domain:** $API_SUBDOMAIN
-**Security Score:** 110/100 (Quantum-Ready)
+**Encryption:** AES-256 / ChaCha20-Poly1305 (classical; no post-quantum algorithms)
 
 ## Deployment Summary
 
@@ -376,7 +376,7 @@ generate_deployment_report() {
 - **Quantum Security:** $QUANTUM_SUBDOMAIN
 
 ### 🔒 Security Features
-- **Quantum-Ready Cryptography:** ✅ Active
+- **Encryption:** ChaCha20-Poly1305 + HKDF (classical)
 - **AI-Powered Threat Detection:** ✅ Active
 - **Behavioral Analysis:** ✅ Active
 - **Predictive Security:** ✅ Active
@@ -385,7 +385,6 @@ generate_deployment_report() {
 
 ### 📊 Performance Metrics
 - **Response Time:** < 15ms
-- **Security Score:** 110/100
 - **Uptime:** 99.999%
 - **Threat Detection:** 97.3% accuracy
 
@@ -399,8 +398,8 @@ generate_deployment_report() {
 
 ### Health Checks
 - **API Health:** ✅ Passing
-- **Security Score:** ✅ 110/100
-- **Quantum Security:** ✅ Active
+- **Encryption:** ✅ ChaCha20-Poly1305 (classical)
+- **Security Worker:** ✅ Deployed
 - **AI Protection:** ✅ Active
 - **Threat Intelligence:** ✅ Active
 
@@ -420,7 +419,7 @@ generate_deployment_report() {
 ---
 **Deployment completed successfully!**
 **Status:** 🟢 **LIVE & SECURE**
-**Security:** 🛡️ **110/100 QUANTUM-READY**
+**Security:** 🛡️ Hardened (classical cryptography; no external audit)
 EOF
 
     print_success "Deployment report generated: $REPORT_FILE"
@@ -464,11 +463,11 @@ main() {
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${GREEN}║                                                              ║${NC}"
-    echo -e "${GREEN}║  ${ROCKET} DEPLOYMENT COMPLETE! ${SHIELD} 110/100 SECURITY${GREEN}           ║${NC}"
+    echo -e "${GREEN}║  ${ROCKET} DEPLOYMENT COMPLETE! ${SHIELD}              ${GREEN}           ║${NC}"
     echo -e "${GREEN}║                                                              ║${NC}"
     echo -e "${GREEN}║  ${CHECK} API: ${API_SUBDOMAIN}${GREEN}                                 ║${NC}"
     echo -e "${GREEN}║  ${CHECK} Security: ${SECURITY_SUBDOMAIN}${GREEN}                           ║${NC}"
-    echo -e "${GREEN}║  ${CHECK} Status: ${QUANTUM} Quantum-Ready${GREEN}                          ║${NC}"
+    echo -e "${GREEN}║  ${CHECK} Status: Deployed             ${GREEN}                          ║${NC}"
     echo -e "${GREEN}║                                                              ║${NC}"
     echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
     echo ""
@@ -478,8 +477,7 @@ main() {
     echo -e "   ${BLUE}• Intelligence: ${INTEL_SUBDOMAIN}${NC}"
     echo -e "   ${BLUE}• Quantum: ${QUANTUM_SUBDOMAIN}${NC}"
     echo ""
-    echo -e "${PURPLE}🔐 Security Score: ${GREEN}110/100${PURPLE} (Beyond Perfect)${NC}"
-    echo -e "${PURPLE}🚀 Status: ${GREEN}LIVE & QUANTUM-READY${NC}"
+    echo -e "${PURPLE}🚀 Status: ${GREEN}LIVE${NC}"
     echo ""
     echo -e "${CYAN}ℹ️  Next: Monitor your security dashboard at ${SECURITY_SUBDOMAIN}${NC}"
     echo ""

@@ -90,13 +90,13 @@ export class AdvancedSecurityDashboard {
     const zkProofsGenerated = await this.env.QUANTUM_KEY_MANAGER.get('zk_proofs_count');
 
     return {
-      score: 20.0, // Quantum-resistant cryptography provides +20 points
+      score: 20.0, // Self-assigned component score (no external rubric; cryptography is classical)
       keyRotationFrequency: keyRotationStatus || 'hourly',
       entropyLevel: parseFloat(quantumEntropyLevel || '0.95'),
       zkProofsGenerated: parseInt(zkProofsGenerated || '0'),
       quantumResistanceLevel: 'AES-256 + ChaCha20-Poly1305',
       lastKeyRotation: await this.env.QUANTUM_KEY_MANAGER.get('last_rotation'),
-      cryptographicStrength: 'Post-Quantum Ready'
+      cryptographicStrength: 'Classical (AES-256 + ChaCha20-Poly1305); no post-quantum algorithms'
     };
   }
 
@@ -199,8 +199,8 @@ export class AdvancedSecurityDashboard {
     const bonusPoints = this.calculateBonusPoints(metrics);
     baseScore += bonusPoints;
 
-    // Cap at 110
-    return Math.min(baseScore, 110.0);
+    // Cap at 100 (self-assessed score, not an external benchmark)
+    return Math.min(baseScore, 100.0);
   }
 
   private calculateBonusPoints(metrics: Record<string, unknown>): number {
@@ -277,9 +277,7 @@ export class AdvancedSecurityDashboard {
   private async generateSecurityRecommendations(score: number): Promise<string[]> {
     const recommendations = [];
 
-    if (score >= 110) {
-      recommendations.push('🏆 Maximum security achieved! System is quantum-ready and future-proof');
-    } else if (score >= 100) {
+    if (score >= 100) {
       recommendations.push('🛡️ Excellent security posture. Continue monitoring for emerging threats');
     } else if (score >= 90) {
       recommendations.push('🔒 Strong security. Consider enabling advanced AI features');
@@ -376,7 +374,7 @@ export class AdvancedSecurityMiddleware {
   }
 
   private async performQuantumSecurityCheck(request: Request): Promise<SecurityCheckResult> {
-    // Implement quantum-resistant cryptography checks
+    // Placeholder: cryptography configuration checks (classical algorithms only)
     return {
       passed: true,
       score: 20.0,
@@ -473,12 +471,10 @@ export class AdvancedSecurityMiddleware {
       'Referrer-Policy': 'strict-origin-when-cross-origin',
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
       'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
-      'X-Quantum-Security': 'enabled',
       'X-AI-Protection': 'enabled',
       'X-Behavioral-Analysis': 'enabled',
       'X-Predictive-Security': 'enabled',
       'X-Zero-Trust': 'enforced',
-      'X-Security-Score': '110/100',
       'Cache-Control': 'no-store, no-cache, must-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0'
@@ -688,7 +684,7 @@ export default {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         securityScore: metrics.overallScore,
-        securityLevel: metrics.overallScore >= 110 ? 'QUANTUM-READY' : 'ADVANCED',
+        securityLevel: metrics.overallScore >= 100 ? 'HARDENED' : 'ADVANCED',
         quantumSecurity: env.QUANTUM_SECURITY_ENABLED === 'true',
         aiProtection: env.AI_THREAT_DETECTION_ENABLED === 'true',
         zeroTrust: env.ZERO_TRUST_ENFORCED === 'true',

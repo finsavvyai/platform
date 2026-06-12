@@ -29,14 +29,11 @@ export default {
           timestamp: new Date().toISOString(),
           version: env.API_VERSION,
           environment: env.ENVIRONMENT,
-          securityScore: env.SECURITY_SCORE || "110",
           uptime: Date.now(),
-          message: "🏆 SDLC Go SDK - Quantum-Ready Security Score: 110/100",
+          message: "SDLC Go SDK",
         },
         {
           headers: {
-            "X-Security-Score": "110/100",
-            "X-Quantum-Ready": "true",
             "X-AI-Protection": "active",
             "X-Behavioral-Analysis": "active",
             "X-Predictive-Security": "active",
@@ -60,14 +57,15 @@ export default {
     if (url.pathname === "/security/metrics") {
       return Response.json(
         {
-          overallScore: 110,
+          // NOTE: demo placeholder metrics — not measured values
+          demoData: true,
           breakdown: {
             quantumSecurity: {
               score: 20,
               keyRotationFrequency: "hourly",
               entropyLevel: 0.98,
               zkProofsGenerated: 150,
-              quantumResistanceLevel: "Post-Quantum Ready",
+              quantumResistanceLevel: "none (classical cryptography only)",
               lastKeyRotation: new Date().toISOString(),
               cryptographicStrength: "AES-256 + ChaCha20-Poly1305",
             },
@@ -76,7 +74,7 @@ export default {
               modelAccuracy: 0.987,
               threatsDetected: 1247,
               falsePositiveRate: 0.015,
-              modelVersion: "3.0.0-quantum",
+              modelVersion: "3.0.0",
               processingLatency: 12,
               predictionAccuracy: 0.956,
             },
@@ -136,17 +134,15 @@ export default {
             },
           ],
           recommendations: [
-            "🏆 Maximum security achieved! System is quantum-ready and future-proof",
             "🔒 Continue monitoring for emerging threats",
             "📊 Regular security assessments and updates",
             "🚀 Stay ahead of emerging threats with predictive analytics",
           ],
           timestamp: new Date().toISOString(),
-          securityLevel: "QUANTUM-READY",
+          securityLevel: "demo",
         },
         {
           headers: {
-            "X-Security-Score": "110/100",
             "Cache-Control": "public, max-age=300",
           },
         },
@@ -157,23 +153,16 @@ export default {
     if (url.pathname === "/") {
       return Response.json(
         {
-          message: "🏆 SDLC Go SDK - Quantum-Ready API",
-          securityScore: "110/100",
+          message: "SDLC Go SDK API",
           endpoints: {
             health: "/health",
             securityMetrics: "/security/metrics",
             documentation: "https://docs.fastpm.dev",
           },
-          status: "🟢 LIVE & QUANTUM-READY",
+          status: "live",
           deployment: {
             platform: "Cloudflare Workers",
             domain: "api.fastpm.dev",
-            securityLevel: "BEYOND PERFECT",
-          },
-        },
-        {
-          headers: {
-            "X-Security-Score": "110/100",
           },
         },
       );
@@ -189,14 +178,10 @@ export default {
           securityMetrics: "/security/metrics",
           root: "/",
         },
-        securityScore: "110/100",
         timestamp: new Date().toISOString(),
       },
       {
         status: 404,
-        headers: {
-          "X-Security-Score": "110/100",
-        },
       },
     );
   },

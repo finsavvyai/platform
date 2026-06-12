@@ -7,7 +7,7 @@
 ---
 
 ### 🛡️ **Zero-Trust Security Architecture**
-- **Quantum-Ready Encryption**: Future-proof security with advanced cryptography
+- **Strong Encryption**: AES-256 and ChaCha20-Poly1305 end-to-end
 - **Purpose-Bound Access Control**: Dynamic, context-aware permissions
 - **Real-time Audit Trails**: Immutable logging for compliance
 - **Multi-Tenant Isolation**: Secure data separation between organizations
@@ -45,7 +45,7 @@ Secure processing of sensitive financial data with automated compliance reportin
 HIPAA-compliant patient data processing with real-time audit capabilities
 
 ### **Government & Defense**
-Maximum security with quantum-resistant encryption and data sovereignty
+Strong AES-256 encryption and data sovereignty
 
 ### **Enterprise SaaS**
 Unified security platform for all AI applications and data processing

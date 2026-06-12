@@ -6,6 +6,12 @@
 **Depends On**: None
 **Status**: Complete
 
+> **Note (June 2026 claims audit):** This sprint doc is a historical record; the "30+"
+> figures below reflect the sprint-time goal. The code-verified public claim is
+> **"26+ list sources wired, extensible"** (`domain.ListCount()` reports the full
+> marketplace catalog of 42 entries, which includes not-yet-wired entries). Do not
+> copy "30+" from this doc into marketing surfaces — use "26+".
+
 ---
 
 ## Objective
