@@ -194,7 +194,7 @@ wrangler login
 - ✅ **Ready for Business**: Production-ready code
 - ✅ **Multiple Deployment Options**: Local, Cloudflare, Vercel, Railway
 
-**Your quantum-enhanced fraud detection API is LIVE and ready for users!**
+**Your classical-ML fraud detection API is LIVE and ready for users!**
 
 ---
 

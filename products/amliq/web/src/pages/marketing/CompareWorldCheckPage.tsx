@@ -27,10 +27,10 @@ const tiers = [
 ]
 
 const reasons = [
-  { icon: DollarSign, title: '10× cheaper', body: 'Same coverage at a fraction of the licence fee. Money you keep buys engineering hours, not procurement cycles.' },
-  { icon: Zap, title: 'Sub-50 ms p99', body: 'Real-time decisions on the hot path. World-Check’s data file model can’t match this regardless of how their portal feels.' },
+  { icon: DollarSign, title: 'Engineer-friendly pricing', body: 'Transparent self-serve plans. Money you keep buys engineering hours, not procurement cycles.' },
+  { icon: Zap, title: 'Real-time API', body: 'In-memory engine on the request path instead of batch data files. Screen at transaction time, not overnight.' },
   { icon: Code, title: 'Built for engineers', body: 'REST + WebSocket + SDKs. Your team integrates in an afternoon, not a quarter.' },
-  { icon: Shield, title: 'Same regulatory rigor', body: 'OFAC, UN, EU, UK, FATF, 80+ lists, plus PEPs and adverse media. Same FATF / Wolfsberg / Patriot Act PEP definitions.' },
+  { icon: Shield, title: '26+ official sources + BYO data', body: 'OFAC, UN, EU, UK OFSI, FATF and more, plus PEPs and adverse media - and import your licensed World-Check feed to keep its coverage.' },
   { icon: Globe, title: 'Specialized country depth', body: 'Israel coverage (NBCTF, MoF, Knesset, judiciary, mayors) that World-Check generally generic-passes through OpenSanctions.' },
 ]
 
@@ -51,14 +51,14 @@ export default function CompareWorldCheckPage() {
           </motion.div>
           <h1 className="text-[2.6rem] sm:text-5xl lg:text-[3.4rem] font-bold leading-[1.06] mb-6"
             style={{ color: 'var(--text)', letterSpacing: '-0.03em' }}>
-            Replace World-Check at{' '}
+            The copilot layer above{' '}
             <span style={{
               background: 'linear-gradient(135deg, #C9A96E 0%, #E8D5A3 50%, #B8945A 100%)',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-            }}>1/10th the cost</span>
+            }}>your screening lists</span>
           </h1>
           <p className="text-lg leading-relaxed mb-8 max-w-[640px]" style={{ color: 'color-mix(in srgb, var(--text) 62%, transparent)' }}>
-            Same regulatory coverage. Real-time API instead of nightly file drops. Self-serve pricing
+            Keep World-Check or bring our 26+ official sources. Real-time API instead of nightly file drops, an AI copilot for triage and investigations, and self-serve pricing
             instead of a six-week sales cycle. Migrate your existing World-Check data in under an hour.
           </p>
           <div className="flex flex-wrap gap-3">

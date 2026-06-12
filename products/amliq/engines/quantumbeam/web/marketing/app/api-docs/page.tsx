@@ -7,7 +7,7 @@ import { CheckCircle2, Copy, Terminal, Code, Zap, Shield, Search } from 'lucide-
 const apiExamples = [
   {
     title: 'Transaction Analysis',
-    description: 'Analyze a transaction for fraud risk using quantum-enhanced algorithms',
+    description: 'Analyze a transaction for fraud risk using classical ML models',
     method: 'POST',
     endpoint: '/api/v1/analyze',
     code: `curl -X POST https://api.quantumbeam.io/api/v1/analyze \\
@@ -190,7 +190,7 @@ export default function APIDocsPage() {
               <h1 className="text-4xl md:text-5xl font-bold">API Documentation</h1>
             </div>
             <p className="text-xl opacity-90 mb-8">
-              Integrate quantum-enhanced fraud detection into your applications with our RESTful API and real-time WebSocket endpoints.
+              Integrate machine-learning fraud detection into your applications with our RESTful API and real-time WebSocket endpoints.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
               <button className="bg-white text-quantum-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
@@ -354,7 +354,7 @@ export default function APIDocsPage() {
                     <li>• 1,000 requests per minute</li>
                     <li>• 100,000 requests per day</li>
                     <li>• Batch processing up to 100 transactions</li>
-                    <li>• Standard quantum algorithms</li>
+                    <li>• Standard ML models</li>
                   </ul>
                 </div>
                 <div>
@@ -363,7 +363,7 @@ export default function APIDocsPage() {
                     <li>• Unlimited requests per minute</li>
                     <li>• Unlimited daily requests</li>
                     <li>• Batch processing up to 10,000 transactions</li>
-                    <li>• Advanced quantum algorithms & custom models</li>
+                    <li>• Advanced ML models & custom models</li>
                   </ul>
                 </div>
               </div>

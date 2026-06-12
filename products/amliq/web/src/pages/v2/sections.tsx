@@ -75,7 +75,7 @@ export function Hero() {
               className="mt-5 max-w-xl text-base leading-relaxed sm:text-lg"
               style={{ color: tok.textSec }}
             >
-              Sub-50ms decisioning, explainable matches, and audit-ready outcomes for
+              Real-time decisioning (sub-50ms target), explainable matches, and audit-ready outcomes for
               regulated transaction flows. Reduce false positives. Increase approvals. Stay
               audit-ready.
             </p>
@@ -92,8 +92,8 @@ export function Hero() {
             <div className="mt-10 grid max-w-xl grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
               {[
                 { k: 'SOC 2', v: 'aligned' },
-                { k: '99.99%', v: 'uptime' },
-                { k: '<50ms', v: 'median' },
+                { k: '99.9%', v: 'uptime target' },
+                { k: '<50ms', v: 'p99 target' },
                 { k: 'Audit', v: 'grade trail' },
               ].map((t) => (
                 <div key={t.k}>
@@ -268,10 +268,10 @@ export function TrustProof() {
           </div>
 
           <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <MetricCard label="Median latency" value="42ms" sub="P50 screening decisions" />
-            <MetricCard label="Uptime target" value="99.99%" sub="Production SLA" />
-            <MetricCard label="False positives" value="−28%" sub="Typical reduction" accent />
-            <MetricCard label="Daily screenings" value="40M+" sub="Across deployed tenants" />
+            <MetricCard label="Latency target" value="<50ms" sub="P99 screening decisions" />
+            <MetricCard label="Uptime target" value="99.9%" sub="Production target" />
+            <MetricCard label="False positives" value="Fewer" sub="vs single-layer tools — see /benchmarks" accent />
+            <MetricCard label="List sources" value="26+" sub="Plus custom lists" />
           </div>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs" style={{ color: tok.textMuted }}>

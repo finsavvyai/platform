@@ -66,7 +66,7 @@ The development environment includes the following services:
 | Service | Port | Description | Credentials |
 |---------|------|-------------|-------------|
 | API Service | 8080 | Main Go API server | - |
-| Quantum Service | 8001 | Python quantum computing service | - |
+| Quantum Service | 8001 | Python quantum-simulator prototype service (experimental, not in scoring path) | - |
 | ML Service | 8002 | Python machine learning service | - |
 
 ### Databases

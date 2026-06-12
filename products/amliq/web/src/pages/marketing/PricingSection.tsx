@@ -8,7 +8,7 @@ const plans = [
     'Community support', '7-day retention',
   ]},
   { name: 'Pro', monthly: 299, highlighted: true, features: [
-    '50,000 screenings/mo', 'All 86 sanctions lists', '3M+ entity database',
+    '50,000 screenings/mo', 'All 26+ sanctions list sources', '1M+ entity records',
     'Disambiguation cascade', 'Freetext screening', 'Batch screening',
     'Webhooks & MFA', 'Priority support', '90-day retention',
   ]},

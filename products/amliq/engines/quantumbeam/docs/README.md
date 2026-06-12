@@ -1,12 +1,12 @@
-# QuantumBeam — Quantum-Enhanced Fraud Detection
+# AMLIQ Fraud Engine (formerly QuantumBeam) — Classical ML Fraud Detection
 
-High-performance fraud detection engine: 99.7% accuracy, <50ms latency, 1000+ txn/sec.
+Fraud detection engine using classical machine-learning scoring. Target: <50ms latency, 1000+ txn/sec.
 
 ## Overview
 
-QuantumBeam is a Go microservice for real-time fraud detection in fintech platforms. Uses quantum-inspired ML algorithms for transaction risk assessment, fraud ring detection, and behavioral analytics.
+The AMLIQ Fraud Engine is a Go microservice for real-time fraud detection in fintech platforms. Uses classical ML models (Random Forest, Gradient Boosting) for transaction risk assessment, fraud ring detection, and behavioral analytics. Accuracy has not yet been benchmarked; no published metric.
 
-**Key Metrics**: 99.7% accuracy | <50ms P99 latency | 1000+ txn/sec throughput | 99.99% uptime
+**Targets**: <50ms P99 latency | 1000+ txn/sec throughput
 
 ## Tech Stack
 

@@ -68,7 +68,7 @@ export default function WorkflowSection() {
           <p className="section-eyebrow mb-4">How it works</p>
           <h2 className="text-3xl sm:text-[2.6rem] font-bold tracking-tight mb-4" style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}>
             From input to decision in{' '}
-            <span style={{ color: 'var(--accent-gold)' }}>under a millisecond</span>
+            <span style={{ color: 'var(--accent-gold)' }}>milliseconds</span>
           </h2>
           <p className="text-base max-w-lg mx-auto" style={{ color: 'color-mix(in srgb, var(--text) 45%, transparent)' }}>
             A deterministic multi-layer pipeline that returns scored, explainable results with full source attribution.
@@ -125,7 +125,7 @@ export default function WorkflowSection() {
         >
           <div className="flex items-center gap-2 px-5 py-2.5" style={{ borderBottom: '1px solid var(--accent-gold-light)' }}>
             <span className="text-[10px] font-mono font-semibold uppercase tracking-wider" style={{ color: 'color-mix(in srgb, var(--accent-gold) 50%, transparent)' }}>Response example</span>
-            <span className="ms-auto text-[10px] font-mono" style={{ color: 'color-mix(in srgb, var(--text) 20%, transparent)' }}>latency: 0.8ms</span>
+            <span className="ms-auto text-[10px] font-mono" style={{ color: 'color-mix(in srgb, var(--text) 20%, transparent)' }}>latency: 42ms</span>
           </div>
           <div className="p-5 font-mono text-sm leading-[1.8]">
             <p style={{ color: 'color-mix(in srgb, var(--text) 25%, transparent)' }}>{'{'}</p>

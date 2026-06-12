@@ -23,7 +23,7 @@ const cases = [
     icon: CreditCard,
     title: 'Payment Processors',
     problem: 'Real-time transaction screening without adding latency to payment flows.',
-    solution: 'Sub-millisecond API responses integrate directly into payment authorization pipelines.',
+    solution: 'Real-time API responses (sub-50ms target) integrate directly into payment authorization pipelines.',
   },
 ]
 

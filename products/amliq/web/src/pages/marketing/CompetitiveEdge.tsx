@@ -3,7 +3,7 @@ import { Zap, Brain, Globe, Eye, DollarSign, Shield } from 'lucide-react'
 import { FadeIn, StaggerGroup, staggerChild } from './animations'
 
 const edges = [
-  { icon: Zap, stat: '200x', label: 'Faster', detail: 'Sub-1ms vs 200ms industry average' },
+  { icon: Zap, stat: '2-tier', label: 'Matching engine', detail: 'In-memory instant index + database-scale search' },
   { icon: Brain, stat: '92%', label: 'Fewer false positives', detail: 'LLM cascade for disambiguation' },
   { icon: Globe, stat: '2.2M+', label: 'Entity profiles', detail: 'Growing to 5M+ from 328 sources' },
   { icon: Eye, stat: '6', label: 'Matching layers', detail: 'Fully explainable scoring' },

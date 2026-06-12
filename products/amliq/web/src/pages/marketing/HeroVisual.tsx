@@ -27,7 +27,7 @@ export default function HeroVisual() {
           <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-white">
             <Shield size={14} className="text-token-gold" />
             <span className="text-13 font-mono text-slate-600">
-              screening &quot;Hassan Ali&quot; -- 0.8ms -- 4 layers
+              screening &quot;Hassan Ali&quot; -- 42ms -- 4 layers
             </span>
           </div>
           {results.map((r, i) => (

@@ -9,15 +9,15 @@ interface Feature {
 }
 
 const features: Feature[] = [
-  { icon: <Zap size={20} />, title: 'Real-time screening API', desc: 'Sub-50ms decisions on entities, counterparties, and transactions. Synchronous REST, no queueing.', code: 'POST /v1/screen' },
+  { icon: <Zap size={20} />, title: 'Real-time screening API', desc: 'Real-time decisions on entities, counterparties, and transactions. Synchronous REST, no queueing.', code: 'POST /v1/screen' },
   { icon: <Search size={20} />, title: 'Fuzzy & phonetic matching', desc: 'Exact, token, fuzzy, phonetic, transliteration, and graph layers tuned per list.', code: 'matcher.strategy = "hybrid"' },
   { icon: <TrendingUp size={20} />, title: 'AI risk scoring', desc: 'Calibrated risk scores per hit, combining list severity, geography, and behavioral signals.', code: 'risk_score: 0.83' },
-  { icon: <Search size={20} />, title: 'False positive reduction', desc: 'Context-aware disambiguation cuts manual review volume by up to 70% without missing true hits.', code: 'fp_reduction: 68%' },
+  { icon: <Search size={20} />, title: 'False positive reduction', desc: 'Context-aware disambiguation materially cuts manual review volume versus single-layer tools (see /benchmarks).', code: 'fp_reduction: /benchmarks' },
   { icon: <Database size={20} />, title: 'Transaction monitoring', desc: 'Rules, velocity, structuring, and sanctions checks on every payment leg.', code: 'stream.tx → decision' },
   { icon: <ClipboardList size={20} />, title: 'Audit logs', desc: 'Immutable per-request evidence: input, match, score, policy version, decision, reviewer.', code: 'GET /v1/audit/{id}' },
   { icon: <FileText size={20} />, title: 'Case management', desc: 'Queue, triage, assign, escalate, and resolve — with SAR-ready export and reviewer SLAs.', code: 'case.status = "escalated"' },
   { icon: <Code2 size={20} />, title: 'Batch + streaming', desc: 'Screen millions of records overnight or sub-second per event via Kafka, Webhooks, and REST.', code: 'POST /v1/batch' },
-  { icon: <Layers size={20} />, title: 'Global list coverage', desc: 'OFAC, EU, UN, HMT, OFSI, NBCTF, INTERPOL and 200+ PEP / adverse media sources.', code: 'lists: 200+' },
+  { icon: <Layers size={20} />, title: 'Global list coverage', desc: 'OFAC, EU, UN, HMT, OFSI, NBCTF, INTERPOL and 26+ list sources, plus custom lists.', code: 'lists: 26+' },
 ]
 
 function Card({ icon, title, desc, code }: Feature) {

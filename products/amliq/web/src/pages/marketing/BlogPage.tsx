@@ -23,8 +23,8 @@ export default function BlogPage() {
             },
             {
               date: 'February 2026', tag: 'Engineering',
-              title: 'How We Achieve Sub-Millisecond Screening at Scale',
-              desc: "A deep dive into the infrastructure choices behind AMLIQ's <1ms average screening latency.",
+              title: 'How We Built Real-Time Screening at Scale',
+              desc: "A deep dive into the infrastructure choices behind AMLIQ's in-memory real-time screening engine.",
             },
           ].map(post => (
             <div key={post.title} className="pb-10" style={{ borderBottom: '1px solid #E8E5DF' }}>

@@ -35,7 +35,7 @@ export function HeroScreeningCard() {
         </div>
 
         <div className="p-5 font-mono text-sm leading-[1.9]" style={{ borderTop: '1px solid rgba(45,122,79,0.12)', background: 'rgba(45,122,79,0.03)' }}>
-          <p className="mb-1" style={{ color: 'color-mix(in srgb, var(--text) 20%, transparent)' }}>{'// Response — 0.8ms'}</p>
+          <p className="mb-1" style={{ color: 'color-mix(in srgb, var(--text) 20%, transparent)' }}>{'// Response — 42ms'}</p>
           <p style={{ color: 'color-mix(in srgb, var(--text) 25%, transparent)' }}>{'{'}</p>
           <p className="ms-4"><span style={{ color: 'var(--accent-gold)' }}>"matches"</span><span style={{ color: 'color-mix(in srgb, var(--text) 25%, transparent)' }}>: </span><span style={{ color: 'var(--text)' }}>2</span>,</p>
           <p className="ms-4"><span style={{ color: 'var(--accent-gold)' }}>"score"</span><span style={{ color: 'color-mix(in srgb, var(--text) 25%, transparent)' }}>: </span><span style={{ color: 'var(--accent-gold)' }}>0.94</span>,</p>

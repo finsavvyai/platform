@@ -5,19 +5,19 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'QuantumBeam - Quantum-Enhanced Fraud Detection',
-  description: 'Revolutionary fraud detection powered by quantum computing. Experience unprecedented accuracy and speed in identifying fraudulent transactions with our quantum-enhanced AI algorithms.',
+  title: 'AMLIQ Fraud Engine - Machine-Learning Fraud Detection',
+  description: 'Real-time fraud detection powered by classical machine learning. Identify fraudulent transactions with ensemble ML models and graph-based ring detection.',
   keywords: [
     'fraud detection',
-    'quantum computing',
+    'machine learning',
     'AI security',
     'transaction monitoring',
     'financial security',
-    'quantum machine learning',
+    'ensemble models',
     'fraud prevention',
     'regtech',
     'fintech',
-    'quantum advantage'
+    'real-time scoring'
   ],
   authors: [{ name: 'QuantumBeam Team' }],
   creator: 'QuantumBeam',
@@ -37,22 +37,22 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     url: 'https://quantumbeam.io',
-    title: 'QuantumBeam - Quantum-Enhanced Fraud Detection',
-    description: 'Revolutionary fraud detection powered by quantum computing. Experience unprecedented accuracy and speed.',
+    title: 'AMLIQ Fraud Engine - Machine-Learning Fraud Detection',
+    description: 'Real-time fraud detection powered by classical machine learning.',
     siteName: 'QuantumBeam',
     images: [
       {
         url: '/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'QuantumBeam - Quantum Fraud Detection',
+        alt: 'AMLIQ Fraud Engine - ML Fraud Detection',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'QuantumBeam - Quantum-Enhanced Fraud Detection',
-    description: 'Revolutionary fraud detection powered by quantum computing.',
+    title: 'AMLIQ Fraud Engine - Machine-Learning Fraud Detection',
+    description: 'Real-time fraud detection powered by classical machine learning.',
     images: ['/twitter-image.jpg'],
     creator: '@quantumbeam',
   },
@@ -97,7 +97,7 @@ export default function RootLayout({
               "name": "QuantumBeam",
               "url": "https://quantumbeam.io",
               "logo": "https://quantumbeam.io/logo.png",
-              "description": "Quantum-enhanced fraud detection and financial security platform",
+              "description": "Machine-learning fraud detection and financial security platform",
               "foundingDate": "2024",
               "contactPoint": {
                 "@type": "ContactPoint",

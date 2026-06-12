@@ -119,18 +119,18 @@ export default function HomePage() {
               transition={{ duration: 2, repeat: Infinity }}
             >
               <Zap className="w-4 h-4" />
-              <span className="text-sm font-semibold">Quantum-Enhanced Security</span>
+              <span className="text-sm font-semibold">Machine-Learning Fraud Scoring</span>
             </motion.div>
 
             <h1 className="hero-text text-balance mb-6">
-              <span className="gradient-text">Quantum-Powered Fraud Detection</span>
+              <span className="gradient-text">ML-Powered Fraud Detection</span>
               <br />
-              Unprecedented Accuracy & Speed
+              Real-Time Scoring at Speed
             </h1>
 
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto text-pretty">
-              Harness the power of quantum computing to identify fraudulent transactions with
-              99.7% accuracy. Process millions of transactions in real-time with quantum-enhanced
+              Classical machine-learning models identify fraudulent transactions in real time
+              (accuracy benchmarking in progress). Process high transaction volumes with ML-driven
               AI algorithms that adapt to emerging threats.
             </p>
 
@@ -147,7 +147,7 @@ export default function HomePage() {
 
             <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto">
               {[
-                { label: 'Accuracy Rate', value: '99.7%', icon: CheckCircle2 },
+                { label: 'Scoring', value: 'Real-time', icon: CheckCircle2 },
                 { label: 'Processing Speed', value: '100M+/sec', icon: Zap },
                 { label: 'False Positive Rate', value: '&lt;0.1%', icon: AlertTriangle }
               ].map((stat, index) => (
@@ -178,10 +178,10 @@ export default function HomePage() {
             className="text-center mb-16"
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Quantum <span className="gradient-text">Advantage</span>
+              ML <span className="gradient-text">Advantage</span>
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Our quantum algorithms process complex fraud patterns that are impossible
+              Our machine-learning models process complex fraud patterns that are hard
               for classical systems to detect in real-time.
             </p>
           </motion.div>
@@ -190,38 +190,38 @@ export default function HomePage() {
             {[
               {
                 icon: Brain,
-                title: "Quantum Machine Learning",
-                description: "Variational Quantum Classifiers identify subtle fraud patterns with quantum superposition states.",
+                title: "Ensemble Machine Learning",
+                description: "Random Forest and Gradient Boosting models identify subtle fraud patterns.",
                 color: "from-brand-purple to-brand-pink"
               },
               {
                 icon: TrendingUp,
                 title: "Real-time Processing",
-                description: "Process millions of transactions per second with quantum parallelism and entanglement.",
+                description: "Process high transaction volumes with parallel model inference.",
                 color: "from-quantum-600 to-quantum-700"
               },
               {
                 icon: Lock,
-                title: "Quantum Encryption",
-                description: "Your data is protected by quantum-resistant encryption algorithms.",
+                title: "Strong Encryption",
+                description: "Your data is protected by industry-standard encryption.",
                 color: "from-brand-cyan to-quantum-600"
               },
               {
                 icon: BarChart3,
                 title: "Advanced Analytics",
-                description: "Quantum-inspired analytics reveal hidden fraud rings and sophisticated attack patterns.",
+                description: "Graph analytics reveal hidden fraud rings and sophisticated attack patterns.",
                 color: "from-brand-pink to-brand-purple"
               },
               {
                 icon: Shield,
                 title: "Adaptive Defense",
-                description: "Self-evolving quantum models that adapt to new fraud techniques automatically.",
+                description: "Retrainable ML models that adapt to new fraud techniques.",
                 color: "from-quantum-600 to-brand-cyan"
               },
               {
                 icon: Eye,
                 title: "Complete Visibility",
-                description: "Comprehensive dashboard with quantum-enhanced visualization tools.",
+                description: "Comprehensive dashboard with rich visualization tools.",
                 color: "from-brand-purple to-quantum-700"
               }
             ].map((feature, index) => (
@@ -254,24 +254,22 @@ export default function HomePage() {
                 viewport={{ once: true }}
               >
                 <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                  How <span className="gradient-text">Quantum</span> Works
+                  How <span className="gradient-text">the ML Engine</span> Works
                 </h2>
                 <p className="text-lg text-muted-foreground mb-6">
-                  Unlike classical computers that process information in binary bits (0s and 1s),
-                  quantum computers use qubits that can exist in superposition - allowing them to
-                  explore multiple possibilities simultaneously.
+                  Every transaction is converted into behavioral and transactional features,
+                  then scored by an ensemble of classical machine-learning models in real time.
                 </p>
                 <p className="text-lg text-muted-foreground mb-8">
-                  Our quantum fraud detection algorithms leverage this quantum parallelism to
-                  analyze billions of potential fraud patterns in parallel, identifying threats
-                  that would be computationally impossible for classical systems to detect.
+                  Graph analysis links related accounts and merchants to surface fraud rings,
+                  while anomaly detection flags outliers that rule-based systems miss.
                 </p>
                 <div className="space-y-4">
                   {[
-                    "Variational Quantum Classifier for pattern recognition",
-                    "Quantum Approximate Optimization Algorithm (QAOA)",
-                    "Quantum kernel methods for feature mapping",
-                    "Hybrid quantum-classical processing pipeline"
+                    "Random Forest and Gradient Boosting classifiers",
+                    "Graph-based fraud ring detection",
+                    "Anomaly detection for outlier scoring",
+                    "Modular scoring and analytics pipeline"
                   ].map((item, index) => (
                     <div key={index} className="flex items-center space-x-3">
                       <CheckCircle2 className="w-5 h-5 text-quantum-600 flex-shrink-0" />
@@ -291,8 +289,8 @@ export default function HomePage() {
                   <div className="aspect-square bg-gradient-to-br from-quantum-600/20 to-brand-purple/20 rounded-lg flex items-center justify-center">
                     <div className="text-center">
                       <Brain className="w-16 h-16 text-quantum-600 mx-auto mb-4 quantum-pulse" />
-                      <div className="text-2xl font-bold gradient-text">Quantum Core</div>
-                      <div className="text-sm text-muted-foreground mt-2">Processing at Quantum Speed</div>
+                      <div className="text-2xl font-bold gradient-text">ML Core</div>
+                      <div className="text-sm text-muted-foreground mt-2">Real-Time Scoring</div>
                     </div>
                   </div>
                 </div>
@@ -312,7 +310,7 @@ export default function HomePage() {
             className="max-w-4xl mx-auto text-center"
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Ready to Experience <span className="gradient-text">Quantum Security</span>?
+              Ready to Experience <span className="gradient-text">Real-Time Fraud Protection</span>?
             </h2>
             <p className="text-xl text-muted-foreground mb-8">
               Join leading financial institutions already using QuantumBeam to protect
@@ -344,7 +342,7 @@ export default function HomePage() {
                 <span className="text-xl font-bold">QuantumBeam</span>
               </div>
               <p className="text-muted-foreground">
-                Quantum-enhanced fraud detection for the future of financial security.
+                Machine-learning fraud detection for the future of financial security.
               </p>
             </div>
 

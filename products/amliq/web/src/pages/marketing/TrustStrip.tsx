@@ -11,7 +11,7 @@ export default function TrustStrip() {
   return (
     <div className="relative overflow-hidden py-5" style={{ background: 'var(--bg)', borderBottom: '1px solid var(--accent-gold-light)' }}>
       <p className="text-center text-[10px] font-semibold uppercase tracking-[0.18em] mb-4" style={{ color: 'color-mix(in srgb, var(--accent-gold) 50%, transparent)' }}>
-        Screening against 200+ global sanctions &amp; watchlists
+        Screening against 26+ global sanctions &amp; watchlists
       </p>
 
       <div className="relative overflow-hidden">

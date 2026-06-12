@@ -1,6 +1,6 @@
 # 🚀 START HERE - QuantumBeam Quick Navigation
 
-Welcome to **QuantumBeam** - your quantum-enhanced fraud detection platform that's ready for production!
+Welcome to **QuantumBeam** (the AMLIQ Fraud Engine) - a classical machine-learning fraud detection engine.
 
 ---
 
@@ -145,7 +145,7 @@ Everything is ready to deploy:
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| Backend API | ✅ Ready | 99.7% accuracy, <50ms latency |
+| Backend API | ✅ Ready | Classical ML scoring (accuracy not yet benchmarked), <50ms latency target |
 | Health Checks | ✅ Ready | `/health`, `/health/live`, `/health/ready` |
 | Circuit Breaker | ✅ Implemented | Prevents cascade failures |
 | Rate Limiting | ✅ Active | 100 req/s with burst |
@@ -345,5 +345,5 @@ All production documentation in one place:
 
 ---
 
-*QuantumBeam - Quantum-Enhanced Fraud Detection*
+*AMLIQ Fraud Engine - Classical ML Fraud Detection*
 *Version 1.0.0 - Production Ready ✅*

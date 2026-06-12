@@ -4,15 +4,15 @@ import { Zap, Database, Shield, Activity } from 'lucide-react';
 
 const metrics = [
   {
-    value: '<1ms',
-    label: 'Avg screening latency',
+    value: 'Real-time',
+    label: 'Screening response',
     icon: Zap,
     accent: 'var(--accent-gold)',
     accentBg: 'var(--accent-gold-light)',
-    detail: 'sub-millisecond at scale',
+    detail: 'in-memory instant index',
   },
   {
-    value: '86',
+    value: '26+',
     label: 'Sanctions & watchlists',
     icon: Shield,
     accent: '#3DAA6A',
@@ -20,8 +20,8 @@ const metrics = [
     detail: 'OFAC · UN · EU · FATF + more',
   },
   {
-    value: '3M+',
-    label: 'Entity profiles indexed',
+    value: '1M+',
+    label: 'Entity records searchable',
     icon: Database,
     accent: 'var(--accent-gold)',
     accentBg: 'var(--accent-gold-light)',
@@ -29,7 +29,7 @@ const metrics = [
   },
   {
     value: '99.9%',
-    label: 'Uptime SLA',
+    label: 'Uptime target',
     icon: Activity,
     accent: '#3DAA6A',
     accentBg: 'rgba(61,170,106,0.1)',

@@ -74,7 +74,7 @@ Adoption funnel: `Cursor → PushCI → QueryFlux → Qestro → OpenSyber → S
 
 **Problem**: Legacy AML stacks push analysts through fragmented sanctions lists, manual case files, per-record fees ($100K-$500K/seat/year). Workflow is the textbook "humans copy-pasting between four tabs" automation target.
 
-**Solution**: Autonomous AML agent on top of two production fraud-scoring engines (QuantumBeam quantum-enhanced + ML-Fraud classical), exposed as one decision API + one analyst console. Every decision emits a signed, PII-free audit record.
+**Solution**: Autonomous AML agent on top of two classical-ML fraud-scoring engines (QuantumBeam — classical ML despite the legacy name — + ML-Fraud), exposed as one decision API + one analyst console. Every decision emits a signed, PII-free audit record.
 
 **Surface**: `POST /v1/aml/decision`, `POST /v1/aml/investigate`, `GET /v1/aml/cases/{id}`, `GET /v1/aml/audit/{id}`, plus React analyst console.
 

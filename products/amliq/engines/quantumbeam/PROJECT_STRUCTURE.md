@@ -51,8 +51,8 @@ quantumbeam/
 ## Core Interfaces
 
 ### Fraud Detection Service
-- **Primary**: Quantum-enhanced fraud detection using VQC and QAOA
-- **Secondary**: Classical processing for fallback and comparison
+- **Primary**: Classical ML fraud detection (Random Forest / Gradient Boosting, graph-based ring detection)
+- **Secondary**: Experimental quantum-simulator prototype (`services/quantum/`, local simulator only — not in the scoring path)
 - **Features**: Real-time analysis, batch processing, fraud ring detection
 
 ### Authentication Service
@@ -69,7 +69,7 @@ quantumbeam/
 
 ### Core Models
 - **TransactionData**: Financial transaction with validation
-- **FraudResult**: Fraud detection results with quantum metrics
+- **FraudResult**: Fraud detection results with model metrics
 - **User**: System user with role-based access
 - **APIKey**: API authentication with usage tracking
 

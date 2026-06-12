@@ -45,7 +45,7 @@ export const aboutSections: TrustSectionData[] = [
     items: [
       'Real-time sanctions screening across OFAC, UN, EU, UK, and additional global watchlists.',
       'Explainable matching: every result includes a confidence score and a human-readable explanation of why a match was flagged.',
-      'Sub-50ms API response times for single-entity screening.',
+      'Real-time API responses for single-entity screening (sub-50ms design target).',
       'Batch screening for onboarding and periodic review workflows.',
     ],
   },

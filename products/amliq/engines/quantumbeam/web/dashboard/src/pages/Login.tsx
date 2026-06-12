@@ -169,7 +169,7 @@ export function Login() {
         <div className="mt-6 text-center">
           <div className="flex items-center justify-center space-x-2 text-xs text-gray-500">
             <Shield className="h-3 w-3" />
-            <span>Secured with quantum-enhanced protection</span>
+            <span>Secured with enterprise-grade protection</span>
           </div>
         </div>
       </div>

@@ -5,14 +5,14 @@ import HomePage from '../app/page'
 describe('HomePage', () => {
   test('renders main heading', () => {
     render(<HomePage />)
-    expect(screen.getByText(/Quantum-Powered Fraud Detection/)).toBeInTheDocument()
+    expect(screen.getByText(/Fraud Detection/)).toBeInTheDocument()
   })
 
   test('displays key statistics', () => {
     render(<HomePage />)
-    expect(screen.getByText('99.7%')).toBeInTheDocument()
-    expect(screen.getByText('100M+/sec')).toBeInTheDocument()
-    expect(screen.getByText('<0.1%')).toBeInTheDocument()
+    expect(screen.getByText('ML')).toBeInTheDocument()
+    expect(screen.getByText('<50ms')).toBeInTheDocument()
+    expect(screen.getByText('24/7')).toBeInTheDocument()
   })
 
   test('renders navigation links', () => {
@@ -24,21 +24,21 @@ describe('HomePage', () => {
 
   test('displays call-to-action buttons', () => {
     render(<HomePage />)
-    expect(screen.getByText('Start Free Trial')).toBeInTheDocument()
+    expect(screen.getAllByText('Start Free Trial').length).toBeGreaterThan(0)
     expect(screen.getByText('Watch Demo')).toBeInTheDocument()
   })
 
   test('shows feature cards', () => {
     render(<HomePage />)
-    expect(screen.getByText('Quantum Machine Learning')).toBeInTheDocument()
-    expect(screen.getByText('Real-time Processing')).toBeInTheDocument()
-    expect(screen.getByText('Quantum Encryption')).toBeInTheDocument()
+    expect(screen.getByText('Ensemble Machine Learning')).toBeInTheDocument()
+    expect(screen.getByText('Real-Time Processing')).toBeInTheDocument()
+    expect(screen.getByText('Strong Encryption')).toBeInTheDocument()
   })
 
-  test('includes quantum-themed elements', () => {
+  test('does not make quantum-computing or accuracy claims', () => {
     render(<HomePage />)
-    expect(screen.getByText('Quantum-Enhanced Security')).toBeInTheDocument()
-    expect(screen.getByText('Quantum Advantage')).toBeInTheDocument()
-    expect(screen.getByText('How Quantum Works')).toBeInTheDocument()
+    expect(screen.queryByText(/Powered by Quantum Computing/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/quantum algorithms/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/99\.7/)).not.toBeInTheDocument()
   })
 })

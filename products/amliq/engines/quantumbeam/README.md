@@ -1,6 +1,6 @@
 # QuantumBeam — fraud-scoring engine (AMLIQ sub-component)
 
-**QuantumBeam is a quantum-enhanced fraud-detection engine. It is a sub-component of the AMLIQ product, not a standalone product.**
+**QuantumBeam (the AMLIQ Fraud Engine) is a classical machine-learning fraud-detection engine. It is a sub-component of the AMLIQ product, not a standalone product.** Despite the legacy name, scoring is classical ML (sklearn-based); the `services/quantum/` tree is an experimental local-simulator prototype with no quantum hardware backend and no published accuracy metrics.
 
 ## Status
 
@@ -14,8 +14,8 @@ The previous top-level README, which positioned QuantumBeam as a standalone prod
 
 | Responsibility | Where |
 |---|---|
-| Quantum pattern detection (VQC, QAOA, quantum kernels) | `services/quantum/` (Python) |
-| Classical fallback when quantum backend unavailable | `services/ml/` (Python) |
+| Experimental quantum-simulator prototype (local simulator only — not in the scoring path) | `services/quantum/` (Python) |
+| Classical ML scoring (primary) | `services/ml/` (Python) |
 | Go orchestration + HTTP surface | `cmd/`, `internal/`, `pkg/` |
 | Engine adapter (called by AMLIQ decision API) | **TBD** — not yet implemented; tracked in `products/amliq/MIGRATION_NOTES.md` |
 

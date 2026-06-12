@@ -1,14 +1,16 @@
-# QuantumBeam Quantum Service
+# QuantumBeam Quantum Service (experimental prototype)
 
-The Quantum Service provides quantum computing capabilities for fraud detection, including Variational Quantum Circuits (VQC) and Quantum Approximate Optimization Algorithm (QAOA).
+> **Status**: experimental prototype, NOT part of the production scoring path. Runs only against a local quantum simulator — no quantum hardware backend is configured or validated. Production fraud scoring is classical ML (see `services/ml/`). No accuracy metrics have been benchmarked for this service.
+
+The Quantum Service prototypes quantum-circuit experiments for fraud detection, including Variational Quantum Circuits (VQC) and Quantum Approximate Optimization Algorithm (QAOA).
 
 ## Features
 
 - **Variational Quantum Classifier (VQC)**: Quantum-enhanced classification for fraud detection
 - **Quantum Approximate Optimization Algorithm (QAOA)**: Optimization for fraud ring detection
 - **Hybrid Quantum-Classical Processing**: Automatic fallback to classical ML when quantum resources are unavailable
-- **Multi-Backend Support**: IBM Quantum, Amazon Braket, Azure Quantum, and local simulators
-- **Real-time Processing**: Sub-50ms quantum computation latency
+- **Backend Support**: local simulators (IBM Quantum / Amazon Braket / Azure Quantum integrations are scaffolded but unvalidated)
+- **Real-time Processing**: sub-50ms latency target (unverified)
 - **Comprehensive Monitoring**: Prometheus metrics, Jaeger tracing, and structured logging
 
 ## Quick Start

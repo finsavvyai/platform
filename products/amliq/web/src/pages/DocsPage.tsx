@@ -55,10 +55,10 @@ const sdks = [
 ]
 
 const latencyClaims = [
-  { label: 'P50 decision', value: '18ms' },
-  { label: 'P95 decision', value: '34ms' },
-  { label: 'P99 decision', value: '<50ms' },
-  { label: 'Uptime SLA', value: '99.97%' },
+  { label: 'P99 decision target', value: '<50ms' },
+  { label: 'Cold starts', value: 'Zero' },
+  { label: 'List sources', value: '26+' },
+  { label: 'Uptime target', value: '99.9%' },
 ]
 
 const codeBlock = {

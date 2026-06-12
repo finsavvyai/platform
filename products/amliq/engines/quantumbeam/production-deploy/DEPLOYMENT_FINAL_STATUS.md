@@ -268,7 +268,7 @@ app.listen(process.env.PORT || 3000);
 ✅ **Documentation**: Complete
 ✅ **Multi-platform**: Ready for any host
 
-**Your quantum-enhanced fraud detection API with MCP integration is LIVE and ready for business!**
+**Your classical-ML fraud detection API with MCP integration is LIVE and ready for business!**
 
 ---
 
@@ -290,7 +290,7 @@ app.listen(process.env.PORT || 3000);
 
 **🚀 QuantumBeam.io Deployment: MISSION ACCOMPLISHED! 🎉**
 
-*Your fraud detection API is serving the globe with quantum-enhanced intelligence!*
+*Your fraud detection API is serving the globe with machine-learning intelligence!*
 
 ---
 

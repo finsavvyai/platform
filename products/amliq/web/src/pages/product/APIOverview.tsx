@@ -4,7 +4,7 @@ const request = `POST /v1/screen
   "lists": ["OFAC", "UN", "EU"]
 }`
 
-const response = `Response (0.8ms):
+const response = `Response (42ms):
 {
   "matches": [{
     "name": "HASSAN ALI",
@@ -22,7 +22,7 @@ export default function APIOverview() {
           API Overview
         </h2>
         <p className="text-base text-token-fg-muted mb-10 max-w-2xl">
-          A single endpoint handles real-time screening with sub-millisecond latency.
+          A single endpoint handles real-time screening in real time from an in-memory index.
         </p>
         <div className="grid md:grid-cols-2 gap-6">
           {[

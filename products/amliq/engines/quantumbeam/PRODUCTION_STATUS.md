@@ -8,12 +8,12 @@
 
 ## Executive Summary
 
-QuantumBeam is a quantum-enhanced fraud detection platform that is **fully production-ready** and can be deployed immediately to any cloud platform or on-premises infrastructure.
+QuantumBeam (now the AMLIQ Fraud Engine) is a classical machine-learning fraud detection engine that can be deployed to any cloud platform or on-premises infrastructure.
 
 ### Key Achievements
 
-- ✅ **99.7% fraud detection accuracy** (target: >99%)
-- ✅ **50ms processing latency** (target: <100ms)
+- ✅ **Classical ML fraud scoring** (accuracy not yet benchmarked — no published metric)
+- ✅ **50ms processing-latency target** (target: <100ms; unverified)
 - ✅ **Production-grade infrastructure** with circuit breaker, rate limiting, caching
 - ✅ **Modern Qodo-inspired website** with dark theme and animations
 - ✅ **Complete monitoring stack** (Prometheus + Grafana)
@@ -38,7 +38,7 @@ QuantumBeam is a quantum-enhanced fraud detection platform that is **fully produ
 
 **Features:**
 - Automatic retry with exponential backoff
-- Classical fallback when quantum backends fail
+- Fallback scoring path on model-service failure
 - Request deduplication
 - Comprehensive logging with structured format
 - Performance tracking and alerting
@@ -213,13 +213,13 @@ kubectl rollout status deployment/quantumbeam-api
 
 ### Benchmark Results ✅
 
-| Metric | Target | Achieved | Status |
-|--------|--------|----------|--------|
-| Detection Accuracy | >99% | **99.7%** | ✅ Exceeded |
-| Processing Latency (p95) | <100ms | **50ms** | ✅ Exceeded |
-| Throughput | 10K req/s | **100K+ req/s** | ✅ Exceeded |
-| False Positive Rate | <1% | **0.1%** | ✅ Exceeded |
-| Uptime SLA | 99.9% | **Ready** | ✅ Configured |
+| Metric | Target | Status |
+|--------|--------|--------|
+| Detection Accuracy | TBD | Not yet benchmarked |
+| Processing Latency (p95) | <100ms | Target: 50ms (unverified) |
+| Throughput | 10K req/s | Target (unverified) |
+| False Positive Rate | <1% | Not yet benchmarked |
+| Uptime SLA | 99.9% | Not yet measured |
 
 ### Load Test Results
 ```
@@ -379,7 +379,7 @@ Results: ✓ 18 passed, ✗ 0 failed
 
 ✅ **QuantumBeam is PRODUCTION READY**
 
-All components have been implemented, tested, and documented. The system exceeds all performance targets and is ready for immediate deployment to production.
+All components have been implemented, tested, and documented. Performance targets are defined but not yet independently benchmarked.
 
 **To deploy now:**
 ```bash

@@ -797,7 +797,7 @@ wrangler rollback <VERSION_ID>
 2. **Deploy Quantum Service** (optional)
    - Uncomment service binding
    - Deploy quantumbeam-quantum-service
-   - Enable quantum-enhanced fraud detection
+   - Enable the experimental quantum-simulator prototype (local simulator only — not used in production scoring)
 
 3. **Add Monitoring Alerts**
    - Configure error rate alerts

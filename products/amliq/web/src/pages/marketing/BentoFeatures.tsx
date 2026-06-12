@@ -4,8 +4,8 @@ import { FadeIn, StaggerGroup, staggerChild } from './animations'
 
 const items = [
   { icon: Layers, title: 'Multi-Layer Matching', desc: 'Exact, Fuzzy, Phonetic, and Token layers in production today. Semantic (Embedding) and Graph layers in active rollout.', span: 'md:col-span-2' },
-  { icon: Zap, title: 'Sub-1ms Screening', desc: 'In-memory engine screens entities in real-time. Zero cold starts.', span: '' },
-  { icon: Globe, title: 'Global Coverage', desc: 'OFAC, UN, EU, UK OFSI, IL NBCTF and 80+ additional lists updated daily.', span: '' },
+  { icon: Zap, title: 'Real-Time Screening', desc: 'In-memory engine screens entities in real-time. Zero cold starts.', span: '' },
+  { icon: Globe, title: 'Global Coverage', desc: 'OFAC, UN, EU, UK OFSI, IL NBCTF and 20+ additional lists updated daily.', span: '' },
   { icon: Brain, title: 'Explainable Results', desc: 'Every match shows exactly why -- which layer, which tokens, what score.', span: 'md:col-span-2' },
   { icon: Shield, title: 'PEP & RCA', desc: 'Politicians, relatives, close associates across 195 countries.', span: '' },
   { icon: BarChart3, title: 'Ongoing Monitoring', desc: 'Continuous re-screening when lists update. Instant alerts.', span: 'md:col-span-2' },

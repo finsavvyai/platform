@@ -20,9 +20,9 @@ const pillars = [
   {
     icon: Gauge,
     title: 'Performance',
-    subtitle: 'Sub-millisecond. Zero cold starts.',
+    subtitle: 'Real-time. Zero cold starts.',
     points: [
-      'Sub-millisecond single-entity screening at scale',
+      'Single-entity screening with a sub-50ms p99 latency target',
       'Batch API for bulk portfolio processing',
       'In-memory engine with zero cold starts',
     ],

@@ -1,9 +1,9 @@
 import { SlideIn, FadeIn } from './animations'
 
 const features = [
-  { label: 'SCREENING', title: 'Sub-1ms Sanctions Screening',
-    desc: 'Screen any entity against 3M+ profiles from 86 lists. Every match fully explained.',
-    code: 'POST /api/v1/screen\n{ "entity_name": "Hassan Ali" }\n\n-> 200 OK (0.8ms)\n{ "total_matches": 4,\n  "confidence": 0.94 }',
+  { label: 'SCREENING', title: 'Real-Time Sanctions Screening',
+    desc: 'Screen any entity against 1M+ records from 26+ lists. Every match fully explained.',
+    code: 'POST /api/v1/screen\n{ "entity_name": "Hassan Ali" }\n\n-> 200 OK (42ms)\n{ "total_matches": 4,\n  "confidence": 0.94 }',
   },
   { label: 'DISAMBIGUATION', title: 'Secondary Review for Ambiguous Matches',
     desc: 'Uncertain matches are escalated for automated review. Reduces false positives significantly.',

@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-QuantumBeam quantum fraud detection platform has been successfully transformed into a **production-ready system** with all enterprise-grade features, comprehensive documentation, and multiple deployment options. The system exceeds all performance targets and is ready for immediate deployment.
+The QuantumBeam classical-ML fraud detection engine (now the AMLIQ Fraud Engine) has been hardened with enterprise-grade features, comprehensive documentation, and multiple deployment options. Performance targets are defined but not yet independently verified.
 
 ---
 
@@ -43,10 +43,9 @@ QuantumBeam quantum fraud detection platform has been successfully transformed i
    - Circuit breaker integration tests
 
 **Results:**
-- ✅ 99.7% fraud detection accuracy (target: >99%)
-- ✅ 50ms processing latency (target: <100ms)
-- ✅ 100K+ req/s throughput (target: 10K)
-- ✅ 0.1% false positive rate (target: <1%)
+- Classical ML fraud scoring in place (accuracy not yet benchmarked — no published metric)
+- 50ms processing-latency target (<100ms goal; unverified)
+- Throughput and false-positive-rate targets not yet measured
 
 ### Phase 2: Website Redesign (Qodo.ai Style) ✅
 
@@ -140,13 +139,13 @@ QuantumBeam quantum fraud detection platform has been successfully transformed i
 
 ### Target vs Achieved
 
-| Metric | Target | Achieved | Status |
-|--------|--------|----------|--------|
-| Detection Accuracy | >99% | **99.7%** | ✅ Exceeded by 0.7% |
-| Processing Latency (p95) | <100ms | **50ms** | ✅ 50% faster |
-| Throughput | 10K req/s | **100K+ req/s** | ✅ 10x capacity |
-| False Positive Rate | <1% | **0.1%** | ✅ 90% reduction |
-| Uptime SLA | 99.9% | **Ready** | ✅ Configured |
+| Metric | Target | Status |
+|--------|--------|--------|
+| Detection Accuracy | TBD | Not yet benchmarked |
+| Processing Latency (p95) | <100ms | Target: 50ms (unverified) |
+| Throughput | 10K req/s | Target (unverified) |
+| False Positive Rate | <1% | Not yet benchmarked |
+| Uptime SLA | 99.9% | Not yet measured |
 
 ### Load Test Results
 ```
@@ -397,8 +396,8 @@ curl http://localhost:8080/health/detailed
 ## Success Criteria - All Met ✅
 
 ### Technical Requirements
-- ✅ 99%+ fraud detection accuracy → **99.7% achieved**
-- ✅ <100ms processing latency → **50ms achieved**
+- Fraud detection accuracy → **not yet benchmarked (no published metric)**
+- <100ms processing latency → **50ms target (unverified)**
 - ✅ Production-grade error handling → **Implemented with circuit breaker**
 - ✅ Comprehensive testing → **6 test suites completed**
 - ✅ Security hardening → **All controls implemented**
@@ -421,9 +420,9 @@ curl http://localhost:8080/health/detailed
 
 ## Conclusion
 
-**QuantumBeam is production-ready and exceeds all performance targets.**
+**The engine is deployable; performance targets are defined but not yet benchmarked.**
 
-The system has been successfully transformed from a development-stage application into a production-grade quantum fraud detection platform with:
+The system has been transformed from a development-stage application into a hardened classical-ML fraud detection engine with:
 
 - ✅ Enterprise-grade backend features
 - ✅ Modern, professional website design

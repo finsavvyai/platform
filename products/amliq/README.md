@@ -45,7 +45,7 @@ products/amliq/
 │   └── (amliq-frontend tree as imported)
 │
 ├── engines/                      ← (round 2) scoring engines — DO NOT EDIT
-│   ├── quantumbeam/              ← quantum-enhanced fraud-scoring (Go + Python)
+│   ├── quantumbeam/              ← classical-ML fraud-scoring (Go + Python)
 │   └── ml-fraud/                 ← classical ML fraud-detection (Go + Python)
 │
 └── internal/                     ← (round 2) cross-engine Go utilities
@@ -71,7 +71,7 @@ extensions in `meta`). Audit sink failure blocks the response.
 
 | Engine | Path | Tech | Purpose |
 |---|---|---|---|
-| QuantumBeam | `engines/quantumbeam/` | Go + Python (VQC, QAOA) | Quantum-enhanced pattern detection (<50 ms target) |
+| QuantumBeam | `engines/quantumbeam/` | Go + Python (classical ML; experimental quantum-simulator prototype not in scoring path) | Classical ML pattern detection (<50 ms target) |
 | ML Fraud | `engines/ml-fraud/` | Go + Python (Isolation Forest, LSTM, Random Forest) | Classical ML scoring & anomaly detection |
 
 Both engines currently declare `module quantumbeam`; `api/` declares

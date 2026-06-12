@@ -30,7 +30,7 @@ Core fraud detection logic. Process:
 - Neural Net (deep feature learning)
 - Anomaly Detection (outlier scoring)
 
-**Accuracy**: 99.7%
+**Accuracy**: not yet benchmarked (no published metric)
 
 ### Ring Detection
 Graph-based fraud ring detection:

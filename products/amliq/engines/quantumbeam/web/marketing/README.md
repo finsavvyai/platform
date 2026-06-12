@@ -1,6 +1,6 @@
 # QuantumBeam Marketing Website
 
-A Next.js 14 marketing website showcasing QuantumBeam's quantum-enhanced fraud detection platform.
+A Next.js 14 marketing website showcasing the AMLIQ Fraud Engine's classical machine-learning fraud detection.
 
 ## 🌟 Features
 

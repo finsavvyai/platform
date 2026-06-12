@@ -10,7 +10,7 @@ const sources = [
   { name: 'PEP Lists', icon: FileCheck },
   { name: 'FATF Lists', icon: Landmark },
   { name: 'Swiss SECO', icon: Building2 },
-  { name: '3M+ Entities', icon: Zap },
+  { name: '1M+ Entity records', icon: Zap },
 ]
 
 function Badge({ name, icon: Icon }: { name: string; icon: typeof Shield }) {

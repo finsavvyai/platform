@@ -53,7 +53,7 @@ interface DecisionRequest {
 | Condition | QuantumBeam | ml-fraud | Rationale |
 |---|---|---|---|
 | `transaction.amount < context.lowRiskCeiling` | yes | no | QB-only for fast-path low-value flows (< 50 ms budget) |
-| `transaction.channel ∈ {wire, crypto}` | yes | yes | Both engines — quantum pattern detection + classical ML cross-check |
+| `transaction.channel ∈ {wire, crypto}` | yes | yes | Both engines — two independent classical-ML scorers cross-check |
 | `subject.riskTier == "high"` | yes | yes | Both — max-score wins on aggregation |
 | `transaction.requiresExplainability` | no | yes | ml-fraud surfaces feature attributions; QB is opaque |
 | QB engine `degraded` (per `/health`) | no | yes | Fail-safe to ml-fraud |

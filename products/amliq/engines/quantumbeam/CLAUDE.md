@@ -3,7 +3,7 @@
 > **Portfolio Tracker**: `../../../portfolio-tracker.html` | **Readiness**: 76% | **Category**: BUILD
 
 ## Mission
-Production fraud detection platform achieving 99.7% accuracy via quantum-enhanced ML. Real-time transaction scoring with sub-50ms response times at edge (Cloudflare Workers), serving fintech enterprises with SOC 2 / PCI DSS compliance.
+Fraud detection engine (AMLIQ Fraud Engine) using classical machine-learning scoring (sklearn-based models; accuracy not yet benchmarked — no published metric). Real-time transaction scoring targeting sub-50ms response times at edge (Cloudflare Workers), serving fintech enterprises with SOC 2 / PCI DSS compliance as a goal.
 
 ## Code Map & Index
 ### Directory Structure
@@ -159,7 +159,7 @@ go test -run Security ./...         # Run security-specific tests
 ## What's Done vs What's Left
 ### Completed (76%)
 - Go API server with Gin framework
-- Fraud scoring engine (99.7% accuracy)
+- Fraud scoring engine (classical ML; accuracy not yet benchmarked)
 - JWT auth with session management
 - PostgreSQL database with GORM
 - Stripe billing integration
@@ -189,9 +189,8 @@ go test -run Security ./...         # Run security-specific tests
 - In-house ML teams (large enterprises)
 
 **Differentiation**:
-- Quantum-enhanced ML (hybrid classical/quantum models)
+- Classical ML scoring (Random Forest / Gradient Boosting ensemble)
 - Sub-50ms response time at edge (Cloudflare Workers)
-- 99.7% accuracy on fraud detection
 - Multi-ring fraud detection (organized fraud groups)
 - SOC 2 / PCI DSS compliant out-of-box
 - Modular architecture (use any component independently)

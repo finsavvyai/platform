@@ -4,7 +4,7 @@
 
 ![QuantumBeam Logo](https://via.placeholder.com/150x150/A855F7/FFFFFF?text=QB)
 
-**Quantum-Enhanced Fraud Detection Platform**
+**Classical ML Fraud Detection Engine (AMLIQ Fraud Engine)**
 
 [![Production Ready](https://img.shields.io/badge/Production-Ready-success?style=for-the-badge)](.)
 [![Version](https://img.shields.io/badge/Version-1.0.0-blue?style=for-the-badge)](.)
@@ -18,13 +18,14 @@
 
 ## 🎯 What is QuantumBeam?
 
-QuantumBeam is a **production-ready** quantum-enhanced fraud detection platform that combines cutting-edge quantum computing algorithms with classical machine learning to deliver:
+QuantumBeam (now the AMLIQ Fraud Engine) is a fraud detection engine built on classical machine learning (Random Forest / Gradient Boosting ensembles plus graph-based ring detection) that delivers:
 
-- **99.7% Fraud Detection Accuracy**
-- **<50ms Quantum Processing Time**
-- **40% Reduction in False Positives**
+- **Classical ML fraud scoring** (accuracy not yet benchmarked — no published metric)
+- **<50ms processing-time target**
 - **Real-time Transaction Analysis**
-- **Fraud Ring Detection with QAOA**
+- **Graph-based Fraud Ring Detection**
+
+Note: experimental quantum-simulator prototype code exists in `services/quantum/` (local simulator only, no quantum hardware backend) and is not part of the production scoring path.
 
 ---
 
@@ -93,14 +94,14 @@ kubectl rollout status deployment/quantumbeam-api
 ### 1. Production-Grade Backend
 
 ```
-✅ Quantum fraud detection API (99.7% accuracy)
-✅ Real-time processing (<50ms latency)
+✅ Classical ML fraud detection API (accuracy not yet benchmarked)
+✅ Real-time processing (<50ms latency target)
 ✅ Circuit breaker pattern for resilience
 ✅ Rate limiting (100 req/s with burst)
 ✅ Automatic retry with exponential backoff
 ✅ Health checks and monitoring
 ✅ Prometheus metrics integration
-✅ Classical fallback when quantum fails
+✅ Fallback scoring path on model-service failure
 ```
 
 ### 2. Modern Marketing Website
@@ -143,12 +144,12 @@ kubectl rollout status deployment/quantumbeam-api
 
 ## 🎨 Features
 
-### Quantum Algorithms
+### Scoring Algorithms (classical ML)
 
-- **Variational Quantum Classifier (VQC)**: Pattern recognition in superposition
-- **QAOA**: Fraud ring detection through quantum optimization
-- **Quantum Kernel Methods**: Advanced feature mapping
-- **Hybrid Quantum-Classical**: Best of both worlds
+- **Random Forest / Gradient Boosting**: Primary transaction classifiers
+- **Graph analysis**: Fraud ring detection
+- **Anomaly detection**: Outlier scoring
+- Experimental quantum-simulator prototype code exists (`services/quantum/`, local simulator only) and is not used in production scoring
 
 ### Production Features
 
@@ -174,13 +175,13 @@ kubectl rollout status deployment/quantumbeam-api
 
 ### Benchmarks
 
-| Metric | Target | Achieved |
-|--------|--------|----------|
-| Detection Accuracy | >99% | **99.7%** |
-| Processing Latency (p95) | <100ms | **50ms** |
-| Throughput | 10K req/s | **100K+ req/s** |
-| False Positive Rate | <1% | **0.1%** |
-| Uptime SLA | 99.9% | **✅ Ready** |
+| Metric | Target | Status |
+|--------|--------|--------|
+| Detection Accuracy | TBD | Not yet benchmarked |
+| Processing Latency (p95) | <100ms | Target: 50ms (unverified) |
+| Throughput | 10K req/s | Target (unverified) |
+| False Positive Rate | <1% | Not yet benchmarked |
+| Uptime SLA | 99.9% | Not yet measured |
 
 ---
 
@@ -441,7 +442,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 🙏 Acknowledgments
 
 - Built with [Go](https://golang.org/), [Next.js](https://nextjs.org/), and [Docker](https://www.docker.com/)
-- Quantum algorithms inspired by IBM Qiskit and AWS Braket
+- Experimental quantum-simulator prototype inspired by IBM Qiskit and AWS Braket (not in scoring path)
 - UI design inspired by [Qodo.ai](https://qodo.ai)
 - Monitoring powered by [Prometheus](https://prometheus.io/) and [Grafana](https://grafana.com/)
 

@@ -1,13 +1,11 @@
-# QuantumBeam - Quantum-Enhanced Fraud Detection Platform
+# AMLIQ Fraud Engine (formerly QuantumBeam) - Classical ML Fraud Detection
 
 <div align="center">
 
-![QuantumBeam](https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge)
 ![Version](https://img.shields.io/badge/Version-1.0.0-blue?style=for-the-badge)
-![Accuracy](https://img.shields.io/badge/Accuracy-99.7%25-green?style=for-the-badge)
-![Latency](https://img.shields.io/badge/Latency-<50ms-brightgreen?style=for-the-badge)
+![Latency](https://img.shields.io/badge/Latency%20Target-<50ms-brightgreen?style=for-the-badge)
 
-**Quantum-powered fraud detection with 99.7% accuracy and <50ms latency**
+**Classical machine-learning fraud scoring with a <50ms latency target** (accuracy not yet benchmarked)
 
 [🚀 Quick Deploy](#-quick-deploy) • [📚 Documentation](#-documentation) • [✨ Features](#-features) • [🎯 Get Started](START_HERE.md)
 
@@ -15,11 +13,11 @@
 
 ---
 
-## ✅ Production Ready!
+## Status
 
-QuantumBeam is **fully production-ready** with:
-- ✅ 99.7% fraud detection accuracy
-- ✅ <50ms quantum processing time
+The engine ships with:
+- Classical ML fraud scoring (accuracy not yet benchmarked)
+- <50ms processing-time target
 - ✅ Circuit breaker & rate limiting
 - ✅ Modern Qodo-inspired website
 - ✅ Complete monitoring stack
@@ -44,7 +42,7 @@ cp .env.production.example .env.production
 curl http://localhost:8080/health
 ```
 
-**That's it!** Your quantum fraud detection platform is now running. 🎉
+**That's it!** Your fraud detection platform is now running. 🎉
 
 ---
 
@@ -68,18 +66,18 @@ Complete production documentation:
 
 ## ✨ Features
 
-### Quantum Algorithms
-- **Variational Quantum Classifier (VQC)**: Pattern recognition in superposition
-- **QAOA**: Fraud ring detection through quantum optimization
-- **Quantum Kernel Methods**: Advanced feature mapping
-- **Hybrid Processing**: Best of quantum and classical
+### Scoring Algorithms (classical ML)
+- **Random Forest / Gradient Boosting**: Primary transaction classifiers
+- **Graph analysis**: Fraud ring detection
+- **Anomaly detection**: Outlier scoring
+- Note: the repo also contains experimental quantum-simulator prototype code (`services/quantum/`, local simulator only — no quantum hardware backend); it is not part of the production scoring path.
 
 ### Production Features
 - **Circuit Breaker**: Prevents cascade failures
 - **Rate Limiting**: 100 req/s with burst protection
 - **Request Caching**: 5-minute TTL for performance
 - **Health Monitoring**: Kubernetes-ready endpoints
-- **Graceful Degradation**: Classical fallback when quantum fails
+- **Graceful Degradation**: Fallback scoring path on model-service failure
 - **Metrics Collection**: Complete Prometheus integration
 
 ### Security
@@ -112,12 +110,12 @@ vercel --prod
 
 ## 📊 Performance
 
-| Metric | Target | Achieved |
-|--------|--------|----------|
-| Detection Accuracy | >99% | **99.7%** ✅ |
-| Processing Latency (p95) | <100ms | **50ms** ✅ |
-| Throughput | 10K req/s | **100K+ req/s** ✅ |
-| False Positive Rate | <1% | **0.1%** ✅ |
+| Metric | Target | Status |
+|--------|--------|--------|
+| Detection Accuracy | TBD | Not yet benchmarked |
+| Processing Latency (p95) | <100ms | Target: 50ms (unverified) |
+| Throughput | 10K req/s | Target (unverified) |
+| False Positive Rate | <1% | Not yet benchmarked |
 
 ---
 
@@ -304,7 +302,7 @@ MIT License - see LICENSE file for details.
 ## 🙏 Acknowledgments
 
 - Built with Go, Next.js, and Docker
-- Quantum algorithms inspired by IBM Qiskit and AWS Braket
+- Experimental quantum-simulator prototype inspired by IBM Qiskit and AWS Braket (not in scoring path)
 - UI design inspired by Qodo.ai
 - Monitoring powered by Prometheus and Grafana
 

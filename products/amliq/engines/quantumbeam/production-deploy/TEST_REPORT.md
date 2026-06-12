@@ -235,7 +235,7 @@ curl -X POST https://quantumbeam.io/mcp \
 ✅ **Global edge distribution active**
 ✅ **Enterprise security configured**
 
-**The quantum-enhanced fraud detection API is ready for production use!**
+**The classical-ML fraud detection API is ready for production use!**
 
 **Deployment Status**: 🟡 **WAITING FOR DNS PROPAGATION**
 **Expected Live Time**: Within 30 minutes

@@ -32,7 +32,7 @@ const plans = [
     description: 'Perfect for small businesses and startups',
     features: [
       'Up to 10,000 transactions/month',
-      'Standard quantum algorithms',
+      'Standard ML models',
       'Real-time monitoring',
       'Email support',
       'Basic analytics dashboard'
@@ -47,7 +47,7 @@ const plans = [
     description: 'Ideal for growing companies',
     features: [
       'Up to 100,000 transactions/month',
-      'Advanced quantum algorithms',
+      'Advanced ML models',
       'Priority processing queue',
       '24/7 phone support',
       'Advanced analytics & reporting',
@@ -89,7 +89,7 @@ const useCases = [
   {
     icon: Users,
     title: 'User Verification',
-    description: 'Quantum-enhanced identity verification and risk assessment'
+    description: 'ML-driven identity verification and risk assessment'
   },
   {
     icon: Building,
@@ -139,7 +139,7 @@ export default function GetStartedPage() {
           </div>
           <h1 className="text-4xl font-bold mb-4">Welcome to QuantumBeam!</h1>
           <p className="text-xl text-muted-foreground mb-8">
-            Your quantum-enhanced fraud detection journey begins now. Check your email for next steps.
+            Your machine-learning fraud detection journey begins now. Check your email for next steps.
           </p>
           <div className="bg-muted/50 rounded-lg p-6 text-left">
             <h3 className="font-semibold mb-4">What happens next:</h3>
@@ -179,7 +179,7 @@ export default function GetStartedPage() {
           >
             <h1 className="text-4xl md:text-5xl font-bold mb-6">Get Started with QuantumBeam</h1>
             <p className="text-xl opacity-90 mb-8">
-              Join leading financial institutions using quantum-enhanced fraud detection to protect millions of transactions.
+              Protect your transactions with machine-learning fraud detection.
             </p>
             <div className="flex items-center justify-center space-x-8">
               <div className="flex items-center space-x-2">
@@ -392,7 +392,7 @@ export default function GetStartedPage() {
                     className="w-4 h-4 text-quantum-600 rounded border-gray-300 focus:ring-quantum-600"
                   />
                   <span className="text-sm">
-                    I'd like to receive product updates and quantum computing insights
+                    I'd like to receive product updates and fraud-prevention insights
                   </span>
                 </label>
               </div>

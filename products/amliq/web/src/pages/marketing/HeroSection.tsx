@@ -82,7 +82,7 @@ export default function HeroSection() {
               variants={fadeUp} initial="initial" animate="animate"
               transition={{ duration: 0.5, delay: 0.28 }}
             >
-              {['OFAC, EU, UN, HMT & 200+ lists', 'Explainable matching', 'SOC 2 & GDPR aligned'].map((item) => (
+              {['OFAC, EU, UN, HMT & 26+ list sources', 'Explainable matching', 'SOC 2 & GDPR aligned'].map((item) => (
                 <li key={item} className="inline-flex items-center gap-2">
                   <Check className="w-4 h-4" style={{ color: 'var(--accent-gold)' }} />
                   {item}
@@ -153,9 +153,9 @@ export default function HeroSection() {
               transition={{ duration: 0.5, delay: 0.42 }}
             >
               {[
-                { icon: Zap, value: '<50ms', label: 'P99 decision latency' },
-                { icon: Shield, value: '200+', label: 'Sanctions & PEP lists' },
-                { icon: Globe, value: '99.97%', label: 'Uptime SLA' },
+                { icon: Zap, value: '<50ms', label: 'P99 latency target' },
+                { icon: Shield, value: '26+', label: 'Sanctions list sources' },
+                { icon: Globe, value: '99.9%', label: 'Uptime target' },
               ].map(({ icon: Icon, value, label }, i) => (
                 <div key={label} className="flex items-center gap-2.5">
                   {i > 0 && <div className="w-px h-8" style={{ background: 'color-mix(in srgb, var(--text) 8%, transparent)' }} />}

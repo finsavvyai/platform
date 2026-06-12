@@ -12,13 +12,13 @@
 
 ### 1. Backend Services ✅
 
-#### A. Quantum Fraud Detection API
+#### A. Fraud Detection API (classical ML)
 - **Location**: `cmd/api-server/`
 - **Port**: 8080
 - **Features**:
-  - Quantum-enhanced fraud detection (99.7% accuracy)
-  - Real-time transaction analysis (<50ms)
-  - Fraud ring detection with QAOA
+  - Classical ML fraud detection (accuracy not yet benchmarked)
+  - Real-time transaction analysis (<50ms target)
+  - Graph-based fraud ring detection
   - RESTful API with Gin framework
   - Production error handling
   - Circuit breaker pattern
@@ -183,11 +183,11 @@ kubectl rollout status deployment/quantumbeam-api
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| **Accuracy** | 99%+ | 99.7% |
-| **Latency (p95)** | <100ms | 50ms (quantum) |
-| **Throughput** | 10K req/s | 100K+ req/s |
-| **Uptime SLA** | 99.9% | ✅ Ready |
-| **False Positives** | <1% | 0.1% |
+| **Accuracy** | TBD | Not yet benchmarked |
+| **Latency (p95)** | <100ms | Target: 50ms (unverified) |
+| **Throughput** | 10K req/s | Target (unverified) |
+| **Uptime SLA** | 99.9% | Not yet measured |
+| **False Positives** | <1% | Not yet benchmarked |
 
 ### Resource Requirements
 

@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { FadeIn } from './animations'
 
 const stats = [
-  { value: 3000000, suffix: '+', label: 'Entities', format: true },
+  { value: 1000000, suffix: '+', label: 'Entity records', format: true },
   { value: 6, suffix: '', label: 'AI Layers' },
-  { value: 1, suffix: 'ms', label: 'Latency', prefix: '<' },
-  { value: 86, suffix: '', label: 'Lists' },
+  { value: 50, suffix: 'ms', label: 'P99 latency target', prefix: '<' },
+  { value: 26, suffix: '+', label: 'List sources' },
 ]
 
 function Counter({ value, suffix = '', prefix = '', format = false }: {

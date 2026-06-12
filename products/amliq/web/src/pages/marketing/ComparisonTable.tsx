@@ -5,10 +5,10 @@ interface Row { feature: string; amliq: Val; worldCheck: Val; dowJones: Val }
 
 const rows: Row[] = [
   { feature: 'Starting Price', amliq: '$299/mo', worldCheck: '$15K+/yr', dowJones: '$10K+/yr' },
-  { feature: 'Screening Latency', amliq: '<1ms', worldCheck: '200-500ms', dowJones: '300-800ms' },
+  { feature: 'Screening Latency', amliq: 'Real-time (in-memory)', worldCheck: 'Batch file delivery', dowJones: 'Batch file delivery' },
   { feature: 'Integration Time', amliq: 'Minutes', worldCheck: 'Weeks', dowJones: 'Weeks' },
   { feature: 'Explainable Results', amliq: true, worldCheck: false, dowJones: false },
-  { feature: 'List Coverage', amliq: '86 lists', worldCheck: '40+ lists', dowJones: '30+ lists' },
+  { feature: 'List Coverage', amliq: '26+ lists', worldCheck: '40+ lists', dowJones: '30+ lists' },
   { feature: 'Matching Layers', amliq: '4 active + 2 in rollout', worldCheck: '2 layers', dowJones: '1 layer' },
   { feature: 'Custom Thresholds', amliq: true, worldCheck: false, dowJones: false },
   { feature: 'Self-Hosted Option', amliq: true, worldCheck: false, dowJones: false },

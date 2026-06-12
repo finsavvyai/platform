@@ -158,7 +158,7 @@ export default function HomePage() {
               className="inline-flex items-center space-x-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-2 mb-8"
             >
               <Sparkles className="w-4 h-4 text-purple-400" />
-              <span className="text-sm font-medium text-purple-300">Powered by Quantum Computing</span>
+              <span className="text-sm font-medium text-purple-300">Classical Machine-Learning Fraud Scoring</span>
             </motion.div>
 
             {/* Main Heading */}
@@ -172,7 +172,7 @@ export default function HomePage() {
                 Fraud Detection
               </span>
               <br />
-              <span className="text-white/90">at Quantum Speed</span>
+              <span className="text-white/90">in Real Time</span>
             </motion.h1>
 
             {/* Subtitle */}
@@ -182,8 +182,8 @@ export default function HomePage() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="text-xl md:text-2xl text-white/60 max-w-3xl mx-auto mb-12 leading-relaxed"
             >
-              Harness quantum algorithms to detect fraud with <span className="text-purple-400 font-semibold">99.7% accuracy</span>.
-              Process millions of transactions in real-time while reducing false positives by 40%.
+              Classical machine-learning models score transactions <span className="text-purple-400 font-semibold">in real time</span>.
+              Built for high transaction volumes with a low-latency target. Accuracy benchmarking is in progress.
             </motion.p>
 
             {/* CTA Buttons */}
@@ -219,9 +219,9 @@ export default function HomePage() {
               className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto"
             >
               {[
-                { icon: CheckCircle2, value: '99.7%', label: 'Detection Accuracy' },
-                { icon: Zap, value: '<50ms', label: 'Quantum Processing' },
-                { icon: TrendingUp, value: '40%', label: 'False Positive Reduction' }
+                { icon: CheckCircle2, value: 'ML', label: 'Classical Model Scoring' },
+                { icon: Zap, value: '<50ms', label: 'Latency Target' },
+                { icon: TrendingUp, value: '24/7', label: 'Real-Time Monitoring' }
               ].map((stat, index) => (
                 <motion.div
                   key={stat.label}
@@ -263,15 +263,14 @@ export default function HomePage() {
                 <span className="text-xs text-white/40">fraud_detection.py</span>
               </div>
               <pre className="text-sm text-white/80 font-mono leading-relaxed">
-                <code>{`from quantumbeam import QuantumDetector
+                <code>{`from amliq_fraud import FraudDetector
 
-detector = QuantumDetector(backend="ibm_quantum")
+detector = FraudDetector(model="ensemble")
 
-# Analyze transaction with quantum algorithms
+# Analyze transaction with classical ML models
 result = detector.analyze(
     transaction_id="txn_12345",
     amount=15000.00,
-    quantum_features=True
 )
 
 print(f"Fraud Score: {result.fraud_score}")
@@ -294,12 +293,12 @@ print(f"Fraud Score: {result.fraud_score}")
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-6">
               <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Quantum-Powered
+                ML-Powered
               </span>
               {' '}Features
             </h2>
             <p className="text-xl text-white/60 max-w-2xl mx-auto">
-              Advanced fraud detection capabilities powered by quantum computing and AI
+              Advanced fraud detection capabilities powered by classical machine learning
             </p>
           </motion.div>
 
@@ -307,38 +306,38 @@ print(f"Fraud Score: {result.fraud_score}")
             {[
               {
                 icon: Brain,
-                title: 'Quantum Machine Learning',
-                description: 'Variational Quantum Classifiers process complex fraud patterns in superposition',
+                title: 'Ensemble Machine Learning',
+                description: 'Random Forest and Gradient Boosting models classify complex fraud patterns',
                 color: 'from-purple-500 to-pink-500'
               },
               {
                 icon: Zap,
                 title: 'Real-Time Processing',
-                description: 'Analyze millions of transactions per second with quantum parallelism',
+                description: 'Analyze high transaction volumes with parallel model inference',
                 color: 'from-blue-500 to-purple-500'
               },
               {
                 icon: Network,
                 title: 'Fraud Ring Detection',
-                description: 'QAOA algorithms identify sophisticated fraud networks instantly',
+                description: 'Graph algorithms identify sophisticated fraud networks',
                 color: 'from-pink-500 to-red-500'
               },
               {
                 icon: Lock,
-                title: 'Quantum Encryption',
-                description: 'Post-quantum cryptography ensures your data stays secure',
+                title: 'Strong Encryption',
+                description: 'TLS encryption and hardened key management keep your data secure',
                 color: 'from-green-500 to-blue-500'
               },
               {
                 icon: BarChart3,
                 title: 'Advanced Analytics',
-                description: 'Quantum-inspired insights reveal hidden patterns and trends',
+                description: 'Model-driven insights reveal hidden patterns and trends',
                 color: 'from-yellow-500 to-orange-500'
               },
               {
                 icon: Cpu,
                 title: 'Hybrid Architecture',
-                description: 'Seamlessly combines quantum and classical processing',
+                description: 'Modular services for scoring, ring detection, and analytics',
                 color: 'from-indigo-500 to-purple-500'
               }
             ].map((feature, index) => (
@@ -380,37 +379,37 @@ print(f"Fraud Score: {result.fraud_score}")
             >
               <div className="inline-flex items-center space-x-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-2 mb-6">
                 <Sparkles className="w-4 h-4 text-purple-400" />
-                <span className="text-sm font-medium text-purple-300">Quantum Technology</span>
+                <span className="text-sm font-medium text-purple-300">Machine-Learning Technology</span>
               </div>
 
               <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                How Quantum Computing{' '}
+                How Machine Learning{' '}
                 <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  Changes Everything
+                  Catches Fraud
                 </span>
               </h2>
 
               <p className="text-lg text-white/60 mb-8 leading-relaxed">
-                Unlike classical computers that process information sequentially, quantum computers leverage
-                superposition and entanglement to explore billions of possibilities simultaneously.
+                Ensemble models trained on transaction features score every event in real time,
+                combining behavioral signals, graph structure, and anomaly detection.
               </p>
 
               <div className="space-y-6">
                 {[
                   {
                     icon: GitBranch,
-                    title: 'Quantum Superposition',
-                    description: 'Process multiple fraud patterns in parallel states'
+                    title: 'Feature Engineering',
+                    description: 'Extract behavioral and transactional signals per event'
                   },
                   {
                     icon: Network,
-                    title: 'Quantum Entanglement',
+                    title: 'Graph Analysis',
                     description: 'Detect complex correlations across transaction networks'
                   },
                   {
                     icon: Target,
-                    title: 'Quantum Optimization',
-                    description: 'Find optimal fraud detection strategies instantly'
+                    title: 'Ensemble Scoring',
+                    description: 'Blend model outputs into a single calibrated risk score'
                   }
                 ].map((item, index) => (
                   <motion.div
@@ -539,12 +538,12 @@ print(f"Fraud Score: {result.fraud_score}")
               <h2 className="text-4xl md:text-5xl font-bold mb-6">
                 Ready to Experience{' '}
                 <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  Quantum Security
+                  Real-Time Fraud Protection
                 </span>
                 ?
               </h2>
               <p className="text-xl text-white/60 mb-10 max-w-2xl mx-auto">
-                Join hundreds of organizations protecting billions in transactions with quantum-powered fraud detection
+                Protect your transactions with classical machine-learning fraud detection
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
                 <motion.button
@@ -580,7 +579,7 @@ print(f"Fraud Score: {result.fraud_score}")
                 <span className="text-xl font-bold">QuantumBeam</span>
               </div>
               <p className="text-white/60 mb-6 leading-relaxed max-w-sm">
-                Quantum-enhanced fraud detection platform protecting billions in transactions worldwide.
+                Classical machine-learning fraud detection engine for real-time transaction scoring.
               </p>
               <div className="flex items-center space-x-4">
                 {['Twitter', 'LinkedIn', 'GitHub'].map((social) => (

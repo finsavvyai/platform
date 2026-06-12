@@ -185,7 +185,7 @@ Just let me know!
 
 ---
 
-**The hard work is done - your quantum-enhanced fraud detection API is ready for business! 🚀**
+**The hard work is done - your classical-ML fraud detection API is ready for business! 🚀**
 
 ---
 

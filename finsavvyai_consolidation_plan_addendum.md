@@ -12,7 +12,7 @@ Companion to `finsavvyai_full_extended_consolidation_plan.md`. Adds the three se
 
 | fintech-suite component | What it actually is | New home | Action |
 |---|---|---|---|
-| `quantumbeam/` | Despite the CLAUDE.md description ("algorithmic trading"), the README and code position it as a **quantum-enhanced fraud detection platform** (99.7% accuracy, <50ms latency) | `products/amliq/engines/quantumbeam/` | Fold into AMLIQ as its fraud-scoring engine. Keep the QuantumBeam brand as a sub-engine, not a standalone product |
+| `quantumbeam/` | Despite the CLAUDE.md description ("algorithmic trading"), the README and code positioned it as a "quantum-enhanced fraud detection platform (99.7% accuracy, <50ms latency)" — **those claims were inflated**: the engine is classical sklearn ML with a local quantum-simulator mock, and no accuracy metric exists in code | `products/amliq/engines/quantumbeam/` | Fold into AMLIQ as its classical-ML fraud-scoring engine. Keep the QuantumBeam brand as a sub-engine, not a standalone product; market it as classical ML with no accuracy claim |
 | `api-gateway/` | Labeled "PipeWarden API Gateway" — Cloudflare Workers + Hono.js, JWT, rate limiting, edge caching, 168 E2E tests | `platform/ai-gateway/` (production base) | Promote: this is the most mature gateway implementation in the portfolio. Replace the stub in `finsavvyai-platform/packages/ai-gateway` |
 | `fintech-enterprise-platform/services/billing-payments/` | Multi-gateway payment orchestration, invoicing | `platform/billing/` | Fold in. Replace the LemonSqueezy-only stub |
 | `fintech-enterprise-platform/services/analytics/` | Financial analytics, reporting | `platform/telemetry/` (analytics module) | Fold in. Keep separate from raw OTel traces |

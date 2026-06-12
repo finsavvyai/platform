@@ -5,9 +5,9 @@ Real-time analytics and monitoring dashboard for QuantumBeam fraud detection sys
 ## Features
 
 ### 🎯 Core Functionality
-- **Real-time Fraud Detection**: Live monitoring of transaction fraud detection with quantum-enhanced algorithms
-- **System Health Monitoring**: Comprehensive monitoring of quantum backends and system components
-- **Interactive Analytics**: Performance comparison between quantum and classical processing methods
+- **Real-time Fraud Detection**: Live monitoring of transaction fraud detection with classical ML scoring
+- **System Health Monitoring**: Comprehensive monitoring of scoring services and system components
+- **Interactive Analytics**: Performance comparison across scoring methods
 - **User Management**: Role-based access control and API key management
 - **Alert System**: Real-time notifications for fraud alerts and system events
 

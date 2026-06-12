@@ -1,1 +1,1 @@
-# QuantumBeam - Quantum-Enhanced Fraud Detection API
+# QuantumBeam - Classical ML Fraud Detection API (legacy name)

@@ -5,7 +5,7 @@ import { FadeUp, ScaleIn } from './animations'
 
 const features = [
   { icon: Layers, label: 'Multi-Layer Matching', detail: 'Exact, Fuzzy, Phonetic, Token, Embedding, Graph' },
-  { icon: Zap, label: 'Sub-50ms Screening', detail: '18,699+ entities screened in real-time' },
+  { icon: Zap, label: 'Real-Time Screening', detail: '18,699+ entities screened in real-time' },
   { icon: Globe, label: 'Global List Coverage', detail: 'OFAC, UN, EU, UK OFSI, IL NBCTF, OpenSanctions' },
   { icon: Shield, label: 'PEP + RCA Screening', detail: 'Politicians, relatives, close associates' },
   { icon: Brain, label: 'Explainable Results', detail: 'Every match shows why it matched and how' },

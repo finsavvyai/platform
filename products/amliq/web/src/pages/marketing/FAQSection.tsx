@@ -3,13 +3,13 @@ import { ChevronDown } from 'lucide-react'
 
 const faqs = [
   { q: 'What is AMLIQ?',
-    a: 'AMLIQ is a sanctions screening infrastructure platform for financial institutions. It screens entities against 86+ global sanctions and watchlists with sub-millisecond latency using a multi-layer matching engine.' },
+    a: 'AMLIQ is a sanctions screening infrastructure platform for financial institutions. It screens entities against 26+ global sanctions and watchlists in real time using a multi-layer matching engine (exact, fuzzy, phonetic, embeddings, LLM).' },
   { q: 'How does AMLIQ reduce false positives?',
     a: 'AMLIQ runs four matching layers in production -- exact, fuzzy, phonetic, and token -- with semantic (vector embedding) and network (graph) layers in active rollout. The layers produce a weighted composite score, and uncertain results are escalated through a disambiguation cascade. Customers see materially fewer false positives than single-layer tools; we publish reproducible benchmarks rather than rely on aggregate marketing claims.' },
   { q: 'What sanctions lists are supported?',
-    a: 'OFAC SDN, UN Consolidated, EU Financial Sanctions, UK OFSI, FATF, PEP databases, and 80+ additional lists covering 3M+ entities. Lists are updated daily from official government sources.' },
+    a: 'OFAC SDN, UN Consolidated, EU Financial Sanctions, UK OFSI, FATF, PEP databases, and 20+ additional lists covering 1M+ entity records. Lists are updated daily from official government sources.' },
   { q: 'How fast is screening?',
-    a: 'Sub-millisecond for single entities. The in-memory engine has zero cold starts. Batch API supports bulk portfolio screening.' },
+    a: 'Real-time for single entities, with a sub-50ms p99 latency target. The in-memory engine has zero cold starts. Batch API supports bulk portfolio screening.' },
   { q: 'Can AMLIQ be self-hosted?',
     a: 'Yes. Enterprise customers can deploy AMLIQ on-premise or in their own cloud environment for data residency and compliance requirements.' },
   { q: 'How does AMLIQ handle data privacy?',

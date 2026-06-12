@@ -33,8 +33,8 @@ describe('GetStartedPage', () => {
 
   test('shows plan features', () => {
     render(<GetStartedPage />)
-    expect(screen.getByText('Standard quantum algorithms')).toBeInTheDocument()
-    expect(screen.getByText('Advanced quantum algorithms')).toBeInTheDocument()
+    expect(screen.getByText('Standard ML models')).toBeInTheDocument()
+    expect(screen.getByText('Advanced ML models')).toBeInTheDocument()
     expect(screen.getByText('Custom quantum model development')).toBeInTheDocument()
   })
 
