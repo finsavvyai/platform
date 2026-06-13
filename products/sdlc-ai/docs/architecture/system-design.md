@@ -540,10 +540,10 @@ graph LR
 
 ### Technology Evolution
 
-1. **Quantum-Ready Security**
-   - Post-quantum cryptography
-   - Future-proofing encryption
-   - Security algorithm updates
+1. **Post-quantum cryptography (roadmap, not implemented)**
+   - Evaluating ML-KEM/Kyber for a future release; no PQC algorithms exist in the codebase today
+   - Current crypto is classical AES-256 + ChaCha20-Poly1305
+   - Future-proofing of encryption and security algorithm updates are aspirational, not shipped
 
 2. **Advanced AI Features**
    - Multi-modal AI

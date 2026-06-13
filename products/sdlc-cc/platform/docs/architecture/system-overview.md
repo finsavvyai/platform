@@ -475,7 +475,7 @@ graph LR
 1. **Edge AI**: Model inference at the edge
 2. **Federated Learning**: Privacy-preserving model training
 3. **Blockchain Integration**: Immutable audit trails
-4. **Quantum-Resistant Encryption**: Future-proof security
+4. **Post-quantum cryptography (roadmap, not implemented)**: evaluating ML-KEM/Kyber for a future release; current crypto is classical AES-256 + ChaCha20-Poly1305. No PQC algorithms are present in the codebase today.
 5. **Multi-Cloud Support**: Hybrid deployment options
 
 ### Technology Roadmap

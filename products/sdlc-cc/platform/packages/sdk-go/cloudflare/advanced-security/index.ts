@@ -94,7 +94,8 @@ export class AdvancedSecurityDashboard {
       keyRotationFrequency: keyRotationStatus || 'hourly',
       entropyLevel: parseFloat(quantumEntropyLevel || '0.95'),
       zkProofsGenerated: parseInt(zkProofsGenerated || '0'),
-      quantumResistanceLevel: 'AES-256 + ChaCha20-Poly1305',
+      // Renamed from legacy `quantumResistanceLevel` (misleading: crypto is classical, not post-quantum).
+      cipherSuite: 'AES-256 + ChaCha20-Poly1305',
       lastKeyRotation: await this.env.QUANTUM_KEY_MANAGER.get('last_rotation'),
       cryptographicStrength: 'Classical (AES-256 + ChaCha20-Poly1305); no post-quantum algorithms'
     };
@@ -561,7 +562,7 @@ interface QuantumSecurityMetrics {
   keyRotationFrequency: string;
   entropyLevel: number;
   zkProofsGenerated: number;
-  quantumResistanceLevel: string;
+  cipherSuite: string; // classical cipher suite (renamed from legacy `quantumResistanceLevel`)
   lastKeyRotation: string;
   cryptographicStrength: string;
 }
