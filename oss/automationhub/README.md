@@ -1,5 +1,15 @@
 # AutomationHub
 
+> **⚠️ Deprecated as the platform workflow substrate (June 2026).** A code
+> audit chose [CodeRailFlow](https://github.com/finsavvyai/coderail-flow) as the
+> single automation/workflow engine for the platform's `deterministic-flows`
+> direction: it ships record-once + deterministic replay on a durable,
+> versioned, deployed Cloudflare runtime (Workers + D1 + R2 + Workflows) plus
+> LLM self-healing — capabilities this in-process Python library cannot match.
+> Running both duplicates effort. This package stays published on PyPI for
+> existing external users, but **new platform workflow work should target
+> CodeRailFlow**, not this library.
+
 `automationhub` is a lightweight Python library that provides core primitives for building workflow automation systems:
 
 - Workflow lifecycle management
