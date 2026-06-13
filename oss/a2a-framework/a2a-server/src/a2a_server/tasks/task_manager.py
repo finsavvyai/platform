@@ -12,33 +12,38 @@ Key guarantees
 * Exposes the historical names `_tasks` and `_active_tasks` so older code that
   pokes internals continues to run.
 * Graceful `shutdown()` cancels and waits for background jobs.
+
+The handler-registry and task-lifecycle behaviour live in mixins
+(:mod:`_manager_handlers`, :mod:`_manager_lifecycle`) so this module stays
+within the project file-size limit.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from uuid import uuid4
 
 from a2a_json_rpc.spec import (
     Artifact,
     Message,
-    Role,
     Task,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatus,
     TaskStatusUpdateEvent,
-    TextPart,
 )
 from a2a_server.pubsub import EventBus
 from a2a_server.tasks.task_handler import TaskHandler
+from a2a_server.tasks._manager_handlers import HandlerRegistryMixin
+from a2a_server.tasks._manager_lifecycle import LifecycleMixin
 
 __all__ = [
     "TaskManager",
     "TaskNotFound",
     "InvalidTransition",
+    "Task",
 ]
 
 logger = logging.getLogger(__name__)
@@ -52,7 +57,7 @@ class InvalidTransition(Exception):
     """Raised on an illegal FSM transition."""
 
 
-class TaskManager:  # pylint: disable=too-many-instance-attributes
+class TaskManager(HandlerRegistryMixin, LifecycleMixin):  # pylint: disable=too-many-instance-attributes
     """Central task registry and orchestrator for the A2A server."""
 
     _TRANSITIONS: Dict[TaskState, List[TaskState]] = {
@@ -76,30 +81,6 @@ class TaskManager:  # pylint: disable=too-many-instance-attributes
 
         self._lock = asyncio.Lock()
         self._background: set[asyncio.Task[Any]] = set()
-
-    # ─── handler registry ───────────────────────────────────────────────
-
-    def register_handler(self, handler: TaskHandler, *, default: bool = False) -> None:
-        self._handlers[handler.name] = handler
-        if default or self._default_handler is None:
-            self._default_handler = handler.name
-        logger.debug("Registered handler %s%s", handler.name, " (default)" if default else "")
-
-    def _resolve_handler(self, name: str | None) -> TaskHandler:
-        if name is None:
-            if self._default_handler is None:
-                raise ValueError("No default handler registered")
-            return self._handlers[self._default_handler]
-        return self._handlers[name]
-
-    def get_handler(self, name: str | None = None) -> TaskHandler:
-        return self._resolve_handler(name)
-
-    def get_handlers(self) -> Dict[str, str]:
-        return {n: n for n in self._handlers}
-
-    def get_default_handler(self) -> str | None:
-        return self._default_handler
 
     # ─── public API ────────────────────────────────────────────────────
 
@@ -189,42 +170,3 @@ class TaskManager:  # pylint: disable=too-many-instance-attributes
         if self._bus:
             await self._bus.publish(TaskArtifactUpdateEvent(id=real, artifact=artifact))
         return task
-
-    async def cancel_task(self, task_id: str, *, reason: str | None = None) -> Task:
-        real = self._aliases.get(task_id, task_id)
-        h_name = self._active.get(real)
-        if h_name and await self._handlers[h_name].cancel_task(real):
-            return await self._finish_cancel(real, reason)
-        return await self._finish_cancel(real, reason)
-
-    async def _finish_cancel(self, task_id: str, reason: str | None) -> Task:
-        msg = Message(role=Role.agent, parts=[TextPart(type="text", text=reason or "Canceled by client")])
-        return await self.update_status(task_id, TaskState.canceled, message=msg)
-
-    async def _run_task(self, task_id: str, handler: TaskHandler, user_msg: Message, session_id: str) -> None:
-        try:
-            async for event in handler.process_task(task_id, user_msg, session_id):
-                if isinstance(event, TaskStatusUpdateEvent):
-                    await self.update_status(task_id, event.status.state, message=event.status.message)
-                elif isinstance(event, TaskArtifactUpdateEvent):
-                    await self.add_artifact(task_id, event.artifact)
-        except asyncio.CancelledError:
-            logger.info("Task %s cancelled", task_id)
-            await self.update_status(task_id, TaskState.canceled)
-            raise
-        except Exception as exc:
-            logger.exception("Task %s failed: %s", task_id, exc)
-            await self.update_status(task_id, TaskState.failed)
-        finally:
-            self._active.pop(task_id, None)
-
-    async def shutdown(self) -> None:
-        for bg in list(self._background):
-            bg.cancel()
-        if self._background:
-            await asyncio.gather(*self._background, return_exceptions=True)
-        self._background.clear()
-
-    def tasks_by_state(self, state: TaskState) -> List[Task]:
-        """Return all tasks currently in the given state."""
-        return [t for t in self._tasks.values() if t.status.state == state]
