@@ -13,13 +13,11 @@ Multi-transport: JSON-RPC over HTTP / WebSocket / SSE / stdio. Google ADK handle
 A2A is becoming the lingua franca for agent interop. A working multi-transport reference impl is high-leverage OSS:
 - Every developer searching "A2A framework Python" lands on this repo
 - Adoption is a leading indicator for the broader FinsavvyAI stack
-- LunaOS uses A2A as its wire protocol for orchestrated agents
 
 ## Position in the stack
 
 - **OSS** — Apache-protocol, MIT-licensed implementation
-- **Production user** — [LunaOS](../../products/lunaos/) orchestrates AI agents using A2A as the wire format
-- **Adjacent** — [OpenSyber](../../products/opensyber/) inspects A2A traffic for runtime security; [SDLC.cc](../../products/sdlc-cc/) records A2A calls for compliance evidence
+- **Intended integration (not yet wired)** — A2A is the planned wire protocol for orchestrated agents in [LunaOS](../../products/lunaos/), with [OpenSyber](../../products/opensyber/) inspecting A2A traffic for runtime security and [SDLC.cc](../../products/sdlc-cc/) recording A2A calls as compliance evidence. As of June 2026 no product imports this framework — these are roadmap targets, not shipped integrations.
 
 ## Surface
 

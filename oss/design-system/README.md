@@ -1,8 +1,10 @@
 # FinsavvyAI Shared Design System (F8 UI Foundation)
 
-> **This is the canonical shared design system for ALL FinsavvyAI products.**
+> **This is the *intended* canonical shared design system for FinsavvyAI products — adoption is a roadmap goal, not the current state.**
 >
-> Per the consolidation plan (addendum §3): future UIs for PushCI, Qestro, LunaOS, OpenSyber, SDLC.cc, AMLIQ, TenantIQ, and any new FinsavvyAI product should consume components, tokens, and templates from this package set rather than building parallel design systems.
+> Per the consolidation plan (addendum §3): future UIs for PushCI, Qestro, LunaOS, OpenSyber, SDLC.cc, AMLIQ, TenantIQ, and any new FinsavvyAI product *should* consume components, tokens, and templates from this package set rather than building parallel design systems.
+>
+> **Reality check (June 2026 audit):** no product currently imports these packages. Several products (qestro, sdlc-cc, opensyber) ship their own divergent copies of the same package names (`@finsavvyai/ui`, `@finsavvyai/auth`), so this set is not yet canonical in practice. Treat the statement above as the target to migrate toward, not a description of today.
 >
 > Apple HIG compliance is a baseline requirement (see portfolio CLAUDE rules). Product-specific extensions are allowed; deviation from the underlying tokens (colors, typography scale, spacing grid) is not.
 >
