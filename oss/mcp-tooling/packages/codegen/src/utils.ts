@@ -123,7 +123,7 @@ function extractParameters(endpoint: ExtractedEndpoint) {
         type: mapOpenAPITypeToMCPType(param.type),
         description: param.description,
         required: param.required,
-        schema: param.schema,
+        schema: { type: param.type, format: param.format, example: param.example },
         validation: createValidationRules(param)
       });
     });
@@ -137,7 +137,7 @@ function extractParameters(endpoint: ExtractedEndpoint) {
         type: mapOpenAPITypeToMCPType(param.type),
         description: param.description,
         required: param.required,
-        schema: param.schema,
+        schema: { type: param.type, format: param.format, example: param.example },
         validation: createValidationRules(param)
       });
     });

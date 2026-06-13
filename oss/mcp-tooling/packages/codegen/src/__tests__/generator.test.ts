@@ -49,32 +49,31 @@ describe('GoMCPGenerator', () => {
             name: 'limit',
             in: 'query',
             required: false,
-            schema: { type: 'integer', minimum: 1, maximum: 100 },
+            type: 'integer',
             description: 'Number of users to return',
           },
         ],
         requestBody: undefined,
-        responses: {
-          '200': {
+        responses: [
+          {
+            statusCode: '200',
             description: 'Success',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      id: { type: 'string' },
-                      name: { type: 'string' },
-                    },
-                  },
+            contentType: 'application/json',
+            schema: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
                 },
               },
             },
           },
-        },
+        ],
         tags: ['users'],
         security: [],
+        deprecated: false,
       },
     ];
 

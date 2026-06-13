@@ -205,27 +205,24 @@ export class TypeScriptMCPGenerator implements LanguageGenerator {
   private extractParameters(endpoint: ExtractedEndpoint): MCPParameter[] {
     const params: MCPParameter[] = [];
 
-    // Path parameters
+    // Path / query / header parameters
     if (endpoint.parameters) {
       for (const param of endpoint.parameters) {
         params.push({
           name: param.name,
-          type: this.mapSchemaType(param.schema?.type),
+          type: this.mapSchemaType(param.type),
           description: param.description,
           required: param.required || false,
-          schema: param.schema,
+          schema: { type: param.type, format: param.format, example: param.example },
         });
       }
     }
 
     // Request body
     if (endpoint.requestBody) {
-      const content = endpoint.requestBody.content;
-      const jsonContent = content?.['application/json'];
-      
-      if (jsonContent?.schema) {
-        const schema = jsonContent.schema;
-        
+      const schema = endpoint.requestBody.schema;
+
+      if (schema) {
         if (schema.properties) {
           for (const [propName, propSchema] of Object.entries(schema.properties)) {
             const prop = propSchema as any;

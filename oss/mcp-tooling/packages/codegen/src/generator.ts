@@ -247,6 +247,11 @@ export class GoMCPGenerator implements LanguageGenerator {
 
       for (const file of templateFiles) {
         if (file.endsWith('.hbs')) {
+          // The per-tool template ({{this.name}}.go.hbs) is rendered once per
+          // tool in generateAdditionalFiles, not in the generic context loop.
+          if (file.includes('{{this.name}}')) {
+            continue;
+          }
           const filePath = path.join(this.templateDir, file);
           const content = await fs.readFile(filePath, 'utf-8');
           templates.push({
@@ -275,7 +280,9 @@ export class GoMCPGenerator implements LanguageGenerator {
     for (const tool of context.tools) {
       try {
         const toolTemplate = await this.loadToolTemplate();
-        const content = this.handlebars.compile(toolTemplate)({ ...context, tool });
+        // The per-tool template references the tool via `this.*`, so the tool
+        // is the root render context.
+        const content = this.handlebars.compile(toolTemplate)(tool);
         const filePath = `internal/tools/${tool.name}.go`;
         const { lines, size } = calculateFileStats(content);
 
@@ -321,7 +328,7 @@ export class GoMCPGenerator implements LanguageGenerator {
    * Load tool template
    */
   private async loadToolTemplate(): Promise<string> {
-    const toolTemplatePath = path.join(this.templateDir, 'internal/tools/tool.go.hbs');
+    const toolTemplatePath = path.join(this.templateDir, 'internal/tools/{{this.name}}.go.hbs');
     return await fs.readFile(toolTemplatePath, 'utf-8');
   }
 
