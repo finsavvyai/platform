@@ -1,5 +1,20 @@
 # TokenForge
 
+> [!IMPORTANT]
+> **This copy is a REFERENCE SKELETON, not the canonical implementation.**
+>
+> Two TokenForge codebases exist in this monorepo:
+>
+> | Copy | Path | Status |
+> |------|------|--------|
+> | **Canonical (live)** | `products/opensyber/packages/tokenforge` | Published as `@opensyber/tokenforge@0.1.2`, consumed by TenantIQ. v1.0.0 GA in source. **This is the source of truth.** |
+> | Reference skeleton (this) | `oss/tokenforge` | Phase 10/12 OSS skeleton. NOT npm-published. Not consumed by any product. Pending reconciliation. |
+>
+> Do not build new integrations against this skeleton. See [RECONCILIATION.md](./RECONCILIATION.md)
+> for the API-surface diff, the `tokenforge.io` naming-collision rename requirement, and the
+> deferred consolidation decision (fold into `packages/auth`). Neither copy will be deleted
+> until that decision is made by the maintainer.
+
 ## Post-Authentication Session Security
 
 **"Your auth provider handles identity. TokenForge handles session integrity."**
